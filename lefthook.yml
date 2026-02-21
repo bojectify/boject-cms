@@ -3,9 +3,9 @@ pre-commit:
   jobs:
     - name: lint
       glob: '*.{js,mjs,ts,vue}'
-      run: npx eslint {staged_files}
+      run: pnpm exec eslint {staged_files}
 
     - name: format
       glob: '*.{js,mjs,ts,vue,json,yml,yaml,css,scss,md}'
       exclude: 'pnpm-lock.yaml'
-      run: npx prettier --check {staged_files}
+      run: pnpm exec prettier --check {staged_files}
