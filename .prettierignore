@@ -1,0 +1,10 @@
+node_modules
+.husky
+coverage
+.prettierignore
+.stylelintignore
+.eslintignore
+.fttemplates
+src/**/__generated__
+public
+tsconfig.json
