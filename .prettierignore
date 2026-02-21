@@ -11,3 +11,4 @@ coverage
 src/**/__generated__
 public
 tsconfig.json
+pnpm-lock.yaml
