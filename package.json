@@ -2,14 +2,16 @@
   "name": "boject-cms",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
   "type": "module",
   "scripts": {
+    "dev": "nuxt dev",
+    "build": "nuxt build",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare && prisma generate",
     "prisma:start:local": "prisma dev start boject-cms-local",
     "prisma:start:remote": "prisma dev start boject-cms",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:generate": "prisma generate",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "prisma:generate": "prisma generate"
   },
   "keywords": [],
   "author": "",
@@ -17,12 +19,14 @@
   "packageManager": "pnpm@10.30.1",
   "devDependencies": {
     "@types/node": "^25.3.0",
+    "dotenv": "^17.3.1",
     "prettier": "^3.8.1",
     "prisma": "^7.4.1"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.4.1",
     "@prisma/client": "^7.4.1",
-    "dotenv": "^17.3.1"
+    "nuxt": "^4.3.1",
+    "vue": "^3.5.28"
   }
 }

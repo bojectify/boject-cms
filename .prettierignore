@@ -1,4 +1,7 @@
 node_modules
+.nuxt
+.output
+generated
 .husky
 coverage
 .prettierignore

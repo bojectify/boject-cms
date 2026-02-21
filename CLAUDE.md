@@ -4,13 +4,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-boject-cms is a TypeScript CMS backend for a rugby club, built on Prisma v7 with PostgreSQL. Early-stage project — no application framework, build pipeline, or test framework configured yet.
+boject-cms is a TypeScript CMS for a rugby club, built with Nuxt 3 (Vue) and Prisma v7 on PostgreSQL.
 
 ## Commands
 
 ```bash
-pnpm install                  # Install dependencies
-pnpm prisma:generate          # Generate Prisma client (required after schema changes)
+pnpm install                  # Install dependencies (runs nuxt prepare + prisma generate via postinstall)
+pnpm dev                      # Start Nuxt development server (http://localhost:3000)
+pnpm build                    # Build for production (outputs to .output/)
+pnpm preview                  # Preview production build locally
+pnpm prisma:generate          # Regenerate Prisma client (required after schema changes)
 pnpm prisma:migrate           # Run database migrations
 pnpm prisma:start:local       # Start local Prisma dev server
 pnpm prisma:start:remote      # Start remote Prisma dev server
@@ -21,10 +24,12 @@ Note: `prisma migrate dev` requires an interactive terminal. When running from a
 
 ## Architecture
 
+- **Nuxt 3** — Full-stack Vue framework. Pages in `pages/`, API routes in `server/api/`, server utilities in `server/utils/`. Nitro is the server engine.
 - **ESM-only** — `"type": "module"` in package.json. All imports use ESM syntax, no CommonJS.
-- **Prisma v7 with driver adapters** — Uses `@prisma/adapter-pg` (PrismaPg) instead of the traditional Rust engine binary. The adapter is mandatory; `PrismaClient` is instantiated with `{ adapter }` in `lib/prisma.ts`.
+- **Prisma v7 with driver adapters** — Uses `@prisma/adapter-pg` (PrismaPg) instead of the traditional Rust engine binary. The adapter is mandatory.
+- **Prisma singleton** — `server/utils/prisma.ts` exports a singleton `prisma` instance using the `globalThis` guard pattern to prevent connection pool exhaustion during Nuxt HMR. It is auto-imported into all server routes — no import needed.
 - **Generated client** — Output to `generated/prisma/` (not the default `node_modules` location). This directory is gitignored and must be regenerated after every schema change via `pnpm prisma:generate`.
-- **Config** — `prisma.config.ts` configures datasource, schema path, and migrations path. Database URL comes from `DATABASE_URL` env var loaded via `dotenv`.
+- **Environment variables** — `.env` is loaded automatically by Nuxt in development. `prisma.config.ts` retains its own `import 'dotenv/config'` for CLI-only use (migrations, generation). `DATABASE_URL` is accessed via `process.env` in server code.
 - **Prisma MCP server** — Local MCP server configured for Claude Code, providing direct access to migrate-status, migrate-dev, migrate-reset, and Prisma Studio.
 
 ## Database Schema
@@ -36,8 +41,8 @@ Defined in `prisma/schema.prisma`. All models use UUID primary keys, `createdAt`
 - **Team** — Internal club squads (e.g. 1st XV, Veterans, Juniors). Linked to competitions and fixtures.
 - **Club** — External opponent clubs with a name and optional crest (one-to-one Image relation).
 - **Competition** — Leagues/cups, linked to a Season and to Teams via a many-to-many join table (`TeamsOnCompetitions`).
-- **Season** — Has name, startDate, endDate. Competitions belong to a season.
-- **Fixture** — A match. Links to a Team (which squad is playing), an optional Club (opponent), an optional Competition, and has `isHome` boolean. Scores are tracked via the Score model.
+- **Season** — Has name, startDate, endDate. Competitions and fixtures belong to a season.
+- **Fixture** — A match. Links to a Team (which squad is playing), an optional Club (opponent), an optional Competition, an optional Season, and has `isHome` boolean. Scores are tracked via the Score model.
 - **Score** — Individual scoring events (TRY, CONVERSION, PENALTY, DROP_GOAL enum). Links to a Fixture and optionally to a Player, with an optional `minute` field. Final score is calculated from these records.
 - **Player** — Has firstName, lastName, optional bio, optional position. Images via headshot (one-to-one), actionShot (one-to-one), and a general images list. Team membership tracked via PlayerTeamHistory.
 - **PlayerTeamHistory** — Join table tracking which Team a Player belongs to over time. `endDate` is nullable (null = currently on that team). A player can have multiple open records.
@@ -46,11 +51,13 @@ Defined in `prisma/schema.prisma`. All models use UUID primary keys, `createdAt`
 
 ## Key Files
 
-- `lib/prisma.ts` — Singleton PrismaClient instance (import `prisma` from here)
+- `nuxt.config.ts` — Nuxt configuration (runtimeConfig, nitro options)
+- `server/utils/prisma.ts` — Singleton PrismaClient instance (auto-imported into all server routes)
+- `server/api/` — Nitro API route handlers
+- `pages/` — Nuxt page components
 - `prisma/schema.prisma` — Database schema
-- `prisma.config.ts` — Prisma configuration (datasource, paths)
-- `generated/prisma/client.ts` — Server-side entry (PrismaClient + model types)
-- `generated/prisma/browser.ts` — Browser-safe entry (types only)
+- `prisma.config.ts` — Prisma CLI configuration (datasource, paths; dotenv-loaded for CLI use)
+- `generated/prisma/client.ts` — Server-side entry (PrismaClient + model types; gitignored, regenerated)
 
 ## Code Style
 

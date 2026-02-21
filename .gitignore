@@ -44,3 +44,7 @@ coverage/
 .temp/
 
 /generated/prisma
+
+# Nuxt
+.nuxt/
+.output/
