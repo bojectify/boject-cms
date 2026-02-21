@@ -87,7 +87,21 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder.
 - `prisma.config.ts` — Prisma CLI configuration (datasource, paths; dotenv-loaded for CLI use)
 - `generated/prisma/client.ts` — Server-side entry (PrismaClient + model types; gitignored, regenerated)
 - `generated/pothos-types.ts` — Pothos-Prisma type bridge (gitignored, regenerated)
+- `eslint.config.mjs` — ESLint flat config (extends Nuxt-generated config)
+- `lefthook.yml` — Pre-commit hook configuration
+- `vitest.config.ts` — Vitest configuration
+- `server/api/graphql.test.ts` — GraphQL API integration tests
 
-## Code Style
+## Linting & Formatting
 
-Prettier configured: single quotes, trailing commas (es5), semicolons, 2-space indent, 80 char width.
+- **ESLint** — Via `@nuxt/eslint` module (registered in `nuxt.config.ts`). Includes Vue, TypeScript, and Nuxt-specific rules. Config in `eslint.config.mjs`.
+- **Prettier** — Single quotes, trailing commas (es5), semicolons, 2-space indent, 80 char width. Config in `.prettierrc.yml`.
+- **eslint-config-prettier** — Disables ESLint rules that conflict with Prettier.
+- **Lefthook** — Pre-commit hooks run ESLint and Prettier in parallel on staged files. Config in `lefthook.yml`.
+
+## Testing
+
+- **Vitest** — Test runner, configured via `vitest.config.ts` using `@nuxt/test-utils/config`.
+- **@nuxt/test-utils** — Starts a Nuxt dev server for integration tests. Tests must use `setup({ dev: true })` (production mode masks GraphQL errors).
+- **Test location** — Colocated with source files (e.g. `server/api/graphql.test.ts`).
+- **GraphQL tests** — 19 integration tests covering list queries, single-item lookups, relation resolution, and where filtering.
