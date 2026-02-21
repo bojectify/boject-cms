@@ -9,14 +9,15 @@ boject-cms is a TypeScript CMS for a rugby club, built with Nuxt 3 (Vue) and Pri
 ## Commands
 
 ```bash
+docker compose up -d          # Start local PostgreSQL (required before dev/migrate)
+docker compose down           # Stop local PostgreSQL (data persists in pgdata volume)
 pnpm install                  # Install dependencies (runs nuxt prepare + prisma generate via postinstall)
 pnpm dev                      # Start Nuxt development server (http://localhost:3000)
 pnpm build                    # Build for production (outputs to .output/)
 pnpm preview                  # Preview production build locally
 pnpm prisma:generate          # Regenerate Prisma client + Pothos types (required after schema changes)
 pnpm prisma:migrate           # Run database migrations
-pnpm prisma:start:local       # Start local Prisma dev server
-pnpm prisma:start:remote      # Start remote Prisma dev server
+pnpm prisma:seed              # Seed database with test data
 pnpm prettier --write .       # Format all files
 ```
 
@@ -29,6 +30,7 @@ Note: `prisma migrate dev` requires an interactive terminal. When running from a
 - **Prisma v7 with driver adapters** — Uses `@prisma/adapter-pg` (PrismaPg) instead of the traditional Rust engine binary. The adapter is mandatory.
 - **Prisma singleton** — `server/utils/prisma.ts` exports a singleton `prisma` instance using the `globalThis` guard pattern to prevent connection pool exhaustion during Nuxt HMR. It is auto-imported into all server routes — no import needed.
 - **Generated client** — Output to `generated/prisma/` (not the default `node_modules` location). This directory is gitignored and must be regenerated after every schema change via `pnpm prisma:generate`.
+- **Local PostgreSQL** — `docker-compose.yml` runs Postgres 17 on port 5432 (user: `boject`, password: `boject`, db: `boject`). Data persists in a Docker volume (`pgdata`). `DATABASE_URL` in `.env` should be `postgresql://boject:boject@localhost:5432/boject`.
 - **Environment variables** — `.env` is loaded automatically by Nuxt in development. `prisma.config.ts` retains its own `import 'dotenv/config'` for CLI-only use (migrations, generation). `DATABASE_URL` is accessed via `process.env` in server code.
 - **Prisma MCP server** — Local MCP server configured for Claude Code, providing direct access to migrate-status, migrate-dev, migrate-reset, and Prisma Studio.
 
@@ -57,9 +59,10 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder.
 - **Schema builder** — `server/graphql/builder.ts` exports the singleton `SchemaBuilder` with PrismaPlugin.
 - **Type definitions** — One file per Prisma model in `server/graphql/types/`. Each file calls `builder.prismaObject(...)` as a side effect.
 - **Root queries** — All root Query fields in `server/graphql/query/index.ts`. List + single-item lookups for all models except TeamsOnCompetitions (accessible only as nested data via `team.competitions` or `competition.teams`).
+- **Where filtering** — `server/graphql/filters.ts` defines Prisma-style where inputs via `@pothos/plugin-prisma-utils`. All list queries accept an optional `where` arg (e.g. `clubs(where: { name: { contains: "RFC" } })`).
 - **Schema assembly** — `server/graphql/schema.ts` imports all type/query files for side effects, then exports `builder.toSchema()`.
 - **Generated types** — `generated/pothos-types.ts` is produced by `prisma generate` alongside the Prisma client. Gitignored, never edit manually.
-- **DateTime fields** — Serialised as ISO-8601 strings (no custom scalar yet).
+- **DateTime scalar** — Registered in the builder. Serialises as ISO-8601 strings, parses string input to `Date`.
 
 ## Key Files
 
@@ -69,7 +72,10 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder.
 - `server/graphql/builder.ts` — Pothos SchemaBuilder singleton with PrismaPlugin
 - `server/graphql/schema.ts` — Assembles all type registrations and exports the GraphQL schema
 - `server/graphql/types/` — Per-model Pothos type definitions
+- `server/graphql/filters.ts` — Prisma-style where filter input types
 - `server/graphql/query/index.ts` — Root Query field definitions
+- `prisma/seed.ts` — Database seed script (positions, teams, clubs, seasons, competitions, players, fixtures, scores)
+- `docker-compose.yml` — Local PostgreSQL 17 container
 - `server/api/` — Nitro API route handlers
 - `pages/` — Nuxt page components
 - `prisma/schema.prisma` — Database schema
