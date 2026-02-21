@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-boject-cms is a TypeScript CMS for a rugby club, built with Nuxt 3 (Vue) and Prisma v7 on PostgreSQL.
+boject-cms is a TypeScript CMS for a rugby club, built with Nuxt 4 (Vue) and Prisma v7 on PostgreSQL.
 
 ## Commands
 
@@ -24,13 +24,14 @@ pnpm format                   # Check formatting with Prettier
 pnpm format:fix               # Format all files with Prettier
 pnpm test                     # Run tests in watch mode
 pnpm test:run                 # Run tests once (CI)
+pnpm typecheck                # Run TypeScript type checker (nuxi typecheck)
 ```
 
 Note: `prisma migrate dev` requires an interactive terminal. When running from a non-interactive context, use `prisma migrate diff` to generate the SQL and `prisma migrate deploy` to apply it.
 
 ## Architecture
 
-- **Nuxt 3** — Full-stack Vue framework. Pages in `pages/`, API routes in `server/api/`, server utilities in `server/utils/`. Nitro is the server engine.
+- **Nuxt 4** — Full-stack Vue framework. Pages in `pages/`, API routes in `server/api/`, server utilities in `server/utils/`. Nitro is the server engine.
 - **ESM-only** — `"type": "module"` in package.json. All imports use ESM syntax, no CommonJS.
 - **Prisma v7 with driver adapters** — Uses `@prisma/adapter-pg` (PrismaPg) instead of the traditional Rust engine binary. The adapter is mandatory.
 - **Prisma singleton** — `server/utils/prisma.ts` exports a singleton `prisma` instance using the `globalThis` guard pattern to prevent connection pool exhaustion during Nuxt HMR. It is auto-imported into all server routes — no import needed.
@@ -61,7 +62,7 @@ Defined in `prisma/schema.prisma`. All models use UUID primary keys, `createdAt`
 Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder.
 
 - **Endpoint** — `POST /api/graphql` for queries/mutations. `GET /api/graphql` serves GraphiQL playground in development.
-- **Schema builder** — `server/graphql/builder.ts` exports the singleton `SchemaBuilder` with PrismaPlugin.
+- **Schema builder** — `server/graphql/builder.ts` exports the singleton `SchemaBuilder` with PrismaPlugin and PrismaUtilsPlugin.
 - **Type definitions** — One file per Prisma model in `server/graphql/types/`. Each file calls `builder.prismaObject(...)` as a side effect.
 - **Root queries** — All root Query fields in `server/graphql/query/index.ts`. List + single-item lookups for all models except TeamsOnCompetitions (accessible only as nested data via `team.competitions` or `competition.teams`).
 - **Where filtering** — `server/graphql/filters.ts` defines Prisma-style where inputs via `@pothos/plugin-prisma-utils`. All list queries accept an optional `where` arg (e.g. `clubs(where: { name: { contains: "RFC" } })`).
@@ -73,7 +74,7 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder.
 
 - `nuxt.config.ts` — Nuxt configuration (runtimeConfig, nitro options)
 - `server/utils/prisma.ts` — Singleton PrismaClient instance (auto-imported into all server routes)
-- `server/api/graphql.ts` — GraphQL Yoga ↔ H3 bridge
+- `server/api/graphql.ts` — GraphQL Yoga ↔ H3 bridge (explicitly imports `defineEventHandler` from `h3`)
 - `server/graphql/builder.ts` — Pothos SchemaBuilder singleton with PrismaPlugin
 - `server/graphql/schema.ts` — Assembles all type registrations and exports the GraphQL schema
 - `server/graphql/types/` — Per-model Pothos type definitions
@@ -94,7 +95,7 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder.
 
 ## Linting & Formatting
 
-- **ESLint** — Via `@nuxt/eslint` module (registered in `nuxt.config.ts`). Includes Vue, TypeScript, and Nuxt-specific rules. Config in `eslint.config.mjs`.
+- **ESLint** — Via `@nuxt/eslint` module (registered in `nuxt.config.ts`). Includes Vue, TypeScript, and Nuxt-specific rules. Config in `eslint.config.mjs`. Custom config covers all `**/*.ts` files with `@typescript-eslint/parser`. Underscore-prefixed variables are allowed as unused (`varsIgnorePattern: '^_'`).
 - **Prettier** — Single quotes, trailing commas (es5), semicolons, 2-space indent, 80 char width. Config in `.prettierrc.yml`.
 - **eslint-config-prettier** — Disables ESLint rules that conflict with Prettier.
 - **Lefthook** — Pre-commit hooks run ESLint and Prettier in parallel on staged files. Config in `lefthook.yml`.
