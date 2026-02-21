@@ -8,9 +8,12 @@ export default withNuxt(
     ignores: ['generated/**'],
   },
   {
-    files: ['*.config.ts', '**/*.test.ts'],
+    files: ['**/*.ts'],
     languageOptions: {
       parser: tsParser,
+    },
+    rules: {
+      'no-unused-vars': ['error', { varsIgnorePattern: '^_' }],
     },
   },
   eslintConfigPrettier

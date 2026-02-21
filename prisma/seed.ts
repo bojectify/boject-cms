@@ -53,13 +53,13 @@ async function main() {
     create: { name: '2nd XV' },
   });
 
-  const veterans = await prisma.team.upsert({
+  const _veterans = await prisma.team.upsert({
     where: { name: 'Veterans' },
     update: {},
     create: { name: 'Veterans' },
   });
 
-  const colts = await prisma.team.upsert({
+  const _colts = await prisma.team.upsert({
     where: { name: 'Colts' },
     update: {},
     create: { name: 'Colts' },
@@ -176,12 +176,37 @@ async function main() {
 
   // Player team history
   for (const data of [
-    { playerId: jones.id, teamId: firstXV.id, startDate: new Date('2023-09-01') },
-    { playerId: williams.id, teamId: firstXV.id, startDate: new Date('2024-09-01') },
-    { playerId: evans.id, teamId: firstXV.id, startDate: new Date('2025-09-01') },
-    { playerId: evans.id, teamId: secondXV.id, startDate: new Date('2023-09-01'), endDate: new Date('2025-08-31') },
-    { playerId: morgan.id, teamId: firstXV.id, startDate: new Date('2025-09-01') },
-    { playerId: price.id, teamId: secondXV.id, startDate: new Date('2025-09-01') },
+    {
+      playerId: jones.id,
+      teamId: firstXV.id,
+      startDate: new Date('2023-09-01'),
+    },
+    {
+      playerId: williams.id,
+      teamId: firstXV.id,
+      startDate: new Date('2024-09-01'),
+    },
+    {
+      playerId: evans.id,
+      teamId: firstXV.id,
+      startDate: new Date('2025-09-01'),
+    },
+    {
+      playerId: evans.id,
+      teamId: secondXV.id,
+      startDate: new Date('2023-09-01'),
+      endDate: new Date('2025-08-31'),
+    },
+    {
+      playerId: morgan.id,
+      teamId: firstXV.id,
+      startDate: new Date('2025-09-01'),
+    },
+    {
+      playerId: price.id,
+      teamId: secondXV.id,
+      startDate: new Date('2025-09-01'),
+    },
   ]) {
     await prisma.playerTeamHistory.create({ data });
   }
@@ -228,21 +253,66 @@ async function main() {
 
   // Scores for fixture 1 (home win 24-12)
   for (const data of [
-    { fixtureId: fixture1.id, playerId: jones.id, type: 'TRY' as const, minute: 12 },
-    { fixtureId: fixture1.id, playerId: jones.id, type: 'CONVERSION' as const, minute: 13 },
-    { fixtureId: fixture1.id, playerId: morgan.id, type: 'TRY' as const, minute: 28 },
-    { fixtureId: fixture1.id, playerId: jones.id, type: 'CONVERSION' as const, minute: 29 },
-    { fixtureId: fixture1.id, playerId: jones.id, type: 'PENALTY' as const, minute: 55 },
-    { fixtureId: fixture1.id, playerId: evans.id, type: 'TRY' as const, minute: 72 },
+    {
+      fixtureId: fixture1.id,
+      playerId: jones.id,
+      type: 'TRY' as const,
+      minute: 12,
+    },
+    {
+      fixtureId: fixture1.id,
+      playerId: jones.id,
+      type: 'CONVERSION' as const,
+      minute: 13,
+    },
+    {
+      fixtureId: fixture1.id,
+      playerId: morgan.id,
+      type: 'TRY' as const,
+      minute: 28,
+    },
+    {
+      fixtureId: fixture1.id,
+      playerId: jones.id,
+      type: 'CONVERSION' as const,
+      minute: 29,
+    },
+    {
+      fixtureId: fixture1.id,
+      playerId: jones.id,
+      type: 'PENALTY' as const,
+      minute: 55,
+    },
+    {
+      fixtureId: fixture1.id,
+      playerId: evans.id,
+      type: 'TRY' as const,
+      minute: 72,
+    },
   ]) {
     await prisma.score.create({ data });
   }
 
   // Scores for fixture 2 (away loss 10-17)
   for (const data of [
-    { fixtureId: fixture2.id, playerId: price.id, type: 'TRY' as const, minute: 35 },
-    { fixtureId: fixture2.id, playerId: jones.id, type: 'CONVERSION' as const, minute: 36 },
-    { fixtureId: fixture2.id, playerId: jones.id, type: 'PENALTY' as const, minute: 68 },
+    {
+      fixtureId: fixture2.id,
+      playerId: price.id,
+      type: 'TRY' as const,
+      minute: 35,
+    },
+    {
+      fixtureId: fixture2.id,
+      playerId: jones.id,
+      type: 'CONVERSION' as const,
+      minute: 36,
+    },
+    {
+      fixtureId: fixture2.id,
+      playerId: jones.id,
+      type: 'PENALTY' as const,
+      minute: 68,
+    },
   ]) {
     await prisma.score.create({ data });
   }
