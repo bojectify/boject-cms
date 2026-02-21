@@ -92,7 +92,7 @@ describe('GraphQL API', async () => {
       const { data: list } = await gql<{
         teams: { id: string; name: string }[];
       }>('{ teams { id name } }');
-      const first = list.teams[0];
+      const first = list.teams[0]!;
 
       const { data } = await gql<{ team: { id: string; name: string } }>(
         `{ team(id: "${first.id}") { id name } }`
@@ -105,7 +105,7 @@ describe('GraphQL API', async () => {
       const { data: list } = await gql<{
         players: { id: string; firstName: string }[];
       }>('{ players { id firstName } }');
-      const first = list.players[0];
+      const first = list.players[0]!;
 
       const { data } = await gql<{
         player: { id: string; firstName: string };
@@ -215,8 +215,8 @@ describe('GraphQL API', async () => {
         '{ players(where: { firstName: { equals: "Tom" } }) { id firstName lastName } }'
       );
       expect(data.players.length).toBe(1);
-      expect(data.players[0].firstName).toBe('Tom');
-      expect(data.players[0].lastName).toBe('Evans');
+      expect(data.players[0]!.firstName).toBe('Tom');
+      expect(data.players[0]!.lastName).toBe('Evans');
     });
 
     it('filters fixtures by isHome', async () => {

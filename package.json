@@ -18,7 +18,8 @@
     "format": "prettier --check .",
     "format:fix": "prettier --write .",
     "test": "vitest",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "typecheck": "nuxi typecheck"
   },
   "keywords": [],
   "author": "",
