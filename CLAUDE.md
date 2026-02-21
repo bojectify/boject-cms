@@ -18,6 +18,8 @@ pnpm preview                  # Preview production build locally
 pnpm prisma:generate          # Regenerate Prisma client + Pothos types (required after schema changes)
 pnpm prisma:migrate           # Run database migrations
 pnpm prisma:seed              # Seed database with test data
+pnpm lint                     # Lint with ESLint
+pnpm lint:fix                 # Lint and auto-fix
 pnpm prettier --write .       # Format all files
 ```
 
