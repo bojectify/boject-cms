@@ -6,5 +6,8 @@ export default withNuxt(
   {
     ignores: ['generated/**'],
   },
+  {
+    files: ['*.config.ts'],
+  },
   eslintConfigPrettier
 );
