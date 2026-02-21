@@ -7,7 +7,7 @@ export default defineNuxtConfig({
 
   nitro: {
     externals: {
-      inline: ['@prisma/adapter-pg'],
+      inline: ['@prisma/adapter-pg', 'graphql-yoga'],
     },
   },
 });

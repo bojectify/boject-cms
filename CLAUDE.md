@@ -13,7 +13,7 @@ pnpm install                  # Install dependencies (runs nuxt prepare + prisma
 pnpm dev                      # Start Nuxt development server (http://localhost:3000)
 pnpm build                    # Build for production (outputs to .output/)
 pnpm preview                  # Preview production build locally
-pnpm prisma:generate          # Regenerate Prisma client (required after schema changes)
+pnpm prisma:generate          # Regenerate Prisma client + Pothos types (required after schema changes)
 pnpm prisma:migrate           # Run database migrations
 pnpm prisma:start:local       # Start local Prisma dev server
 pnpm prisma:start:remote      # Start remote Prisma dev server
@@ -49,15 +49,33 @@ Defined in `prisma/schema.prisma`. All models use UUID primary keys, `createdAt`
 - **Position** — Rugby positions (e.g. Fly-half, Hooker). Unique name.
 - **Image** — Reusable image model with url, alt, width, height. Used for player headshots, action shots, general player images, and club crests.
 
+## GraphQL
+
+Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder.
+
+- **Endpoint** — `POST /api/graphql` for queries/mutations. `GET /api/graphql` serves GraphiQL playground in development.
+- **Schema builder** — `server/graphql/builder.ts` exports the singleton `SchemaBuilder` with PrismaPlugin.
+- **Type definitions** — One file per Prisma model in `server/graphql/types/`. Each file calls `builder.prismaObject(...)` as a side effect.
+- **Root queries** — All root Query fields in `server/graphql/query/index.ts`. List + single-item lookups for all models except TeamsOnCompetitions (accessible only as nested data via `team.competitions` or `competition.teams`).
+- **Schema assembly** — `server/graphql/schema.ts` imports all type/query files for side effects, then exports `builder.toSchema()`.
+- **Generated types** — `generated/pothos-types.ts` is produced by `prisma generate` alongside the Prisma client. Gitignored, never edit manually.
+- **DateTime fields** — Serialised as ISO-8601 strings (no custom scalar yet).
+
 ## Key Files
 
 - `nuxt.config.ts` — Nuxt configuration (runtimeConfig, nitro options)
 - `server/utils/prisma.ts` — Singleton PrismaClient instance (auto-imported into all server routes)
+- `server/api/graphql.ts` — GraphQL Yoga ↔ H3 bridge
+- `server/graphql/builder.ts` — Pothos SchemaBuilder singleton with PrismaPlugin
+- `server/graphql/schema.ts` — Assembles all type registrations and exports the GraphQL schema
+- `server/graphql/types/` — Per-model Pothos type definitions
+- `server/graphql/query/index.ts` — Root Query field definitions
 - `server/api/` — Nitro API route handlers
 - `pages/` — Nuxt page components
 - `prisma/schema.prisma` — Database schema
 - `prisma.config.ts` — Prisma CLI configuration (datasource, paths; dotenv-loaded for CLI use)
 - `generated/prisma/client.ts` — Server-side entry (PrismaClient + model types; gitignored, regenerated)
+- `generated/pothos-types.ts` — Pothos-Prisma type bridge (gitignored, regenerated)
 
 ## Code Style
 

@@ -1,0 +1,25 @@
+import SchemaBuilder from '@pothos/core';
+import PrismaPlugin from '@pothos/plugin-prisma';
+import PrismaUtilsPlugin from '@pothos/plugin-prisma-utils';
+import type PrismaTypes from '../../generated/pothos-types';
+import { getDatamodel } from '../../generated/pothos-types';
+import { prisma } from '../utils/prisma';
+
+export const builder = new SchemaBuilder<{
+  PrismaTypes: PrismaTypes;
+  Scalars: {
+    DateTime: { Input: Date | string; Output: Date | string };
+  };
+}>({
+  plugins: [PrismaPlugin, PrismaUtilsPlugin],
+  prisma: {
+    client: prisma,
+    dmmf: getDatamodel(),
+  },
+});
+
+builder.scalarType('DateTime', {
+  serialize: (value) =>
+    value instanceof Date ? value.toISOString() : String(value),
+  parseValue: (value) => new Date(String(value)),
+});
