@@ -5,10 +5,10 @@ builder.prismaObject('Fixture', {
     id: t.exposeID('id'),
     name: t.exposeString('name'),
     isHome: t.exposeBoolean('isHome'),
-    kickoff: t.expose('kickoff', { type: 'String' }),
+    kickoff: t.expose('kickoff', { type: 'DateTime' }),
     venue: t.exposeString('venue'),
-    createdAt: t.expose('createdAt', { type: 'String' }),
-    updatedAt: t.expose('updatedAt', { type: 'String' }),
+    createdAt: t.expose('createdAt', { type: 'DateTime' }),
+    updatedAt: t.expose('updatedAt', { type: 'DateTime' }),
     competition: t.relation('competition', { nullable: true }),
     season: t.relation('season', { nullable: true }),
     team: t.relation('team', { nullable: true }),
@@ -16,6 +16,5 @@ builder.prismaObject('Fixture', {
     scores: t.relation('scores'),
   }),
 });
-
 
 export const _registered = true;

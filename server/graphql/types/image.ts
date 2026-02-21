@@ -7,10 +7,9 @@ builder.prismaObject('Image', {
     alt: t.exposeString('alt'),
     width: t.exposeInt('width'),
     height: t.exposeInt('height'),
-    createdAt: t.expose('createdAt', { type: 'String' }),
-    updatedAt: t.expose('updatedAt', { type: 'String' }),
+    createdAt: t.expose('createdAt', { type: 'DateTime' }),
+    updatedAt: t.expose('updatedAt', { type: 'DateTime' }),
   }),
 });
-
 
 export const _registered = true;

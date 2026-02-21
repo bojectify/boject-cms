@@ -40,7 +40,7 @@ export const SeasonWhere = builder.prismaWhere('Season', {
     name: StringFilter,
     startDate: DateTimeFilter,
     endDate: DateTimeFilter,
-  },
+  } as never,
 });
 
 export const PositionWhere = builder.prismaWhere('Position', {
@@ -70,7 +70,7 @@ export const FixtureWhere = builder.prismaWhere('Fixture', {
     isHome: BooleanFilter,
     kickoff: DateTimeFilter,
     venue: StringFilter,
-  },
+  } as never,
 });
 
 export const ScoreWhere = builder.prismaWhere('Score', {

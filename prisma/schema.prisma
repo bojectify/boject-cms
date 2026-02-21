@@ -12,7 +12,7 @@ generator client {
 generator pothos {
   provider     = "prisma-pothos-types"
   output       = "../generated/pothos-types.ts"
-  clientOutput = "./prisma/client"
+  clientOutput = "./prisma"
   prismaUtils  = true
 }
 

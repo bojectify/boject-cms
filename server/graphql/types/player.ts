@@ -6,8 +6,8 @@ builder.prismaObject('Player', {
     firstName: t.exposeString('firstName'),
     lastName: t.exposeString('lastName'),
     bio: t.exposeString('bio', { nullable: true }),
-    createdAt: t.expose('createdAt', { type: 'String' }),
-    updatedAt: t.expose('updatedAt', { type: 'String' }),
+    createdAt: t.expose('createdAt', { type: 'DateTime' }),
+    updatedAt: t.expose('updatedAt', { type: 'DateTime' }),
     position: t.relation('position', { nullable: true }),
     headshot: t.relation('headshot', { nullable: true }),
     actionShot: t.relation('actionShot', { nullable: true }),
@@ -15,6 +15,5 @@ builder.prismaObject('Player', {
     scores: t.relation('scores'),
   }),
 });
-
 
 export const _registered = true;
