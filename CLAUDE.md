@@ -20,7 +20,10 @@ pnpm prisma:migrate           # Run database migrations
 pnpm prisma:seed              # Seed database with test data
 pnpm lint                     # Lint with ESLint
 pnpm lint:fix                 # Lint and auto-fix
-pnpm prettier --write .       # Format all files
+pnpm format                   # Check formatting with Prettier
+pnpm format:fix               # Format all files with Prettier
+pnpm test                     # Run tests in watch mode
+pnpm test:run                 # Run tests once (CI)
 ```
 
 Note: `prisma migrate dev` requires an interactive terminal. When running from a non-interactive context, use `prisma migrate diff` to generate the SQL and `prisma migrate deploy` to apply it.
