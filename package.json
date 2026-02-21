@@ -14,7 +14,9 @@
     "prisma:generate": "prisma generate",
     "prisma:seed": "tsx prisma/seed.ts",
     "lint": "eslint .",
-    "lint:fix": "eslint . --fix"
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --check .",
+    "format:fix": "prettier --write ."
   },
   "keywords": [],
   "author": "",
@@ -24,9 +26,19 @@
     "@nuxt/eslint": "^1.15.1",
     "@types/node": "^25.3.0",
     "dotenv": "^17.3.1",
+    "eslint-config-prettier": "^10.1.8",
+    "lefthook": "^2.1.1",
     "prettier": "^3.8.1",
     "prisma": "^7.4.1",
     "tsx": "^4.21.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "@parcel/watcher",
+      "prisma",
+      "lefthook"
+    ]
   },
   "dependencies": {
     "@pothos/core": "^4.12.0",
