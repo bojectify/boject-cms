@@ -72,6 +72,39 @@ export const PlayerWhere = builder.prismaWhere('Player', {
   },
 });
 
+// Relation filters (to-one, wraps Where with is/isNot)
+const SeasonRelationFilter = builder.inputType('SeasonRelationFilter', {
+  fields: (t) => ({
+    is: t.field({ type: SeasonWhere }),
+    isNot: t.field({ type: SeasonWhere }),
+  }),
+});
+
+const TeamRelationFilter = builder.inputType('TeamRelationFilter', {
+  fields: (t) => ({
+    is: t.field({ type: TeamWhere }),
+    isNot: t.field({ type: TeamWhere }),
+  }),
+});
+
+const ClubRelationFilter = builder.inputType('ClubRelationFilter', {
+  fields: (t) => ({
+    is: t.field({ type: ClubWhere }),
+    isNot: t.field({ type: ClubWhere }),
+  }),
+});
+
+const CompetitionRelationFilter = builder.inputType(
+  'CompetitionRelationFilter',
+  {
+    fields: (t) => ({
+      is: t.field({ type: CompetitionWhere }),
+      isNot: t.field({ type: CompetitionWhere }),
+    }),
+  }
+);
+
+// Model where inputs (with relation filters)
 export const FixtureWhere = builder.prismaWhere('Fixture', {
   fields: {
     name: StringFilter,
@@ -79,6 +112,10 @@ export const FixtureWhere = builder.prismaWhere('Fixture', {
     status: ContentStatusFilter,
     kickoff: DateTimeFilter,
     venue: StringFilter,
+    team: TeamRelationFilter,
+    opponent: ClubRelationFilter,
+    competition: CompetitionRelationFilter,
+    season: SeasonRelationFilter,
   } as never,
 });
 
