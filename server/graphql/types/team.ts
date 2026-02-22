@@ -1,4 +1,5 @@
 import { builder } from '../builder';
+import { FixtureWhere, PlayerTeamHistoryWhere } from '../filters';
 import { contentMetadataFields } from './contentFields';
 
 builder.prismaObject('Team', {
@@ -9,8 +10,14 @@ builder.prismaObject('Team', {
     createdAt: t.expose('createdAt', { type: 'DateTime' }),
     updatedAt: t.expose('updatedAt', { type: 'DateTime' }),
     competitions: t.relation('competitions'),
-    playerHistory: t.relation('playerHistory'),
-    fixtures: t.relation('fixtures'),
+    playerHistory: t.relation('playerHistory', {
+      args: { where: t.arg({ type: PlayerTeamHistoryWhere }) },
+      query: (args) => ({ where: args.where ?? undefined }),
+    }),
+    fixtures: t.relation('fixtures', {
+      args: { where: t.arg({ type: FixtureWhere }) },
+      query: (args) => ({ where: args.where ?? undefined }),
+    }),
   }),
 });
 

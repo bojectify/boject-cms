@@ -1,4 +1,5 @@
 import { builder } from '../builder';
+import { PlayerTeamHistoryWhere, ScoreWhere } from '../filters';
 import { contentMetadataFields } from './contentFields';
 
 builder.prismaObject('Player', {
@@ -13,8 +14,14 @@ builder.prismaObject('Player', {
     position: t.relation('position', { nullable: true }),
     headshot: t.relation('headshot', { nullable: true }),
     actionShot: t.relation('actionShot', { nullable: true }),
-    teamHistory: t.relation('teamHistory'),
-    scores: t.relation('scores'),
+    teamHistory: t.relation('teamHistory', {
+      args: { where: t.arg({ type: PlayerTeamHistoryWhere }) },
+      query: (args) => ({ where: args.where ?? undefined }),
+    }),
+    scores: t.relation('scores', {
+      args: { where: t.arg({ type: ScoreWhere }) },
+      query: (args) => ({ where: args.where ?? undefined }),
+    }),
   }),
 });
 

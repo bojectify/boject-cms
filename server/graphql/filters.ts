@@ -82,6 +82,13 @@ export const FixtureWhere = builder.prismaWhere('Fixture', {
   } as never,
 });
 
+export const PlayerTeamHistoryWhere = builder.prismaWhere('PlayerTeamHistory', {
+  fields: {
+    startDate: DateTimeFilter,
+    endDate: DateTimeFilter,
+  } as never,
+});
+
 export const ScoreWhere = builder.prismaWhere('Score', {
   fields: {
     type: ScoreTypeFilter,

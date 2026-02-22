@@ -1,4 +1,5 @@
 import { builder } from '../builder';
+import { PlayerWhere } from '../filters';
 
 builder.prismaObject('Position', {
   fields: (t) => ({
@@ -6,7 +7,10 @@ builder.prismaObject('Position', {
     name: t.exposeString('name'),
     createdAt: t.expose('createdAt', { type: 'DateTime' }),
     updatedAt: t.expose('updatedAt', { type: 'DateTime' }),
-    players: t.relation('players'),
+    players: t.relation('players', {
+      args: { where: t.arg({ type: PlayerWhere }) },
+      query: (args) => ({ where: args.where ?? undefined }),
+    }),
   }),
 });
 

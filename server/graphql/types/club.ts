@@ -1,4 +1,5 @@
 import { builder } from '../builder';
+import { FixtureWhere } from '../filters';
 import { contentMetadataFields } from './contentFields';
 
 builder.prismaObject('Club', {
@@ -9,7 +10,10 @@ builder.prismaObject('Club', {
     createdAt: t.expose('createdAt', { type: 'DateTime' }),
     updatedAt: t.expose('updatedAt', { type: 'DateTime' }),
     crest: t.relation('crest', { nullable: true }),
-    fixtures: t.relation('fixtures'),
+    fixtures: t.relation('fixtures', {
+      args: { where: t.arg({ type: FixtureWhere }) },
+      query: (args) => ({ where: args.where ?? undefined }),
+    }),
   }),
 });
 

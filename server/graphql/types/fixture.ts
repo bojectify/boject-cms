@@ -1,4 +1,5 @@
 import { builder } from '../builder';
+import { ScoreWhere } from '../filters';
 import { contentMetadataFields } from './contentFields';
 
 builder.prismaObject('Fixture', {
@@ -15,7 +16,10 @@ builder.prismaObject('Fixture', {
     season: t.relation('season', { nullable: true }),
     team: t.relation('team', { nullable: true }),
     opponent: t.relation('opponent', { nullable: true }),
-    scores: t.relation('scores'),
+    scores: t.relation('scores', {
+      args: { where: t.arg({ type: ScoreWhere }) },
+      query: (args) => ({ where: args.where ?? undefined }),
+    }),
   }),
 });
 
