@@ -23,6 +23,7 @@ datasource db {
 enum ContentStatus {
   DRAFT
   PUBLISHED
+  CHANGED
   ARCHIVED
 }
 
@@ -177,14 +178,18 @@ model PlayerTeamHistory {
 }
 
 model Image {
-  id           String   @id @default(uuid())
+  id           String        @id @default(uuid())
   url          String
   alt          String
   width        Int
   height       Int
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  headshotOf   Player?  @relation("PlayerHeadshot")
-  actionShotOf Player?  @relation("PlayerActionShot")
-  crestOf      Club?    @relation("ClubCrest")
+  status       ContentStatus @default(DRAFT)
+  publishedAt  DateTime?
+  createdBy    String?
+  updatedBy    String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  headshotOf   Player?       @relation("PlayerHeadshot")
+  actionShotOf Player?       @relation("PlayerActionShot")
+  crestOf      Club?         @relation("ClubCrest")
 }

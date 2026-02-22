@@ -59,6 +59,7 @@ export const ImageWhere = builder.prismaWhere('Image', {
     alt: StringFilter,
     width: IntFilter,
     height: IntFilter,
+    status: ContentStatusFilter,
   },
 });
 

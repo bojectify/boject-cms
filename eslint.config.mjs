@@ -23,5 +23,13 @@ export default withNuxt(
       ],
     },
   },
+  {
+    files: ['**/*.vue'],
+    languageOptions: {
+      parserOptions: {
+        parser: tsParser,
+      },
+    },
+  },
   eslintConfigPrettier
 );
