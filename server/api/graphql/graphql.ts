@@ -1,6 +1,6 @@
 import { createYoga } from 'graphql-yoga';
 import { defineEventHandler } from 'h3';
-import { getSchema } from '../graphql/schema';
+import { getSchema } from '../../graphql/schema';
 
 const yoga = createYoga({
   schema: getSchema(),

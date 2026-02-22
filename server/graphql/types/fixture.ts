@@ -1,4 +1,5 @@
 import { builder } from '../builder';
+import { contentMetadataFields } from './contentFields';
 
 builder.prismaObject('Fixture', {
   fields: (t) => ({
@@ -7,6 +8,7 @@ builder.prismaObject('Fixture', {
     isHome: t.exposeBoolean('isHome'),
     kickoff: t.expose('kickoff', { type: 'DateTime' }),
     venue: t.exposeString('venue'),
+    ...contentMetadataFields(t),
     createdAt: t.expose('createdAt', { type: 'DateTime' }),
     updatedAt: t.expose('updatedAt', { type: 'DateTime' }),
     competition: t.relation('competition', { nullable: true }),

@@ -20,9 +20,19 @@ datasource db {
   provider = "postgresql"
 }
 
+enum ContentStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
 model Team {
   id            String                @id @default(uuid())
   name          String                @unique
+  status        ContentStatus         @default(DRAFT)
+  publishedAt   DateTime?
+  createdBy     String?
+  updatedBy     String?
   createdAt     DateTime              @default(now())
   updatedAt     DateTime              @updatedAt
   competitions  TeamsOnCompetitions[]
@@ -31,24 +41,32 @@ model Team {
 }
 
 model Club {
-  id        String    @id @default(uuid())
-  name      String    @unique
-  crest     Image?    @relation(name: "ClubCrest", fields: [crestId], references: [id], onDelete: SetNull)
-  crestId   String?   @unique
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  fixtures  Fixture[]
+  id          String        @id @default(uuid())
+  name        String        @unique
+  crest       Image?        @relation(name: "ClubCrest", fields: [crestId], references: [id], onDelete: SetNull)
+  crestId     String?       @unique
+  status      ContentStatus @default(DRAFT)
+  publishedAt DateTime?
+  createdBy   String?
+  updatedBy   String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  fixtures    Fixture[]
 }
 
 model Competition {
-  id        String                @id @default(uuid())
-  name      String                @unique
-  season    Season?               @relation(fields: [seasonId], references: [id])
-  seasonId  String?
-  createdAt DateTime              @default(now())
-  updatedAt DateTime              @updatedAt
-  teams     TeamsOnCompetitions[]
-  fixtures  Fixture[]
+  id          String                @id @default(uuid())
+  name        String                @unique
+  season      Season?               @relation(fields: [seasonId], references: [id])
+  seasonId    String?
+  status      ContentStatus         @default(DRAFT)
+  publishedAt DateTime?
+  createdBy   String?
+  updatedBy   String?
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  teams       TeamsOnCompetitions[]
+  fixtures    Fixture[]
 }
 
 model Season {
@@ -56,6 +74,10 @@ model Season {
   name         String        @unique
   startDate    DateTime
   endDate      DateTime
+  status       ContentStatus @default(DRAFT)
+  publishedAt  DateTime?
+  createdBy    String?
+  updatedBy    String?
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   competitions Competition[]
@@ -72,22 +94,26 @@ model TeamsOnCompetitions {
 }
 
 model Fixture {
-  id            String       @id @default(uuid())
+  id            String        @id @default(uuid())
   name          String
-  competition   Competition? @relation(fields: [competitionId], references: [id])
+  competition   Competition?  @relation(fields: [competitionId], references: [id])
   competitionId String?
-  season        Season?      @relation(fields: [seasonId], references: [id])
+  season        Season?       @relation(fields: [seasonId], references: [id])
   seasonId      String?
-  team          Team?        @relation(fields: [teamId], references: [id])
+  team          Team?         @relation(fields: [teamId], references: [id])
   teamId        String?
-  opponent      Club?        @relation(fields: [opponentId], references: [id])
+  opponent      Club?         @relation(fields: [opponentId], references: [id])
   opponentId    String?
-  isHome        Boolean      @default(true)
+  isHome        Boolean       @default(true)
   kickoff       DateTime
   venue         String
+  status        ContentStatus @default(DRAFT)
+  publishedAt   DateTime?
+  createdBy     String?
+  updatedBy     String?
   scores        Score[]
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 }
 
 model Player {
@@ -97,6 +123,10 @@ model Player {
   position     Position?           @relation(fields: [positionId], references: [id])
   positionId   String?
   bio          String?
+  status       ContentStatus       @default(DRAFT)
+  publishedAt  DateTime?
+  createdBy    String?
+  updatedBy    String?
   teamHistory  PlayerTeamHistory[]
   headshot     Image?              @relation(name: "PlayerHeadshot", fields: [headshotId], references: [id], onDelete: SetNull)
   headshotId   String?             @unique

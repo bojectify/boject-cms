@@ -1,4 +1,5 @@
 import { builder } from './builder';
+import { ContentStatusEnum } from './types/contentStatus';
 import { ScoreTypeEnum } from './types/score';
 
 // Scalar filters
@@ -18,26 +19,31 @@ const DateTimeFilter = builder.prismaFilter('DateTime', {
   ops: ['equals', 'gt', 'gte', 'lt', 'lte', 'not'],
 });
 
+const ContentStatusFilter = builder.prismaFilter(ContentStatusEnum, {
+  ops: ['equals', 'not'],
+});
+
 const ScoreTypeFilter = builder.prismaFilter(ScoreTypeEnum, {
   ops: ['equals', 'not'],
 });
 
 // Model where inputs
 export const TeamWhere = builder.prismaWhere('Team', {
-  fields: { name: StringFilter },
+  fields: { name: StringFilter, status: ContentStatusFilter },
 });
 
 export const ClubWhere = builder.prismaWhere('Club', {
-  fields: { name: StringFilter },
+  fields: { name: StringFilter, status: ContentStatusFilter },
 });
 
 export const CompetitionWhere = builder.prismaWhere('Competition', {
-  fields: { name: StringFilter },
+  fields: { name: StringFilter, status: ContentStatusFilter },
 });
 
 export const SeasonWhere = builder.prismaWhere('Season', {
   fields: {
     name: StringFilter,
+    status: ContentStatusFilter,
     startDate: DateTimeFilter,
     endDate: DateTimeFilter,
   } as never,
@@ -61,6 +67,7 @@ export const PlayerWhere = builder.prismaWhere('Player', {
     firstName: StringFilter,
     lastName: StringFilter,
     bio: StringFilter,
+    status: ContentStatusFilter,
   },
 });
 
@@ -68,6 +75,7 @@ export const FixtureWhere = builder.prismaWhere('Fixture', {
   fields: {
     name: StringFilter,
     isHome: BooleanFilter,
+    status: ContentStatusFilter,
     kickoff: DateTimeFilter,
     venue: StringFilter,
   } as never,

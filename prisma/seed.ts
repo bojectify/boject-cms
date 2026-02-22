@@ -44,44 +44,56 @@ async function main() {
   const firstXV = await prisma.team.upsert({
     where: { name: '1st XV' },
     update: {},
-    create: { name: '1st XV' },
+    create: { name: '1st XV', status: 'PUBLISHED', publishedAt: new Date() },
   });
 
   const secondXV = await prisma.team.upsert({
     where: { name: '2nd XV' },
     update: {},
-    create: { name: '2nd XV' },
+    create: { name: '2nd XV', status: 'PUBLISHED', publishedAt: new Date() },
   });
 
   const _veterans = await prisma.team.upsert({
     where: { name: 'Veterans' },
     update: {},
-    create: { name: 'Veterans' },
+    create: { name: 'Veterans', status: 'PUBLISHED', publishedAt: new Date() },
   });
 
   const _colts = await prisma.team.upsert({
     where: { name: 'Colts' },
     update: {},
-    create: { name: 'Colts' },
+    create: { name: 'Colts', status: 'PUBLISHED', publishedAt: new Date() },
   });
 
   // Clubs (opponents)
   const oakdale = await prisma.club.upsert({
     where: { name: 'Oakdale RFC' },
     update: {},
-    create: { name: 'Oakdale RFC' },
+    create: {
+      name: 'Oakdale RFC',
+      status: 'PUBLISHED',
+      publishedAt: new Date(),
+    },
   });
 
   const riverside = await prisma.club.upsert({
     where: { name: 'Riverside RFC' },
     update: {},
-    create: { name: 'Riverside RFC' },
+    create: {
+      name: 'Riverside RFC',
+      status: 'PUBLISHED',
+      publishedAt: new Date(),
+    },
   });
 
   const hilltop = await prisma.club.upsert({
     where: { name: 'Hilltop RFC' },
     update: {},
-    create: { name: 'Hilltop RFC' },
+    create: {
+      name: 'Hilltop RFC',
+      status: 'PUBLISHED',
+      publishedAt: new Date(),
+    },
   });
 
   // Season
@@ -92,6 +104,8 @@ async function main() {
       name: '2025/26',
       startDate: new Date('2025-09-01'),
       endDate: new Date('2026-05-31'),
+      status: 'PUBLISHED',
+      publishedAt: new Date(),
     },
   });
 
@@ -99,13 +113,23 @@ async function main() {
   const league = await prisma.competition.upsert({
     where: { name: 'Division 1' },
     update: {},
-    create: { name: 'Division 1', seasonId: season.id },
+    create: {
+      name: 'Division 1',
+      seasonId: season.id,
+      status: 'PUBLISHED',
+      publishedAt: new Date(),
+    },
   });
 
   const cup = await prisma.competition.upsert({
     where: { name: 'County Cup' },
     update: {},
-    create: { name: 'County Cup', seasonId: season.id },
+    create: {
+      name: 'County Cup',
+      seasonId: season.id,
+      status: 'PUBLISHED',
+      publishedAt: new Date(),
+    },
   });
 
   // Link teams to competitions
@@ -138,6 +162,8 @@ async function main() {
       lastName: 'Jones',
       positionId: flyHalf.id,
       bio: 'Club captain and first-choice fly-half.',
+      status: 'PUBLISHED',
+      publishedAt: new Date(),
     },
   });
 
@@ -146,6 +172,8 @@ async function main() {
       firstName: 'Dai',
       lastName: 'Williams',
       positionId: hooker.id,
+      status: 'PUBLISHED',
+      publishedAt: new Date(),
     },
   });
 
@@ -154,6 +182,8 @@ async function main() {
       firstName: 'Tom',
       lastName: 'Evans',
       positionId: scrumHalf.id,
+      status: 'PUBLISHED',
+      publishedAt: new Date(),
     },
   });
 
@@ -163,6 +193,8 @@ async function main() {
       lastName: 'Morgan',
       positionId: fullback.id,
       bio: 'Versatile back, covers fullback and wing.',
+      status: 'PUBLISHED',
+      publishedAt: new Date(),
     },
   });
 
@@ -171,6 +203,8 @@ async function main() {
       firstName: 'Gethin',
       lastName: 'Price',
       positionId: leftWing.id,
+      status: 'PUBLISHED',
+      publishedAt: new Date(),
     },
   });
 
@@ -222,6 +256,8 @@ async function main() {
       isHome: true,
       kickoff: new Date('2025-09-13T14:30:00'),
       venue: 'Home Ground',
+      status: 'PUBLISHED',
+      publishedAt: new Date(),
     },
   });
 
@@ -235,6 +271,8 @@ async function main() {
       isHome: false,
       kickoff: new Date('2025-09-20T15:00:00'),
       venue: 'Riverside Park',
+      status: 'PUBLISHED',
+      publishedAt: new Date(),
     },
   });
 
@@ -248,6 +286,8 @@ async function main() {
       isHome: true,
       kickoff: new Date('2025-10-04T14:30:00'),
       venue: 'Home Ground',
+      status: 'PUBLISHED',
+      publishedAt: new Date(),
     },
   });
 

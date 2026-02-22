@@ -10,13 +10,29 @@ import { _registered as _teamsOnCompetitions } from './types/teamsOnCompetitions
 import { _registered as _competition } from './types/competition';
 import { _registered as _playerTeamHistory } from './types/playerTeamHistory';
 import { _registered as _player } from './types/player';
+import { ContentStatusEnum } from './types/contentStatus';
 import { ScoreTypeEnum } from './types/score';
 import { _registered as _fixture } from './types/fixture';
 import { _registered as _filters } from './filters';
 import { _registered as _query } from './query/index';
 
 // Reference imports to ensure they're not stripped
-void [_image, _position, _season, _team, _club, _teamsOnCompetitions, _competition, _playerTeamHistory, _player, ScoreTypeEnum, _fixture, _filters, _query];
+void [
+  _image,
+  _position,
+  _season,
+  _team,
+  _club,
+  _teamsOnCompetitions,
+  _competition,
+  _playerTeamHistory,
+  _player,
+  ContentStatusEnum,
+  ScoreTypeEnum,
+  _fixture,
+  _filters,
+  _query,
+];
 
 let _schema: ReturnType<typeof builder.toSchema> | null = null;
 

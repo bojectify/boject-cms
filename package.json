@@ -18,7 +18,7 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --check .",
     "format:fix": "prettier --write .",
-    "test": "vitest",
+    "test:watch": "vitest",
     "test:run": "vitest run",
     "typecheck": "nuxi typecheck"
   },
@@ -30,6 +30,7 @@
     "@nuxt/eslint": "^1.15.1",
     "@nuxt/test-utils": "^4.0.0",
     "@types/node": "^25.3.0",
+    "@vue/eslint-config-typescript": "^14.7.0",
     "@vue/test-utils": "^2.4.6",
     "dotenv": "^17.3.1",
     "eslint-config-prettier": "^10.1.8",
@@ -59,6 +60,7 @@
     "graphql-yoga": "^5.18.0",
     "h3": "1.15.5",
     "nuxt": "^4.3.1",
+    "tailwindcss": "^4.2.0",
     "vue": "^3.5.28"
   }
 }

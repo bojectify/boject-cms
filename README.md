@@ -56,7 +56,7 @@ The app runs at http://localhost:3000. The GraphQL playground (GraphiQL) is avai
 | `pnpm lint:fix`        | Lint and auto-fix                            |
 | `pnpm format`          | Check formatting with Prettier               |
 | `pnpm format:fix`      | Format all files                             |
-| `pnpm test`            | Run tests in watch mode                      |
+| `pnpm test:watch`      | Run tests in watch mode                      |
 | `pnpm test:run`        | Run tests once (CI)                          |
 | `pnpm typecheck`       | Run TypeScript type checker                  |
 
