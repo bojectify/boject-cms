@@ -8,11 +8,12 @@
     "build": "nuxt build",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare && prisma generate",
-    "prisma:start:local": "prisma dev start boject-cms-local",
+    "db:up": "docker compose up -d",
     "prisma:start:remote": "prisma dev start boject-cms",
     "prisma:migrate": "prisma migrate dev",
     "prisma:generate": "prisma generate",
     "prisma:seed": "tsx prisma/seed.ts",
+    "prisma:studio": "prisma studio",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --check .",
@@ -48,6 +49,7 @@
     ]
   },
   "dependencies": {
+    "@nuxt/ui": "4.4.0",
     "@pothos/core": "^4.12.0",
     "@pothos/plugin-prisma": "^4.14.2",
     "@pothos/plugin-prisma-utils": "^1.3.3",
