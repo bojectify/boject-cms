@@ -77,7 +77,7 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder.
 - **Type definitions** — One file per Prisma model in `server/graphql/types/`. Each file calls `builder.prismaObject(...)` as a side effect. Content metadata fields are shared via `contentMetadataFields()` helper in `server/graphql/types/contentFields.ts`.
 - **Enums** — `ScoreTypeEnum` in `server/graphql/types/score.ts`, `ContentStatusEnum` in `server/graphql/types/contentStatus.ts`.
 - **Root queries** — All root Query fields in `server/graphql/query/index.ts`. List + single-item lookups for all models except TeamsOnCompetitions (accessible only as nested data via `team.competitions` or `competition.teams`).
-- **Where filtering** — `server/graphql/filters.ts` defines Prisma-style where inputs via `@pothos/plugin-prisma-utils`. All list queries accept an optional `where` arg (e.g. `clubs(where: { name: { contains: "RFC" } })`).
+- **Where filtering** — `server/graphql/filters.ts` defines Prisma-style where inputs via `@pothos/plugin-prisma-utils`. All root list queries and one-to-many relation fields accept an optional `where` arg (e.g. `clubs(where: { name: { contains: "RFC" } })` or `team.fixtures(where: { isHome: { equals: true } })`). Relations use `t.relation()` with `args` and `query` callback to pass filters to Prisma.
 - **Schema assembly** — `server/graphql/schema.ts` imports all type/query files for side effects, then exports `builder.toSchema()`.
 - **Generated types** — `generated/pothos-types.ts` is produced by `prisma generate` alongside the Prisma client. Gitignored, never edit manually.
 - **DateTime scalar** — Registered in the builder. Serialises as ISO-8601 strings, parses string input to `Date`.
