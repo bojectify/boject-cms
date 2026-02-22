@@ -112,7 +112,7 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder.
 
 ## Linting & Formatting
 
-- **ESLint** — Via `@nuxt/eslint` module (registered in `nuxt.config.ts`). Includes Vue, TypeScript, and Nuxt-specific rules. Config in `eslint.config.mjs`. Custom config covers all `**/*.ts` files with `@typescript-eslint/parser` and `@typescript-eslint/eslint-plugin`. Underscore-prefixed variables are allowed as unused (`varsIgnorePattern: '^_'`).
+- **ESLint** — Via `@nuxt/eslint` module (registered in `nuxt.config.ts`). Includes Vue, TypeScript, and Nuxt-specific rules. Config in `eslint.config.mjs`. Custom config covers `**/*.ts` files with `@typescript-eslint/parser` and `@typescript-eslint/eslint-plugin`. A separate block sets `parserOptions.parser` to `@typescript-eslint/parser` for `**/*.vue` files (the Nuxt-generated config uses `vue-eslint-parser` but doesn't configure a TypeScript sub-parser). Underscore-prefixed variables are allowed as unused (`varsIgnorePattern: '^_'`).
 - **Prettier** — Single quotes, trailing commas (es5), semicolons, 2-space indent, 80 char width. Config in `.prettierrc.yml`.
 - **eslint-config-prettier** — Disables ESLint rules that conflict with Prettier.
 - **Lefthook** — Pre-commit hooks run ESLint and Prettier in parallel on staged files. Config in `lefthook.yml`.
