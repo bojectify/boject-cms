@@ -15,6 +15,7 @@ pnpm install                  # Install dependencies (runs nuxt prepare + prisma
 pnpm dev                      # Start Nuxt development server (http://localhost:3000)
 pnpm build                    # Build for production (outputs to .output/)
 pnpm preview                  # Preview production build locally
+pnpm db:up                    # Start local PostgreSQL container (alias for docker compose up -d)
 pnpm prisma:generate          # Regenerate Prisma client + Pothos types (required after schema changes)
 pnpm prisma:migrate           # Run database migrations
 pnpm prisma:seed              # Seed database with test data
@@ -38,11 +39,21 @@ Note: `prisma migrate dev` requires an interactive terminal. When running from a
 - **Generated client** — Output to `generated/prisma/` (not the default `node_modules` location). This directory is gitignored and must be regenerated after every schema change via `pnpm prisma:generate`.
 - **Local PostgreSQL** — `docker-compose.yml` runs Postgres 17 on port 5432 (user: `boject`, password: `boject`, db: `boject`). Data persists in a Docker volume (`pgdata`). `DATABASE_URL` in `.env` should be `postgresql://boject:boject@localhost:5432/boject`.
 - **Environment variables** — `.env` is loaded automatically by Nuxt in development. `prisma.config.ts` retains its own `import 'dotenv/config'` for CLI-only use (migrations, generation). `DATABASE_URL` is accessed via `process.env` in server code.
+- **Nuxt UI** — Component library (Tailwind CSS v4 + Reka UI primitives). Registered as a Nuxt module. CSS imported via `assets/css/main.css`. `app.vue` wraps pages in `<UApp>` (required for toasts, tooltips, overlays).
 - **Prisma MCP server** — Local MCP server configured for Claude Code, providing direct access to migrate-status, migrate-dev, migrate-reset, and Prisma Studio.
+- **Nuxt UI MCP server** — Remote MCP server at `https://ui.nuxt.com/mcp` for component docs, examples, and metadata.
 
 ## Database Schema
 
 Defined in `prisma/schema.prisma`. All models use UUID primary keys, `createdAt`/`updatedAt` timestamps, and `@unique` constraints on name fields where duplicates don't make sense.
+
+### Content Metadata
+
+Content models (Team, Club, Competition, Season, Player, Fixture) have publishing metadata:
+
+- `status` — `ContentStatus` enum (`DRAFT`, `PUBLISHED`, `ARCHIVED`), defaults to `DRAFT`
+- `publishedAt` — Nullable `DateTime`, set when first published
+- `createdBy` / `updatedBy` — Nullable `String` fields for user tracking (will become relations when auth is added)
 
 ### Domain Models
 
@@ -63,7 +74,8 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder.
 
 - **Endpoint** — `POST /api/graphql` for queries/mutations. `GET /api/graphql` serves GraphiQL playground in development.
 - **Schema builder** — `server/graphql/builder.ts` exports the singleton `SchemaBuilder` with PrismaPlugin and PrismaUtilsPlugin.
-- **Type definitions** — One file per Prisma model in `server/graphql/types/`. Each file calls `builder.prismaObject(...)` as a side effect.
+- **Type definitions** — One file per Prisma model in `server/graphql/types/`. Each file calls `builder.prismaObject(...)` as a side effect. Content metadata fields are shared via `contentMetadataFields()` helper in `server/graphql/types/contentFields.ts`.
+- **Enums** — `ScoreTypeEnum` in `server/graphql/types/score.ts`, `ContentStatusEnum` in `server/graphql/types/contentStatus.ts`.
 - **Root queries** — All root Query fields in `server/graphql/query/index.ts`. List + single-item lookups for all models except TeamsOnCompetitions (accessible only as nested data via `team.competitions` or `competition.teams`).
 - **Where filtering** — `server/graphql/filters.ts` defines Prisma-style where inputs via `@pothos/plugin-prisma-utils`. All list queries accept an optional `where` arg (e.g. `clubs(where: { name: { contains: "RFC" } })`).
 - **Schema assembly** — `server/graphql/schema.ts` imports all type/query files for side effects, then exports `builder.toSchema()`.
@@ -72,30 +84,35 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder.
 
 ## Key Files
 
-- `nuxt.config.ts` — Nuxt configuration (runtimeConfig, nitro options)
+- `nuxt.config.ts` — Nuxt configuration (modules, runtimeConfig, nitro options, CSS)
+- `app.vue` — Root component wrapping `<NuxtPage />` in `<UApp>`
+- `assets/css/main.css` — Tailwind CSS + Nuxt UI imports
 - `server/utils/prisma.ts` — Singleton PrismaClient instance (auto-imported into all server routes)
-- `server/api/graphql.ts` — GraphQL Yoga ↔ H3 bridge (explicitly imports `defineEventHandler` from `h3`)
+- `server/api/graphql/graphql.ts` — GraphQL Yoga ↔ H3 bridge (explicitly imports `defineEventHandler` from `h3`)
+- `server/api/teams.get.ts` — Teams API route (Prisma direct, not GraphQL)
 - `server/graphql/builder.ts` — Pothos SchemaBuilder singleton with PrismaPlugin
 - `server/graphql/schema.ts` — Assembles all type registrations and exports the GraphQL schema
 - `server/graphql/types/` — Per-model Pothos type definitions
+- `server/graphql/types/contentFields.ts` — Shared content metadata field helper
+- `server/graphql/types/contentStatus.ts` — ContentStatus GraphQL enum
 - `server/graphql/filters.ts` — Prisma-style where filter input types
 - `server/graphql/query/index.ts` — Root Query field definitions
 - `prisma/seed.ts` — Database seed script (positions, teams, clubs, seasons, competitions, players, fixtures, scores)
 - `docker-compose.yml` — Local PostgreSQL 17 container
-- `server/api/` — Nitro API route handlers
+- `server/api/` — Nitro API route handlers (CMS pages use Prisma directly, not GraphQL)
 - `pages/` — Nuxt page components
 - `prisma/schema.prisma` — Database schema
 - `prisma.config.ts` — Prisma CLI configuration (datasource, paths; dotenv-loaded for CLI use)
 - `generated/prisma/client.ts` — Server-side entry (PrismaClient + model types; gitignored, regenerated)
 - `generated/pothos-types.ts` — Pothos-Prisma type bridge (gitignored, regenerated)
-- `eslint.config.mjs` — ESLint flat config (extends Nuxt-generated config)
+- `eslint.config.mjs` — ESLint flat config (extends Nuxt-generated config, loads `@typescript-eslint` plugin)
 - `lefthook.yml` — Pre-commit hook configuration
 - `vitest.config.ts` — Vitest configuration
-- `server/api/graphql.test.ts` — GraphQL API integration tests
+- `server/api/graphql/graphql.test.ts` — GraphQL API integration tests
 
 ## Linting & Formatting
 
-- **ESLint** — Via `@nuxt/eslint` module (registered in `nuxt.config.ts`). Includes Vue, TypeScript, and Nuxt-specific rules. Config in `eslint.config.mjs`. Custom config covers all `**/*.ts` files with `@typescript-eslint/parser`. Underscore-prefixed variables are allowed as unused (`varsIgnorePattern: '^_'`).
+- **ESLint** — Via `@nuxt/eslint` module (registered in `nuxt.config.ts`). Includes Vue, TypeScript, and Nuxt-specific rules. Config in `eslint.config.mjs`. Custom config covers all `**/*.ts` files with `@typescript-eslint/parser` and `@typescript-eslint/eslint-plugin`. Underscore-prefixed variables are allowed as unused (`varsIgnorePattern: '^_'`).
 - **Prettier** — Single quotes, trailing commas (es5), semicolons, 2-space indent, 80 char width. Config in `.prettierrc.yml`.
 - **eslint-config-prettier** — Disables ESLint rules that conflict with Prettier.
 - **Lefthook** — Pre-commit hooks run ESLint and Prettier in parallel on staged files. Config in `lefthook.yml`.
@@ -104,5 +121,5 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder.
 
 - **Vitest** — Test runner, configured via `vitest.config.ts` using `@nuxt/test-utils/config`.
 - **@nuxt/test-utils** — Starts a Nuxt dev server for integration tests. Tests must use `setup({ dev: true })` (production mode masks GraphQL errors).
-- **Test location** — Colocated with source files (e.g. `server/api/graphql.test.ts`).
+- **Test location** — Colocated with source files (e.g. `server/api/graphql/graphql.test.ts`).
 - **GraphQL tests** — 19 integration tests covering list queries, single-item lookups, relation resolution, and where filtering.

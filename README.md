@@ -5,6 +5,7 @@ A TypeScript CMS for a rugby club, built with Nuxt 4 and Prisma v7 on PostgreSQL
 ## Tech Stack
 
 - **Nuxt 4** — Full-stack Vue framework with Nitro server engine
+- **Nuxt UI** — Component library (Tailwind CSS v4 + Reka UI primitives)
 - **Prisma v7** — ORM with `@prisma/adapter-pg` driver adapter
 - **PostgreSQL 17** — Database (local via Docker)
 - **GraphQL Yoga** — GraphQL server at `/api/graphql`
@@ -49,6 +50,7 @@ The app runs at http://localhost:3000. The GraphQL playground (GraphiQL) is avai
 | `pnpm dev`             | Start Nuxt development server                |
 | `pnpm build`           | Build for production (outputs to `.output/`) |
 | `pnpm preview`         | Preview production build locally             |
+| `pnpm db:up`           | Start local PostgreSQL container             |
 | `pnpm prisma:generate` | Regenerate Prisma client + Pothos types      |
 | `pnpm prisma:migrate`  | Run database migrations                      |
 | `pnpm prisma:seed`     | Seed database with test data                 |
@@ -56,7 +58,7 @@ The app runs at http://localhost:3000. The GraphQL playground (GraphiQL) is avai
 | `pnpm lint:fix`        | Lint and auto-fix                            |
 | `pnpm format`          | Check formatting with Prettier               |
 | `pnpm format:fix`      | Format all files                             |
-| `pnpm test:watch`      | Run tests in watch mode                      |
+| `pnpm test`            | Run tests in watch mode                      |
 | `pnpm test:run`        | Run tests once (CI)                          |
 | `pnpm typecheck`       | Run TypeScript type checker                  |
 
@@ -67,21 +69,25 @@ prisma/
   schema.prisma              # Database schema
   seed.ts                    # Seed script
   migrations/                # Migration files
+app.vue                        # Root component (UApp wrapper)
+assets/css/main.css            # Tailwind CSS + Nuxt UI imports
 server/
   api/
-    graphql.ts               # GraphQL Yoga endpoint
-    graphql.test.ts          # Integration tests
-    health.get.ts            # Health check endpoint
+    graphql/                   # GraphQL Yoga endpoint + tests
+    teams.get.ts               # Teams API route (Prisma direct)
   graphql/
-    builder.ts               # Pothos SchemaBuilder singleton
-    schema.ts                # Schema assembly
-    filters.ts               # Prisma-style where filter inputs
-    query/index.ts           # Root Query field definitions
-    types/                   # Per-model Pothos type definitions
+    builder.ts                 # Pothos SchemaBuilder singleton
+    schema.ts                  # Schema assembly
+    filters.ts                 # Prisma-style where filter inputs
+    query/index.ts             # Root Query field definitions
+    types/                     # Per-model Pothos type definitions
+      contentStatus.ts         # ContentStatus enum
+      contentFields.ts         # Shared metadata field helper
   utils/
-    prisma.ts                # Singleton PrismaClient (auto-imported)
+    prisma.ts                  # Singleton PrismaClient (auto-imported)
 pages/
-  index.vue                  # Home page
+  index.vue                    # Home page
+  teams.vue                    # Teams listing page
 generated/                   # Gitignored, auto-generated
   prisma/                    # Prisma client
   pothos-types.ts            # Pothos-Prisma type bridge
@@ -90,12 +96,14 @@ generated/                   # Gitignored, auto-generated
 ## Architecture
 
 ```
-Client → Nuxt (Vue) → Nitro → GraphQL Yoga → Pothos → Prisma → PostgreSQL
+External clients → GraphQL Yoga → Pothos → Prisma → PostgreSQL
+CMS pages → Nuxt server routes → Prisma → PostgreSQL
 ```
 
 - **Nuxt 4** serves pages and API routes. Nitro is the server engine.
-- **GraphQL Yoga** handles requests at `POST /api/graphql`.
-- **Pothos** builds the schema from Prisma model definitions, with auto-generated types.
+- **GraphQL Yoga** handles external client requests at `POST /api/graphql`.
+- **CMS pages** use dedicated Nuxt server API routes that query Prisma directly (not via GraphQL).
+- **Pothos** builds the GraphQL schema from Prisma model definitions, with auto-generated types.
 - **Prisma v7** uses the `@prisma/adapter-pg` driver adapter (not the traditional Rust engine). A singleton client in `server/utils/prisma.ts` is auto-imported into all server routes.
 - **Generated types** live in `generated/` (gitignored). Run `pnpm prisma:generate` after any schema change.
 
@@ -141,13 +149,14 @@ All list queries accept an optional `where` argument with Prisma-style filters:
 
 **Available filter operations:**
 
-| Type      | Operations                                            |
-| --------- | ----------------------------------------------------- |
-| String    | `contains`, `equals`, `startsWith`, `endsWith`, `not` |
-| Int       | `equals`, `gt`, `gte`, `lt`, `lte`, `not`             |
-| Boolean   | `equals`, `not`                                       |
-| DateTime  | `equals`, `gt`, `gte`, `lt`, `lte`, `not`             |
-| ScoreType | `equals`, `not`                                       |
+| Type          | Operations                                            |
+| ------------- | ----------------------------------------------------- |
+| String        | `contains`, `equals`, `startsWith`, `endsWith`, `not` |
+| Int           | `equals`, `gt`, `gte`, `lt`, `lte`, `not`             |
+| Boolean       | `equals`, `not`                                       |
+| DateTime      | `equals`, `gt`, `gte`, `lt`, `lte`, `not`             |
+| ScoreType     | `equals`, `not`                                       |
+| ContentStatus | `equals`, `not`                                       |
 
 ### Custom Scalars
 
@@ -172,7 +181,7 @@ PostgreSQL 17 runs locally via Docker Compose (port 5432, user/password/db: `boj
 | **Position**          | Rugby positions (e.g. Fly-half, Hooker)                                              |
 | **Image**             | Reusable image with url, alt, width, height                                          |
 
-All models use UUID primary keys and `createdAt`/`updatedAt` timestamps.
+All models use UUID primary keys and `createdAt`/`updatedAt` timestamps. Content models (Team, Club, Competition, Season, Player, Fixture) also have `status` (`DRAFT`/`PUBLISHED`/`ARCHIVED`), `publishedAt`, `createdBy`, and `updatedBy` metadata fields.
 
 ### Migrations
 
