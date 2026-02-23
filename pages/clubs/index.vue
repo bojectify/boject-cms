@@ -14,5 +14,6 @@ const { data, status } = await useFetch('/api/clubs', {
     :data="data?.items ?? []"
     :loading="status === 'pending'"
     :total="data?.total ?? 0"
+    :row-link="(row) => '/clubs/' + row.id"
   />
 </template>

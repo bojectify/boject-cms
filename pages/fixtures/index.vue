@@ -25,6 +25,7 @@ const columns: TableColumn<Record<string, unknown>>[] = [
     :loading="status === 'pending'"
     :columns="columns"
     :total="data?.total ?? 0"
+    :row-link="(row) => '/fixtures/' + row.id"
   >
     <template #kickoff-cell="{ row }">
       {{ formatDate(row.original.kickoff as string) }}

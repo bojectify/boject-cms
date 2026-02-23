@@ -35,6 +35,16 @@ export default withNuxt(
         parser: tsParser,
       },
     },
+    plugins: {
+      '@typescript-eslint': tseslint,
+    },
+    rules: {
+      'no-unused-vars': 'off',
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { varsIgnorePattern: '^_', ignoreRestSiblings: true },
+      ],
+    },
   },
   eslintConfigPrettier
 );

@@ -10,6 +10,7 @@ const props = defineProps<{
   page?: number;
   total?: number;
   itemsPerPage?: number;
+  rowLink?: (_row: Record<string, unknown>) => string;
 }>();
 
 const emit = defineEmits<{
@@ -33,6 +34,16 @@ const allColumns = computed<TableColumn<Record<string, unknown>>[]>(() => [
   <div class="p-6">
     <h1 class="text-2xl font-bold mb-4">{{ title }}</h1>
     <UTable :data="data" :columns="allColumns" :loading="loading">
+      <template #entryTitle-cell="{ row }">
+        <NuxtLink
+          v-if="rowLink"
+          :to="rowLink(row.original)"
+          class="text-primary hover:underline"
+        >
+          {{ row.original.entryTitle }}
+        </NuxtLink>
+        <span v-else>{{ row.original.entryTitle }}</span>
+      </template>
       <template #createdAt-cell="{ row }">
         {{ formatDate(row.original.createdAt as string) }}
       </template>

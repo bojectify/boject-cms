@@ -1,7 +1,7 @@
 <script setup lang="ts">
 const page = ref(1);
 
-const { data, status } = await useFetch('/api/players', {
+const { data, status } = await useFetch('/api/images', {
   query: { page, perPage: 15 },
   watch: [page],
 });
@@ -10,9 +10,10 @@ const { data, status } = await useFetch('/api/players', {
 <template>
   <ContentTable
     v-model:page="page"
-    title="Players"
+    title="Images"
     :data="data?.items ?? []"
     :loading="status === 'pending'"
     :total="data?.total ?? 0"
+    :row-link="(row) => '/images/' + row.id"
   />
 </template>
