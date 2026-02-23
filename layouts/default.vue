@@ -23,7 +23,9 @@ const items: NavigationMenuItem[] = [
     </UDashboardSidebar>
 
     <UDashboardPanel>
-      <slot />
+      <template #body>
+        <slot />
+      </template>
     </UDashboardPanel>
   </UDashboardGroup>
 </template>
