@@ -40,7 +40,7 @@ Note: `prisma migrate dev` requires an interactive terminal. When running from a
 - **Local PostgreSQL** — `docker-compose.yml` runs Postgres 17 on port 5432 (user: `boject`, password: `boject`, db: `boject`). Data persists in a Docker volume (`pgdata`). `DATABASE_URL` in `.env` should be `postgresql://boject:boject@localhost:5432/boject`.
 - **Environment variables** — `.env` is loaded automatically by Nuxt in development. `prisma.config.ts` retains its own `import 'dotenv/config'` for CLI-only use (migrations, generation). `DATABASE_URL` is accessed via `process.env` in server code.
 - **Nuxt UI** — Component library (Tailwind CSS v4 + Reka UI primitives). Registered as a Nuxt module. CSS imported via `assets/css/main.css`. `app.vue` wraps pages in `<UApp>` with `<NuxtLayout>` (required for toasts, tooltips, overlays).
-- **Dashboard layout** — `layouts/default.vue` uses `UDashboardGroup`, `UDashboardSidebar`, and `UDashboardPanel` to provide a sidebar navigation across all CMS pages. The sidebar contains a `UNavigationMenu` (vertical orientation) with links to all content listing pages. Active page is highlighted automatically via `to` prop matching.
+- **Dashboard layout** — `layouts/default.vue` uses `UDashboardGroup`, `UDashboardSidebar`, and `UDashboardPanel` to provide a sidebar navigation across all CMS pages. The sidebar contains a `UNavigationMenu` (vertical orientation) with links to All Content (index) and all per-model listing pages. Active page is highlighted automatically via `to` prop matching. Page content renders in the panel's `#body` slot for scrollability.
 - **ContentTable component** — Reusable table wrapper (`components/ContentTable.vue`) around UTable. Provides standard columns (entryTitle, createdAt, updatedAt, status) with built-in date formatting and status badges. Pages pass `title`, `data`, `loading`, and optional extra `columns` which are inserted after entryTitle. Extra scoped slots are forwarded to UTable. Uses `useContentTable` composable for shared `formatDate` and `statusColor` logic.
 - **Prisma MCP server** — Local MCP server configured for Claude Code, providing direct access to migrate-status, migrate-dev, migrate-reset, and Prisma Studio.
 - **Nuxt UI MCP server** — Remote MCP server at `https://ui.nuxt.com/mcp` for component docs, examples, and metadata.
@@ -95,6 +95,7 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder.
 - `server/api/graphql/graphql.ts` — GraphQL Yoga ↔ H3 bridge (explicitly imports `defineEventHandler` from `h3`)
 - `components/ContentTable.vue` — Reusable content listing table (UTable wrapper with standard columns + slot forwarding)
 - `composables/useContentTable.ts` — Shared `formatDate` and `statusColor` helpers
+- `server/api/content.get.ts` — Aggregated content API route (queries all 7 content models, tags with `contentType`, sorts by `updatedAt` desc, returns top 40)
 - `server/api/{model}.get.ts` — Per-model API routes (teams, fixtures, players, clubs, competitions, seasons, images) querying Prisma directly
 - `server/graphql/builder.ts` — Pothos SchemaBuilder singleton with PrismaPlugin
 - `server/graphql/schema.ts` — Assembles all type registrations and exports the GraphQL schema

@@ -2,6 +2,7 @@
 import type { NavigationMenuItem } from '@nuxt/ui';
 
 const items: NavigationMenuItem[] = [
+  { label: 'All Content', icon: 'i-lucide-layout-grid', to: '/' },
   { label: 'Teams', icon: 'i-lucide-shield', to: '/teams' },
   { label: 'Players', icon: 'i-lucide-users', to: '/players' },
   { label: 'Fixtures', icon: 'i-lucide-calendar', to: '/fixtures' },

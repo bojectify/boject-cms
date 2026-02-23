@@ -76,6 +76,7 @@ assets/css/main.css            # Tailwind CSS + Nuxt UI imports
 server/
   api/
     graphql/                   # GraphQL Yoga endpoint + tests
+    content.get.ts             # Aggregated content route (all models, top 40)
     {model}.get.ts             # Per-model listing routes (Prisma direct)
   graphql/
     builder.ts                 # Pothos SchemaBuilder singleton
@@ -92,7 +93,7 @@ components/
 composables/
   useContentTable.ts           # Shared formatDate + statusColor helpers
 pages/
-  index.vue                    # Home page
+  index.vue                    # Recent content (aggregated, top 40 by updatedAt)
   teams.vue                    # Teams listing
   fixtures.vue                 # Fixtures listing
   players.vue                  # Players listing
