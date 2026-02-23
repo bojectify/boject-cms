@@ -1,6 +1,18 @@
+<script setup lang="ts">
+import type { TableColumn } from '@nuxt/ui';
+
+const { data: content, status } = await useFetch('/api/content');
+
+const columns: TableColumn<Record<string, unknown>>[] = [
+  { accessorKey: 'contentType', header: 'Type' },
+];
+</script>
+
 <template>
-  <div>
-    <h1>Boject CMS</h1>
-    <p>Rugby club CMS is running.</p>
-  </div>
+  <ContentTable
+    title="Recent Content"
+    :data="content ?? []"
+    :loading="status === 'pending'"
+    :columns="columns"
+  />
 </template>
