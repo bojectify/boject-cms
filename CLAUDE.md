@@ -93,9 +93,7 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder.
 - `server/api/graphql/graphql.ts` — GraphQL Yoga ↔ H3 bridge (explicitly imports `defineEventHandler` from `h3`)
 - `components/ContentTable.vue` — Reusable content listing table (UTable wrapper with standard columns + slot forwarding)
 - `composables/useContentTable.ts` — Shared `formatDate` and `statusColor` helpers
-- `server/api/teams.get.ts` — Teams API route (Prisma direct, not GraphQL)
-- `server/api/fixtures.get.ts` — Fixtures API route (Prisma direct, not GraphQL)
-- `server/api/players.get.ts` — Players API route (Prisma direct, not GraphQL)
+- `server/api/{model}.get.ts` — Per-model API routes (teams, fixtures, players, clubs, competitions, seasons, images) querying Prisma directly
 - `server/graphql/builder.ts` — Pothos SchemaBuilder singleton with PrismaPlugin
 - `server/graphql/schema.ts` — Assembles all type registrations and exports the GraphQL schema
 - `server/graphql/types/` — Per-model Pothos type definitions

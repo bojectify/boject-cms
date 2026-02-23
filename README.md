@@ -74,9 +74,7 @@ assets/css/main.css            # Tailwind CSS + Nuxt UI imports
 server/
   api/
     graphql/                   # GraphQL Yoga endpoint + tests
-    teams.get.ts               # Teams API route (Prisma direct)
-    fixtures.get.ts            # Fixtures API route (Prisma direct)
-    players.get.ts             # Players API route (Prisma direct)
+    {model}.get.ts             # Per-model listing routes (Prisma direct)
   graphql/
     builder.ts                 # Pothos SchemaBuilder singleton
     schema.ts                  # Schema assembly
@@ -93,9 +91,13 @@ composables/
   useContentTable.ts           # Shared formatDate + statusColor helpers
 pages/
   index.vue                    # Home page
-  teams.vue                    # Teams listing page
-  fixtures.vue                 # Fixtures listing page
-  players.vue                  # Players listing page
+  teams.vue                    # Teams listing
+  fixtures.vue                 # Fixtures listing
+  players.vue                  # Players listing
+  clubs.vue                    # Clubs listing
+  competitions.vue             # Competitions listing
+  seasons.vue                  # Seasons listing
+  images.vue                   # Images listing
 generated/                   # Gitignored, auto-generated
   prisma/                    # Prisma client
   pothos-types.ts            # Pothos-Prisma type bridge
