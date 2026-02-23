@@ -6,6 +6,7 @@ builder.prismaObject('Season', {
   fields: (t) => ({
     id: t.exposeID('id'),
     name: t.exposeString('name'),
+    slug: t.exposeString('slug'),
     startDate: t.expose('startDate', { type: 'DateTime' }),
     endDate: t.expose('endDate', { type: 'DateTime' }),
     ...contentMetadataFields(t),

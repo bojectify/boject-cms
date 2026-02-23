@@ -7,6 +7,7 @@ builder.prismaObject('Player', {
     id: t.exposeID('id'),
     firstName: t.exposeString('firstName'),
     lastName: t.exposeString('lastName'),
+    slug: t.exposeString('slug'),
     bio: t.exposeString('bio', { nullable: true }),
     ...contentMetadataFields(t),
     createdAt: t.expose('createdAt', { type: 'DateTime' }),

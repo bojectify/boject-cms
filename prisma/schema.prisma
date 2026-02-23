@@ -31,6 +31,7 @@ model Team {
   id            String                @id @default(uuid())
   entryTitle    String                @default("")
   name          String                @unique
+  slug          String                @unique
   status        ContentStatus         @default(DRAFT)
   publishedAt   DateTime?
   createdBy     String?
@@ -46,6 +47,7 @@ model Club {
   id          String        @id @default(uuid())
   entryTitle  String        @default("")
   name        String        @unique
+  slug        String        @unique
   crest       Image?        @relation(name: "ClubCrest", fields: [crestId], references: [id], onDelete: SetNull)
   crestId     String?       @unique
   status      ContentStatus @default(DRAFT)
@@ -61,6 +63,7 @@ model Competition {
   id          String                @id @default(uuid())
   entryTitle  String                @default("")
   name        String                @unique
+  slug        String                @unique
   season      Season?               @relation(fields: [seasonId], references: [id])
   seasonId    String?
   status      ContentStatus         @default(DRAFT)
@@ -77,6 +80,7 @@ model Season {
   id           String        @id @default(uuid())
   entryTitle   String        @default("")
   name         String        @unique
+  slug         String        @unique
   startDate    DateTime
   endDate      DateTime
   status       ContentStatus @default(DRAFT)
@@ -102,6 +106,7 @@ model Fixture {
   id            String        @id @default(uuid())
   entryTitle    String        @default("")
   name          String
+  slug          String        @unique
   competition   Competition?  @relation(fields: [competitionId], references: [id])
   competitionId String?
   season        Season?       @relation(fields: [seasonId], references: [id])
@@ -127,6 +132,7 @@ model Player {
   entryTitle   String              @default("")
   firstName    String
   lastName     String
+  slug         String              @unique
   position     Position?           @relation(fields: [positionId], references: [id])
   positionId   String?
   bio          String?

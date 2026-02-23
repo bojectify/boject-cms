@@ -6,6 +6,7 @@ builder.prismaObject('Club', {
   fields: (t) => ({
     id: t.exposeID('id'),
     name: t.exposeString('name'),
+    slug: t.exposeString('slug'),
     ...contentMetadataFields(t),
     createdAt: t.expose('createdAt', { type: 'DateTime' }),
     updatedAt: t.expose('updatedAt', { type: 'DateTime' }),

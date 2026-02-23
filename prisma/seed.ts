@@ -46,6 +46,7 @@ async function main() {
     update: {},
     create: {
       name: '1st XV',
+      slug: '1st-xv',
       entryTitle: '1st XV',
       status: 'PUBLISHED',
       publishedAt: new Date(),
@@ -57,6 +58,7 @@ async function main() {
     update: {},
     create: {
       name: '2nd XV',
+      slug: '2nd-xv',
       entryTitle: '2nd XV',
       status: 'PUBLISHED',
       publishedAt: new Date(),
@@ -68,6 +70,7 @@ async function main() {
     update: {},
     create: {
       name: 'Veterans',
+      slug: 'veterans',
       entryTitle: 'Veterans',
       status: 'PUBLISHED',
       publishedAt: new Date(),
@@ -79,6 +82,7 @@ async function main() {
     update: {},
     create: {
       name: 'Colts',
+      slug: 'colts',
       entryTitle: 'Colts',
       status: 'PUBLISHED',
       publishedAt: new Date(),
@@ -91,6 +95,7 @@ async function main() {
     update: {},
     create: {
       name: 'Oakdale RFC',
+      slug: 'oakdale-rfc',
       entryTitle: 'Oakdale RFC',
       status: 'PUBLISHED',
       publishedAt: new Date(),
@@ -102,6 +107,7 @@ async function main() {
     update: {},
     create: {
       name: 'Riverside RFC',
+      slug: 'riverside-rfc',
       entryTitle: 'Riverside RFC',
       status: 'PUBLISHED',
       publishedAt: new Date(),
@@ -113,6 +119,7 @@ async function main() {
     update: {},
     create: {
       name: 'Hilltop RFC',
+      slug: 'hilltop-rfc',
       entryTitle: 'Hilltop RFC',
       status: 'PUBLISHED',
       publishedAt: new Date(),
@@ -125,6 +132,7 @@ async function main() {
     update: {},
     create: {
       name: '2025/26',
+      slug: '2025-26',
       entryTitle: '2025/26',
       startDate: new Date('2025-09-01'),
       endDate: new Date('2026-05-31'),
@@ -139,6 +147,7 @@ async function main() {
     update: {},
     create: {
       name: 'Division 1',
+      slug: 'division-1',
       entryTitle: 'Division 1',
       seasonId: season.id,
       status: 'PUBLISHED',
@@ -151,6 +160,7 @@ async function main() {
     update: {},
     create: {
       name: 'County Cup',
+      slug: 'county-cup',
       entryTitle: 'County Cup',
       seasonId: season.id,
       status: 'PUBLISHED',
@@ -186,6 +196,7 @@ async function main() {
     data: {
       firstName: 'Rhys',
       lastName: 'Jones',
+      slug: 'rhys-jones',
       entryTitle: 'Rhys Jones',
       positionId: flyHalf.id,
       bio: 'Club captain and first-choice fly-half.',
@@ -198,6 +209,7 @@ async function main() {
     data: {
       firstName: 'Dai',
       lastName: 'Williams',
+      slug: 'dai-williams',
       entryTitle: 'Dai Williams',
       positionId: hooker.id,
       status: 'PUBLISHED',
@@ -209,6 +221,7 @@ async function main() {
     data: {
       firstName: 'Tom',
       lastName: 'Evans',
+      slug: 'tom-evans',
       entryTitle: 'Tom Evans',
       positionId: scrumHalf.id,
       status: 'PUBLISHED',
@@ -220,6 +233,7 @@ async function main() {
     data: {
       firstName: 'Owen',
       lastName: 'Morgan',
+      slug: 'owen-morgan',
       entryTitle: 'Owen Morgan',
       positionId: fullback.id,
       bio: 'Versatile back, covers fullback and wing.',
@@ -232,6 +246,7 @@ async function main() {
     data: {
       firstName: 'Gethin',
       lastName: 'Price',
+      slug: 'gethin-price',
       entryTitle: 'Gethin Price',
       positionId: leftWing.id,
       status: 'PUBLISHED',
@@ -280,6 +295,7 @@ async function main() {
   const fixture1 = await prisma.fixture.create({
     data: {
       name: '1st XV vs Oakdale RFC',
+      slug: '1st-xv-vs-oakdale-rfc',
       entryTitle: '1st XV vs Oakdale RFC',
       teamId: firstXV.id,
       opponentId: oakdale.id,
@@ -296,6 +312,7 @@ async function main() {
   const fixture2 = await prisma.fixture.create({
     data: {
       name: 'Riverside RFC vs 1st XV',
+      slug: 'riverside-rfc-vs-1st-xv',
       entryTitle: 'Riverside RFC vs 1st XV',
       teamId: firstXV.id,
       opponentId: riverside.id,
@@ -312,6 +329,7 @@ async function main() {
   await prisma.fixture.create({
     data: {
       name: '1st XV vs Hilltop RFC (Cup)',
+      slug: '1st-xv-vs-hilltop-rfc-cup',
       entryTitle: '1st XV vs Hilltop RFC (Cup)',
       teamId: firstXV.id,
       opponentId: hilltop.id,

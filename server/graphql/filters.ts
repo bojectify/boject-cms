@@ -32,6 +32,7 @@ export const TeamWhere = builder.prismaWhere('Team', {
   fields: {
     entryTitle: StringFilter,
     name: StringFilter,
+    slug: StringFilter,
     status: ContentStatusFilter,
   },
 });
@@ -40,6 +41,7 @@ export const ClubWhere = builder.prismaWhere('Club', {
   fields: {
     entryTitle: StringFilter,
     name: StringFilter,
+    slug: StringFilter,
     status: ContentStatusFilter,
   },
 });
@@ -48,6 +50,7 @@ export const CompetitionWhere = builder.prismaWhere('Competition', {
   fields: {
     entryTitle: StringFilter,
     name: StringFilter,
+    slug: StringFilter,
     status: ContentStatusFilter,
   },
 });
@@ -56,6 +59,7 @@ export const SeasonWhere = builder.prismaWhere('Season', {
   fields: {
     entryTitle: StringFilter,
     name: StringFilter,
+    slug: StringFilter,
     status: ContentStatusFilter,
     startDate: DateTimeFilter,
     endDate: DateTimeFilter,
@@ -82,6 +86,7 @@ export const PlayerWhere = builder.prismaWhere('Player', {
     entryTitle: StringFilter,
     firstName: StringFilter,
     lastName: StringFilter,
+    slug: StringFilter,
     bio: StringFilter,
     status: ContentStatusFilter,
   },
@@ -124,6 +129,7 @@ export const FixtureWhere = builder.prismaWhere('Fixture', {
   fields: {
     entryTitle: StringFilter,
     name: StringFilter,
+    slug: StringFilter,
     isHome: BooleanFilter,
     status: ContentStatusFilter,
     kickoff: DateTimeFilter,

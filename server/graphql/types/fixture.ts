@@ -6,6 +6,7 @@ builder.prismaObject('Fixture', {
   fields: (t) => ({
     id: t.exposeID('id'),
     name: t.exposeString('name'),
+    slug: t.exposeString('slug'),
     isHome: t.exposeBoolean('isHome'),
     kickoff: t.expose('kickoff', { type: 'DateTime' }),
     venue: t.exposeString('venue'),
