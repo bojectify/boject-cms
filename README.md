@@ -126,36 +126,87 @@ CMS pages → Nuxt server routes → Prisma → PostgreSQL
 
 ### Queries
 
-List and single-item lookups for all models:
+All list queries return [Relay-style cursor connections](https://relay.dev/graphql/connections.htm) with `edges`, `node`, `cursor`, and `pageInfo`. Single-item lookups return the model directly.
 
-| Query                              | Args                      | Returns                     |
-| ---------------------------------- | ------------------------- | --------------------------- |
-| `teams` / `team(id)`               | `where: TeamWhere`        | Team[] / Team               |
-| `clubs` / `club(id)`               | `where: ClubWhere`        | Club[] / Club               |
-| `players` / `player(id)`           | `where: PlayerWhere`      | Player[] / Player           |
-| `fixtures` / `fixture(id)`         | `where: FixtureWhere`     | Fixture[] / Fixture         |
-| `scores` / `score(id)`             | `where: ScoreWhere`       | Score[] / Score             |
-| `competitions` / `competition(id)` | `where: CompetitionWhere` | Competition[] / Competition |
-| `seasons` / `season(id)`           | `where: SeasonWhere`      | Season[] / Season           |
-| `positions` / `position(id)`       | `where: PositionWhere`    | Position[] / Position       |
-| `images` / `image(id)`             | `where: ImageWhere`       | Image[] / Image             |
+| Query                              | Args                                        | Returns                             |
+| ---------------------------------- | ------------------------------------------- | ----------------------------------- |
+| `teams` / `team(id)`               | `first`, `after`, `last`, `before`, `where` | TeamConnection / Team               |
+| `clubs` / `club(id)`               | `first`, `after`, `last`, `before`, `where` | ClubConnection / Club               |
+| `players` / `player(id)`           | `first`, `after`, `last`, `before`, `where` | PlayerConnection / Player           |
+| `fixtures` / `fixture(id)`         | `first`, `after`, `last`, `before`, `where` | FixtureConnection / Fixture         |
+| `scores` / `score(id)`             | `first`, `after`, `last`, `before`, `where` | ScoreConnection / Score             |
+| `competitions` / `competition(id)` | `first`, `after`, `last`, `before`, `where` | CompetitionConnection / Competition |
+| `seasons` / `season(id)`           | `first`, `after`, `last`, `before`, `where` | SeasonConnection / Season           |
+| `positions` / `position(id)`       | `first`, `after`, `last`, `before`, `where` | PositionConnection / Position       |
+| `images` / `image(id)`             | `first`, `after`, `last`, `before`, `where` | ImageConnection / Image             |
+
+One-to-many relation fields (e.g. `team.fixtures`, `player.scores`) also use connections with the same pagination and filtering args. One-to-one relations (e.g. `fixture.season`, `player.position`) return the model directly.
+
+### Pagination
+
+```graphql
+# First page
+{
+  teams(first: 10) {
+    edges {
+      node {
+        id
+        name
+      }
+      cursor
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}
+
+# Next page (pass endCursor from previous response)
+{
+  teams(first: 10, after: "cursor-value") {
+    edges {
+      node {
+        id
+        name
+      }
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}
+```
 
 ### Where Filtering
 
-All list queries accept an optional `where` argument with Prisma-style filters:
+All list queries accept an optional `where` argument with Prisma-style filters, combinable with pagination args:
 
 ```graphql
 {
   clubs(where: { name: { contains: "RFC" } }) {
-    id
-    name
+    edges {
+      node {
+        id
+        name
+      }
+    }
   }
 
-  fixtures(where: { isHome: { equals: true } }) {
-    id
-    name
-    kickoff
-    venue
+  fixtures(first: 10, where: { isHome: { equals: true } }) {
+    edges {
+      node {
+        id
+        name
+        kickoff
+        venue
+      }
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
   }
 }
 ```
@@ -205,14 +256,14 @@ prisma migrate deploy          # Apply migrations (non-interactive / CI)
 
 ## Testing
 
-19 integration tests using Vitest + `@nuxt/test-utils`. Tests start a Nuxt dev server and send real GraphQL queries against the seeded database.
+21 integration tests using Vitest + `@nuxt/test-utils`. Tests start a Nuxt dev server and send real GraphQL queries against the seeded database.
 
 ```bash
 pnpm test          # Watch mode
 pnpm test:run      # Single run (CI)
 ```
 
-Tests cover list queries, single-item lookups, relation resolution, and where filtering.
+Tests cover list queries, single-item lookups, relation resolution, where filtering, and Relay cursor pagination.
 
 **Requirement:** Docker PostgreSQL must be running with seeded data.
 

@@ -76,11 +76,12 @@ Content models (Team, Club, Competition, Season, Player, Fixture, Image) have pu
 Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder.
 
 - **Endpoint** — `POST /api/graphql` for queries/mutations. `GET /api/graphql` serves GraphiQL playground in development.
-- **Schema builder** — `server/graphql/builder.ts` exports the singleton `SchemaBuilder` with PrismaPlugin and PrismaUtilsPlugin.
+- **Schema builder** — `server/graphql/builder.ts` exports the singleton `SchemaBuilder` with PrismaPlugin, PrismaUtilsPlugin, and RelayPlugin.
 - **Type definitions** — One file per Prisma model in `server/graphql/types/`. Each file calls `builder.prismaObject(...)` as a side effect. Content metadata fields are shared via `contentMetadataFields()` helper in `server/graphql/types/contentFields.ts`.
 - **Enums** — `ScoreTypeEnum` in `server/graphql/types/score.ts`, `ContentStatusEnum` in `server/graphql/types/contentStatus.ts`.
 - **Root queries** — All root Query fields in `server/graphql/query/index.ts`. List + single-item lookups for all models except TeamsOnCompetitions (accessible only as nested data via `team.competitions` or `competition.teams`).
-- **Where filtering** — `server/graphql/filters.ts` defines Prisma-style where inputs via `@pothos/plugin-prisma-utils`. All root list queries and one-to-many relation fields accept an optional `where` arg (e.g. `clubs(where: { name: { contains: "RFC" } })` or `team.fixtures(where: { isHome: { equals: true } })`). Relations use `t.relation()` with `args` and `query` callback to pass filters to Prisma. Scalar filters use `builder.prismaFilter()`, model where inputs use `builder.prismaWhere()`. To-one relation filters (e.g. filtering fixtures by season) use manual `builder.inputType()` wrappers with `is`/`isNot` fields since `builder.prismaObjectFilter()` is not available in the current Pothos version. `FixtureWhere` includes relation filters for `team`, `opponent`, `competition`, and `season`.
+- **Relay cursor pagination** — All root list queries use `t.prismaConnection()` and one-to-many relation fields use `t.relatedConnection()` via `@pothos/plugin-relay`. Responses use standard Relay connection shape (`edges { node { ... } cursor } pageInfo { hasNextPage endCursor ... }`). Clients can paginate with `first`/`after`/`last`/`before` args. One-to-one relations remain as `t.relation()`. All models use `cursor: 'id'` except `TeamsOnCompetitions` which uses the composite cursor `teamId_competitionId`.
+- **Where filtering** — `server/graphql/filters.ts` defines Prisma-style where inputs via `@pothos/plugin-prisma-utils`. All root list queries and one-to-many relation fields accept an optional `where` arg alongside the Relay pagination args (e.g. `clubs(first: 10, where: { name: { contains: "RFC" } })` or `team.fixtures(where: { isHome: { equals: true } })`). One-to-many relations use `t.relatedConnection()` with `args` and `query` callback to pass filters to Prisma. Scalar filters use `builder.prismaFilter()`, model where inputs use `builder.prismaWhere()`. To-one relation filters (e.g. filtering fixtures by season) use manual `builder.inputType()` wrappers with `is`/`isNot` fields since `builder.prismaObjectFilter()` is not available in the current Pothos version. `FixtureWhere` includes relation filters for `team`, `opponent`, `competition`, and `season`.
 - **Schema assembly** — `server/graphql/schema.ts` imports all type/query files for side effects, then exports `builder.toSchema()`.
 - **Generated types** — `generated/pothos-types.ts` is produced by `prisma generate` alongside the Prisma client. Gitignored, never edit manually.
 - **DateTime scalar** — Registered in the builder. Serialises as ISO-8601 strings, parses string input to `Date`.
@@ -97,7 +98,7 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder.
 - `composables/useContentTable.ts` — Shared `formatDate` and `statusColor` helpers
 - `server/api/content.get.ts` — Aggregated content API route (queries all 7 content models, tags with `contentType`, sorts by `updatedAt` desc, returns top 40)
 - `server/api/{model}.get.ts` — Per-model API routes (teams, fixtures, players, clubs, competitions, seasons, images) querying Prisma directly
-- `server/graphql/builder.ts` — Pothos SchemaBuilder singleton with PrismaPlugin
+- `server/graphql/builder.ts` — Pothos SchemaBuilder singleton with PrismaPlugin, PrismaUtilsPlugin, and RelayPlugin
 - `server/graphql/schema.ts` — Assembles all type registrations and exports the GraphQL schema
 - `server/graphql/types/` — Per-model Pothos type definitions
 - `server/graphql/types/contentFields.ts` — Shared content metadata field helper
@@ -129,4 +130,4 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder.
 - **Vitest** — Test runner, configured via `vitest.config.ts` using `@nuxt/test-utils/config`.
 - **@nuxt/test-utils** — Starts a Nuxt dev server for integration tests. Tests must use `setup({ dev: true })` (production mode masks GraphQL errors).
 - **Test location** — Colocated with source files (e.g. `server/api/graphql/graphql.test.ts`).
-- **GraphQL tests** — 19 integration tests covering list queries, single-item lookups, relation resolution, and where filtering.
+- **GraphQL tests** — 21 integration tests covering list queries, single-item lookups, relation resolution, where filtering, and Relay cursor pagination.
