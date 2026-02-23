@@ -40,7 +40,7 @@ Note: `prisma migrate dev` requires an interactive terminal. When running from a
 - **Local PostgreSQL** — `docker-compose.yml` runs Postgres 17 on port 5432 (user: `boject`, password: `boject`, db: `boject`). Data persists in a Docker volume (`pgdata`). `DATABASE_URL` in `.env` should be `postgresql://boject:boject@localhost:5432/boject`.
 - **Environment variables** — `.env` is loaded automatically by Nuxt in development. `prisma.config.ts` retains its own `import 'dotenv/config'` for CLI-only use (migrations, generation). `DATABASE_URL` is accessed via `process.env` in server code.
 - **Nuxt UI** — Component library (Tailwind CSS v4 + Reka UI primitives). Registered as a Nuxt module. CSS imported via `assets/css/main.css`. `app.vue` wraps pages in `<UApp>` (required for toasts, tooltips, overlays).
-- **ContentTable component** — Reusable table wrapper (`components/ContentTable.vue`) around UTable. Provides standard columns (name, createdAt, updatedAt, status) with built-in date formatting and status badges. Pages pass `title`, `data`, `loading`, and optional extra `columns` which are inserted between name and the metadata columns. Extra scoped slots are forwarded to UTable. Uses `useContentTable` composable for shared `formatDate` and `statusColor` logic.
+- **ContentTable component** — Reusable table wrapper (`components/ContentTable.vue`) around UTable. Provides standard columns (entryTitle, createdAt, updatedAt, status) with built-in date formatting and status badges. Pages pass `title`, `data`, `loading`, and optional extra `columns` which are inserted after entryTitle. Extra scoped slots are forwarded to UTable. Uses `useContentTable` composable for shared `formatDate` and `statusColor` logic.
 - **Prisma MCP server** — Local MCP server configured for Claude Code, providing direct access to migrate-status, migrate-dev, migrate-reset, and Prisma Studio.
 - **Nuxt UI MCP server** — Remote MCP server at `https://ui.nuxt.com/mcp` for component docs, examples, and metadata.
 
@@ -50,8 +50,9 @@ Defined in `prisma/schema.prisma`. All models use UUID primary keys, `createdAt`
 
 ### Content Metadata
 
-Content models (Team, Club, Competition, Season, Player, Fixture) have publishing metadata:
+Content models (Team, Club, Competition, Season, Player, Fixture, Image) have publishing metadata:
 
+- `entryTitle` — Display name for the entry in the CMS (e.g. the model's `name`, or `firstName lastName` for players)
 - `status` — `ContentStatus` enum (`DRAFT`, `PUBLISHED`, `CHANGED`, `ARCHIVED`), defaults to `DRAFT`
 - `publishedAt` — Nullable `DateTime`, set when first published
 - `createdBy` / `updatedBy` — Nullable `String` fields for user tracking (will become relations when auth is added)
@@ -94,6 +95,7 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder.
 - `composables/useContentTable.ts` — Shared `formatDate` and `statusColor` helpers
 - `server/api/teams.get.ts` — Teams API route (Prisma direct, not GraphQL)
 - `server/api/fixtures.get.ts` — Fixtures API route (Prisma direct, not GraphQL)
+- `server/api/players.get.ts` — Players API route (Prisma direct, not GraphQL)
 - `server/graphql/builder.ts` — Pothos SchemaBuilder singleton with PrismaPlugin
 - `server/graphql/schema.ts` — Assembles all type registrations and exports the GraphQL schema
 - `server/graphql/types/` — Per-model Pothos type definitions

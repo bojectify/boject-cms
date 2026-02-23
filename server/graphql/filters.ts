@@ -29,19 +29,32 @@ const ScoreTypeFilter = builder.prismaFilter(ScoreTypeEnum, {
 
 // Model where inputs
 export const TeamWhere = builder.prismaWhere('Team', {
-  fields: { name: StringFilter, status: ContentStatusFilter },
+  fields: {
+    entryTitle: StringFilter,
+    name: StringFilter,
+    status: ContentStatusFilter,
+  },
 });
 
 export const ClubWhere = builder.prismaWhere('Club', {
-  fields: { name: StringFilter, status: ContentStatusFilter },
+  fields: {
+    entryTitle: StringFilter,
+    name: StringFilter,
+    status: ContentStatusFilter,
+  },
 });
 
 export const CompetitionWhere = builder.prismaWhere('Competition', {
-  fields: { name: StringFilter, status: ContentStatusFilter },
+  fields: {
+    entryTitle: StringFilter,
+    name: StringFilter,
+    status: ContentStatusFilter,
+  },
 });
 
 export const SeasonWhere = builder.prismaWhere('Season', {
   fields: {
+    entryTitle: StringFilter,
     name: StringFilter,
     status: ContentStatusFilter,
     startDate: DateTimeFilter,
@@ -55,6 +68,7 @@ export const PositionWhere = builder.prismaWhere('Position', {
 
 export const ImageWhere = builder.prismaWhere('Image', {
   fields: {
+    entryTitle: StringFilter,
     url: StringFilter,
     alt: StringFilter,
     width: IntFilter,
@@ -65,6 +79,7 @@ export const ImageWhere = builder.prismaWhere('Image', {
 
 export const PlayerWhere = builder.prismaWhere('Player', {
   fields: {
+    entryTitle: StringFilter,
     firstName: StringFilter,
     lastName: StringFilter,
     bio: StringFilter,
@@ -107,6 +122,7 @@ const CompetitionRelationFilter = builder.inputType(
 // Model where inputs (with relation filters)
 export const FixtureWhere = builder.prismaWhere('Fixture', {
   fields: {
+    entryTitle: StringFilter,
     name: StringFilter,
     isHome: BooleanFilter,
     status: ContentStatusFilter,

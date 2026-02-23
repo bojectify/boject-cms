@@ -44,25 +44,45 @@ async function main() {
   const firstXV = await prisma.team.upsert({
     where: { name: '1st XV' },
     update: {},
-    create: { name: '1st XV', status: 'PUBLISHED', publishedAt: new Date() },
+    create: {
+      name: '1st XV',
+      entryTitle: '1st XV',
+      status: 'PUBLISHED',
+      publishedAt: new Date(),
+    },
   });
 
   const secondXV = await prisma.team.upsert({
     where: { name: '2nd XV' },
     update: {},
-    create: { name: '2nd XV', status: 'PUBLISHED', publishedAt: new Date() },
+    create: {
+      name: '2nd XV',
+      entryTitle: '2nd XV',
+      status: 'PUBLISHED',
+      publishedAt: new Date(),
+    },
   });
 
   const _veterans = await prisma.team.upsert({
     where: { name: 'Veterans' },
     update: {},
-    create: { name: 'Veterans', status: 'PUBLISHED', publishedAt: new Date() },
+    create: {
+      name: 'Veterans',
+      entryTitle: 'Veterans',
+      status: 'PUBLISHED',
+      publishedAt: new Date(),
+    },
   });
 
   const _colts = await prisma.team.upsert({
     where: { name: 'Colts' },
     update: {},
-    create: { name: 'Colts', status: 'PUBLISHED', publishedAt: new Date() },
+    create: {
+      name: 'Colts',
+      entryTitle: 'Colts',
+      status: 'PUBLISHED',
+      publishedAt: new Date(),
+    },
   });
 
   // Clubs (opponents)
@@ -71,6 +91,7 @@ async function main() {
     update: {},
     create: {
       name: 'Oakdale RFC',
+      entryTitle: 'Oakdale RFC',
       status: 'PUBLISHED',
       publishedAt: new Date(),
     },
@@ -81,6 +102,7 @@ async function main() {
     update: {},
     create: {
       name: 'Riverside RFC',
+      entryTitle: 'Riverside RFC',
       status: 'PUBLISHED',
       publishedAt: new Date(),
     },
@@ -91,6 +113,7 @@ async function main() {
     update: {},
     create: {
       name: 'Hilltop RFC',
+      entryTitle: 'Hilltop RFC',
       status: 'PUBLISHED',
       publishedAt: new Date(),
     },
@@ -102,6 +125,7 @@ async function main() {
     update: {},
     create: {
       name: '2025/26',
+      entryTitle: '2025/26',
       startDate: new Date('2025-09-01'),
       endDate: new Date('2026-05-31'),
       status: 'PUBLISHED',
@@ -115,6 +139,7 @@ async function main() {
     update: {},
     create: {
       name: 'Division 1',
+      entryTitle: 'Division 1',
       seasonId: season.id,
       status: 'PUBLISHED',
       publishedAt: new Date(),
@@ -126,6 +151,7 @@ async function main() {
     update: {},
     create: {
       name: 'County Cup',
+      entryTitle: 'County Cup',
       seasonId: season.id,
       status: 'PUBLISHED',
       publishedAt: new Date(),
@@ -160,6 +186,7 @@ async function main() {
     data: {
       firstName: 'Rhys',
       lastName: 'Jones',
+      entryTitle: 'Rhys Jones',
       positionId: flyHalf.id,
       bio: 'Club captain and first-choice fly-half.',
       status: 'PUBLISHED',
@@ -171,6 +198,7 @@ async function main() {
     data: {
       firstName: 'Dai',
       lastName: 'Williams',
+      entryTitle: 'Dai Williams',
       positionId: hooker.id,
       status: 'PUBLISHED',
       publishedAt: new Date(),
@@ -181,6 +209,7 @@ async function main() {
     data: {
       firstName: 'Tom',
       lastName: 'Evans',
+      entryTitle: 'Tom Evans',
       positionId: scrumHalf.id,
       status: 'PUBLISHED',
       publishedAt: new Date(),
@@ -191,6 +220,7 @@ async function main() {
     data: {
       firstName: 'Owen',
       lastName: 'Morgan',
+      entryTitle: 'Owen Morgan',
       positionId: fullback.id,
       bio: 'Versatile back, covers fullback and wing.',
       status: 'PUBLISHED',
@@ -202,6 +232,7 @@ async function main() {
     data: {
       firstName: 'Gethin',
       lastName: 'Price',
+      entryTitle: 'Gethin Price',
       positionId: leftWing.id,
       status: 'PUBLISHED',
       publishedAt: new Date(),
@@ -249,6 +280,7 @@ async function main() {
   const fixture1 = await prisma.fixture.create({
     data: {
       name: '1st XV vs Oakdale RFC',
+      entryTitle: '1st XV vs Oakdale RFC',
       teamId: firstXV.id,
       opponentId: oakdale.id,
       competitionId: league.id,
@@ -264,6 +296,7 @@ async function main() {
   const fixture2 = await prisma.fixture.create({
     data: {
       name: 'Riverside RFC vs 1st XV',
+      entryTitle: 'Riverside RFC vs 1st XV',
       teamId: firstXV.id,
       opponentId: riverside.id,
       competitionId: league.id,
@@ -279,6 +312,7 @@ async function main() {
   await prisma.fixture.create({
     data: {
       name: '1st XV vs Hilltop RFC (Cup)',
+      entryTitle: '1st XV vs Hilltop RFC (Cup)',
       teamId: firstXV.id,
       opponentId: hilltop.id,
       competitionId: cup.id,

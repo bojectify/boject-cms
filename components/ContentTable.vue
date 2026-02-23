@@ -14,7 +14,7 @@ const slots = defineSlots();
 const { formatDate, statusColor } = useContentTable();
 
 const allColumns = computed<TableColumn<Record<string, unknown>>[]>(() => [
-  { accessorKey: 'name', header: 'Name' },
+  { accessorKey: 'entryTitle', header: 'Entry Title' },
   { accessorKey: 'createdAt', header: 'Created' },
   { accessorKey: 'updatedAt', header: 'Updated' },
   { accessorKey: 'status', header: 'Status' },

@@ -29,6 +29,7 @@ enum ContentStatus {
 
 model Team {
   id            String                @id @default(uuid())
+  entryTitle    String                @default("")
   name          String                @unique
   status        ContentStatus         @default(DRAFT)
   publishedAt   DateTime?
@@ -43,6 +44,7 @@ model Team {
 
 model Club {
   id          String        @id @default(uuid())
+  entryTitle  String        @default("")
   name        String        @unique
   crest       Image?        @relation(name: "ClubCrest", fields: [crestId], references: [id], onDelete: SetNull)
   crestId     String?       @unique
@@ -57,6 +59,7 @@ model Club {
 
 model Competition {
   id          String                @id @default(uuid())
+  entryTitle  String                @default("")
   name        String                @unique
   season      Season?               @relation(fields: [seasonId], references: [id])
   seasonId    String?
@@ -72,6 +75,7 @@ model Competition {
 
 model Season {
   id           String        @id @default(uuid())
+  entryTitle   String        @default("")
   name         String        @unique
   startDate    DateTime
   endDate      DateTime
@@ -96,6 +100,7 @@ model TeamsOnCompetitions {
 
 model Fixture {
   id            String        @id @default(uuid())
+  entryTitle    String        @default("")
   name          String
   competition   Competition?  @relation(fields: [competitionId], references: [id])
   competitionId String?
@@ -119,6 +124,7 @@ model Fixture {
 
 model Player {
   id           String              @id @default(uuid())
+  entryTitle   String              @default("")
   firstName    String
   lastName     String
   position     Position?           @relation(fields: [positionId], references: [id])
@@ -179,6 +185,7 @@ model PlayerTeamHistory {
 
 model Image {
   id           String        @id @default(uuid())
+  entryTitle   String        @default("")
   url          String
   alt          String
   width        Int
