@@ -51,7 +51,7 @@ Defined in `prisma/schema.prisma`. All models use UUID primary keys, `createdAt`
 
 Content models (Team, Club, Competition, Season, Player, Fixture) have publishing metadata:
 
-- `status` — `ContentStatus` enum (`DRAFT`, `PUBLISHED`, `ARCHIVED`), defaults to `DRAFT`
+- `status` — `ContentStatus` enum (`DRAFT`, `PUBLISHED`, `CHANGED`, `ARCHIVED`), defaults to `DRAFT`
 - `publishedAt` — Nullable `DateTime`, set when first published
 - `createdBy` / `updatedBy` — Nullable `String` fields for user tracking (will become relations when auth is added)
 
@@ -77,7 +77,7 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder.
 - **Type definitions** — One file per Prisma model in `server/graphql/types/`. Each file calls `builder.prismaObject(...)` as a side effect. Content metadata fields are shared via `contentMetadataFields()` helper in `server/graphql/types/contentFields.ts`.
 - **Enums** — `ScoreTypeEnum` in `server/graphql/types/score.ts`, `ContentStatusEnum` in `server/graphql/types/contentStatus.ts`.
 - **Root queries** — All root Query fields in `server/graphql/query/index.ts`. List + single-item lookups for all models except TeamsOnCompetitions (accessible only as nested data via `team.competitions` or `competition.teams`).
-- **Where filtering** — `server/graphql/filters.ts` defines Prisma-style where inputs via `@pothos/plugin-prisma-utils`. All root list queries and one-to-many relation fields accept an optional `where` arg (e.g. `clubs(where: { name: { contains: "RFC" } })` or `team.fixtures(where: { isHome: { equals: true } })`). Relations use `t.relation()` with `args` and `query` callback to pass filters to Prisma.
+- **Where filtering** — `server/graphql/filters.ts` defines Prisma-style where inputs via `@pothos/plugin-prisma-utils`. All root list queries and one-to-many relation fields accept an optional `where` arg (e.g. `clubs(where: { name: { contains: "RFC" } })` or `team.fixtures(where: { isHome: { equals: true } })`). Relations use `t.relation()` with `args` and `query` callback to pass filters to Prisma. Scalar filters use `builder.prismaFilter()`, model where inputs use `builder.prismaWhere()`. To-one relation filters (e.g. filtering fixtures by season) use manual `builder.inputType()` wrappers with `is`/`isNot` fields since `builder.prismaObjectFilter()` is not available in the current Pothos version. `FixtureWhere` includes relation filters for `team`, `opponent`, `competition`, and `season`.
 - **Schema assembly** — `server/graphql/schema.ts` imports all type/query files for side effects, then exports `builder.toSchema()`.
 - **Generated types** — `generated/pothos-types.ts` is produced by `prisma generate` alongside the Prisma client. Gitignored, never edit manually.
 - **DateTime scalar** — Registered in the builder. Serialises as ISO-8601 strings, parses string input to `Date`.
