@@ -157,5 +157,4 @@ builder.queryType({
   }),
 });
 
-
 export const _registered = true;

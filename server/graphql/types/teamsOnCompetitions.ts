@@ -9,5 +9,4 @@ builder.prismaObject('TeamsOnCompetitions', {
   }),
 });
 
-
 export const _registered = true;
