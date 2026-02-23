@@ -96,7 +96,7 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder.
 - `server/api/graphql/graphql.ts` — GraphQL Yoga ↔ H3 bridge (explicitly imports `defineEventHandler` from `h3`)
 - `components/ContentTable.vue` — Reusable content listing table (UTable wrapper with standard columns + slot forwarding)
 - `composables/useContentTable.ts` — Shared `formatDate` and `statusColor` helpers
-- `server/api/content.get.ts` — Aggregated content API route (queries all 7 content models, tags with `contentType`, sorts by `updatedAt` desc, returns top 40)
+- `server/api/content.get.ts` — Paginated content API route (raw SQL `UNION ALL` across all 7 content models, sorted by `updatedAt` desc, accepts `page`/`perPage` query params, returns `{ items, total }`)
 - `server/api/{model}.get.ts` — Per-model API routes (teams, fixtures, players, clubs, competitions, seasons, images) querying Prisma directly
 - `server/graphql/builder.ts` — Pothos SchemaBuilder singleton with PrismaPlugin, PrismaUtilsPlugin, and RelayPlugin
 - `server/graphql/schema.ts` — Assembles all type registrations and exports the GraphQL schema
@@ -120,7 +120,7 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder.
 
 ## Linting & Formatting
 
-- **ESLint** — Via `@nuxt/eslint` module (registered in `nuxt.config.ts`). Includes Vue, TypeScript, and Nuxt-specific rules. Config in `eslint.config.mjs`. Custom config covers `**/*.ts` files with `@typescript-eslint/parser` and `@typescript-eslint/eslint-plugin`. A separate block sets `parserOptions.parser` to `@typescript-eslint/parser` for `**/*.vue` files (the Nuxt-generated config uses `vue-eslint-parser` but doesn't configure a TypeScript sub-parser). Underscore-prefixed variables are allowed as unused (`varsIgnorePattern: '^_'`).
+- **ESLint** — Via `@nuxt/eslint` module (registered in `nuxt.config.ts`). Includes Vue, TypeScript, and Nuxt-specific rules. Config in `eslint.config.mjs`. Custom config covers `**/*.ts` files with `@typescript-eslint/parser` and `@typescript-eslint/eslint-plugin`. A separate block sets `parserOptions.parser` to `@typescript-eslint/parser` for `**/*.vue` files (the Nuxt-generated config uses `vue-eslint-parser` but doesn't configure a TypeScript sub-parser). Underscore-prefixed variables are allowed as unused (`varsIgnorePattern: '^_'`). Destructured rest siblings are also ignored (`ignoreRestSiblings: true`).
 - **Prettier** — Single quotes, trailing commas (es5), semicolons, 2-space indent, 80 char width. Config in `.prettierrc.yml`.
 - **eslint-config-prettier** — Disables ESLint rules that conflict with Prettier.
 - **Lefthook** — Pre-commit hooks run ESLint and Prettier in parallel on staged files. Config in `lefthook.yml`.

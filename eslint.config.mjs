@@ -19,7 +19,7 @@ export default withNuxt(
       'no-unused-vars': 'off',
       '@typescript-eslint/no-unused-vars': [
         'error',
-        { varsIgnorePattern: '^_' },
+        { varsIgnorePattern: '^_', ignoreRestSiblings: true },
       ],
     },
   },
