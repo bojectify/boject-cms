@@ -75,6 +75,7 @@ server/
   api/
     graphql/                   # GraphQL Yoga endpoint + tests
     teams.get.ts               # Teams API route (Prisma direct)
+    fixtures.get.ts            # Fixtures API route (Prisma direct)
   graphql/
     builder.ts                 # Pothos SchemaBuilder singleton
     schema.ts                  # Schema assembly
@@ -85,9 +86,14 @@ server/
       contentFields.ts         # Shared metadata field helper
   utils/
     prisma.ts                  # Singleton PrismaClient (auto-imported)
+components/
+  ContentTable.vue             # Reusable content listing table
+composables/
+  useContentTable.ts           # Shared formatDate + statusColor helpers
 pages/
   index.vue                    # Home page
   teams.vue                    # Teams listing page
+  fixtures.vue                 # Fixtures listing page
 generated/                   # Gitignored, auto-generated
   prisma/                    # Prisma client
   pothos-types.ts            # Pothos-Prisma type bridge
@@ -181,7 +187,7 @@ PostgreSQL 17 runs locally via Docker Compose (port 5432, user/password/db: `boj
 | **Position**          | Rugby positions (e.g. Fly-half, Hooker)                                              |
 | **Image**             | Reusable image with url, alt, width, height                                          |
 
-All models use UUID primary keys and `createdAt`/`updatedAt` timestamps. Content models (Team, Club, Competition, Season, Player, Fixture) also have `status` (`DRAFT`/`PUBLISHED`/`ARCHIVED`), `publishedAt`, `createdBy`, and `updatedBy` metadata fields.
+All models use UUID primary keys and `createdAt`/`updatedAt` timestamps. Content models (Team, Club, Competition, Season, Player, Fixture) also have `status` (`DRAFT`/`PUBLISHED`/`CHANGED`/`ARCHIVED`), `publishedAt`, `createdBy`, and `updatedBy` metadata fields.
 
 ### Migrations
 

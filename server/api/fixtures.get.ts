@@ -1,5 +1,5 @@
 export default defineEventHandler(async () => {
-  return prisma.team.findMany({
+  return prisma.fixture.findMany({
     orderBy: { updatedAt: 'desc' },
   });
 });
