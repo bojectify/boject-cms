@@ -7,6 +7,13 @@ const props = defineProps<{
   data: Record<string, unknown>[];
   loading?: boolean;
   columns?: TableColumn<Record<string, unknown>>[];
+  page?: number;
+  total?: number;
+  itemsPerPage?: number;
+}>();
+
+const emit = defineEmits<{
+  'update:page': [value: number];
 }>();
 
 const slots = defineSlots();
@@ -45,5 +52,20 @@ const allColumns = computed<TableColumn<Record<string, unknown>>[]>(() => [
         <slot :name="name" v-bind="slotProps" />
       </template>
     </UTable>
+    <div
+      v-if="total !== undefined"
+      class="flex justify-center border-t border-default pt-4"
+    >
+      <UPagination
+        :page="page"
+        :total="total"
+        :items-per-page="itemsPerPage ?? 15"
+        show-edges
+        :sibling-count="1"
+        size="lg"
+        :disabled="(itemsPerPage ?? 15) >= (total ?? 0)"
+        @update:page="emit('update:page', $event)"
+      />
+    </div>
   </div>
 </template>

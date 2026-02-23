@@ -2,7 +2,13 @@
 import type { TableColumn } from '@nuxt/ui';
 import { useContentTable } from '~/composables/useContentTable';
 
-const { data: fixtures, status } = await useFetch('/api/fixtures');
+const page = ref(1);
+
+const { data, status } = await useFetch('/api/fixtures', {
+  query: { page, perPage: 15 },
+  watch: [page],
+});
+
 const { formatDate } = useContentTable();
 
 const columns: TableColumn<Record<string, unknown>>[] = [
@@ -13,10 +19,12 @@ const columns: TableColumn<Record<string, unknown>>[] = [
 
 <template>
   <ContentTable
+    v-model:page="page"
     title="Fixtures"
-    :data="fixtures ?? []"
+    :data="data?.items ?? []"
     :loading="status === 'pending'"
     :columns="columns"
+    :total="data?.total ?? 0"
   >
     <template #kickoff-cell="{ row }">
       {{ formatDate(row.original.kickoff as string) }}

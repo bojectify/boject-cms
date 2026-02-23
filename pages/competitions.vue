@@ -1,11 +1,18 @@
 <script setup lang="ts">
-const { data: competitions, status } = await useFetch('/api/competitions');
+const page = ref(1);
+
+const { data, status } = await useFetch('/api/competitions', {
+  query: { page, perPage: 15 },
+  watch: [page],
+});
 </script>
 
 <template>
   <ContentTable
+    v-model:page="page"
     title="Competitions"
-    :data="competitions ?? []"
+    :data="data?.items ?? []"
     :loading="status === 'pending'"
+    :total="data?.total ?? 0"
   />
 </template>

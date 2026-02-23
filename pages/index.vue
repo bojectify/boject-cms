@@ -14,21 +14,12 @@ const columns: TableColumn<Record<string, unknown>>[] = [
 </script>
 
 <template>
-  <div>
-    <ContentTable
-      title="All Content"
-      :data="data?.items ?? []"
-      :loading="status === 'pending'"
-      :columns="columns"
-    />
-    <div class="flex justify-center border-t border-default pt-4">
-      <UPagination
-        v-model:page="page"
-        :total="data?.total ?? 0"
-        :items-per-page="15"
-        show-edges
-        :sibling-count="1"
-      />
-    </div>
-  </div>
+  <ContentTable
+    v-model:page="page"
+    title="All Content"
+    :data="data?.items ?? []"
+    :loading="status === 'pending'"
+    :columns="columns"
+    :total="data?.total ?? 0"
+  />
 </template>

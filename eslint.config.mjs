@@ -8,6 +8,11 @@ export default withNuxt(
     ignores: ['generated/**'],
   },
   {
+    rules: {
+      eqeqeq: ['error', 'always', { null: 'ignore' }],
+    },
+  },
+  {
     files: ['**/*.ts'],
     languageOptions: {
       parser: tsParser,
