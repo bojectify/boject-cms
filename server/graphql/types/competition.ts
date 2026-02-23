@@ -11,8 +11,11 @@ builder.prismaObject('Competition', {
     createdAt: t.expose('createdAt', { type: 'DateTime' }),
     updatedAt: t.expose('updatedAt', { type: 'DateTime' }),
     season: t.relation('season', { nullable: true }),
-    teams: t.relation('teams'),
-    fixtures: t.relation('fixtures', {
+    teams: t.relatedConnection('teams', {
+      cursor: 'teamId_competitionId',
+    }),
+    fixtures: t.relatedConnection('fixtures', {
+      cursor: 'id',
       args: { where: t.arg({ type: FixtureWhere }) },
       query: (args) => ({ where: args.where ?? undefined }),
     }),

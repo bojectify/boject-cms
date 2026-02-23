@@ -17,7 +17,8 @@ builder.prismaObject('Fixture', {
     season: t.relation('season', { nullable: true }),
     team: t.relation('team', { nullable: true }),
     opponent: t.relation('opponent', { nullable: true }),
-    scores: t.relation('scores', {
+    scores: t.relatedConnection('scores', {
+      cursor: 'id',
       args: { where: t.arg({ type: ScoreWhere }) },
       query: (args) => ({ where: args.where ?? undefined }),
     }),

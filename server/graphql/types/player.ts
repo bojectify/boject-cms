@@ -15,11 +15,13 @@ builder.prismaObject('Player', {
     position: t.relation('position', { nullable: true }),
     headshot: t.relation('headshot', { nullable: true }),
     actionShot: t.relation('actionShot', { nullable: true }),
-    teamHistory: t.relation('teamHistory', {
+    teamHistory: t.relatedConnection('teamHistory', {
+      cursor: 'id',
       args: { where: t.arg({ type: PlayerTeamHistoryWhere }) },
       query: (args) => ({ where: args.where ?? undefined }),
     }),
-    scores: t.relation('scores', {
+    scores: t.relatedConnection('scores', {
+      cursor: 'id',
       args: { where: t.arg({ type: ScoreWhere }) },
       query: (args) => ({ where: args.where ?? undefined }),
     }),

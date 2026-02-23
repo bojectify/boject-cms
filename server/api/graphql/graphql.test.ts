@@ -10,6 +10,17 @@ function gql<T>(query: string) {
   });
 }
 
+type Edge<T> = { node: T; cursor: string };
+type Connection<T> = {
+  edges: Edge<T>[];
+  pageInfo: {
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+    startCursor: string | null;
+    endCursor: string | null;
+  };
+};
+
 describe('GraphQL API', async () => {
   await setup({ dev: true });
 
@@ -17,71 +28,83 @@ describe('GraphQL API', async () => {
 
   describe('list queries', () => {
     it('returns all teams', async () => {
-      const { data } = await gql<{ teams: { id: string; name: string }[] }>(
-        '{ teams { id name } }'
-      );
-      expect(data.teams).toBeInstanceOf(Array);
-      expect(data.teams.length).toBeGreaterThanOrEqual(4);
-      expect(data.teams[0]).toHaveProperty('id');
-      expect(data.teams[0]).toHaveProperty('name');
+      const { data } = await gql<{
+        teams: Connection<{ id: string; name: string }>;
+      }>('{ teams { edges { node { id name } } } }');
+      expect(data.teams.edges).toBeInstanceOf(Array);
+      expect(data.teams.edges.length).toBeGreaterThanOrEqual(4);
+      expect(data.teams.edges[0]!.node).toHaveProperty('id');
+      expect(data.teams.edges[0]!.node).toHaveProperty('name');
     });
 
     it('returns all clubs', async () => {
-      const { data } = await gql<{ clubs: { id: string; name: string }[] }>(
-        '{ clubs { id name } }'
-      );
-      expect(data.clubs.length).toBeGreaterThanOrEqual(3);
+      const { data } = await gql<{
+        clubs: Connection<{ id: string; name: string }>;
+      }>('{ clubs { edges { node { id name } } } }');
+      expect(data.clubs.edges.length).toBeGreaterThanOrEqual(3);
     });
 
     it('returns all players', async () => {
       const { data } = await gql<{
-        players: { id: string; firstName: string; lastName: string }[];
-      }>('{ players { id firstName lastName } }');
-      expect(data.players.length).toBeGreaterThanOrEqual(5);
-      expect(data.players[0]).toHaveProperty('firstName');
-      expect(data.players[0]).toHaveProperty('lastName');
+        players: Connection<{
+          id: string;
+          firstName: string;
+          lastName: string;
+        }>;
+      }>('{ players { edges { node { id firstName lastName } } } }');
+      expect(data.players.edges.length).toBeGreaterThanOrEqual(5);
+      expect(data.players.edges[0]!.node).toHaveProperty('firstName');
+      expect(data.players.edges[0]!.node).toHaveProperty('lastName');
     });
 
     it('returns all positions', async () => {
       const { data } = await gql<{
-        positions: { id: string; name: string }[];
-      }>('{ positions { id name } }');
-      expect(data.positions.length).toBeGreaterThanOrEqual(14);
+        positions: Connection<{ id: string; name: string }>;
+      }>('{ positions { edges { node { id name } } } }');
+      expect(data.positions.edges.length).toBeGreaterThanOrEqual(14);
     });
 
     it('returns all seasons', async () => {
       const { data } = await gql<{
-        seasons: { id: string; name: string; startDate: string }[];
-      }>('{ seasons { id name startDate } }');
-      expect(data.seasons.length).toBeGreaterThanOrEqual(1);
-      expect(data.seasons[0]).toHaveProperty('startDate');
+        seasons: Connection<{
+          id: string;
+          name: string;
+          startDate: string;
+        }>;
+      }>('{ seasons { edges { node { id name startDate } } } }');
+      expect(data.seasons.edges.length).toBeGreaterThanOrEqual(1);
+      expect(data.seasons.edges[0]!.node).toHaveProperty('startDate');
     });
 
     it('returns all competitions', async () => {
       const { data } = await gql<{
-        competitions: { id: string; name: string }[];
-      }>('{ competitions { id name } }');
-      expect(data.competitions.length).toBeGreaterThanOrEqual(2);
+        competitions: Connection<{ id: string; name: string }>;
+      }>('{ competitions { edges { node { id name } } } }');
+      expect(data.competitions.edges.length).toBeGreaterThanOrEqual(2);
     });
 
     it('returns all fixtures', async () => {
       const { data } = await gql<{
-        fixtures: {
+        fixtures: Connection<{
           id: string;
           name: string;
           isHome: boolean;
           venue: string;
-        }[];
-      }>('{ fixtures { id name isHome venue } }');
-      expect(data.fixtures.length).toBeGreaterThanOrEqual(3);
-      expect(data.fixtures[0]).toHaveProperty('isHome');
+        }>;
+      }>('{ fixtures { edges { node { id name isHome venue } } } }');
+      expect(data.fixtures.edges.length).toBeGreaterThanOrEqual(3);
+      expect(data.fixtures.edges[0]!.node).toHaveProperty('isHome');
     });
 
     it('returns all scores', async () => {
       const { data } = await gql<{
-        scores: { id: string; type: string; minute: number | null }[];
-      }>('{ scores { id type minute } }');
-      expect(data.scores.length).toBeGreaterThanOrEqual(9);
+        scores: Connection<{
+          id: string;
+          type: string;
+          minute: number | null;
+        }>;
+      }>('{ scores { edges { node { id type minute } } } }');
+      expect(data.scores.edges.length).toBeGreaterThanOrEqual(9);
     });
   });
 
@@ -90,9 +113,9 @@ describe('GraphQL API', async () => {
   describe('single-item queries', () => {
     it('fetches a team by ID', async () => {
       const { data: list } = await gql<{
-        teams: { id: string; name: string }[];
-      }>('{ teams { id name } }');
-      const first = list.teams[0]!;
+        teams: Connection<{ id: string; name: string }>;
+      }>('{ teams { edges { node { id name } } } }');
+      const first = list.teams.edges[0]!.node;
 
       const { data } = await gql<{ team: { id: string; name: string } }>(
         `{ team(id: "${first.id}") { id name } }`
@@ -103,9 +126,9 @@ describe('GraphQL API', async () => {
 
     it('fetches a player by ID', async () => {
       const { data: list } = await gql<{
-        players: { id: string; firstName: string }[];
-      }>('{ players { id firstName } }');
-      const first = list.players[0]!;
+        players: Connection<{ id: string; firstName: string }>;
+      }>('{ players { edges { node { id firstName } } } }');
+      const first = list.players.edges[0]!.node;
 
       const { data } = await gql<{
         player: { id: string; firstName: string };
@@ -126,71 +149,83 @@ describe('GraphQL API', async () => {
   describe('relation resolution', () => {
     it('resolves player relations', async () => {
       const { data } = await gql<{
-        players: {
+        players: Connection<{
           id: string;
           firstName: string;
           position: { name: string } | null;
-          teamHistory: { team: { name: string } }[];
-          scores: { type: string }[];
-        }[];
+          teamHistory: Connection<{ team: { name: string } }>;
+          scores: Connection<{ type: string }>;
+        }>;
       }>(`{
         players {
-          id firstName
-          position { name }
-          teamHistory { team { name } }
-          scores { type }
+          edges { node {
+            id firstName
+            position { name }
+            teamHistory { edges { node { team { name } } } }
+            scores { edges { node { type } } }
+          } }
         }
       }`);
-      const withPosition = data.players.find((p) => p.position !== null);
+      const nodes = data.players.edges.map((e) => e.node);
+      const withPosition = nodes.find((p) => p.position !== null);
       expect(withPosition).toBeDefined();
       expect(withPosition!.position!.name).toBeTruthy();
 
-      const withHistory = data.players.find((p) => p.teamHistory.length > 0);
+      const withHistory = nodes.find((p) => p.teamHistory.edges.length > 0);
       expect(withHistory).toBeDefined();
     });
 
     it('resolves fixture relations', async () => {
       const { data } = await gql<{
-        fixtures: {
+        fixtures: Connection<{
           id: string;
           name: string;
           team: { name: string } | null;
           opponent: { name: string } | null;
           competition: { name: string } | null;
           season: { name: string } | null;
-          scores: { type: string; minute: number | null }[];
-        }[];
+          scores: Connection<{
+            type: string;
+            minute: number | null;
+          }>;
+        }>;
       }>(`{
         fixtures {
-          id name
-          team { name }
-          opponent { name }
-          competition { name }
-          season { name }
-          scores { type minute }
+          edges { node {
+            id name
+            team { name }
+            opponent { name }
+            competition { name }
+            season { name }
+            scores { edges { node { type minute } } }
+          } }
         }
       }`);
-      const withScores = data.fixtures.find((f) => f.scores.length > 0);
+      const nodes = data.fixtures.edges.map((e) => e.node);
+      const withScores = nodes.find((f) => f.scores.edges.length > 0);
       expect(withScores).toBeDefined();
-      expect(withScores!.scores[0]).toHaveProperty('type');
+      expect(withScores!.scores.edges[0]!.node).toHaveProperty('type');
     });
 
     it('resolves competition relations', async () => {
       const { data } = await gql<{
-        competitions: {
+        competitions: Connection<{
           id: string;
           name: string;
           season: { name: string } | null;
-          teams: { team: { name: string } }[];
-        }[];
+          teams: Connection<{ team: { name: string } }>;
+        }>;
       }>(`{
         competitions {
-          id name
-          season { name }
-          teams { team { name } }
+          edges { node {
+            id name
+            season { name }
+            teams { edges { node { team { name } } } }
+          } }
         }
       }`);
-      const withSeason = data.competitions.find((c) => c.season !== null);
+      const nodes = data.competitions.edges.map((e) => e.node);
+      const withSeason = nodes.find((c) => c.season !== null);
       expect(withSeason).toBeDefined();
     });
   });
@@ -199,53 +234,115 @@ describe('GraphQL API', async () => {
 
   describe('where filtering', () => {
     it('filters clubs by name contains', async () => {
-      const { data } = await gql<{ clubs: { id: string; name: string }[] }>(
-        '{ clubs(where: { name: { contains: "RFC" } }) { id name } }'
+      const { data } = await gql<{
+        clubs: Connection<{ id: string; name: string }>;
+      }>(
+        '{ clubs(where: { name: { contains: "RFC" } }) { edges { node { id name } } } }'
       );
-      expect(data.clubs.length).toBe(3);
-      data.clubs.forEach((club) => {
-        expect(club.name).toContain('RFC');
+      expect(data.clubs.edges.length).toBe(3);
+      data.clubs.edges.forEach((edge) => {
+        expect(edge.node.name).toContain('RFC');
       });
     });
 
     it('filters players by exact firstName', async () => {
       const { data } = await gql<{
-        players: { id: string; firstName: string; lastName: string }[];
+        players: Connection<{
+          id: string;
+          firstName: string;
+          lastName: string;
+        }>;
       }>(
-        '{ players(where: { firstName: { equals: "Tom" } }) { id firstName lastName } }'
+        '{ players(where: { firstName: { equals: "Tom" } }) { edges { node { id firstName lastName } } } }'
       );
-      expect(data.players.length).toBe(1);
-      expect(data.players[0]!.firstName).toBe('Tom');
-      expect(data.players[0]!.lastName).toBe('Evans');
+      expect(data.players.edges.length).toBe(1);
+      expect(data.players.edges[0]!.node.firstName).toBe('Tom');
+      expect(data.players.edges[0]!.node.lastName).toBe('Evans');
     });
 
     it('filters fixtures by isHome', async () => {
       const { data } = await gql<{
-        fixtures: { id: string; name: string; isHome: boolean }[];
+        fixtures: Connection<{
+          id: string;
+          name: string;
+          isHome: boolean;
+        }>;
       }>(
-        '{ fixtures(where: { isHome: { equals: true } }) { id name isHome } }'
+        '{ fixtures(where: { isHome: { equals: true } }) { edges { node { id name isHome } } } }'
       );
-      expect(data.fixtures.length).toBeGreaterThan(0);
-      data.fixtures.forEach((f) => {
-        expect(f.isHome).toBe(true);
+      expect(data.fixtures.edges.length).toBeGreaterThan(0);
+      data.fixtures.edges.forEach((edge) => {
+        expect(edge.node.isHome).toBe(true);
       });
     });
 
     it('filters scores by type', async () => {
       const { data } = await gql<{
-        scores: { id: string; type: string }[];
-      }>('{ scores(where: { type: { equals: TRY } }) { id type } }');
-      expect(data.scores.length).toBeGreaterThan(0);
-      data.scores.forEach((s) => {
-        expect(s.type).toBe('TRY');
+        scores: Connection<{ id: string; type: string }>;
+      }>(
+        '{ scores(where: { type: { equals: TRY } }) { edges { node { id type } } } }'
+      );
+      expect(data.scores.edges.length).toBeGreaterThan(0);
+      data.scores.edges.forEach((edge) => {
+        expect(edge.node.type).toBe('TRY');
       });
     });
 
-    it('returns empty array for no matches', async () => {
-      const { data } = await gql<{ clubs: { id: string }[] }>(
-        '{ clubs(where: { name: { equals: "Nonexistent Club" } }) { id } }'
+    it('returns empty connection for no matches', async () => {
+      const { data } = await gql<{
+        clubs: Connection<{ id: string }>;
+      }>(
+        '{ clubs(where: { name: { equals: "Nonexistent Club" } }) { edges { node { id } } } }'
       );
-      expect(data.clubs).toEqual([]);
+      expect(data.clubs.edges).toEqual([]);
+    });
+  });
+
+  // ── Pagination ──────────────────────────────────────────────
+
+  describe('pagination', () => {
+    it('paginates with first/after', async () => {
+      // Fetch first page
+      const { data: page1 } = await gql<{
+        teams: Connection<{ id: string; name: string }>;
+      }>(
+        '{ teams(first: 2) { edges { node { id name } cursor } pageInfo { hasNextPage endCursor } } }'
+      );
+      expect(page1.teams.edges.length).toBe(2);
+      expect(page1.teams.pageInfo.hasNextPage).toBe(true);
+
+      const endCursor = page1.teams.pageInfo.endCursor!;
+
+      // Fetch second page
+      const { data: page2 } = await gql<{
+        teams: Connection<{ id: string; name: string }>;
+      }>(
+        `{ teams(first: 2, after: "${endCursor}") { edges { node { id name } cursor } pageInfo { hasNextPage endCursor } } }`
+      );
+      expect(page2.teams.edges.length).toBeGreaterThanOrEqual(1);
+
+      // No overlap between pages
+      const page1Ids = page1.teams.edges.map((e) => e.node.id);
+      const page2Ids = page2.teams.edges.map((e) => e.node.id);
+      page2Ids.forEach((id) => {
+        expect(page1Ids).not.toContain(id);
+      });
+    });
+
+    it('paginates with where filtering', async () => {
+      const { data } = await gql<{
+        fixtures: Connection<{
+          id: string;
+          name: string;
+          isHome: boolean;
+        }>;
+      }>(
+        '{ fixtures(first: 1, where: { isHome: { equals: true } }) { edges { node { id name isHome } } pageInfo { hasNextPage } } }'
+      );
+      expect(data.fixtures.edges.length).toBeLessThanOrEqual(1);
+      data.fixtures.edges.forEach((edge) => {
+        expect(edge.node.isHome).toBe(true);
+      });
     });
   });
 });

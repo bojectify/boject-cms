@@ -20,6 +20,9 @@ importers:
       '@pothos/plugin-prisma-utils':
         specifier: ^1.3.3
         version: 1.3.3(@pothos/core@4.12.0(graphql@16.12.0))(@pothos/plugin-prisma@4.14.2(@pothos/core@4.12.0(graphql@16.12.0))(@prisma/client@7.4.1(prisma@7.4.1(@types/react@19.2.14)(magicast@0.5.2)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3))(graphql@16.12.0)(typescript@5.9.3))(@prisma/client@7.4.1(prisma@7.4.1(@types/react@19.2.14)(magicast@0.5.2)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3))(graphql@16.12.0)
+      '@pothos/plugin-relay':
+        specifier: ^4.7.0
+        version: 4.7.0(@pothos/core@4.12.0(graphql@16.12.0))(graphql@16.12.0)
       '@prisma/adapter-pg':
         specifier: ^7.4.1
         version: 7.4.1
@@ -1548,6 +1551,12 @@ packages:
       '@prisma/client': '*'
       graphql: ^16.10.0
       typescript: '>=4.7.2'
+
+  '@pothos/plugin-relay@4.7.0':
+    resolution: {integrity: sha512-IQ7f7WLu7uXxiZBcJgUTdspjIVzX3bgvd8XjnzxGJUbn/uE5HlVyCFmvhJffHIIS2OKSHhOOJRMwIwVwauwnSg==}
+    peerDependencies:
+      '@pothos/core': '*'
+      graphql: ^16.10.0
 
   '@prisma/adapter-pg@7.4.1':
     resolution: {integrity: sha512-AH9XrqvSoBAaStn0Gm/sAnF97pDKz8uLpNmn51j1S9O9dhUva6LIxGdoDiiU9VXRIR89wAJXsvJSy+mK40m2xw==}
@@ -7579,6 +7588,11 @@ snapshots:
       '@prisma/generator-helper': 7.4.1
       graphql: 16.12.0
       typescript: 5.9.3
+
+  '@pothos/plugin-relay@4.7.0(@pothos/core@4.12.0(graphql@16.12.0))(graphql@16.12.0)':
+    dependencies:
+      '@pothos/core': 4.12.0(graphql@16.12.0)
+      graphql: 16.12.0
 
   '@prisma/adapter-pg@7.4.1':
     dependencies:

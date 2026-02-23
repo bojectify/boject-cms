@@ -11,7 +11,8 @@ builder.prismaObject('Club', {
     createdAt: t.expose('createdAt', { type: 'DateTime' }),
     updatedAt: t.expose('updatedAt', { type: 'DateTime' }),
     crest: t.relation('crest', { nullable: true }),
-    fixtures: t.relation('fixtures', {
+    fixtures: t.relatedConnection('fixtures', {
+      cursor: 'id',
       args: { where: t.arg({ type: FixtureWhere }) },
       query: (args) => ({ where: args.where ?? undefined }),
     }),

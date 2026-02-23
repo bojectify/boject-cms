@@ -10,12 +10,16 @@ builder.prismaObject('Team', {
     ...contentMetadataFields(t),
     createdAt: t.expose('createdAt', { type: 'DateTime' }),
     updatedAt: t.expose('updatedAt', { type: 'DateTime' }),
-    competitions: t.relation('competitions'),
-    playerHistory: t.relation('playerHistory', {
+    competitions: t.relatedConnection('competitions', {
+      cursor: 'teamId_competitionId',
+    }),
+    playerHistory: t.relatedConnection('playerHistory', {
+      cursor: 'id',
       args: { where: t.arg({ type: PlayerTeamHistoryWhere }) },
       query: (args) => ({ where: args.where ?? undefined }),
     }),
-    fixtures: t.relation('fixtures', {
+    fixtures: t.relatedConnection('fixtures', {
+      cursor: 'id',
       args: { where: t.arg({ type: FixtureWhere }) },
       query: (args) => ({ where: args.where ?? undefined }),
     }),

@@ -15,8 +15,9 @@ import {
 builder.queryType({
   fields: (t) => ({
     // Image
-    images: t.prismaField({
-      type: ['Image'],
+    images: t.prismaConnection({
+      type: 'Image',
+      cursor: 'id',
       args: { where: t.arg({ type: ImageWhere }) },
       resolve: (query, _root, args) =>
         prisma.image.findMany({ ...query, where: args.where ?? undefined }),
@@ -30,8 +31,9 @@ builder.queryType({
     }),
 
     // Position
-    positions: t.prismaField({
-      type: ['Position'],
+    positions: t.prismaConnection({
+      type: 'Position',
+      cursor: 'id',
       args: { where: t.arg({ type: PositionWhere }) },
       resolve: (query, _root, args) =>
         prisma.position.findMany({
@@ -48,8 +50,9 @@ builder.queryType({
     }),
 
     // Season
-    seasons: t.prismaField({
-      type: ['Season'],
+    seasons: t.prismaConnection({
+      type: 'Season',
+      cursor: 'id',
       args: { where: t.arg({ type: SeasonWhere }) },
       resolve: (query, _root, args) =>
         prisma.season.findMany({ ...query, where: args.where ?? undefined }),
@@ -63,8 +66,9 @@ builder.queryType({
     }),
 
     // Team
-    teams: t.prismaField({
-      type: ['Team'],
+    teams: t.prismaConnection({
+      type: 'Team',
+      cursor: 'id',
       args: { where: t.arg({ type: TeamWhere }) },
       resolve: (query, _root, args) =>
         prisma.team.findMany({ ...query, where: args.where ?? undefined }),
@@ -78,8 +82,9 @@ builder.queryType({
     }),
 
     // Club
-    clubs: t.prismaField({
-      type: ['Club'],
+    clubs: t.prismaConnection({
+      type: 'Club',
+      cursor: 'id',
       args: { where: t.arg({ type: ClubWhere }) },
       resolve: (query, _root, args) =>
         prisma.club.findMany({ ...query, where: args.where ?? undefined }),
@@ -93,8 +98,9 @@ builder.queryType({
     }),
 
     // Competition
-    competitions: t.prismaField({
-      type: ['Competition'],
+    competitions: t.prismaConnection({
+      type: 'Competition',
+      cursor: 'id',
       args: { where: t.arg({ type: CompetitionWhere }) },
       resolve: (query, _root, args) =>
         prisma.competition.findMany({
@@ -111,8 +117,9 @@ builder.queryType({
     }),
 
     // Player
-    players: t.prismaField({
-      type: ['Player'],
+    players: t.prismaConnection({
+      type: 'Player',
+      cursor: 'id',
       args: { where: t.arg({ type: PlayerWhere }) },
       resolve: (query, _root, args) =>
         prisma.player.findMany({ ...query, where: args.where ?? undefined }),
@@ -126,8 +133,9 @@ builder.queryType({
     }),
 
     // Fixture
-    fixtures: t.prismaField({
-      type: ['Fixture'],
+    fixtures: t.prismaConnection({
+      type: 'Fixture',
+      cursor: 'id',
       args: { where: t.arg({ type: FixtureWhere }) },
       resolve: (query, _root, args) =>
         prisma.fixture.findMany({ ...query, where: args.where ?? undefined }),
@@ -141,8 +149,9 @@ builder.queryType({
     }),
 
     // Score
-    scores: t.prismaField({
-      type: ['Score'],
+    scores: t.prismaConnection({
+      type: 'Score',
+      cursor: 'id',
       args: { where: t.arg({ type: ScoreWhere }) },
       resolve: (query, _root, args) =>
         prisma.score.findMany({ ...query, where: args.where ?? undefined }),

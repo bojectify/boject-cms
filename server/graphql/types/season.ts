@@ -12,11 +12,13 @@ builder.prismaObject('Season', {
     ...contentMetadataFields(t),
     createdAt: t.expose('createdAt', { type: 'DateTime' }),
     updatedAt: t.expose('updatedAt', { type: 'DateTime' }),
-    competitions: t.relation('competitions', {
+    competitions: t.relatedConnection('competitions', {
+      cursor: 'id',
       args: { where: t.arg({ type: CompetitionWhere }) },
       query: (args) => ({ where: args.where ?? undefined }),
     }),
-    fixtures: t.relation('fixtures', {
+    fixtures: t.relatedConnection('fixtures', {
+      cursor: 'id',
       args: { where: t.arg({ type: FixtureWhere }) },
       query: (args) => ({ where: args.where ?? undefined }),
     }),

@@ -1,6 +1,7 @@
 import SchemaBuilder from '@pothos/core';
 import PrismaPlugin from '@pothos/plugin-prisma';
 import PrismaUtilsPlugin from '@pothos/plugin-prisma-utils';
+import RelayPlugin from '@pothos/plugin-relay';
 import type PrismaTypes from '../../generated/pothos-types';
 import { getDatamodel } from '../../generated/pothos-types';
 import { prisma } from '../utils/prisma';
@@ -11,11 +12,12 @@ export const builder = new SchemaBuilder<{
     DateTime: { Input: Date | string; Output: Date | string };
   };
 }>({
-  plugins: [PrismaPlugin, PrismaUtilsPlugin],
+  plugins: [PrismaPlugin, PrismaUtilsPlugin, RelayPlugin],
   prisma: {
     client: prisma,
     dmmf: getDatamodel(),
   },
+  relay: {},
 });
 
 builder.scalarType('DateTime', {
