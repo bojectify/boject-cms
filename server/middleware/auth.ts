@@ -17,9 +17,18 @@ export default defineEventHandler(async (event) => {
   const session = await getUserSession(event);
   if (session.user) return;
 
-  // Fall back to API key auth
+  // Fall back to API key auth (read-only access)
   const result = await validateApiKey(event);
-  if (result.valid) return;
+  if (result.valid) {
+    const method = getMethod(event);
+    if (method !== 'GET' && method !== 'HEAD') {
+      throw createError({
+        statusCode: 403,
+        message: 'API keys have read-only access',
+      });
+    }
+    return;
+  }
 
   throw createError({ statusCode: 401, message: 'Unauthorized' });
 });
