@@ -23,7 +23,7 @@ pnpm lint                     # Lint with ESLint
 pnpm lint:fix                 # Lint and auto-fix
 pnpm format                   # Check formatting with Prettier
 pnpm format:fix               # Format all files with Prettier
-pnpm test                     # Run tests in watch mode
+pnpm test:watch               # Run tests in watch mode
 pnpm test:run                 # Run tests once (CI)
 pnpm typecheck                # Run TypeScript type checker (nuxi typecheck)
 pnpm apikey:create <name>     # Create a new API key (prints raw key once)
@@ -48,7 +48,9 @@ Note: `prisma migrate dev` requires an interactive terminal. When running from a
 - **ContentEditor component** — Generic form component (`components/ContentEditor.vue`) for editing any content model. Accepts a `fields: FieldConfig[]` array (discriminated union on `type`: text, textarea, number, boolean, datetime, select, relation) and a reactive `state` object. Renders the appropriate Nuxt UI input per field type. Includes a fixed "Publishing" section with status dropdown and slug field. Uses UForm with custom `validate` prop for required-field validation. Relation fields fetch options from an `optionsEndpoint` on mount.
 - **useContentEditor composable** — `composables/useContentEditor.ts` manages content editing lifecycle: fetches item via `useFetch`, populates reactive `formState`, provides `save()` (PUT via `$fetch`), `generateSlug()` helper, and loading/error state. Used by all per-model edit pages.
 - **Content field types** — `types/contentEditor.ts` defines the `FieldConfig` discriminated union used by `ContentEditor`. Auto-imported by Nuxt.
-- **Authentication** — `nuxt-auth-utils` module provides encrypted cookie sessions. Login page at `/login` (uses `layouts/auth.vue`). Global server middleware (`server/middleware/auth.ts`) protects all `/api/*` routes — accepts either a valid session cookie (CMS users) or an API key in `Authorization: Bearer` header (external consumers). Skips `/api/auth/**`, `/api/_auth/**`, and `/api/graphql` (has its own API key gate). Global client middleware (`middleware/auth.global.ts`) redirects unauthenticated users to `/login`. Password hashing uses scrypt via `hashPassword()` / `verifyPassword()` (auto-imported in server routes). `NUXT_SESSION_PASSWORD` env var required in production (auto-generated in dev). Default admin credentials: `admin@boject.com` / `password` (seeded via `prisma/seed.ts`). The sidebar footer shows the logged-in user's name and a logout button.
+- **Path aliases** — `nuxt.config.ts` defines `#prisma` → `generated/prisma/client` and `#generated` → `generated/`. These are resolved by both Nuxt (app + Nitro server) and TypeScript (via auto-generated `.nuxt/tsconfig.json`). Use `import type { Prisma } from '#prisma'` instead of relative paths. Standalone scripts (`scripts/`, `prisma/seed.ts`) that run via `tsx` outside Nuxt still use relative paths.
+- **REST API filtering** — `server/api/fixtures.get.ts` supports optional query param filters (`teamId`, `opponentId`, `competitionId`, `seasonId`, `isHome`, `status`) alongside pagination (`page`, `perPage`). The `where` clause is passed to both `findMany` and `count` so totals reflect filtered results. This pattern will be extended to other model list endpoints.
+- **Authentication** — `nuxt-auth-utils` module provides encrypted cookie sessions. Login page at `/login` (uses `layouts/auth.vue`). Global server middleware (`server/middleware/auth.ts`) protects all `/api/*` routes — accepts either a valid session cookie (CMS users) or an API key in `Authorization: Bearer` header (external consumers). Skips `/api/auth/**`, `/api/_auth/**`, and `/api/graphql` (has its own API key gate). Global client middleware (`middleware/auth.global.ts`) redirects unauthenticated users to `/login` and authenticated users away from `/login` to `/`. Password hashing uses scrypt via `hashPassword()` / `verifyPassword()` (auto-imported in server routes). `NUXT_SESSION_PASSWORD` env var required in production (auto-generated in dev). Default admin credentials: `admin@boject.com` / `password` (seeded via `prisma/seed.ts`). The sidebar footer shows the logged-in user's name and a logout button.
 - **Prisma MCP server** — Local MCP server configured for Claude Code, providing direct access to migrate-status, migrate-dev, migrate-reset, and Prisma Studio.
 - **Nuxt UI MCP server** — Remote MCP server at `https://ui.nuxt.com/mcp` for component docs, examples, and metadata.
 
@@ -101,7 +103,7 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder.
 
 ## Key Files
 
-- `nuxt.config.ts` — Nuxt configuration (modules, runtimeConfig, nitro options, CSS)
+- `nuxt.config.ts` — Nuxt configuration (modules, runtimeConfig, nitro options, CSS, path aliases)
 - `app.vue` — Root component wrapping `<NuxtLayout>` + `<NuxtPage />` in `<UApp>`
 - `layouts/default.vue` — Dashboard layout with sidebar navigation and user info/logout in footer
 - `layouts/auth.vue` — Centered layout for login page (no sidebar)
@@ -110,7 +112,7 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder.
 - `server/api/auth/login.post.ts` — Login endpoint (email/password → session cookie)
 - `server/api/auth/logout.post.ts` — Logout endpoint (clears session)
 - `server/middleware/auth.ts` — Global server middleware protecting `/api/*` routes (session or API key)
-- `middleware/auth.global.ts` — Global client middleware redirecting to `/login` if unauthenticated
+- `middleware/auth.global.ts` — Global client middleware redirecting to `/login` if unauthenticated, or to `/` if already authenticated
 - `assets/css/main.css` — Tailwind CSS + Nuxt UI imports
 - `server/utils/prisma.ts` — Singleton PrismaClient instance (auto-imported into all server routes)
 - `server/api/graphql/graphql.ts` — GraphQL Yoga ↔ H3 bridge with API key auth gate (explicitly imports `defineEventHandler` from `h3`)
@@ -120,7 +122,7 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder.
 - `components/ContentTable.vue` — Reusable content listing table (UTable wrapper with standard columns + slot forwarding)
 - `composables/useContentTable.ts` — Shared `formatDate` and `statusColor` helpers
 - `server/api/content.get.ts` — Paginated content API route (raw SQL `UNION ALL` across all 7 content models, sorted by `updatedAt` desc, accepts `page`/`perPage` query params, returns `{ items, total }`)
-- `server/api/{model}.get.ts` — Per-model list API routes (teams, fixtures, players, clubs, competitions, seasons, images) querying Prisma directly
+- `server/api/{model}.get.ts` — Per-model list API routes (teams, fixtures, players, clubs, competitions, seasons, images) querying Prisma directly. Fixtures endpoint supports query param filtering (teamId, opponentId, competitionId, seasonId, isHome, status).
 - `server/api/{model}/[id].get.ts` — Per-model single-item GET routes (findUnique by UUID, returns 404 if not found)
 - `server/api/{model}/[id].put.ts` — Per-model PUT routes for updating records (readBody, explicit field allow-list, `applyContentMetadata`, handles unique constraint → 409)
 - `server/api/{teams,clubs,competitions,seasons,positions}/options.get.ts` — Lightweight endpoints returning `{ label, value }[]` for relation dropdowns
@@ -142,8 +144,10 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder.
 - `generated/pothos-types.ts` — Pothos-Prisma type bridge (gitignored, regenerated)
 - `eslint.config.mjs` — ESLint flat config (extends Nuxt-generated config, loads `@typescript-eslint` plugin)
 - `lefthook.yml` — Pre-commit hook configuration
-- `vitest.config.ts` — Vitest configuration
+- `vitest.config.ts` — Vitest configuration (fileParallelism disabled to prevent port conflicts)
 - `server/api/graphql/graphql.test.ts` — GraphQL API integration tests
+- `server/api/fixtures/fixtures.test.ts` — Fixtures REST API integration tests
+- `server/api/auth/auth.test.ts` — Auth endpoint and middleware integration tests
 
 ## Linting & Formatting
 
@@ -154,7 +158,10 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder.
 
 ## Testing
 
-- **Vitest** — Test runner, configured via `vitest.config.ts` using `@nuxt/test-utils/config`.
+- **Vitest** — Test runner, configured via `vitest.config.ts` using `@nuxt/test-utils/config`. `fileParallelism: false` prevents port conflicts between test files that each start a Nuxt dev server.
 - **@nuxt/test-utils** — Starts a Nuxt dev server for integration tests. Tests must use `setup({ dev: true })` (production mode masks GraphQL errors).
 - **Test location** — Colocated with source files (e.g. `server/api/graphql/graphql.test.ts`).
-- **GraphQL tests** — 24 integration tests covering list queries, single-item lookups, relation resolution, where filtering, Relay cursor pagination, and API key authentication. Tests use a deterministic test key (`boject_test_key_for_integration_tests_only`) seeded via `prisma/seed.ts`.
+- **Test API key** — All REST and GraphQL tests authenticate with a deterministic test key (`boject_test_key_for_integration_tests_only`) seeded via `prisma/seed.ts`.
+- **GraphQL tests** — 24 integration tests covering list queries, single-item lookups, relation resolution, where filtering, Relay cursor pagination, and API key authentication.
+- **Fixtures tests** — 16 integration tests covering default listing, pagination, relation filters (teamId, opponentId, competitionId, seasonId), boolean/enum filters (isHome, status), combined filters, and edge cases.
+- **Auth tests** — Integration tests covering login validation, credential checking, session handling, and middleware behaviour.

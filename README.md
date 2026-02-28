@@ -58,7 +58,7 @@ The app runs at http://localhost:3000. The GraphQL playground (GraphiQL) is avai
 | `pnpm lint:fix`        | Lint and auto-fix                            |
 | `pnpm format`          | Check formatting with Prettier               |
 | `pnpm format:fix`      | Format all files                             |
-| `pnpm test`            | Run tests in watch mode                      |
+| `pnpm test:watch`      | Run tests in watch mode                      |
 | `pnpm test:run`        | Run tests once (CI)                          |
 | `pnpm typecheck`       | Run TypeScript type checker                  |
 
@@ -256,14 +256,16 @@ prisma migrate deploy          # Apply migrations (non-interactive / CI)
 
 ## Testing
 
-21 integration tests using Vitest + `@nuxt/test-utils`. Tests start a Nuxt dev server and send real GraphQL queries against the seeded database.
+47 integration tests using Vitest + `@nuxt/test-utils`. Tests start a Nuxt dev server and run against the seeded database.
 
 ```bash
-pnpm test          # Watch mode
+pnpm test:watch    # Watch mode
 pnpm test:run      # Single run (CI)
 ```
 
-Tests cover list queries, single-item lookups, relation resolution, where filtering, and Relay cursor pagination.
+- **GraphQL** (24 tests) — list queries, single-item lookups, relation resolution, where filtering, Relay cursor pagination, API key authentication.
+- **Fixtures REST API** (16 tests) — default listing, pagination, relation filters (teamId, opponentId, competitionId, seasonId), boolean/enum filters (isHome, status), combined filters.
+- **Auth** (7 tests) — login validation, credential checking, session handling, middleware behaviour.
 
 **Requirement:** Docker PostgreSQL must be running with seeded data.
 
@@ -283,8 +285,9 @@ pnpm format:fix    # Auto-fix formatting
 
 ## Environment Variables
 
-| Variable       | Description                  | Default                                            |
-| -------------- | ---------------------------- | -------------------------------------------------- |
-| `DATABASE_URL` | PostgreSQL connection string | `postgresql://boject:boject@localhost:5432/boject` |
+| Variable                | Description                               | Default                                            |
+| ----------------------- | ----------------------------------------- | -------------------------------------------------- |
+| `DATABASE_URL`          | PostgreSQL connection string              | `postgresql://boject:boject@localhost:5432/boject` |
+| `NUXT_SESSION_PASSWORD` | Session encryption key (required in prod) | Auto-generated in dev                              |
 
 Create a `.env` file in the project root. Nuxt loads it automatically in development.
