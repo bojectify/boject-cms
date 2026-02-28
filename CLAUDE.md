@@ -48,6 +48,7 @@ Note: `prisma migrate dev` requires an interactive terminal. When running from a
 - **ContentEditor component** — Generic form component (`components/ContentEditor.vue`) for editing any content model. Accepts a `fields: FieldConfig[]` array (discriminated union on `type`: text, textarea, number, boolean, datetime, select, relation) and a reactive `state` object. Renders the appropriate Nuxt UI input per field type. Includes a fixed "Publishing" section with status dropdown and slug field. Uses UForm with custom `validate` prop for required-field validation. Relation fields fetch options from an `optionsEndpoint` on mount.
 - **useContentEditor composable** — `composables/useContentEditor.ts` manages content editing lifecycle: fetches item via `useFetch`, populates reactive `formState`, provides `save()` (PUT via `$fetch`), `generateSlug()` helper, and loading/error state. Used by all per-model edit pages.
 - **Content field types** — `types/contentEditor.ts` defines the `FieldConfig` discriminated union used by `ContentEditor`. Auto-imported by Nuxt.
+- **Authentication** — `nuxt-auth-utils` module provides encrypted cookie sessions. Login page at `/login` (uses `layouts/auth.vue`). Global server middleware (`server/middleware/auth.ts`) protects all `/api/*` routes — accepts either a valid session cookie (CMS users) or an API key in `Authorization: Bearer` header (external consumers). Skips `/api/auth/**`, `/api/_auth/**`, and `/api/graphql` (has its own API key gate). Global client middleware (`middleware/auth.global.ts`) redirects unauthenticated users to `/login`. Password hashing uses scrypt via `hashPassword()` / `verifyPassword()` (auto-imported in server routes). `NUXT_SESSION_PASSWORD` env var required in production (auto-generated in dev). Default admin credentials: `admin@boject.com` / `password` (seeded via `prisma/seed.ts`). The sidebar footer shows the logged-in user's name and a logout button.
 - **Prisma MCP server** — Local MCP server configured for Claude Code, providing direct access to migrate-status, migrate-dev, migrate-reset, and Prisma Studio.
 - **Nuxt UI MCP server** — Remote MCP server at `https://ui.nuxt.com/mcp` for component docs, examples, and metadata.
 
@@ -64,9 +65,10 @@ Content models (Team, Club, Competition, Season, Player, Fixture, Image) have pu
 - `publishedAt` — Nullable `DateTime`, set when first published
 - `createdBy` / `updatedBy` — Nullable `String` fields for user tracking (will become relations when auth is added)
 
-### API Key Management
+### Users & API Keys
 
-- **ApiKey** — Stores hashed API keys for GraphQL endpoint authentication. Fields: `name` (human label), `keyHash` (SHA-256 hash, unique), `keyPrefix` (first 11 chars for identification), `revokedAt` (nullable, soft-revoke), `lastUsedAt` (nullable, updated on use). Not a content model — no publishing metadata.
+- **User** — CMS admin accounts. Fields: `email` (unique), `password` (scrypt hash), `name`. No signup flow — users are seeded or created manually.
+- **ApiKey** — Stores hashed API keys for GraphQL endpoint and REST API authentication. Fields: `name` (human label), `keyHash` (SHA-256 hash, unique), `keyPrefix` (first 11 chars for identification), `revokedAt` (nullable, soft-revoke), `lastUsedAt` (nullable, updated on use). Not a content model — no publishing metadata.
 
 ### Domain Models
 
@@ -101,7 +103,14 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder.
 
 - `nuxt.config.ts` — Nuxt configuration (modules, runtimeConfig, nitro options, CSS)
 - `app.vue` — Root component wrapping `<NuxtLayout>` + `<NuxtPage />` in `<UApp>`
-- `layouts/default.vue` — Dashboard layout with sidebar navigation (UDashboardGroup + UDashboardSidebar + UDashboardPanel)
+- `layouts/default.vue` — Dashboard layout with sidebar navigation and user info/logout in footer
+- `layouts/auth.vue` — Centered layout for login page (no sidebar)
+- `pages/login.vue` — Login page with email/password form
+- `auth.d.ts` — Session type augmentation (`UserSessionData` with id, email, name)
+- `server/api/auth/login.post.ts` — Login endpoint (email/password → session cookie)
+- `server/api/auth/logout.post.ts` — Logout endpoint (clears session)
+- `server/middleware/auth.ts` — Global server middleware protecting `/api/*` routes (session or API key)
+- `middleware/auth.global.ts` — Global client middleware redirecting to `/login` if unauthenticated
 - `assets/css/main.css` — Tailwind CSS + Nuxt UI imports
 - `server/utils/prisma.ts` — Singleton PrismaClient instance (auto-imported into all server routes)
 - `server/api/graphql/graphql.ts` — GraphQL Yoga ↔ H3 bridge with API key auth gate (explicitly imports `defineEventHandler` from `h3`)

@@ -1,7 +1,47 @@
 import 'dotenv/config';
-import { createHash } from 'node:crypto';
+import {
+  createHash,
+  randomBytes,
+  scrypt as scryptCb,
+  type ScryptOptions,
+} from 'node:crypto';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../generated/prisma/client';
+
+function scryptAsync(
+  password: string,
+  salt: Buffer,
+  keyLength: number,
+  options: ScryptOptions
+): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    scryptCb(password, salt, keyLength, options, (err, derived) => {
+      if (err) reject(err);
+      else resolve(derived);
+    });
+  });
+}
+
+/**
+ * Hash a password into PHC format compatible with @adonisjs/hash Scrypt driver.
+ * Format: $scrypt$n=16384,r=8,p=1$<salt_b64>$<hash_b64>
+ */
+async function hashPasswordForSeed(password: string): Promise<string> {
+  const n = 16384;
+  const r = 8;
+  const p = 1;
+  const keyLength = 64;
+  const salt = randomBytes(16);
+  const derived = await scryptAsync(password, salt, keyLength, {
+    cost: n,
+    blockSize: r,
+    parallelization: p,
+    maxmem: 32 * 1024 * 1024,
+  });
+  const saltB64 = salt.toString('base64').replace(/=+$/, '');
+  const hashB64 = derived.toString('base64').replace(/=+$/, '');
+  return `$scrypt$n=${n},r=${r},p=${p}$${saltB64}$${hashB64}`;
+}
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
 const prisma = new PrismaClient({ adapter });
@@ -87,6 +127,18 @@ async function main() {
       entryTitle: 'Colts',
       status: 'PUBLISHED',
       publishedAt: new Date(),
+    },
+  });
+
+  // Admin user
+  const hashedPassword = await hashPasswordForSeed('password');
+  await prisma.user.upsert({
+    where: { email: 'admin@boject.com' },
+    update: {},
+    create: {
+      email: 'admin@boject.com',
+      password: hashedPassword,
+      name: 'Admin',
     },
   });
 
