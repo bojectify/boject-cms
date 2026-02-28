@@ -123,6 +123,7 @@ function onSubmit() {
           :label="field.label"
           :name="field.key"
           :required="field.required"
+          size="xl"
         >
           <UInput
             :model-value="(state[field.key] as string) ?? ''"
@@ -137,6 +138,7 @@ function onSubmit() {
           :label="field.label"
           :name="field.key"
           :required="field.required"
+          size="xl"
         >
           <UTextarea
             :model-value="(state[field.key] as string) ?? ''"
@@ -152,6 +154,7 @@ function onSubmit() {
           :label="field.label"
           :name="field.key"
           :required="field.required"
+          size="xl"
         >
           <UInput
             type="number"
@@ -166,7 +169,11 @@ function onSubmit() {
           />
         </UFormField>
 
-        <UFormField v-else-if="field.type === 'boolean'" :name="field.key">
+        <UFormField
+          v-else-if="field.type === 'boolean'"
+          :name="field.key"
+          size="xl"
+        >
           <USwitch
             :model-value="(state[field.key] as boolean) ?? false"
             :label="field.label"
@@ -179,6 +186,7 @@ function onSubmit() {
           :label="field.label"
           :name="field.key"
           :required="field.required"
+          size="xl"
         >
           <UInput
             type="datetime-local"
@@ -195,6 +203,7 @@ function onSubmit() {
           :label="field.label"
           :name="field.key"
           :required="field.required"
+          size="xl"
         >
           <USelect
             :model-value="(state[field.key] as string) ?? ''"
@@ -210,6 +219,7 @@ function onSubmit() {
           :label="field.label"
           :name="field.key"
           :required="field.required"
+          size="xl"
         >
           <USelect
             :model-value="(state[field.key] as string) ?? ''"
@@ -224,7 +234,7 @@ function onSubmit() {
 
       <USeparator label="Publishing" />
 
-      <UFormField label="Status" name="status">
+      <UFormField label="Status" name="status" size="xl">
         <USelect
           :model-value="(state.status as string) ?? 'DRAFT'"
           :items="statusOptions"
@@ -234,7 +244,7 @@ function onSubmit() {
         />
       </UFormField>
 
-      <UFormField label="Slug" name="slug" required>
+      <UFormField label="Slug" name="slug" required size="xl">
         <UInput
           :model-value="(state.slug as string) ?? ''"
           class="w-full"

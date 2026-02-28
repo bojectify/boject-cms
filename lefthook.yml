@@ -9,3 +9,7 @@ pre-commit:
       glob: '*.{js,mjs,ts,vue,json,yml,yaml,css,scss,md}'
       exclude: 'pnpm-lock.yaml'
       run: pnpm exec prettier --check {staged_files}
+
+    - name: typecheck
+      glob: '*.{ts,vue}'
+      run: pnpm typecheck
