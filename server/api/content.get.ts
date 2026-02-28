@@ -1,8 +1,56 @@
+import { Prisma } from '#prisma';
+
+const VALID_STATUSES = new Set<string>([
+  'DRAFT',
+  'PUBLISHED',
+  'CHANGED',
+  'ARCHIVED',
+]);
+
+const CONTENT_TABLES = [
+  'Team',
+  'Club',
+  'Competition',
+  'Season',
+  'Fixture',
+  'Player',
+  'Image',
+] as const;
+
 export default defineEventHandler(async (event) => {
   const query = getQuery(event);
   const page = Math.max(1, Number(query.page) || 1);
   const perPage = Math.max(1, Number(query.perPage) || 15);
   const offset = (page - 1) * perPage;
+
+  const contentType =
+    typeof query.contentType === 'string' &&
+    CONTENT_TABLES.includes(
+      query.contentType as (typeof CONTENT_TABLES)[number]
+    )
+      ? query.contentType
+      : null;
+
+  const status =
+    typeof query.status === 'string' && VALID_STATUSES.has(query.status)
+      ? query.status
+      : null;
+
+  const tables = contentType
+    ? CONTENT_TABLES.filter((t) => t === contentType)
+    : CONTENT_TABLES;
+
+  // Both table names and status values come from validated allowlists
+  const statusWhere = status
+    ? ` WHERE status = '${status}'::"ContentStatus"`
+    : '';
+
+  const unionSql = tables
+    .map(
+      (t) =>
+        `SELECT id, "entryTitle", status::text, "createdAt", "updatedAt", '${t}' AS "contentType" FROM "${t}"${statusWhere}`
+    )
+    .join(' UNION ALL ');
 
   const rows = await prisma.$queryRaw<
     Array<{
@@ -16,21 +64,7 @@ export default defineEventHandler(async (event) => {
     }>
   >`
     SELECT *, count(*) OVER() AS total
-    FROM (
-      SELECT id, "entryTitle", status::text, "createdAt", "updatedAt", 'Team' AS "contentType" FROM "Team"
-      UNION ALL
-      SELECT id, "entryTitle", status::text, "createdAt", "updatedAt", 'Club' AS "contentType" FROM "Club"
-      UNION ALL
-      SELECT id, "entryTitle", status::text, "createdAt", "updatedAt", 'Competition' AS "contentType" FROM "Competition"
-      UNION ALL
-      SELECT id, "entryTitle", status::text, "createdAt", "updatedAt", 'Season' AS "contentType" FROM "Season"
-      UNION ALL
-      SELECT id, "entryTitle", status::text, "createdAt", "updatedAt", 'Fixture' AS "contentType" FROM "Fixture"
-      UNION ALL
-      SELECT id, "entryTitle", status::text, "createdAt", "updatedAt", 'Player' AS "contentType" FROM "Player"
-      UNION ALL
-      SELECT id, "entryTitle", status::text, "createdAt", "updatedAt", 'Image' AS "contentType" FROM "Image"
-    ) AS content
+    FROM (${Prisma.raw(unionSql)}) AS content
     ORDER BY "updatedAt" DESC
     LIMIT ${perPage} OFFSET ${offset}
   `;
