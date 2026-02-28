@@ -2,8 +2,8 @@ import SchemaBuilder from '@pothos/core';
 import PrismaPlugin from '@pothos/plugin-prisma';
 import PrismaUtilsPlugin from '@pothos/plugin-prisma-utils';
 import RelayPlugin from '@pothos/plugin-relay';
-import type PrismaTypes from '../../generated/pothos-types';
-import { getDatamodel } from '../../generated/pothos-types';
+import type PrismaTypes from '#generated/pothos-types';
+import { getDatamodel } from '#generated/pothos-types';
 import { prisma } from '../utils/prisma';
 
 export const builder = new SchemaBuilder<{

@@ -1,4 +1,4 @@
-import type { Prisma } from '../../../generated/prisma/client';
+import type { Prisma } from '#prisma';
 import { applyContentMetadata } from '../../utils/contentUpdate';
 
 export default defineEventHandler(async (event) => {

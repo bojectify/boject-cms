@@ -1,4 +1,4 @@
-import type { ContentStatus, Prisma } from '../../generated/prisma/client';
+import type { ContentStatus, Prisma } from '#prisma';
 
 const VALID_STATUSES = new Set<string>([
   'DRAFT',
