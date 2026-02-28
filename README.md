@@ -256,7 +256,7 @@ prisma migrate deploy          # Apply migrations (non-interactive / CI)
 
 ## Testing
 
-47 integration tests using Vitest + `@nuxt/test-utils`. Tests start a Nuxt dev server and run against the seeded database.
+87 integration tests using Vitest + `@nuxt/test-utils`. Tests start a Nuxt dev server and run against the seeded database.
 
 ```bash
 pnpm test:watch    # Watch mode
@@ -265,6 +265,8 @@ pnpm test:run      # Single run (CI)
 
 - **GraphQL** (24 tests) — list queries, single-item lookups, relation resolution, where filtering, Relay cursor pagination, API key authentication.
 - **Fixtures REST API** (16 tests) — default listing, pagination, relation filters (teamId, opponentId, competitionId, seasonId), boolean/enum filters (isHome, status), combined filters.
+- **List endpoints** (29 tests) — query param filters on teams, clubs, seasons, images (status), players (positionId, status), competitions (seasonId, status).
+- **Content** (11 tests) — contentType filter, status filter, combined filters, invalid value handling.
 - **Auth** (7 tests) — login validation, credential checking, session handling, middleware behaviour.
 
 **Requirement:** Docker PostgreSQL must be running with seeded data.

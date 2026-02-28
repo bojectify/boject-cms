@@ -3,13 +3,18 @@ pre-commit:
   jobs:
     - name: lint
       glob: '*.{js,mjs,ts,vue}'
-      run: pnpm exec eslint {staged_files}
+      run: pnpm lint {staged_files}
 
     - name: format
       glob: '*.{js,mjs,ts,vue,json,yml,yaml,css,scss,md}'
       exclude: 'pnpm-lock.yaml'
-      run: pnpm exec prettier --check {staged_files}
+      run: pnpm format {staged_files}
 
     - name: typecheck
       glob: '*.{ts,vue}'
       run: pnpm typecheck
+
+pre-push:
+  jobs:
+    - name: test
+      run: pnpm test:run
