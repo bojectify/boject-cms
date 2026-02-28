@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { createHash } from 'node:crypto';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../generated/prisma/client';
 
@@ -408,6 +409,19 @@ async function main() {
   ]) {
     await prisma.score.create({ data });
   }
+
+  // Test API key (deterministic, for integration tests only)
+  const testKey = 'boject_test_key_for_integration_tests_only';
+  const testKeyHash = createHash('sha256').update(testKey).digest('hex');
+  await prisma.apiKey.upsert({
+    where: { keyHash: testKeyHash },
+    update: {},
+    create: {
+      name: 'Integration Tests',
+      keyHash: testKeyHash,
+      keyPrefix: testKey.slice(0, 11),
+    },
+  });
 
   console.log('Seed complete.');
 }

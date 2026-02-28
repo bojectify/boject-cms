@@ -1,12 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import { setup, $fetch } from '@nuxt/test-utils/e2e';
 
+const TEST_API_KEY = 'boject_test_key_for_integration_tests_only';
+
 type GqlResponse<T> = { data: T; errors?: { message: string }[] };
 
 function gql<T>(query: string) {
   return $fetch<GqlResponse<T>>('/api/graphql', {
     method: 'POST',
     body: { query },
+    headers: { Authorization: `Bearer ${TEST_API_KEY}` },
   });
 }
 
@@ -343,6 +346,36 @@ describe('GraphQL API', async () => {
       data.fixtures.edges.forEach((edge) => {
         expect(edge.node.isHome).toBe(true);
       });
+    });
+  });
+
+  // ── Authentication ──────────────────────────────────────────
+
+  describe('authentication', () => {
+    it('rejects requests without an API key', async () => {
+      const response = await $fetch<{ error: string }>('/api/graphql', {
+        method: 'POST',
+        body: { query: '{ teams { edges { node { id } } } }' },
+        ignoreResponseError: true,
+      });
+      expect(response.error).toBe('Missing Authorization header');
+    });
+
+    it('rejects requests with an invalid API key', async () => {
+      const response = await $fetch<{ error: string }>('/api/graphql', {
+        method: 'POST',
+        body: { query: '{ teams { edges { node { id } } } }' },
+        headers: { Authorization: 'Bearer boject_invalid_key' },
+        ignoreResponseError: true,
+      });
+      expect(response.error).toBe('Invalid API key');
+    });
+
+    it('accepts requests with a valid API key', async () => {
+      const { data } = await gql<{
+        teams: { edges: { node: { id: string } }[] };
+      }>('{ teams { edges { node { id } } } }');
+      expect(data.teams.edges).toBeInstanceOf(Array);
     });
   });
 });

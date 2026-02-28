@@ -20,7 +20,10 @@
     "format:fix": "prettier --write .",
     "test:watch": "vitest",
     "test:run": "vitest run",
-    "typecheck": "nuxi typecheck"
+    "typecheck": "nuxi typecheck",
+    "apikey:create": "tsx scripts/manage-api-keys.ts create",
+    "apikey:list": "tsx scripts/manage-api-keys.ts list",
+    "apikey:revoke": "tsx scripts/manage-api-keys.ts revoke"
   },
   "keywords": [],
   "author": "",

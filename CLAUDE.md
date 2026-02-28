@@ -26,6 +26,9 @@ pnpm format:fix               # Format all files with Prettier
 pnpm test                     # Run tests in watch mode
 pnpm test:run                 # Run tests once (CI)
 pnpm typecheck                # Run TypeScript type checker (nuxi typecheck)
+pnpm apikey:create <name>     # Create a new API key (prints raw key once)
+pnpm apikey:list              # List all API keys (prefix, name, status, last used)
+pnpm apikey:revoke <prefix>   # Revoke an API key by its prefix
 ```
 
 Note: `prisma migrate dev` requires an interactive terminal. When running from a non-interactive context, use `prisma migrate diff` to generate the SQL and `prisma migrate deploy` to apply it.
@@ -61,6 +64,10 @@ Content models (Team, Club, Competition, Season, Player, Fixture, Image) have pu
 - `publishedAt` — Nullable `DateTime`, set when first published
 - `createdBy` / `updatedBy` — Nullable `String` fields for user tracking (will become relations when auth is added)
 
+### API Key Management
+
+- **ApiKey** — Stores hashed API keys for GraphQL endpoint authentication. Fields: `name` (human label), `keyHash` (SHA-256 hash, unique), `keyPrefix` (first 11 chars for identification), `revokedAt` (nullable, soft-revoke), `lastUsedAt` (nullable, updated on use). Not a content model — no publishing metadata.
+
 ### Domain Models
 
 - **Team** — Internal club squads (e.g. 1st XV, Veterans, Juniors). Linked to competitions and fixtures.
@@ -78,6 +85,7 @@ Content models (Team, Club, Competition, Season, Player, Fixture, Image) have pu
 
 Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder.
 
+- **Authentication** — All `POST /api/graphql` requests require an `Authorization: Bearer boject_...` header with a valid API key. Keys are SHA-256 hashed and stored in the `ApiKey` database table. `GET` requests in development are unauthenticated (GraphiQL playground access). Key validation is handled by `server/utils/validateApiKey.ts` (auto-imported). Revoked keys (non-null `revokedAt`) are rejected. `lastUsedAt` is updated fire-and-forget on each valid request. Keys are managed via `scripts/manage-api-keys.ts` CLI (create/list/revoke). Integration tests use a deterministic test key seeded by `prisma/seed.ts`.
 - **Endpoint** — `POST /api/graphql` for queries/mutations. `GET /api/graphql` serves GraphiQL playground in development.
 - **Schema builder** — `server/graphql/builder.ts` exports the singleton `SchemaBuilder` with PrismaPlugin, PrismaUtilsPlugin, and RelayPlugin.
 - **Type definitions** — One file per Prisma model in `server/graphql/types/`. Each file calls `builder.prismaObject(...)` as a side effect. Content metadata fields are shared via `contentMetadataFields()` helper in `server/graphql/types/contentFields.ts`.
@@ -96,7 +104,10 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder.
 - `layouts/default.vue` — Dashboard layout with sidebar navigation (UDashboardGroup + UDashboardSidebar + UDashboardPanel)
 - `assets/css/main.css` — Tailwind CSS + Nuxt UI imports
 - `server/utils/prisma.ts` — Singleton PrismaClient instance (auto-imported into all server routes)
-- `server/api/graphql/graphql.ts` — GraphQL Yoga ↔ H3 bridge (explicitly imports `defineEventHandler` from `h3`)
+- `server/api/graphql/graphql.ts` — GraphQL Yoga ↔ H3 bridge with API key auth gate (explicitly imports `defineEventHandler` from `h3`)
+- `server/utils/apiKey.ts` — `generateApiKey()` and `hashApiKey()` utilities (SHA-256, `boject_` prefix)
+- `server/utils/validateApiKey.ts` — `validateApiKey()` extracts Bearer token, hashes, looks up in DB, rejects if missing/invalid/revoked
+- `scripts/manage-api-keys.ts` — CLI for API key create/list/revoke (standalone Prisma, run via `tsx`)
 - `components/ContentTable.vue` — Reusable content listing table (UTable wrapper with standard columns + slot forwarding)
 - `composables/useContentTable.ts` — Shared `formatDate` and `statusColor` helpers
 - `server/api/content.get.ts` — Paginated content API route (raw SQL `UNION ALL` across all 7 content models, sorted by `updatedAt` desc, accepts `page`/`perPage` query params, returns `{ items, total }`)
@@ -112,7 +123,7 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder.
 - `server/graphql/types/contentStatus.ts` — ContentStatus GraphQL enum
 - `server/graphql/filters.ts` — Prisma-style where filter input types
 - `server/graphql/query/index.ts` — Root Query field definitions
-- `prisma/seed.ts` — Database seed script (positions, teams, clubs, seasons, competitions, players, fixtures, scores)
+- `prisma/seed.ts` — Database seed script (positions, teams, clubs, seasons, competitions, players, fixtures, scores, test API key)
 - `docker-compose.yml` — Local PostgreSQL 17 container
 - `server/api/` — Nitro API route handlers (CMS pages use Prisma directly, not GraphQL)
 - `pages/` — Nuxt page components
@@ -137,4 +148,4 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder.
 - **Vitest** — Test runner, configured via `vitest.config.ts` using `@nuxt/test-utils/config`.
 - **@nuxt/test-utils** — Starts a Nuxt dev server for integration tests. Tests must use `setup({ dev: true })` (production mode masks GraphQL errors).
 - **Test location** — Colocated with source files (e.g. `server/api/graphql/graphql.test.ts`).
-- **GraphQL tests** — 21 integration tests covering list queries, single-item lookups, relation resolution, where filtering, and Relay cursor pagination.
+- **GraphQL tests** — 24 integration tests covering list queries, single-item lookups, relation resolution, where filtering, Relay cursor pagination, and API key authentication. Tests use a deterministic test key (`boject_test_key_for_integration_tests_only`) seeded via `prisma/seed.ts`.
