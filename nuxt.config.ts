@@ -3,6 +3,10 @@ import { resolve } from 'node:path';
 export default defineNuxtConfig({
   compatibilityDate: '2024-11-01',
 
+  devServer: {
+    port: 4000,
+  },
+
   modules: ['@nuxt/ui', 'nuxt-auth-utils', '@nuxt/eslint'],
 
   css: ['~/assets/css/main.css'],

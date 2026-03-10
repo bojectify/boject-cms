@@ -113,7 +113,7 @@ External clients → GraphQL Yoga → Pothos → Prisma → PostgreSQL
 CMS pages → Nuxt server routes → Prisma → PostgreSQL
 ```
 
-- **Nuxt 4** serves pages and API routes. Nitro is the server engine. A default layout (`layouts/default.vue`) provides a dashboard shell with sidebar navigation across all CMS pages using Nuxt UI's `UDashboardGroup`, `UDashboardSidebar`, and `UDashboardPanel` components.
+- **Nuxt 4** serves pages and API routes. Nitro is the server engine. A default layout (`layouts/default.vue`) provides a dashboard shell with sidebar navigation and a header navbar (user avatar/dropdown menu) across all CMS pages using Nuxt UI's dashboard components.
 - **GraphQL Yoga** handles external client requests at `POST /api/graphql`.
 - **CMS pages** use dedicated Nuxt server API routes that query Prisma directly (not via GraphQL).
 - **Pothos** builds the GraphQL schema from Prisma model definitions, with auto-generated types.

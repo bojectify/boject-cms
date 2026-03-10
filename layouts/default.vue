@@ -1,7 +1,11 @@
 <script setup lang="ts">
-import type { NavigationMenuItem } from '@nuxt/ui';
+import type { NavigationMenuItem, DropdownMenuItem } from '@nuxt/ui';
 
 const { user, clear } = useUserSession();
+
+const fullName = computed(() =>
+  `${user.value?.firstName ?? ''} ${user.value?.lastName ?? ''}`.trim()
+);
 
 async function logout() {
   await $fetch('/api/auth/logout', { method: 'POST' });
@@ -9,7 +13,7 @@ async function logout() {
   await navigateTo('/login');
 }
 
-const items: NavigationMenuItem[] = [
+const navItems: NavigationMenuItem[] = [
   { label: 'All Content', icon: 'i-lucide-layout-grid', to: '/' },
   { label: 'Teams', icon: 'i-lucide-shield', to: '/teams' },
   { label: 'Players', icon: 'i-lucide-users', to: '/players' },
@@ -19,6 +23,22 @@ const items: NavigationMenuItem[] = [
   { label: 'Seasons', icon: 'i-lucide-clock', to: '/seasons' },
   { label: 'Images', icon: 'i-lucide-image', to: '/images' },
 ];
+
+const userMenuItems = computed<DropdownMenuItem[][]>(() => [
+  [
+    {
+      label: fullName.value,
+      type: 'label',
+    },
+  ],
+  [
+    {
+      label: 'Logout',
+      icon: 'i-lucide-log-out',
+      onSelect: logout,
+    },
+  ],
+]);
 </script>
 
 <template>
@@ -28,25 +48,24 @@ const items: NavigationMenuItem[] = [
         <span class="text-lg font-bold">boject</span>
       </template>
 
-      <UNavigationMenu :items="items" orientation="vertical" />
-
-      <template #footer>
-        <div class="flex items-center justify-between gap-2 px-2">
-          <div class="flex items-center gap-2 truncate">
-            <UIcon name="i-lucide-user" />
-            <span class="truncate text-sm">{{ user?.name }}</span>
-          </div>
-          <UButton
-            icon="i-lucide-log-out"
-            variant="ghost"
-            size="xs"
-            @click="logout"
-          />
-        </div>
-      </template>
+      <UNavigationMenu :items="navItems" orientation="vertical" />
     </UDashboardSidebar>
 
     <UDashboardPanel>
+      <template #header>
+        <UDashboardNavbar>
+          <template #leading>
+            <UDashboardSidebarCollapse />
+          </template>
+
+          <template #right>
+            <UDropdownMenu :items="userMenuItems" size="xl">
+              <UAvatar :alt="fullName" size="xl" />
+            </UDropdownMenu>
+          </template>
+        </UDashboardNavbar>
+      </template>
+
       <template #body>
         <slot />
       </template>
