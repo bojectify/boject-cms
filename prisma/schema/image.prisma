@@ -5,6 +5,10 @@ model Image {
   alt          String
   width        Int
   height       Int
+  storagePath  String?
+  mimeType     String?
+  fileSize     Int?
+  originalName String?
   status       ContentStatus @default(DRAFT)
   publishedAt  DateTime?
   createdBy    String?

@@ -8,6 +8,15 @@ builder.prismaObject('Image', {
     alt: t.exposeString('alt'),
     width: t.exposeInt('width'),
     height: t.exposeInt('height'),
+    storagePath: t.exposeString('storagePath', { nullable: true }),
+    mimeType: t.exposeString('mimeType', { nullable: true }),
+    fileSize: t.exposeInt('fileSize', { nullable: true }),
+    originalName: t.exposeString('originalName', { nullable: true }),
+    transformUrl: t.string({
+      nullable: true,
+      resolve: (image) =>
+        image.storagePath ? `/api/images/${image.id}/transform` : null,
+    }),
     ...contentMetadataFields(t),
     createdAt: t.expose('createdAt', { type: 'DateTime' }),
     updatedAt: t.expose('updatedAt', { type: 'DateTime' }),

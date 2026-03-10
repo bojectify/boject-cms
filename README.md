@@ -61,6 +61,9 @@ The app runs at http://localhost:4000. The GraphQL playground (GraphiQL) is avai
 | `pnpm test:watch`      | Run tests in watch mode                      |
 | `pnpm test:run`        | Run tests once (CI)                          |
 | `pnpm typecheck`       | Run TypeScript type checker                  |
+| `pnpm apikey:create`   | Create a new API key                         |
+| `pnpm apikey:list`     | List all API keys                            |
+| `pnpm apikey:revoke`   | Revoke an API key by prefix                  |
 
 ## Project Structure
 
@@ -99,6 +102,8 @@ server/
     types/                     # Per-model Pothos type definitions
   utils/
     prisma.ts                  # Singleton PrismaClient (auto-imported)
+    imageProcessing.ts         # Sharp-based image processing (upload + transform)
+    rateLimit.ts               # In-memory sliding window rate limiter
   middleware/
     auth.ts                    # Global server auth middleware
 components/
@@ -112,6 +117,7 @@ pages/
   index.vue                    # All content (paginated, sorted by updatedAt)
   {model}/index.vue            # Per-model listing pages
   {model}/[id].vue             # Per-model edit pages
+storage/                     # Gitignored, local image file storage (dev)
 generated/                   # Gitignored, auto-generated
   prisma/                    # Prisma client
   pothos-types.ts            # Pothos-Prisma type bridge
@@ -130,6 +136,7 @@ CMS pages → Nuxt server routes → Prisma → PostgreSQL
 - **Pothos** builds the GraphQL schema from Prisma model definitions, with auto-generated types.
 - **Prisma v7** uses the `@prisma/adapter-pg` driver adapter (not the traditional Rust engine). A singleton client in `server/utils/prisma.ts` is auto-imported into all server routes.
 - **Generated types** live in `generated/` (gitignored). Run `pnpm prisma:generate` after any schema change.
+- **Image upload & transform** — `POST /api/images/upload` accepts multipart file uploads (5MB limit, JPEG/PNG/WebP/GIF/AVIF). Originals are processed via Sharp (auto-orient, max 4000px). `GET /api/images/:id/transform` serves images with on-the-fly resize/format conversion (publicly accessible, cached, rate limited). Stored in `storage/` (gitignored, filesystem in dev, swappable to S3/R2 in production via Nitro storage config).
 
 ## GraphQL API
 
@@ -254,7 +261,7 @@ PostgreSQL 17 runs locally via Docker Compose (port 5432, user/password/db: `boj
 | **Player**            | Has name, position, bio, headshot, action shot, team history                         |
 | **PlayerTeamHistory** | Tracks which team a player belongs to over time                                      |
 | **Position**          | Rugby positions (e.g. Fly-half, Hooker)                                              |
-| **Image**             | Reusable image with url, alt, width, height                                          |
+| **Image**             | Reusable image with url, alt, dimensions, optional file storage (upload + transform) |
 
 All models use UUID primary keys and `createdAt`/`updatedAt` timestamps. Content models (Team, Club, Competition, Season, Player, Fixture, Image) also have `entryTitle` (CMS display name), `status` (`DRAFT`/`PUBLISHED`/`CHANGED`/`ARCHIVED`), `publishedAt`, `createdBy`, and `updatedBy` metadata fields.
 
@@ -267,7 +274,7 @@ prisma migrate deploy          # Apply migrations (non-interactive / CI)
 
 ## Testing
 
-87 integration tests using Vitest + `@nuxt/test-utils`. Tests start a Nuxt dev server and run against the seeded database.
+99 integration tests using Vitest + `@nuxt/test-utils`. Tests start a Nuxt dev server and run against the seeded database.
 
 ```bash
 pnpm test:watch    # Watch mode
@@ -279,6 +286,7 @@ pnpm test:run      # Single run (CI)
 - **List endpoints** (29 tests) — query param filters on teams, clubs, seasons, images (status), players (positionId, status), competitions (seasonId, status).
 - **Content** (11 tests) — contentType filter, status filter, combined filters, invalid value handling.
 - **Auth** (7 tests) — login validation, credential checking, session handling, middleware behaviour.
+- **Image upload & transform** (12 tests) — upload validation (missing file, wrong mime type, file too large), successful upload, transform validation (invalid params), format conversion, public access, rate limiting.
 
 **Requirement:** Docker PostgreSQL must be running with seeded data.
 

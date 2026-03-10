@@ -50,7 +50,8 @@ Note: `prisma migrate dev` requires an interactive terminal. When running from a
 - **Content field types** — `types/contentEditor.ts` defines the `FieldConfig` discriminated union used by `ContentEditor`. Auto-imported by Nuxt.
 - **Path aliases** — `nuxt.config.ts` defines `#prisma` → `generated/prisma/client` and `#generated` → `generated/`. These are resolved by both Nuxt (app + Nitro server) and TypeScript (via auto-generated `.nuxt/tsconfig.json`). Use `import type { Prisma } from '#prisma'` instead of relative paths. Standalone scripts (`scripts/`, `prisma/seed.ts`) that run via `tsx` outside Nuxt still use relative paths.
 - **REST API filtering** — All per-model list endpoints support optional query param filters alongside pagination (`page`, `perPage`). The `where` clause is passed to both `findMany` and `count` so totals reflect filtered results. Filters by endpoint: fixtures (`teamId`, `opponentId`, `competitionId`, `seasonId`, `isHome`, `status`), players (`positionId`, `status`), competitions (`seasonId`, `status`), teams/clubs/seasons/images (`status`). The content endpoint supports `contentType` (filters which UNION subqueries to include) and `status` (adds WHERE clause). All status values are validated against a `VALID_STATUSES` set; invalid values are silently ignored (no filter applied).
-- **Authentication** — `nuxt-auth-utils` module provides encrypted cookie sessions. Login page at `/login` (uses `layouts/auth.vue`). Global server middleware (`server/middleware/auth.ts`) protects all `/api/*` routes — accepts either a valid session cookie (CMS users) or an API key in `Authorization: Bearer` header (external consumers). Skips `/api/auth/**`, `/api/_auth/**`, and `/api/graphql` (has its own API key gate). Global client middleware (`middleware/auth.global.ts`) redirects unauthenticated users to `/login` and authenticated users away from `/login` to `/`. Password hashing uses scrypt via `hashPassword()` / `verifyPassword()` (auto-imported in server routes). `NUXT_SESSION_PASSWORD` env var required in production (auto-generated in dev). Default admin credentials: `admin@boject.com` / `password` (seeded via `prisma/seed.ts`). The logged-in user's name and logout action are in the header navbar dropdown.
+- **Authentication** — `nuxt-auth-utils` module provides encrypted cookie sessions. Login page at `/login` (uses `layouts/auth.vue`). Global server middleware (`server/middleware/auth.ts`) protects all `/api/*` routes — accepts either a valid session cookie (CMS users) or an API key in `Authorization: Bearer` header (external consumers). Skips `/api/auth/**`, `/api/_auth/**`, `/api/graphql` (has its own API key gate), and `/api/images/:id/transform` (public image serving). Global client middleware (`middleware/auth.global.ts`) redirects unauthenticated users to `/login` and authenticated users away from `/login` to `/`. Password hashing uses scrypt via `hashPassword()` / `verifyPassword()` (auto-imported in server routes). `NUXT_SESSION_PASSWORD` env var required in production (auto-generated in dev). Default admin credentials: `admin@boject.com` / `password` (seeded via `prisma/seed.ts`). The logged-in user's name and logout action are in the header navbar dropdown.
+- **Image upload & transform** — File upload via `POST /api/images/upload` (multipart form, session auth required, 5MB limit, accepts JPEG/PNG/WebP/GIF/AVIF). Originals are auto-oriented (EXIF stripped) and downscaled if >4000px wide via Sharp. Stored in Nitro's unstorage (`images:originals` mount, filesystem in dev). On-the-fly transformation via `GET /api/images/:id/transform` (publicly accessible, no auth) with query params: `w` (width), `h` (height), `f` (format: jpeg/png/webp/avif), `q` (quality 1-100), `fit` (cover/contain/fill/inside/outside). Transformed variants are cached in `images:transforms` storage. Responses include `Cache-Control: public, max-age=31536000, immutable`. Rate limited to 100 requests/60s per IP. The `storage/` directory is gitignored. Production storage can be swapped to S3/R2 via `nitro.storage` config.
 - **Prisma MCP server** — Local MCP server configured for Claude Code, providing direct access to migrate-status, migrate-dev, migrate-reset, and Prisma Studio.
 - **Nuxt UI MCP server** — Remote MCP server at `https://ui.nuxt.com/mcp` for component docs, examples, and metadata.
 
@@ -83,7 +84,7 @@ Content models (Team, Club, Competition, Season, Player, Fixture, Image) have pu
 - **Player** — Has firstName, lastName, optional bio, optional position. Images via headshot (one-to-one), actionShot (one-to-one), and a general images list. Team membership tracked via PlayerTeamHistory.
 - **PlayerTeamHistory** — Join table tracking which Team a Player belongs to over time. `endDate` is nullable (null = currently on that team). A player can have multiple open records.
 - **Position** — Rugby positions (e.g. Fly-half, Hooker). Unique name.
-- **Image** — Reusable image model with url, alt, width, height. Used for player headshots, action shots, general player images, and club crests.
+- **Image** — Reusable image model with url, alt, width, height, plus optional storage fields (`storagePath`, `mimeType`, `fileSize`, `originalName`) for uploaded files. Used for player headshots, action shots, general player images, and club crests.
 
 ## GraphQL
 
@@ -121,6 +122,7 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder.
 - `scripts/manage-api-keys.ts` — CLI for API key create/list/revoke (standalone Prisma, run via `tsx`)
 - `components/ContentTable.vue` — Reusable content listing table (UTable wrapper with standard columns + slot forwarding)
 - `composables/useContentTable.ts` — Shared `formatDate` and `statusColor` helpers
+- `server/api/health.get.ts` — Health check endpoint (returns database connection status)
 - `server/api/content.get.ts` — Paginated content API route (raw SQL `UNION ALL` across all 7 content models, sorted by `updatedAt` desc, accepts `page`/`perPage`/`contentType`/`status` query params, returns `{ items, total }`)
 - `server/api/{model}.get.ts` — Per-model list API routes (teams, fixtures, players, clubs, competitions, seasons, images) querying Prisma directly. All support query param filtering (see REST API filtering above).
 - `server/api/{model}/[id].get.ts` — Per-model single-item GET routes (findUnique by UUID, returns 404 if not found)
@@ -150,6 +152,11 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder.
 - `server/api/lists/lists.test.ts` — List endpoint filter integration tests (teams, clubs, players, competitions, seasons, images)
 - `server/api/content/content.test.ts` — Content endpoint filter integration tests (contentType, status)
 - `server/api/auth/auth.test.ts` — Auth endpoint and middleware integration tests
+- `server/utils/imageProcessing.ts` — Sharp-based image processing: `processOriginal()` (auto-orient, max dimension), `transformImage()` (resize, format, quality), constants for allowed types/formats/sizes
+- `server/utils/rateLimit.ts` — In-memory sliding window rate limiter per key, with lazy cleanup
+- `server/api/images/upload.post.ts` — Multipart image upload endpoint (session auth, 5MB limit, stores via unstorage)
+- `server/api/images/[id]/transform.get.ts` — Public image transform endpoint (resize, format, cache)
+- `server/api/images/images.test.ts` — Image upload and transform integration tests
 
 ## Linting & Formatting
 
@@ -169,3 +176,4 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder.
 - **List endpoint tests** — 29 integration tests covering query param filters on teams, clubs, seasons, images (status), players (positionId, status), and competitions (seasonId, status). Includes combined filter and invalid value tests.
 - **Content tests** — 11 integration tests covering contentType filter, status filter, combined filters, and invalid value handling.
 - **Auth tests** — Integration tests covering login validation, credential checking, session handling, and middleware behaviour.
+- **Image tests** — Integration tests covering upload validation (missing file, wrong mime type, file too large), successful upload, transform validation (invalid params), format conversion, public access, and rate limiting.

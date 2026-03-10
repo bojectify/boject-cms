@@ -22,7 +22,17 @@ export default defineNuxtConfig({
 
   nitro: {
     externals: {
-      inline: ['@prisma/adapter-pg', 'graphql-yoga'],
+      inline: ['@prisma/adapter-pg', 'graphql-yoga', 'sharp'],
+    },
+    devStorage: {
+      'images:originals': {
+        driver: 'fs',
+        base: './storage/images/originals',
+      },
+      'images:transforms': {
+        driver: 'fs',
+        base: './storage/images/transforms',
+      },
     },
   },
 });

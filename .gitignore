@@ -46,6 +46,9 @@ coverage/
 /generated/prisma
 /generated/pothos-types.ts
 
+# Local image storage
+storage/
+
 # Nuxt
 .nuxt/
 .output/
