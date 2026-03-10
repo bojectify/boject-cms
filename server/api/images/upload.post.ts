@@ -19,12 +19,30 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: 'Missing file in upload' });
   }
 
-  // Validate mime type
+  // Validate mime type (client-provided header)
   if (!ALLOWED_MIME_TYPES.has(filePart.type)) {
     throw createError({
       statusCode: 415,
       message: `Unsupported media type: ${filePart.type}`,
     });
+  }
+
+  // Validate magic bytes to prevent spoofed Content-Type
+  const MAGIC_BYTES: Record<string, number[]> = {
+    'image/jpeg': [0xff, 0xd8, 0xff],
+    'image/png': [0x89, 0x50, 0x4e, 0x47],
+    'image/webp': [0x52, 0x49, 0x46, 0x46], // RIFF
+    'image/gif': [0x47, 0x49, 0x46], // GIF
+  };
+  const expected = MAGIC_BYTES[filePart.type];
+  if (expected) {
+    const header = filePart.data.slice(0, expected.length);
+    if (!expected.every((byte, i) => header[i] === byte)) {
+      throw createError({
+        statusCode: 415,
+        message: 'File content does not match declared type',
+      });
+    }
   }
 
   // Validate file size

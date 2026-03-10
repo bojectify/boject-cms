@@ -10,6 +10,7 @@ export default defineEventHandler(async (event) => {
   // Rate limit by IP
   const ip =
     getRequestHeader(event, 'x-forwarded-for')?.split(',')[0]?.trim() ||
+    getRequestIP(event) ||
     'unknown';
   const { allowed, retryAfterMs } = rateLimit(`transform:${ip}`);
   if (!allowed) {

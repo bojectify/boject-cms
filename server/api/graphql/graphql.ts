@@ -1,11 +1,13 @@
 import { createYoga } from 'graphql-yoga';
 import { defineEventHandler } from 'h3';
+import { maxDepthPlugin } from '@escape.tech/graphql-armor-max-depth';
 import { getSchema } from '../../graphql/schema';
 
 const yoga = createYoga({
   schema: getSchema(),
   graphqlEndpoint: '/api/graphql',
   graphiql: process.env.NODE_ENV !== 'production',
+  plugins: [maxDepthPlugin({ n: 10 })],
 });
 
 export default defineEventHandler(async (event) => {
