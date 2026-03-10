@@ -12,7 +12,7 @@ boject-cms is a TypeScript CMS for a rugby club, built with Nuxt 4 (Vue) and Pri
 docker compose up -d          # Start local PostgreSQL (required before dev/migrate)
 docker compose down           # Stop local PostgreSQL (data persists in pgdata volume)
 pnpm install                  # Install dependencies (runs nuxt prepare + prisma generate via postinstall)
-pnpm dev                      # Start Nuxt development server (http://localhost:3000)
+pnpm dev                      # Start Nuxt development server (http://localhost:4000)
 pnpm build                    # Build for production (outputs to .output/)
 pnpm preview                  # Preview production build locally
 pnpm db:up                    # Start local PostgreSQL container (alias for docker compose up -d)
@@ -56,7 +56,7 @@ Note: `prisma migrate dev` requires an interactive terminal. When running from a
 
 ## Database Schema
 
-Defined in `prisma/schema.prisma`. All models use UUID primary keys, `createdAt`/`updatedAt` timestamps, and `@unique` constraints on name fields where duplicates don't make sense.
+Defined across multiple `.prisma` files in `prisma/schema/` (multi-file schema). `prisma.config.ts` points to the directory. Files: `base.prisma` (generators, datasource, enums), `team.prisma`, `club.prisma`, `competition.prisma`, `season.prisma`, `fixture.prisma`, `player.prisma`, `image.prisma`, `auth.prisma`. All models use UUID primary keys, `createdAt`/`updatedAt` timestamps, and `@unique` constraints on name fields where duplicates don't make sense.
 
 ### Content Metadata
 
@@ -138,12 +138,12 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder.
 - `docker-compose.yml` — Local PostgreSQL 17 container
 - `server/api/` — Nitro API route handlers (CMS pages use Prisma directly, not GraphQL)
 - `pages/` — Nuxt page components
-- `prisma/schema.prisma` — Database schema
-- `prisma.config.ts` — Prisma CLI configuration (datasource, paths; dotenv-loaded for CLI use)
+- `prisma/schema/` — Multi-file Prisma schema (base, team, club, competition, season, fixture, player, image, auth)
+- `prisma.config.ts` — Prisma CLI configuration (schema directory, datasource, migrations path; dotenv-loaded for CLI use)
 - `generated/prisma/client.ts` — Server-side entry (PrismaClient + model types; gitignored, regenerated)
 - `generated/pothos-types.ts` — Pothos-Prisma type bridge (gitignored, regenerated)
 - `eslint.config.mjs` — ESLint flat config (extends Nuxt-generated config, loads `@typescript-eslint` plugin)
-- `lefthook.yml` — Pre-commit hook configuration
+- `lefthook.yml` — Pre-commit (lint, format, typecheck) and pre-push (test) hook configuration
 - `vitest.config.ts` — Vitest configuration (fileParallelism disabled to prevent port conflicts)
 - `server/api/graphql/graphql.test.ts` — GraphQL API integration tests
 - `server/api/fixtures/fixtures.test.ts` — Fixtures REST API integration tests

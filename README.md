@@ -41,7 +41,7 @@ pnpm prisma:seed
 pnpm dev
 ```
 
-The app runs at http://localhost:3000. The GraphQL playground (GraphiQL) is available at http://localhost:3000/api/graphql in development.
+The app runs at http://localhost:4000. The GraphQL playground (GraphiQL) is available at http://localhost:4000/api/graphql in development.
 
 ## Scripts
 
@@ -66,41 +66,52 @@ The app runs at http://localhost:3000. The GraphQL playground (GraphiQL) is avai
 
 ```
 prisma/
-  schema.prisma              # Database schema
-  seed.ts                    # Seed script
-  migrations/                # Migration files
+  schema/                      # Multi-file Prisma schema
+    base.prisma                # Generators, datasource, enums
+    team.prisma                # Team, TeamsOnCompetitions
+    club.prisma                # Club
+    competition.prisma         # Competition
+    season.prisma              # Season
+    fixture.prisma             # Fixture, Score
+    player.prisma              # Player, Position, PlayerTeamHistory
+    image.prisma               # Image
+    auth.prisma                # User, ApiKey
+  seed.ts                      # Seed script
+  migrations/                  # Migration files
 app.vue                        # Root component (UApp + NuxtLayout wrapper)
 layouts/
-  default.vue                  # Dashboard layout with sidebar navigation
+  default.vue                  # Dashboard layout (sidebar nav + header navbar)
+  auth.vue                     # Centered layout for login page
 assets/css/main.css            # Tailwind CSS + Nuxt UI imports
 server/
   api/
+    auth/                      # Login/logout endpoints + tests
     graphql/                   # GraphQL Yoga endpoint + tests
     content.get.ts             # Paginated content route (raw SQL UNION ALL, all models)
     {model}.get.ts             # Per-model listing routes (Prisma direct)
+    {model}/[id].get.ts        # Per-model single-item routes
+    {model}/[id].put.ts        # Per-model update routes
   graphql/
     builder.ts                 # Pothos SchemaBuilder singleton
     schema.ts                  # Schema assembly
     filters.ts                 # Prisma-style where filter inputs
     query/index.ts             # Root Query field definitions
     types/                     # Per-model Pothos type definitions
-      contentStatus.ts         # ContentStatus enum
-      contentFields.ts         # Shared metadata field helper
   utils/
     prisma.ts                  # Singleton PrismaClient (auto-imported)
+  middleware/
+    auth.ts                    # Global server auth middleware
 components/
   ContentTable.vue             # Reusable content listing table
+  ContentEditor.vue            # Generic content editing form
 composables/
   useContentTable.ts           # Shared formatDate + statusColor helpers
+  useContentEditor.ts          # Content editing lifecycle management
 pages/
+  login.vue                    # Login page
   index.vue                    # All content (paginated, sorted by updatedAt)
-  teams.vue                    # Teams listing
-  fixtures.vue                 # Fixtures listing
-  players.vue                  # Players listing
-  clubs.vue                    # Clubs listing
-  competitions.vue             # Competitions listing
-  seasons.vue                  # Seasons listing
-  images.vue                   # Images listing
+  {model}/index.vue            # Per-model listing pages
+  {model}/[id].vue             # Per-model edit pages
 generated/                   # Gitignored, auto-generated
   prisma/                    # Prisma client
   pothos-types.ts            # Pothos-Prisma type bridge
