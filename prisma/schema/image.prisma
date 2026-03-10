@@ -1,0 +1,17 @@
+model Image {
+  id           String        @id @default(uuid())
+  entryTitle   String        @default("")
+  url          String
+  alt          String
+  width        Int
+  height       Int
+  status       ContentStatus @default(DRAFT)
+  publishedAt  DateTime?
+  createdBy    String?
+  updatedBy    String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  headshotOf   Player?       @relation("PlayerHeadshot")
+  actionShotOf Player?       @relation("PlayerActionShot")
+  crestOf      Club?         @relation("ClubCrest")
+}

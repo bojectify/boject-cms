@@ -1,0 +1,15 @@
+model Club {
+  id          String        @id @default(uuid())
+  entryTitle  String        @default("")
+  name        String        @unique
+  slug        String        @unique
+  crest       Image?        @relation(name: "ClubCrest", fields: [crestId], references: [id], onDelete: SetNull)
+  crestId     String?       @unique
+  status      ContentStatus @default(DRAFT)
+  publishedAt DateTime?
+  createdBy   String?
+  updatedBy   String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  fixtures    Fixture[]
+}

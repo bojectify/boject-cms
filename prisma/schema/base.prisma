@@ -1,0 +1,29 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../../generated/prisma"
+}
+
+generator pothos {
+  provider     = "prisma-pothos-types"
+  output       = "../../generated/pothos-types.ts"
+  clientOutput = "./prisma"
+  prismaUtils  = true
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ContentStatus {
+  DRAFT
+  PUBLISHED
+  CHANGED
+  ARCHIVED
+}
+
+enum ScoreType {
+  TRY
+  CONVERSION
+  PENALTY
+  DROP_GOAL
+}
