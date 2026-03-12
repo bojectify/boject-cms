@@ -9,6 +9,8 @@ model Image {
   mimeType     String?
   fileSize     Int?
   originalName String?
+  focalPointX  Float         @default(0.5)
+  focalPointY  Float         @default(0.5)
   status       ContentStatus @default(DRAFT)
   publishedAt  DateTime?
   createdBy    String?

@@ -72,6 +72,15 @@ export default defineEventHandler(async (event) => {
     ? entryTitlePart.data.toString('utf-8')
     : (filePart.filename ?? '');
 
+  const fpxPart = formData.find((part) => part.name === 'focalPointX');
+  const fpyPart = formData.find((part) => part.name === 'focalPointY');
+  const focalPointX = fpxPart?.data
+    ? Number(fpxPart.data.toString('utf-8'))
+    : 0.5;
+  const focalPointY = fpyPart?.data
+    ? Number(fpyPart.data.toString('utf-8'))
+    : 0.5;
+
   // Create database record
   const image = await prisma.image.create({
     data: {
@@ -84,6 +93,8 @@ export default defineEventHandler(async (event) => {
       mimeType: `image/${processed.format}`,
       fileSize: processed.data.length,
       originalName: filePart.filename ?? null,
+      focalPointX,
+      focalPointY,
     },
   });
 

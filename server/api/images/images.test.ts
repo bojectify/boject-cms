@@ -217,6 +217,33 @@ describe('Image Upload & Transform API', async () => {
       expect(response.status).toBe(200);
     });
 
+    it('returns 400 for fpx out of range', async () => {
+      await expect(
+        $fetch(`/api/images/${uploadedImageId}/transform?w=100&h=100&fpx=1.5`, {
+          responseType: 'arrayBuffer',
+        })
+      ).rejects.toMatchObject({ statusCode: 400 });
+    });
+
+    it('returns 400 for focal point without both dimensions', async () => {
+      await expect(
+        $fetch(
+          `/api/images/${uploadedImageId}/transform?w=100&fpx=0.5&fpy=0.5`,
+          { responseType: 'arrayBuffer' }
+        )
+      ).rejects.toMatchObject({ statusCode: 400 });
+    });
+
+    it('applies focal point crop with fpx and fpy', async () => {
+      const response = await $fetch.raw(
+        `/api/images/${uploadedImageId}/transform?w=1&h=1&fpx=0.5&fpy=0.5&f=png`,
+        { responseType: 'arrayBuffer' }
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get('content-type')).toBe('image/png');
+    });
+
     it('returns 429 when rate limited', async () => {
       // Exhaust rate limit by flooding with requests
       const { rateLimit: rl } = await import('../../utils/rateLimit');

@@ -9,6 +9,8 @@ const fields: FieldConfig[] = [
   { type: 'text', key: 'alt', label: 'Alt Text', required: true },
   { type: 'number', key: 'width', label: 'Width', required: true },
   { type: 'number', key: 'height', label: 'Height', required: true },
+  { type: 'number', key: 'focalPointX', label: 'Focal Point X (0-1)' },
+  { type: 'number', key: 'focalPointY', label: 'Focal Point Y (0-1)' },
 ];
 
 const { formState, loadingStatus, isSaving, saveError, save, generateSlug } =

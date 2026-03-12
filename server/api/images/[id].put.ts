@@ -15,6 +15,8 @@ export default defineEventHandler(async (event) => {
   if ('alt' in body) data.alt = body.alt as string;
   if ('width' in body) data.width = Number(body.width);
   if ('height' in body) data.height = Number(body.height);
+  if ('focalPointX' in body) data.focalPointX = Number(body.focalPointX);
+  if ('focalPointY' in body) data.focalPointY = Number(body.focalPointY);
   applyContentMetadata(
     body,
     data as Record<string, unknown>,

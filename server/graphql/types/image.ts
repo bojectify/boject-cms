@@ -12,6 +12,8 @@ builder.prismaObject('Image', {
     mimeType: t.exposeString('mimeType', { nullable: true }),
     fileSize: t.exposeInt('fileSize', { nullable: true }),
     originalName: t.exposeString('originalName', { nullable: true }),
+    focalPointX: t.exposeFloat('focalPointX'),
+    focalPointY: t.exposeFloat('focalPointY'),
     transformUrl: t.string({
       nullable: true,
       resolve: (image) =>

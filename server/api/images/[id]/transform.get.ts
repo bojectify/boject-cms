@@ -33,6 +33,8 @@ export default defineEventHandler(async (event) => {
   const f = query.f ? String(query.f) : undefined;
   const q = query.q ? Number(query.q) : undefined;
   const fit = query.fit ? String(query.fit) : undefined;
+  const fpx = query.fpx ? Number(query.fpx) : undefined;
+  const fpy = query.fpy ? Number(query.fpy) : undefined;
 
   // Validate params
   if (w !== undefined && (isNaN(w) || w <= 0 || w > 4000)) {
@@ -62,6 +64,33 @@ export default defineEventHandler(async (event) => {
       message: `Invalid fit value. Allowed: ${[...ALLOWED_FIT_VALUES].join(', ')}`,
     });
   }
+  if (fpx !== undefined && (isNaN(fpx) || fpx < 0 || fpx > 1)) {
+    throw createError({
+      statusCode: 400,
+      message: 'Invalid fpx parameter (0-1)',
+    });
+  }
+  if (fpy !== undefined && (isNaN(fpy) || fpy < 0 || fpy > 1)) {
+    throw createError({
+      statusCode: 400,
+      message: 'Invalid fpy parameter (0-1)',
+    });
+  }
+  if ((fpx !== undefined || fpy !== undefined) && (!w || !h)) {
+    throw createError({
+      statusCode: 400,
+      message: 'Focal point requires both w and h parameters',
+    });
+  }
+
+  // Use DB focal point as fallback when resizing with both dimensions
+  const effectiveFpx = fpx ?? (w && h ? image.focalPointX : undefined);
+  const effectiveFpy = fpy ?? (w && h ? image.focalPointY : undefined);
+  // Skip focal point logic if it's the default center (0.5, 0.5) and not explicitly requested
+  const hasFocalPointOverride =
+    fpx !== undefined ||
+    fpy !== undefined ||
+    (w && h && (image.focalPointX !== 0.5 || image.focalPointY !== 0.5));
 
   const originalsStorage = useStorage('images:originals');
   const originalBuffer = await originalsStorage.getItemRaw<Buffer>(
@@ -75,7 +104,7 @@ export default defineEventHandler(async (event) => {
   }
 
   // If no transform params, serve original
-  const hasTransformParams = w || h || f || q || fit;
+  const hasTransformParams = w || h || f || q || fit || fpx || fpy;
   if (!hasTransformParams) {
     setHeader(
       event,
@@ -87,7 +116,7 @@ export default defineEventHandler(async (event) => {
   }
 
   // Build cache key
-  const cacheKey = `${id}/${w ?? '_'}_${h ?? '_'}_${f ?? '_'}_${q ?? '_'}_${fit ?? '_'}`;
+  const cacheKey = `${id}/${w ?? '_'}_${h ?? '_'}_${f ?? '_'}_${q ?? '_'}_${fit ?? '_'}_${effectiveFpx ?? '_'}_${effectiveFpy ?? '_'}`;
   const transformsStorage = useStorage('images:transforms');
 
   // Check cache
@@ -102,7 +131,15 @@ export default defineEventHandler(async (event) => {
   // Transform
   const { data, contentType } = await transformImage(
     Buffer.from(originalBuffer),
-    { w, h, f, q, fit }
+    {
+      w,
+      h,
+      f,
+      q,
+      fit,
+      fpx: hasFocalPointOverride ? effectiveFpx : undefined,
+      fpy: hasFocalPointOverride ? effectiveFpy : undefined,
+    }
   );
 
   // Cache the result
