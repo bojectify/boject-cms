@@ -1,3 +1,4 @@
+import sharp from 'sharp';
 import type { FitEnum } from 'sharp';
 
 export const IMAGE_UPLOAD_MAX_SIZE = 5 * 1024 * 1024; // 5MB
@@ -26,13 +27,7 @@ export const ALLOWED_FIT_VALUES = new Set([
   'outside',
 ]);
 
-async function getSharp() {
-  const mod = await import('sharp');
-  return mod.default;
-}
-
 export async function processOriginal(buffer: Buffer) {
-  const sharp = await getSharp();
   const pipeline = sharp(buffer).rotate(); // auto-orient, strips EXIF
 
   const metadata = await pipeline.metadata();
@@ -66,7 +61,6 @@ export async function transformImage(
     fpy?: number;
   }
 ) {
-  const sharp = await getSharp();
   let pipeline = sharp(buffer);
 
   const hasFocalPoint = params.fpx !== undefined || params.fpy !== undefined;

@@ -5,6 +5,8 @@ import {
   scrypt as scryptCb,
   type ScryptOptions,
 } from 'node:crypto';
+import { copyFileSync, mkdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../generated/prisma/client';
 
@@ -180,6 +182,45 @@ async function main() {
     },
   });
 
+  // Seed image — copy placeholder to storage and create DB record
+  const storageDir = join(
+    import.meta.dirname,
+    '..',
+    'storage',
+    'images',
+    'originals'
+  );
+  mkdirSync(storageDir, { recursive: true });
+  const srcImage = join(
+    import.meta.dirname,
+    '..',
+    'assets',
+    'images',
+    'placeholder-hero.png'
+  );
+  const storageKey = 'seed-placeholder-hero.png';
+  copyFileSync(srcImage, join(storageDir, storageKey));
+  const { size: fileSize } = statSync(srcImage);
+
+  await prisma.image.upsert({
+    where: { id: '00000000-0000-0000-0000-000000000001' },
+    update: {},
+    create: {
+      id: '00000000-0000-0000-0000-000000000001',
+      entryTitle: 'Placeholder Hero',
+      url: '/api/images/00000000-0000-0000-0000-000000000001/transform',
+      alt: 'Placeholder hero image',
+      width: 1920,
+      height: 663,
+      storagePath: storageKey,
+      mimeType: 'image/png',
+      fileSize,
+      originalName: 'placeholder-hero.png',
+      status: 'PUBLISHED',
+      publishedAt: new Date(),
+    },
+  });
+
   // Season
   const season = await prisma.season.upsert({
     where: { name: '2025/26' },
@@ -246,8 +287,10 @@ async function main() {
   });
 
   // Players
-  const jones = await prisma.player.create({
-    data: {
+  const jones = await prisma.player.upsert({
+    where: { slug: 'rhys-jones' },
+    update: {},
+    create: {
       firstName: 'Rhys',
       lastName: 'Jones',
       slug: 'rhys-jones',
@@ -259,8 +302,10 @@ async function main() {
     },
   });
 
-  const williams = await prisma.player.create({
-    data: {
+  const williams = await prisma.player.upsert({
+    where: { slug: 'dai-williams' },
+    update: {},
+    create: {
       firstName: 'Dai',
       lastName: 'Williams',
       slug: 'dai-williams',
@@ -271,8 +316,10 @@ async function main() {
     },
   });
 
-  const evans = await prisma.player.create({
-    data: {
+  const evans = await prisma.player.upsert({
+    where: { slug: 'tom-evans' },
+    update: {},
+    create: {
       firstName: 'Tom',
       lastName: 'Evans',
       slug: 'tom-evans',
@@ -283,8 +330,10 @@ async function main() {
     },
   });
 
-  const morgan = await prisma.player.create({
-    data: {
+  const morgan = await prisma.player.upsert({
+    where: { slug: 'owen-morgan' },
+    update: {},
+    create: {
       firstName: 'Owen',
       lastName: 'Morgan',
       slug: 'owen-morgan',
@@ -296,8 +345,10 @@ async function main() {
     },
   });
 
-  const price = await prisma.player.create({
-    data: {
+  const price = await prisma.player.upsert({
+    where: { slug: 'gethin-price' },
+    update: {},
+    create: {
       firstName: 'Gethin',
       lastName: 'Price',
       slug: 'gethin-price',
@@ -308,7 +359,17 @@ async function main() {
     },
   });
 
-  // Player team history
+  // Player team history — clear existing for seeded players, then recreate
+  const seededPlayerIds = [
+    jones.id,
+    williams.id,
+    evans.id,
+    morgan.id,
+    price.id,
+  ];
+  await prisma.playerTeamHistory.deleteMany({
+    where: { playerId: { in: seededPlayerIds } },
+  });
   for (const data of [
     {
       playerId: jones.id,
@@ -346,8 +407,10 @@ async function main() {
   }
 
   // Fixtures
-  const fixture1 = await prisma.fixture.create({
-    data: {
+  const fixture1 = await prisma.fixture.upsert({
+    where: { slug: '1st-xv-vs-oakdale-rfc' },
+    update: {},
+    create: {
       name: '1st XV vs Oakdale RFC',
       slug: '1st-xv-vs-oakdale-rfc',
       entryTitle: '1st XV vs Oakdale RFC',
@@ -363,8 +426,10 @@ async function main() {
     },
   });
 
-  const fixture2 = await prisma.fixture.create({
-    data: {
+  const fixture2 = await prisma.fixture.upsert({
+    where: { slug: 'riverside-rfc-vs-1st-xv' },
+    update: {},
+    create: {
       name: 'Riverside RFC vs 1st XV',
       slug: 'riverside-rfc-vs-1st-xv',
       entryTitle: 'Riverside RFC vs 1st XV',
@@ -380,8 +445,10 @@ async function main() {
     },
   });
 
-  await prisma.fixture.create({
-    data: {
+  await prisma.fixture.upsert({
+    where: { slug: '1st-xv-vs-hilltop-rfc-cup' },
+    update: {},
+    create: {
       name: '1st XV vs Hilltop RFC (Cup)',
       slug: '1st-xv-vs-hilltop-rfc-cup',
       entryTitle: '1st XV vs Hilltop RFC (Cup)',
@@ -395,6 +462,11 @@ async function main() {
       status: 'PUBLISHED',
       publishedAt: new Date(),
     },
+  });
+
+  // Scores — clear existing for seeded fixtures, then recreate
+  await prisma.score.deleteMany({
+    where: { fixtureId: { in: [fixture1.id, fixture2.id] } },
   });
 
   // Scores for fixture 1 (home win 24-12)
