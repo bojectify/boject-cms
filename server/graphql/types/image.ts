@@ -19,6 +19,11 @@ builder.prismaObject('Image', {
       resolve: (image) =>
         image.storagePath ? `/api/images/${image.id}/transform` : null,
     }),
+    placeholderUrl: t.string({
+      nullable: true,
+      resolve: (image) =>
+        image.storagePath ? `/api/images/${image.id}/placeholder` : null,
+    }),
     ...contentMetadataFields(t),
     createdAt: t.expose('createdAt', { type: 'DateTime' }),
     updatedAt: t.expose('updatedAt', { type: 'DateTime' }),
