@@ -1,5 +1,6 @@
 import type { Prisma } from '#prisma';
 import { applyContentMetadata } from '../../utils/contentUpdate';
+import { toImageResponse } from '../../utils/imageResponse';
 
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id');
@@ -24,7 +25,8 @@ export default defineEventHandler(async (event) => {
   );
 
   try {
-    return await prisma.image.update({ where: { id }, data });
+    const updated = await prisma.image.update({ where: { id }, data });
+    return toImageResponse(updated);
   } catch (err: unknown) {
     if (
       err instanceof Error &&

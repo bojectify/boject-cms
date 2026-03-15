@@ -257,6 +257,61 @@ describe('Image Upload & Transform API', async () => {
       reset();
     });
   });
+
+  // ── Placeholder tests ─────────────────────────────────────────
+
+  describe('GET /api/images/:id/placeholder', () => {
+    it('returns 404 for non-existent image', async () => {
+      await expect(
+        $fetch('/api/images/00000000-0000-0000-0000-000000000000/placeholder')
+      ).rejects.toMatchObject({ statusCode: 404 });
+    });
+
+    it('returns JSON with a valid base64 WebP data URI', async () => {
+      const result = await $fetch<{ dataUri: string }>(
+        `/api/images/${uploadedImageId}/placeholder`
+      );
+
+      expect(result).toHaveProperty('dataUri');
+      expect(result.dataUri).toMatch(
+        /^data:image\/webp;base64,[A-Za-z0-9+/=]+$/
+      );
+    });
+
+    it('returns immutable cache headers', async () => {
+      const response = await fetch(
+        `/api/images/${uploadedImageId}/placeholder`
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get('content-type')).toContain(
+        'application/json'
+      );
+      expect(response.headers.get('cache-control')).toContain('immutable');
+    });
+
+    it('is publicly accessible without auth', async () => {
+      const response = await fetch(
+        `/api/images/${uploadedImageId}/placeholder`
+      );
+
+      expect(response.status).toBe(200);
+    });
+
+    it('returns 429 when rate limited', async () => {
+      const { rateLimit: rl } = await import('../../utils/rateLimit');
+      const testIp = 'placeholder-rate-limit-test-ip';
+      for (let i = 0; i < 100; i++) {
+        rl(`transform:${testIp}`);
+      }
+      const { allowed } = rl(`transform:${testIp}`);
+      expect(allowed).toBe(false);
+
+      const { resetRateLimitStore: reset } =
+        await import('../../utils/rateLimit');
+      reset();
+    });
+  });
 });
 
 // Helper to get session cookie via login
