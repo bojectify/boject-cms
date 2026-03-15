@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { setup, $fetch } from '@nuxt/test-utils/e2e';
+import { setup, $fetch, fetch } from '@nuxt/test-utils/e2e';
 
 // 1x1 red PNG (68 bytes)
 const TINY_PNG = Buffer.from(
@@ -101,7 +101,12 @@ describe('Image Upload & Transform API', async () => {
     });
 
     it('returns 413 for file exceeding 5MB', async () => {
-      const bigBuffer = Buffer.alloc(6 * 1024 * 1024, 0);
+      // Start with a real PNG header so it passes mime-type detection
+      const pngHeader = Buffer.from([
+        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+      ]);
+      const padding = Buffer.alloc(6 * 1024 * 1024 - pngHeader.length, 0);
+      const bigBuffer = Buffer.concat([pngHeader, padding]);
       const { body, contentType } = createFormData(
         bigBuffer,
         'huge.png',
@@ -187,10 +192,7 @@ describe('Image Upload & Transform API', async () => {
     });
 
     it('serves original when no params', async () => {
-      const response = await $fetch.raw(
-        `/api/images/${uploadedImageId}/transform`,
-        { responseType: 'arrayBuffer' }
-      );
+      const response = await fetch(`/api/images/${uploadedImageId}/transform`);
 
       expect(response.status).toBe(200);
       expect(response.headers.get('content-type')).toMatch(/^image\//);
@@ -198,9 +200,8 @@ describe('Image Upload & Transform API', async () => {
     });
 
     it('converts format to webp', async () => {
-      const response = await $fetch.raw(
-        `/api/images/${uploadedImageId}/transform?f=webp`,
-        { responseType: 'arrayBuffer' }
+      const response = await fetch(
+        `/api/images/${uploadedImageId}/transform?f=webp`
       );
 
       expect(response.status).toBe(200);
@@ -209,10 +210,7 @@ describe('Image Upload & Transform API', async () => {
 
     it('is publicly accessible without auth', async () => {
       // No Cookie or Authorization header
-      const response = await $fetch.raw(
-        `/api/images/${uploadedImageId}/transform`,
-        { responseType: 'arrayBuffer' }
-      );
+      const response = await fetch(`/api/images/${uploadedImageId}/transform`);
 
       expect(response.status).toBe(200);
     });
@@ -235,9 +233,8 @@ describe('Image Upload & Transform API', async () => {
     });
 
     it('applies focal point crop with fpx and fpy', async () => {
-      const response = await $fetch.raw(
-        `/api/images/${uploadedImageId}/transform?w=1&h=1&fpx=0.5&fpy=0.5&f=png`,
-        { responseType: 'arrayBuffer' }
+      const response = await fetch(
+        `/api/images/${uploadedImageId}/transform?w=1&h=1&fpx=0.5&fpy=0.5&f=png`
       );
 
       expect(response.status).toBe(200);
@@ -267,9 +264,13 @@ let _sessionCookie: string;
 async function getSessionCookie(): Promise<string> {
   if (_sessionCookie) return _sessionCookie;
 
-  const response = await $fetch.raw('/api/auth/login', {
+  const response = await fetch('/api/auth/login', {
     method: 'POST',
-    body: { email: 'admin@boject.com', password: 'password' },
+    body: JSON.stringify({
+      email: 'admin@boject.com',
+      password: 'password',
+    }),
+    headers: { 'Content-Type': 'application/json' },
   });
 
   const cookies = response.headers.getSetCookie();

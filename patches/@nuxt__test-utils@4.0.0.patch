@@ -1,0 +1,14 @@
+diff --git a/dist/shared/test-utils.BsmyE2FA.mjs b/dist/shared/test-utils.BsmyE2FA.mjs
+index 6a6f5ea6a519c222040ebc6d18ef85933a2b7731..eddcef27d82b336697315b1eaa61c62f7c20dbb2 100644
+--- a/dist/shared/test-utils.BsmyE2FA.mjs
++++ b/dist/shared/test-utils.BsmyE2FA.mjs
+@@ -110,6 +110,9 @@ async function startServer(options = {}) {
+           return;
+         }
+       } catch (e) {
++        if (e && e.statusCode === 426) {
++          return;
++        }
+         lastError = e;
+       }
+     }

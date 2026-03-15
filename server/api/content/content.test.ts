@@ -25,8 +25,9 @@ function getContent(params: Record<string, string | number> = {}) {
   });
 }
 
-// Seed totals: Team=4, Club=3, Competition=2, Season=1, Fixture=3, Player=5, Image=0
-const TOTAL_CONTENT = 18;
+// Seed totals: Team=4, Club=3, Competition=2, Season=1, Fixture=3, Player=5, Image=1
+// Note: image upload tests may add additional DRAFT images, so total may be higher
+const SEEDED_PUBLISHED = 19;
 
 describe('Content API filters', async () => {
   await setup({ dev: true });
@@ -35,8 +36,8 @@ describe('Content API filters', async () => {
 
   it('returns all content items', async () => {
     const { items, total } = await getContent({ perPage: 50 });
-    expect(total).toBe(TOTAL_CONTENT);
-    expect(items).toHaveLength(TOTAL_CONTENT);
+    expect(total).toBeGreaterThanOrEqual(SEEDED_PUBLISHED);
+    expect(items.length).toBeGreaterThanOrEqual(SEEDED_PUBLISHED);
     expect(items[0]).toHaveProperty('contentType');
     expect(items[0]).toHaveProperty('entryTitle');
     expect(items[0]).toHaveProperty('status');
@@ -66,10 +67,10 @@ describe('Content API filters', async () => {
       expect(items.every((i) => i.contentType === 'Player')).toBe(true);
     });
 
-    it('filters by contentType=Image returns empty', async () => {
+    it('filters by contentType=Image', async () => {
       const { items, total } = await getContent({ contentType: 'Image' });
-      expect(total).toBe(0);
-      expect(items).toHaveLength(0);
+      expect(total).toBeGreaterThanOrEqual(1);
+      expect(items.length).toBeGreaterThanOrEqual(1);
     });
 
     it('ignores invalid contentType', async () => {
@@ -77,7 +78,7 @@ describe('Content API filters', async () => {
         contentType: 'NonExistent',
         perPage: 50,
       });
-      expect(total).toBe(TOTAL_CONTENT);
+      expect(total).toBeGreaterThanOrEqual(SEEDED_PUBLISHED);
     });
   });
 
@@ -89,14 +90,13 @@ describe('Content API filters', async () => {
         status: 'PUBLISHED',
         perPage: 50,
       });
-      expect(total).toBe(TOTAL_CONTENT);
+      expect(total).toBe(SEEDED_PUBLISHED);
       expect(items.every((i) => i.status === 'PUBLISHED')).toBe(true);
     });
 
-    it('filters by status=DRAFT returns empty', async () => {
-      const { items, total } = await getContent({ status: 'DRAFT' });
-      expect(items).toHaveLength(0);
-      expect(total).toBe(0);
+    it('filters by status=DRAFT', async () => {
+      const { items } = await getContent({ status: 'DRAFT' });
+      expect(items.every((i) => i.status === 'DRAFT')).toBe(true);
     });
 
     it('ignores invalid status values', async () => {
@@ -104,7 +104,7 @@ describe('Content API filters', async () => {
         status: 'INVALID',
         perPage: 50,
       });
-      expect(total).toBe(TOTAL_CONTENT);
+      expect(total).toBeGreaterThanOrEqual(SEEDED_PUBLISHED);
     });
   });
 

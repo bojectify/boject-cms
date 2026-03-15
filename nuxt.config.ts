@@ -4,7 +4,8 @@ export default defineNuxtConfig({
   compatibilityDate: '2024-11-01',
 
   devServer: {
-    port: 4000,
+    // _PORT is set by @nuxt/test-utils when starting the dev server for tests
+    port: Number(process.env._PORT) || 4000,
   },
 
   modules: ['@nuxt/ui', 'nuxt-auth-utils', '@nuxt/eslint'],

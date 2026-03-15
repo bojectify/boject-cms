@@ -114,26 +114,26 @@ describe('List endpoint filters', async () => {
     });
   });
 
-  // ── Images (status only, 0 seeded) ────────────────────────────
+  // ── Images (status only, 1+ seeded — count may vary if upload tests ran first) ──
 
   describe('images', () => {
-    it('returns empty when none seeded', async () => {
+    it('returns at least the seeded image', async () => {
       const { items, total } = await getList('images');
-      expect(items).toHaveLength(0);
-      expect(total).toBe(0);
+      expect(total).toBeGreaterThanOrEqual(1);
+      expect(items.length).toBeGreaterThanOrEqual(1);
     });
 
-    it('filters by status=PUBLISHED returns empty', async () => {
-      const { items, total } = await getList('images', {
+    it('filters by status=PUBLISHED', async () => {
+      const { items } = await getList('images', {
         status: 'PUBLISHED',
       });
-      expect(items).toHaveLength(0);
-      expect(total).toBe(0);
+      expect(items.length).toBeGreaterThanOrEqual(1);
+      expect(items.every((i) => i.status === 'PUBLISHED')).toBe(true);
     });
 
     it('ignores invalid status values', async () => {
       const { total } = await getList('images', { status: 'INVALID' });
-      expect(total).toBe(0);
+      expect(total).toBeGreaterThanOrEqual(1);
     });
   });
 

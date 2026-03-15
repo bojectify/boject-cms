@@ -50,7 +50,10 @@
       "prisma",
       "lefthook",
       "sharp"
-    ]
+    ],
+    "patchedDependencies": {
+      "@nuxt/test-utils@4.0.0": "patches/@nuxt__test-utils@4.0.0.patch"
+    }
   },
   "dependencies": {
     "@escape.tech/graphql-armor-max-depth": "^2.4.2",
