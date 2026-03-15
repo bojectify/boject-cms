@@ -1,4 +1,5 @@
 import type { ContentStatus, Prisma } from '#prisma';
+import { toImageResponse } from '../utils/imageResponse';
 
 const VALID_STATUSES = new Set<string>([
   'DRAFT',
@@ -28,5 +29,5 @@ export default defineEventHandler(async (event) => {
     prisma.image.count({ where }),
   ]);
 
-  return { items, total };
+  return { items: items.map(toImageResponse), total };
 });

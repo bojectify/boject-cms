@@ -4,6 +4,7 @@ import {
   ALLOWED_MIME_TYPES,
   processOriginal,
 } from '../../utils/imageProcessing';
+import { toImageResponse } from '../../utils/imageResponse';
 
 export default defineEventHandler(async (event) => {
   const formData = await readMultipartFormData(event);
@@ -99,5 +100,5 @@ export default defineEventHandler(async (event) => {
   });
 
   setResponseStatus(event, 201);
-  return image;
+  return toImageResponse(image);
 });
