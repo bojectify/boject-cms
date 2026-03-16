@@ -1,6 +1,7 @@
 import { resolve } from 'node:path';
 
 export default defineNuxtConfig({
+  ignore: ['**/storage/**'],
   compatibilityDate: '2024-11-01',
 
   devServer: {
