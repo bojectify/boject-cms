@@ -1,5 +1,10 @@
 import { builder } from '../builder';
 import { contentMetadataFields } from './contentFields';
+import { transformImage } from '../../utils/imageProcessing';
+
+const PLACEHOLDER_WIDTH = 20;
+const PLACEHOLDER_QUALITY = 30;
+const PLACEHOLDER_FORMAT = 'webp' as const;
 
 builder.prismaObject('Image', {
   fields: (t) => ({
@@ -23,6 +28,38 @@ builder.prismaObject('Image', {
       nullable: true,
       resolve: (image) =>
         image.storagePath ? `/api/images/${image.id}/placeholder` : null,
+    }),
+    placeholder: t.string({
+      nullable: true,
+      resolve: async (image) => {
+        if (!image.storagePath) return null;
+
+        // Check cache first
+        const cacheKey = `${image.id}/placeholder`;
+        const transformsStorage = useStorage('images:transforms');
+        const cached = await transformsStorage.getItem<string>(cacheKey);
+        if (cached) return cached;
+
+        // Load original and generate placeholder
+        const originalsStorage = useStorage('images:originals');
+        const originalBuffer = await originalsStorage.getItemRaw<Buffer>(
+          image.storagePath
+        );
+        if (!originalBuffer) return null;
+
+        const { data } = await transformImage(Buffer.from(originalBuffer), {
+          w: PLACEHOLDER_WIDTH,
+          f: PLACEHOLDER_FORMAT,
+          q: PLACEHOLDER_QUALITY,
+        });
+
+        const dataUri = `data:image/webp;base64,${data.toString('base64')}`;
+
+        // Cache for future requests
+        await transformsStorage.setItem(cacheKey, dataUri);
+
+        return dataUri;
+      },
     }),
     ...contentMetadataFields(t),
     createdAt: t.expose('createdAt', { type: 'DateTime' }),
