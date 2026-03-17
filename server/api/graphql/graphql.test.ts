@@ -349,6 +349,116 @@ describe('GraphQL API', async () => {
     });
   });
 
+  // ── Author queries ──────────────────────────────────────────
+
+  describe('Author queries', () => {
+    it('lists authors', async () => {
+      const { data } = await gql<{
+        authors: Connection<{
+          id: string;
+          name: string;
+          slug: string;
+          bio: string | null;
+        }>;
+      }>(`{
+        authors(first: 10) {
+          edges { node { id name slug bio } }
+        }
+      }`);
+      expect(data.authors.edges.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('fetches single author with socialLinks', async () => {
+      const { data: list } = await gql<{
+        authors: Connection<{ id: string }>;
+      }>(`{
+        authors(first: 1) { edges { node { id } } }
+      }`);
+      const id = list.authors.edges[0]!.node.id;
+      const { data } = await gql<{
+        author: {
+          id: string;
+          name: string;
+          socialLinks: { id: string; platform: string; url: string }[];
+        };
+      }>(`{
+        author(id: "${id}") { id name socialLinks { id platform url } }
+      }`);
+      expect(data.author.id).toBe(id);
+      expect(data.author.socialLinks).toBeDefined();
+    });
+  });
+
+  // ── Tag queries ─────────────────────────────────────────────
+
+  describe('Tag queries', () => {
+    it('lists tags', async () => {
+      const { data } = await gql<{
+        tags: Connection<{ id: string; name: string; slug: string }>;
+      }>(`{
+        tags(first: 10) {
+          edges { node { id name slug } }
+        }
+      }`);
+      expect(data.tags.edges.length).toBeGreaterThanOrEqual(3);
+    });
+  });
+
+  // ── Article queries ─────────────────────────────────────────
+
+  describe('Article queries', () => {
+    it('lists articles', async () => {
+      const { data } = await gql<{
+        articles: Connection<{
+          id: string;
+          title: string;
+          slug: string;
+          summary: string | null;
+        }>;
+      }>(`{
+        articles(first: 10) {
+          edges { node { id title slug summary } }
+        }
+      }`);
+      expect(data.articles.edges.length).toBeGreaterThanOrEqual(3);
+    });
+
+    it('fetches single article with relations', async () => {
+      const { data: list } = await gql<{
+        articles: Connection<{ id: string }>;
+      }>(`{
+        articles(first: 1) { edges { node { id } } }
+      }`);
+      const id = list.articles.edges[0]!.node.id;
+      const { data } = await gql<{
+        article: {
+          id: string;
+          title: string;
+          author: { id: string; name: string } | null;
+          tags: Connection<{ id: string; name: string }>;
+        };
+      }>(`{
+        article(id: "${id}") {
+          id title
+          author { id name }
+          tags(first: 10) { edges { node { id name } } }
+        }
+      }`);
+      expect(data.article.id).toBe(id);
+    });
+
+    it('filters articles by status', async () => {
+      const { data } = await gql<{
+        articles: Connection<{ id: string; title: string; status: string }>;
+      }>(`{
+        articles(first: 10, where: { status: { equals: DRAFT } }) {
+          edges { node { id title status } }
+        }
+      }`);
+      expect(data.articles.edges.length).toBe(1);
+    });
+  });
+
   // ── Authentication ──────────────────────────────────────────
 
   describe('authentication', () => {
