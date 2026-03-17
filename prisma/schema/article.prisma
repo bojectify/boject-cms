@@ -1,0 +1,19 @@
+model Article {
+  id               String        @id @default(uuid())
+  entryTitle       String        @default("")
+  title            String        @unique
+  slug             String        @unique
+  summary          String?
+  body             Json?
+  author           Author?       @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  authorId         String?
+  featuredImage    Image?        @relation(name: "ArticleFeaturedImage", fields: [featuredImageId], references: [id], onDelete: SetNull)
+  featuredImageId  String?       @unique
+  tags             Tag[]
+  status           ContentStatus @default(DRAFT)
+  publishedAt      DateTime?
+  createdBy        String?
+  updatedBy        String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+}

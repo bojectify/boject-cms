@@ -22,6 +22,9 @@ const navItems: NavigationMenuItem[] = [
   { label: 'Competitions', icon: 'i-lucide-trophy', to: '/competitions' },
   { label: 'Seasons', icon: 'i-lucide-clock', to: '/seasons' },
   { label: 'Images', icon: 'i-lucide-image', to: '/images' },
+  { label: 'Articles', icon: 'i-lucide-newspaper', to: '/articles' },
+  { label: 'Authors', icon: 'i-lucide-pen-tool', to: '/authors' },
+  { label: 'Tags', icon: 'i-lucide-tag', to: '/tags' },
 ];
 
 const userMenuItems = computed<DropdownMenuItem[][]>(() => [

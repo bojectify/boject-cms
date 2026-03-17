@@ -19,5 +19,7 @@ model Image {
   updatedAt    DateTime      @updatedAt
   headshotOf   Player?       @relation("PlayerHeadshot")
   actionShotOf Player?       @relation("PlayerActionShot")
-  crestOf      Club?         @relation("ClubCrest")
+  crestOf           Club?    @relation("ClubCrest")
+  authorHeadshotOf  Author?  @relation("AuthorHeadshot")
+  articleFeaturedOf Article? @relation("ArticleFeaturedImage")
 }

@@ -52,6 +52,19 @@ export interface RelationFieldConfig {
   optionsEndpoint: string;
 }
 
+export interface RichtextFieldConfig {
+  type: 'richtext';
+  key: string;
+  label: string;
+}
+
+export interface MultirelationFieldConfig {
+  type: 'multirelation';
+  key: string;
+  label: string;
+  optionsEndpoint: string;
+}
+
 export type FieldConfig =
   | TextFieldConfig
   | TextareaFieldConfig
@@ -59,4 +72,6 @@ export type FieldConfig =
   | BooleanFieldConfig
   | DatetimeFieldConfig
   | SelectFieldConfig
-  | RelationFieldConfig;
+  | RelationFieldConfig
+  | RichtextFieldConfig
+  | MultirelationFieldConfig;

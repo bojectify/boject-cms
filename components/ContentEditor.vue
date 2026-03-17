@@ -33,14 +33,24 @@ onMounted(async () => {
     (f): f is Extract<FieldConfig, { type: 'relation' }> =>
       f.type === 'relation'
   );
-  await Promise.all(
-    relationFields.map(async (field) => {
+  const multirelationFields = props.fields.filter(
+    (f): f is Extract<FieldConfig, { type: 'multirelation' }> =>
+      f.type === 'multirelation'
+  );
+  await Promise.all([
+    ...relationFields.map(async (field) => {
       const data = await $fetch<{ label: string; value: string }[]>(
         field.optionsEndpoint
       );
       relationOptions[field.key] = data;
-    })
-  );
+    }),
+    ...multirelationFields.map(async (field) => {
+      const data = await $fetch<{ label: string; value: string }[]>(
+        field.optionsEndpoint
+      );
+      relationOptions[field.key] = data;
+    }),
+  ]);
 });
 
 function toDatetimeLocal(iso: unknown): string {
@@ -230,7 +240,38 @@ function onSubmit() {
             @update:model-value="state[field.key] = $event || null"
           />
         </UFormField>
+
+        <UFormField
+          v-else-if="field.type === 'multirelation'"
+          :label="field.label"
+          :name="field.key"
+          size="xl"
+        >
+          <USelectMenu
+            :model-value="(state[field.key] as string[]) ?? []"
+            :items="relationOptions[field.key] ?? []"
+            value-key="value"
+            multiple
+            placeholder="Select..."
+            class="w-full"
+            @update:model-value="state[field.key] = $event"
+          />
+        </UFormField>
+
+        <UFormField
+          v-else-if="field.type === 'richtext'"
+          :label="field.label"
+          :name="field.key"
+          size="xl"
+        >
+          <RichTextEditor
+            :model-value="state[field.key]"
+            @update:model-value="state[field.key] = $event"
+          />
+        </UFormField>
       </template>
+
+      <slot name="after-fields" />
 
       <USeparator label="Publishing" />
 
