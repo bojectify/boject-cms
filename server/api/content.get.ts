@@ -15,6 +15,9 @@ const CONTENT_TABLES = [
   'Fixture',
   'Player',
   'Image',
+  'Author',
+  'Tag',
+  'Article',
 ] as const;
 
 export default defineEventHandler(async (event) => {

@@ -535,6 +535,140 @@ async function main() {
     await prisma.score.create({ data });
   }
 
+  // Authors
+  const authorJones = await prisma.author.upsert({
+    where: { name: 'Gareth Jones' },
+    update: {},
+    create: {
+      name: 'Gareth Jones',
+      slug: 'gareth-jones',
+      entryTitle: 'Gareth Jones',
+      bio: 'Club press officer and match report writer.',
+      status: 'PUBLISHED',
+      publishedAt: new Date(),
+      socialLinks: {
+        create: [
+          { platform: 'twitter', url: 'https://twitter.com/garethjones' },
+          { platform: 'instagram', url: 'https://instagram.com/garethjones' },
+        ],
+      },
+    },
+  });
+
+  const authorDavies = await prisma.author.upsert({
+    where: { name: 'Sarah Davies' },
+    update: {},
+    create: {
+      name: 'Sarah Davies',
+      slug: 'sarah-davies',
+      entryTitle: 'Sarah Davies',
+      bio: 'Youth development coordinator.',
+      status: 'PUBLISHED',
+      publishedAt: new Date(),
+      socialLinks: {
+        create: [
+          { platform: 'linkedin', url: 'https://linkedin.com/in/sarahdavies' },
+        ],
+      },
+    },
+  });
+
+  // Tags
+  const tagMatchReport = await prisma.tag.upsert({
+    where: { name: 'Match Report' },
+    update: {},
+    create: {
+      name: 'Match Report',
+      slug: 'match-report',
+      entryTitle: 'Match Report',
+      status: 'PUBLISHED',
+      publishedAt: new Date(),
+    },
+  });
+
+  const tagClubNews = await prisma.tag.upsert({
+    where: { name: 'Club News' },
+    update: {},
+    create: {
+      name: 'Club News',
+      slug: 'club-news',
+      entryTitle: 'Club News',
+      status: 'PUBLISHED',
+      publishedAt: new Date(),
+    },
+  });
+
+  const tagYouth = await prisma.tag.upsert({
+    where: { name: 'Youth' },
+    update: {},
+    create: {
+      name: 'Youth',
+      slug: 'youth',
+      entryTitle: 'Youth',
+      status: 'PUBLISHED',
+      publishedAt: new Date(),
+    },
+  });
+
+  // Articles
+  await prisma.article.upsert({
+    where: { title: 'Opening Day Victory' },
+    update: {},
+    create: {
+      title: 'Opening Day Victory',
+      slug: 'opening-day-victory',
+      entryTitle: 'Opening Day Victory',
+      summary: 'A commanding performance from the 1st XV in the season opener.',
+      body: {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'The 1st XV kicked off the season with a convincing home win against Oakdale RFC.',
+              },
+            ],
+          },
+        ],
+      },
+      authorId: authorJones.id,
+      tags: { connect: [{ id: tagMatchReport.id }] },
+      status: 'PUBLISHED',
+      publishedAt: new Date(),
+    },
+  });
+
+  await prisma.article.upsert({
+    where: { title: 'Youth Programme Expands' },
+    update: {},
+    create: {
+      title: 'Youth Programme Expands',
+      slug: 'youth-programme-expands',
+      entryTitle: 'Youth Programme Expands',
+      summary: 'New age groups added to the junior section for 2025/26.',
+      authorId: authorDavies.id,
+      tags: { connect: [{ id: tagClubNews.id }, { id: tagYouth.id }] },
+      status: 'PUBLISHED',
+      publishedAt: new Date(),
+    },
+  });
+
+  await prisma.article.upsert({
+    where: { title: 'Draft: Season Preview' },
+    update: {},
+    create: {
+      title: 'Draft: Season Preview',
+      slug: 'draft-season-preview',
+      entryTitle: 'Draft: Season Preview',
+      summary: 'Looking ahead to the 2025/26 campaign.',
+      authorId: authorJones.id,
+      tags: { connect: [{ id: tagClubNews.id }] },
+      status: 'DRAFT',
+    },
+  });
+
   // Test API key (deterministic, for integration tests only)
   if (process.env.NODE_ENV !== 'production') {
     const testKey = 'boject_test_key_for_integration_tests_only';

@@ -10,6 +10,10 @@ export const builder = new SchemaBuilder<{
   PrismaTypes: PrismaTypes;
   Scalars: {
     DateTime: { Input: Date | string; Output: Date | string };
+    JSON: {
+      Input: unknown;
+      Output: unknown;
+    };
   };
 }>({
   plugins: [PrismaPlugin, PrismaUtilsPlugin, RelayPlugin],
@@ -24,4 +28,9 @@ builder.scalarType('DateTime', {
   serialize: (value) =>
     value instanceof Date ? value.toISOString() : String(value),
   parseValue: (value) => new Date(String(value)),
+});
+
+builder.scalarType('JSON', {
+  serialize: (value) => value,
+  parseValue: (value) => value,
 });

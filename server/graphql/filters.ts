@@ -155,4 +155,49 @@ export const ScoreWhere = builder.prismaWhere('Score', {
   },
 });
 
+export const AuthorWhere = builder.prismaWhere('Author', {
+  fields: {
+    entryTitle: StringFilter,
+    name: StringFilter,
+    slug: StringFilter,
+    status: ContentStatusFilter,
+  },
+});
+
+export const TagWhere = builder.prismaWhere('Tag', {
+  fields: {
+    entryTitle: StringFilter,
+    name: StringFilter,
+    slug: StringFilter,
+    status: ContentStatusFilter,
+  },
+});
+
+// List relation filter for many-to-many Tag
+const TagListRelationFilter = builder.inputType('TagListRelationFilter', {
+  fields: (t) => ({
+    some: t.field({ type: TagWhere }),
+    every: t.field({ type: TagWhere }),
+    none: t.field({ type: TagWhere }),
+  }),
+});
+
+const AuthorRelationFilter = builder.inputType('AuthorRelationFilter', {
+  fields: (t) => ({
+    is: t.field({ type: AuthorWhere }),
+    isNot: t.field({ type: AuthorWhere }),
+  }),
+});
+
+export const ArticleWhere = builder.prismaWhere('Article', {
+  fields: {
+    entryTitle: StringFilter,
+    title: StringFilter,
+    slug: StringFilter,
+    status: ContentStatusFilter,
+    author: AuthorRelationFilter,
+    tags: TagListRelationFilter,
+  } as never,
+});
+
 export const _registered = true;

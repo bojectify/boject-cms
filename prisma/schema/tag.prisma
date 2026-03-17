@@ -1,0 +1,13 @@
+model Tag {
+  id          String        @id @default(uuid())
+  entryTitle  String        @default("")
+  name        String        @unique
+  slug        String        @unique
+  articles    Article[]
+  status      ContentStatus @default(DRAFT)
+  publishedAt DateTime?
+  createdBy   String?
+  updatedBy   String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}

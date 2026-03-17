@@ -10,6 +10,9 @@ import {
   PlayerWhere,
   FixtureWhere,
   ScoreWhere,
+  AuthorWhere,
+  TagWhere,
+  ArticleWhere,
 } from '../filters';
 
 builder.queryType({
@@ -162,6 +165,57 @@ builder.queryType({
       args: { id: t.arg.string({ required: true }) },
       resolve: (query, _root, args) =>
         prisma.score.findUnique({ ...query, where: { id: args.id } }),
+    }),
+
+    // Author
+    authors: t.prismaConnection({
+      type: 'Author',
+      cursor: 'id',
+      args: { where: t.arg({ type: AuthorWhere }) },
+      resolve: (query, _root, args) =>
+        prisma.author.findMany({ ...query, where: args.where ?? undefined }),
+    }),
+    author: t.prismaField({
+      type: 'Author',
+      nullable: true,
+      args: { id: t.arg.string({ required: true }) },
+      resolve: (query, _root, args) =>
+        prisma.author.findUnique({ ...query, where: { id: args.id } }),
+    }),
+
+    // Tag
+    tags: t.prismaConnection({
+      type: 'Tag',
+      cursor: 'id',
+      args: { where: t.arg({ type: TagWhere }) },
+      resolve: (query, _root, args) =>
+        prisma.tag.findMany({ ...query, where: args.where ?? undefined }),
+    }),
+    tag: t.prismaField({
+      type: 'Tag',
+      nullable: true,
+      args: { id: t.arg.string({ required: true }) },
+      resolve: (query, _root, args) =>
+        prisma.tag.findUnique({ ...query, where: { id: args.id } }),
+    }),
+
+    // Article
+    articles: t.prismaConnection({
+      type: 'Article',
+      cursor: 'id',
+      args: { where: t.arg({ type: ArticleWhere }) },
+      resolve: (query, _root, args) =>
+        prisma.article.findMany({
+          ...query,
+          where: args.where ?? undefined,
+        }),
+    }),
+    article: t.prismaField({
+      type: 'Article',
+      nullable: true,
+      args: { id: t.arg.string({ required: true }) },
+      resolve: (query, _root, args) =>
+        prisma.article.findUnique({ ...query, where: { id: args.id } }),
     }),
   }),
 });

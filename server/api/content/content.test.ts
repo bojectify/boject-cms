@@ -25,9 +25,9 @@ function getContent(params: Record<string, string | number> = {}) {
   });
 }
 
-// Seed totals: Team=4, Club=3, Competition=2, Season=1, Fixture=3, Player=5, Image=1
+// Seed totals: Team=4, Club=3, Competition=2, Season=1, Fixture=3, Player=5, Image=1, Author=2, Tag=3, Article=2 (PUBLISHED)
 // Note: image upload tests may add additional DRAFT images, so total may be higher
-const SEEDED_PUBLISHED = 19;
+const SEEDED_PUBLISHED = 26;
 
 describe('Content API filters', async () => {
   await setup({ dev: true });
@@ -79,6 +79,24 @@ describe('Content API filters', async () => {
         perPage: 50,
       });
       expect(total).toBeGreaterThanOrEqual(SEEDED_PUBLISHED);
+    });
+
+    it('filters by contentType=Author', async () => {
+      const { items, total } = await getContent({ contentType: 'Author' });
+      expect(total).toBe(2);
+      expect(items.every((i) => i.contentType === 'Author')).toBe(true);
+    });
+
+    it('filters by contentType=Tag', async () => {
+      const { items, total } = await getContent({ contentType: 'Tag' });
+      expect(total).toBe(3);
+      expect(items.every((i) => i.contentType === 'Tag')).toBe(true);
+    });
+
+    it('filters by contentType=Article', async () => {
+      const { items, total } = await getContent({ contentType: 'Article' });
+      expect(total).toBe(3);
+      expect(items.every((i) => i.contentType === 'Article')).toBe(true);
     });
   });
 

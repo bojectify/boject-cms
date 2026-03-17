@@ -14,6 +14,9 @@ import { ContentStatusEnum } from './types/contentStatus';
 import { ScoreTypeEnum } from './types/score';
 import { _registered as _fixture } from './types/fixture';
 import { _registered as _filters } from './filters';
+import { _registered as _author } from './types/author';
+import { _registered as _tag } from './types/tag';
+import { _registered as _article } from './types/article';
 import { _registered as _query } from './query/index';
 
 // Reference imports to ensure they're not stripped
@@ -31,6 +34,9 @@ void [
   ScoreTypeEnum,
   _fixture,
   _filters,
+  _author,
+  _tag,
+  _article,
   _query,
 ];
 
