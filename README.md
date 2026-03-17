@@ -10,6 +10,8 @@ A TypeScript CMS for a rugby club, built with Nuxt 4 and Prisma v7 on PostgreSQL
 - **PostgreSQL 17** — Database (local via Docker)
 - **GraphQL Yoga** — GraphQL server at `/api/graphql`
 - **Pothos** — Code-first GraphQL schema builder with Prisma plugin
+- **Tiptap** — Rich text editor (`@tiptap/vue-3`) with custom CmsEmbed extension
+- **Sharp** — Image processing for upload and on-the-fly transforms
 - **Vue 3** — Frontend framework
 - **TypeScript** — ESM-only (`"type": "module"`)
 
@@ -79,6 +81,9 @@ prisma/
     player.prisma              # Player, Position, PlayerTeamHistory
     image.prisma               # Image
     auth.prisma                # User, ApiKey
+    author.prisma              # Author, AuthorSocialLink
+    tag.prisma                 # Tag
+    article.prisma             # Article
   seed.ts                      # Seed script
   migrations/                  # Migration files
 app.vue                        # Root component (UApp + NuxtLayout wrapper)
@@ -90,12 +95,13 @@ server/
   api/
     auth/                      # Login/logout endpoints + tests
     graphql/                   # GraphQL Yoga endpoint + tests
-    content.get.ts             # Paginated content route (raw SQL UNION ALL, all models)
+    images/                    # Image upload + transform endpoints + tests
+    content.get.ts             # Paginated content route (raw SQL UNION ALL, all 10 models)
     {model}.get.ts             # Per-model listing routes (Prisma direct)
     {model}/[id].get.ts        # Per-model single-item routes
     {model}/[id].put.ts        # Per-model update routes
   graphql/
-    builder.ts                 # Pothos SchemaBuilder singleton
+    builder.ts                 # Pothos SchemaBuilder singleton (JSON + DateTime scalars)
     schema.ts                  # Schema assembly
     filters.ts                 # Prisma-style where filter inputs
     query/index.ts             # Root Query field definitions
@@ -109,9 +115,16 @@ server/
 components/
   ContentTable.vue             # Reusable content listing table
   ContentEditor.vue            # Generic content editing form
+  RichTextEditor.vue           # Tiptap rich text editor with toolbar
+  CmsEmbedNode.vue             # Vue NodeView for CmsEmbed nodes
+  CmsEmbedModal.vue            # Modal for selecting content to embed
 composables/
   useContentTable.ts           # Shared formatDate + statusColor helpers
   useContentEditor.ts          # Content editing lifecycle management
+extensions/
+  cmsEmbed.ts                  # Custom Tiptap ProseMirror node for content embeds
+types/
+  contentEditor.ts             # FieldConfig discriminated union (auto-imported)
 pages/
   login.vue                    # Login page
   index.vue                    # All content (paginated, sorted by updatedAt)
@@ -157,6 +170,9 @@ All list queries return [Relay-style cursor connections](https://relay.dev/graph
 | `seasons` / `season(id)`           | `first`, `after`, `last`, `before`, `where` | SeasonConnection / Season           |
 | `positions` / `position(id)`       | `first`, `after`, `last`, `before`, `where` | PositionConnection / Position       |
 | `images` / `image(id)`             | `first`, `after`, `last`, `before`, `where` | ImageConnection / Image             |
+| `authors` / `author(id)`           | `first`, `after`, `last`, `before`, `where` | AuthorConnection / Author           |
+| `tags` / `tag(id)`                 | `first`, `after`, `last`, `before`, `where` | TagConnection / Tag                 |
+| `articles` / `article(id)`         | `first`, `after`, `last`, `before`, `where` | ArticleConnection / Article         |
 
 One-to-many relation fields (e.g. `team.fixtures`, `player.scores`) also use connections with the same pagination and filtering args. One-to-one relations (e.g. `fixture.season`, `player.position`) return the model directly.
 
@@ -243,6 +259,7 @@ All list queries accept an optional `where` argument with Prisma-style filters, 
 ### Custom Scalars
 
 - **DateTime** — Serialises as ISO-8601 strings, parses string input to `Date`.
+- **JSON** — Pass-through scalar for Article body (Tiptap ProseMirror JSON).
 
 ## Database
 
@@ -250,20 +267,24 @@ PostgreSQL 17 runs locally via Docker Compose (port 5432, user/password/db: `boj
 
 ### Domain Models
 
-| Model                 | Description                                                                          |
-| --------------------- | ------------------------------------------------------------------------------------ |
-| **Team**              | Internal club squads (e.g. 1st XV, Veterans, Colts)                                  |
-| **Club**              | External opponent clubs with optional crest image                                    |
-| **Competition**       | Leagues and cups, linked to a season and teams                                       |
-| **Season**            | Has name, start/end dates. Competitions and fixtures belong to a season              |
-| **Fixture**           | A match with team, opponent, competition, season, home/away, kickoff, venue          |
-| **Score**             | Scoring events (TRY, CONVERSION, PENALTY, DROP_GOAL) with optional player and minute |
-| **Player**            | Has name, position, bio, headshot, action shot, team history                         |
-| **PlayerTeamHistory** | Tracks which team a player belongs to over time                                      |
-| **Position**          | Rugby positions (e.g. Fly-half, Hooker)                                              |
-| **Image**             | Reusable image with url, alt, dimensions, optional file storage (upload + transform) |
+| Model                 | Description                                                                                                  |
+| --------------------- | ------------------------------------------------------------------------------------------------------------ |
+| **Team**              | Internal club squads (e.g. 1st XV, Veterans, Colts)                                                          |
+| **Club**              | External opponent clubs with optional crest image                                                            |
+| **Competition**       | Leagues and cups, linked to a season and teams                                                               |
+| **Season**            | Has name, start/end dates. Competitions and fixtures belong to a season                                      |
+| **Fixture**           | A match with team, opponent, competition, season, home/away, kickoff, venue                                  |
+| **Score**             | Scoring events (TRY, CONVERSION, PENALTY, DROP_GOAL) with optional player and minute                         |
+| **Player**            | Has name, position, bio, headshot, action shot, team history                                                 |
+| **PlayerTeamHistory** | Tracks which team a player belongs to over time                                                              |
+| **Position**          | Rugby positions (e.g. Fly-half, Hooker)                                                                      |
+| **Image**             | Reusable image with url, alt, dimensions, optional file storage (upload + transform)                         |
+| **Author**            | Article authors with name, slug, bio, headshot image, and social links                                       |
+| **AuthorSocialLink**  | Social media links for authors (platform + URL)                                                              |
+| **Tag**               | Content tags with name and slug. Many-to-many with articles                                                  |
+| **Article**           | Blog/news articles with title, slug, summary, rich text body (Tiptap JSON), author, featured image, and tags |
 
-All models use UUID primary keys and `createdAt`/`updatedAt` timestamps. Content models (Team, Club, Competition, Season, Player, Fixture, Image) also have `entryTitle` (CMS display name), `status` (`DRAFT`/`PUBLISHED`/`CHANGED`/`ARCHIVED`), `publishedAt`, `createdBy`, and `updatedBy` metadata fields.
+All models use UUID primary keys and `createdAt`/`updatedAt` timestamps. Content models (Team, Club, Competition, Season, Player, Fixture, Image, Author, Tag, Article) also have `entryTitle` (CMS display name), `status` (`DRAFT`/`PUBLISHED`/`CHANGED`/`ARCHIVED`), `publishedAt`, `createdBy`, and `updatedBy` metadata fields.
 
 ### Migrations
 
@@ -274,19 +295,22 @@ prisma migrate deploy          # Apply migrations (non-interactive / CI)
 
 ## Testing
 
-99 integration tests using Vitest + `@nuxt/test-utils`. Tests start a Nuxt dev server and run against the seeded database.
+149 integration tests using Vitest + `@nuxt/test-utils`. Tests start a Nuxt dev server and run against the seeded database.
 
 ```bash
 pnpm test:watch    # Watch mode
 pnpm test:run      # Single run (CI)
 ```
 
-- **GraphQL** (24 tests) — list queries, single-item lookups, relation resolution, where filtering, Relay cursor pagination, API key authentication.
+- **GraphQL** (30 tests) — list queries, single-item lookups, relation resolution, where filtering, Relay cursor pagination, API key authentication, author/tag/article queries.
 - **Fixtures REST API** (16 tests) — default listing, pagination, relation filters (teamId, opponentId, competitionId, seasonId), boolean/enum filters (isHome, status), combined filters.
 - **List endpoints** (29 tests) — query param filters on teams, clubs, seasons, images (status), players (positionId, status), competitions (seasonId, status).
-- **Content** (11 tests) — contentType filter, status filter, combined filters, invalid value handling.
+- **Content** (14 tests) — contentType filter (including Author, Tag, Article), status filter, combined filters, invalid value handling.
 - **Auth** (7 tests) — login validation, credential checking, session handling, middleware behaviour.
 - **Image upload & transform** (12 tests) — upload validation (missing file, wrong mime type, file too large), successful upload, transform validation (invalid params), format conversion, public access, rate limiting.
+- **Authors** (11 tests) — listing, pagination, status filter, single-item lookup, update, slug uniqueness, 404 handling.
+- **Tags** (9 tests) — listing, pagination, status filter, single-item lookup, update, slug uniqueness, 404 handling.
+- **Articles** (13 tests) — listing with relations, pagination, filters (status, authorId, tagId), single-item lookup, update with tags, slug uniqueness, 404 handling.
 
 **Requirement:** Docker PostgreSQL must be running with seeded data.
 
