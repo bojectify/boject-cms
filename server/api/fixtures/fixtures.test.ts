@@ -1,7 +1,26 @@
 import { describe, it, expect } from 'vitest';
-import { setup, $fetch } from '@nuxt/test-utils/e2e';
+import { setup, $fetch, fetch } from '@nuxt/test-utils/e2e';
 
 const TEST_API_KEY = 'boject_test_key_for_integration_tests_only';
+
+let _sessionCookie: string | null = null;
+
+async function getSessionCookie(): Promise<string> {
+  if (_sessionCookie) return _sessionCookie;
+
+  const response = await fetch('/api/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({
+      email: 'admin@boject.com',
+      password: 'password',
+    }),
+    headers: { 'Content-Type': 'application/json' },
+  });
+
+  const cookies = response.headers.getSetCookie();
+  _sessionCookie = cookies.join('; ');
+  return _sessionCookie;
+}
 
 type Fixture = {
   id: string;
@@ -174,6 +193,79 @@ describe('Fixtures API', async () => {
       });
       expect(items).toHaveLength(0);
       expect(total).toBe(0);
+    });
+  });
+
+  // ── POST /api/fixtures ───────────────────────────────────────
+
+  describe('POST /api/fixtures', () => {
+    it('creates a fixture with valid data', async () => {
+      const response = await fetch('/api/fixtures', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: await getSessionCookie(),
+        },
+        body: JSON.stringify({
+          name: 'Test Fixture',
+          slug: 'test-fixture',
+          kickoff: '2026-04-01T15:00:00.000Z',
+        }),
+      });
+      expect(response.status).toBe(201);
+      const fixture = await response.json();
+      expect(fixture.id).toBeDefined();
+      expect(fixture.name).toBe('Test Fixture');
+      expect(fixture.slug).toBe('test-fixture');
+      expect(fixture.status).toBe('DRAFT');
+    });
+
+    it('returns 400 when name is missing', async () => {
+      const err = await $fetch('/api/fixtures', {
+        method: 'POST',
+        headers: { Cookie: await getSessionCookie() },
+        body: { slug: 'no-name', kickoff: '2026-04-01T15:00:00.000Z' },
+      }).catch((e: { response: { status: number } }) => e);
+      expect((err as { response: { status: number } }).response.status).toBe(
+        400
+      );
+    });
+
+    it('returns 400 when slug is missing', async () => {
+      const err = await $fetch('/api/fixtures', {
+        method: 'POST',
+        headers: { Cookie: await getSessionCookie() },
+        body: { name: 'No Slug', kickoff: '2026-04-01T15:00:00.000Z' },
+      }).catch((e: { response: { status: number } }) => e);
+      expect((err as { response: { status: number } }).response.status).toBe(
+        400
+      );
+    });
+
+    it('returns 400 when kickoff is missing', async () => {
+      const err = await $fetch('/api/fixtures', {
+        method: 'POST',
+        headers: { Cookie: await getSessionCookie() },
+        body: { name: 'No Kickoff', slug: 'no-kickoff' },
+      }).catch((e: { response: { status: number } }) => e);
+      expect((err as { response: { status: number } }).response.status).toBe(
+        400
+      );
+    });
+
+    it('returns 409 on duplicate slug', async () => {
+      const err = await $fetch('/api/fixtures', {
+        method: 'POST',
+        headers: { Cookie: await getSessionCookie() },
+        body: {
+          name: 'Duplicate Fixture',
+          slug: 'test-fixture',
+          kickoff: '2026-05-01T15:00:00.000Z',
+        },
+      }).catch((e: { response: { status: number } }) => e);
+      expect((err as { response: { status: number } }).response.status).toBe(
+        409
+      );
     });
   });
 });
