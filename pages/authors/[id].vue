@@ -3,6 +3,7 @@ import type { FieldConfig } from '~/types/contentEditor';
 
 const route = useRoute();
 const id = route.params.id as string;
+const isNew = id === 'new';
 
 const fields: FieldConfig[] = [
   { type: 'text', key: 'name', label: 'Name', required: true },
@@ -45,17 +46,24 @@ function addSocialLink() {
 function removeSocialLink(index: number) {
   socialLinks.value = socialLinks.value.filter((_, i) => i !== index);
 }
+
+async function handleSave() {
+  const newId = await save();
+  if (newId) {
+    await navigateTo(`/authors/${newId}`);
+  }
+}
 </script>
 
 <template>
   <ContentEditor
     v-model:state="formState"
-    title="Edit Author"
+    :title="isNew ? 'New Author' : 'Edit Author'"
     :fields="fields"
-    :loading="loadingStatus === 'pending'"
+    :loading="!isNew && loadingStatus === 'pending'"
     :saving="isSaving"
     :error="saveError"
-    :on-save="save"
+    :on-save="handleSave"
   >
     <template #after-fields>
       <USeparator label="Social Links" />

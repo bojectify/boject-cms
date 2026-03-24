@@ -4,6 +4,10 @@ import type { FieldConfig } from '~/types/contentEditor';
 const route = useRoute();
 const id = route.params.id as string;
 
+if (id === 'new') {
+  await navigateTo('/images', { replace: true });
+}
+
 const fields: FieldConfig[] = [
   { type: 'text', key: 'url', label: 'URL', required: true },
   { type: 'text', key: 'alt', label: 'Alt Text', required: true },
