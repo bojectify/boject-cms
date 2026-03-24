@@ -19,6 +19,11 @@ const emit = defineEmits<{
 
 const slots = defineSlots();
 
+const tableSlots = computed(() => {
+  const { actions: _, ...rest } = slots;
+  return rest;
+});
+
 const { formatDate, statusColor } = useContentTable();
 
 const allColumns = computed<TableColumn<Record<string, unknown>>[]>(() => [
@@ -32,7 +37,10 @@ const allColumns = computed<TableColumn<Record<string, unknown>>[]>(() => [
 
 <template>
   <div class="p-6">
-    <h1 class="text-2xl font-bold mb-4">{{ title }}</h1>
+    <div class="flex items-center justify-between mb-4">
+      <h1 class="text-2xl font-bold">{{ title }}</h1>
+      <slot name="actions" />
+    </div>
     <UTable :data="data" :columns="allColumns" :loading="loading">
       <template #entryTitle-cell="{ row }">
         <NuxtLink
@@ -59,7 +67,7 @@ const allColumns = computed<TableColumn<Record<string, unknown>>[]>(() => [
           {{ row.original.status }}
         </UBadge>
       </template>
-      <template v-for="(_, name) in slots" :key="name" #[name]="slotProps">
+      <template v-for="(_, name) in tableSlots" :key="name" #[name]="slotProps">
         <slot :name="name" v-bind="slotProps" />
       </template>
     </UTable>
