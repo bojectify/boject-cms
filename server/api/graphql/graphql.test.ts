@@ -455,7 +455,10 @@ describe('GraphQL API', async () => {
           edges { node { id title status } }
         }
       }`);
-      expect(data.articles.edges.length).toBe(1);
+      expect(data.articles.edges.length).toBeGreaterThanOrEqual(1);
+      data.articles.edges.forEach((edge) => {
+        expect(edge.node.status).toBe('DRAFT');
+      });
     });
   });
 
