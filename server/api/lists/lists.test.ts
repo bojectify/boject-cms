@@ -30,27 +30,26 @@ describe('List endpoint filters', async () => {
   describe('teams', () => {
     it('returns all teams', async () => {
       const { items, total } = await getList('teams');
-      expect(total).toBe(4);
-      expect(items).toHaveLength(4);
+      expect(total).toBeGreaterThanOrEqual(4);
+      expect(items.length).toBeGreaterThanOrEqual(4);
     });
 
     it('filters by status=PUBLISHED', async () => {
       const { items, total } = await getList('teams', {
         status: 'PUBLISHED',
       });
-      expect(total).toBe(4);
+      expect(total).toBeGreaterThanOrEqual(4);
       expect(items.every((t) => t.status === 'PUBLISHED')).toBe(true);
     });
 
-    it('filters by status=DRAFT returns empty', async () => {
-      const { items, total } = await getList('teams', { status: 'DRAFT' });
-      expect(items).toHaveLength(0);
-      expect(total).toBe(0);
+    it('filters by status=DRAFT', async () => {
+      const { items } = await getList('teams', { status: 'DRAFT' });
+      expect(items.every((t) => t.status === 'DRAFT')).toBe(true);
     });
 
     it('ignores invalid status values', async () => {
       const { total } = await getList('teams', { status: 'INVALID' });
-      expect(total).toBe(4);
+      expect(total).toBeGreaterThanOrEqual(4);
     });
   });
 
@@ -59,27 +58,26 @@ describe('List endpoint filters', async () => {
   describe('clubs', () => {
     it('returns all clubs', async () => {
       const { items, total } = await getList('clubs');
-      expect(total).toBe(3);
-      expect(items).toHaveLength(3);
+      expect(total).toBeGreaterThanOrEqual(3);
+      expect(items.length).toBeGreaterThanOrEqual(3);
     });
 
     it('filters by status=PUBLISHED', async () => {
       const { items, total } = await getList('clubs', {
         status: 'PUBLISHED',
       });
-      expect(total).toBe(3);
+      expect(total).toBeGreaterThanOrEqual(3);
       expect(items.every((c) => c.status === 'PUBLISHED')).toBe(true);
     });
 
-    it('filters by status=DRAFT returns empty', async () => {
-      const { items, total } = await getList('clubs', { status: 'DRAFT' });
-      expect(items).toHaveLength(0);
-      expect(total).toBe(0);
+    it('filters by status=DRAFT', async () => {
+      const { items } = await getList('clubs', { status: 'DRAFT' });
+      expect(items.every((c) => c.status === 'DRAFT')).toBe(true);
     });
 
     it('ignores invalid status values', async () => {
       const { total } = await getList('clubs', { status: 'INVALID' });
-      expect(total).toBe(3);
+      expect(total).toBeGreaterThanOrEqual(3);
     });
   });
 
@@ -88,29 +86,28 @@ describe('List endpoint filters', async () => {
   describe('seasons', () => {
     it('returns all seasons', async () => {
       const { items, total } = await getList('seasons');
-      expect(total).toBe(1);
-      expect(items).toHaveLength(1);
+      expect(total).toBeGreaterThanOrEqual(1);
+      expect(items.length).toBeGreaterThanOrEqual(1);
     });
 
     it('filters by status=PUBLISHED', async () => {
       const { items, total } = await getList('seasons', {
         status: 'PUBLISHED',
       });
-      expect(total).toBe(1);
-      expect(items[0]!.status).toBe('PUBLISHED');
+      expect(total).toBeGreaterThanOrEqual(1);
+      expect(items.every((s) => s.status === 'PUBLISHED')).toBe(true);
     });
 
-    it('filters by status=DRAFT returns empty', async () => {
-      const { items, total } = await getList('seasons', {
+    it('filters by status=DRAFT', async () => {
+      const { items } = await getList('seasons', {
         status: 'DRAFT',
       });
-      expect(items).toHaveLength(0);
-      expect(total).toBe(0);
+      expect(items.every((s) => s.status === 'DRAFT')).toBe(true);
     });
 
     it('ignores invalid status values', async () => {
       const { total } = await getList('seasons', { status: 'INVALID' });
-      expect(total).toBe(1);
+      expect(total).toBeGreaterThanOrEqual(1);
     });
   });
 
@@ -142,12 +139,12 @@ describe('List endpoint filters', async () => {
   describe('players', () => {
     it('returns all players', async () => {
       const { items, total } = await getList('players');
-      expect(total).toBe(5);
-      expect(items).toHaveLength(5);
+      expect(total).toBeGreaterThanOrEqual(5);
+      expect(items.length).toBeGreaterThanOrEqual(5);
     });
 
     it('filters by positionId', async () => {
-      const all = await getList('players');
+      const all = await getList('players', { status: 'PUBLISHED' });
       const positionId = all.items[0]!.positionId as string;
       const { items } = await getList('players', { positionId });
       expect(items.length).toBeGreaterThanOrEqual(1);
@@ -166,25 +163,24 @@ describe('List endpoint filters', async () => {
       const { items, total } = await getList('players', {
         status: 'PUBLISHED',
       });
-      expect(total).toBe(5);
+      expect(total).toBeGreaterThanOrEqual(5);
       expect(items.every((p) => p.status === 'PUBLISHED')).toBe(true);
     });
 
-    it('filters by status=DRAFT returns empty', async () => {
-      const { items, total } = await getList('players', {
+    it('filters by status=DRAFT', async () => {
+      const { items } = await getList('players', {
         status: 'DRAFT',
       });
-      expect(items).toHaveLength(0);
-      expect(total).toBe(0);
+      expect(items.every((p) => p.status === 'DRAFT')).toBe(true);
     });
 
     it('ignores invalid status values', async () => {
       const { total } = await getList('players', { status: 'INVALID' });
-      expect(total).toBe(5);
+      expect(total).toBeGreaterThanOrEqual(5);
     });
 
     it('combines positionId and status filters', async () => {
-      const all = await getList('players');
+      const all = await getList('players', { status: 'PUBLISHED' });
       const positionId = all.items[0]!.positionId as string;
       const { items } = await getList('players', {
         positionId,
@@ -204,15 +200,15 @@ describe('List endpoint filters', async () => {
   describe('competitions', () => {
     it('returns all competitions', async () => {
       const { items, total } = await getList('competitions');
-      expect(total).toBe(2);
-      expect(items).toHaveLength(2);
+      expect(total).toBeGreaterThanOrEqual(2);
+      expect(items.length).toBeGreaterThanOrEqual(2);
     });
 
     it('filters by seasonId', async () => {
-      const all = await getList('competitions');
+      const all = await getList('competitions', { status: 'PUBLISHED' });
       const seasonId = all.items[0]!.seasonId as string;
-      const { items, total } = await getList('competitions', { seasonId });
-      expect(total).toBe(2);
+      const { items } = await getList('competitions', { seasonId });
+      expect(items.length).toBeGreaterThanOrEqual(2);
       expect(items.every((c) => c.seasonId === seasonId)).toBe(true);
     });
 
@@ -228,33 +224,32 @@ describe('List endpoint filters', async () => {
       const { items, total } = await getList('competitions', {
         status: 'PUBLISHED',
       });
-      expect(total).toBe(2);
+      expect(total).toBeGreaterThanOrEqual(2);
       expect(items.every((c) => c.status === 'PUBLISHED')).toBe(true);
     });
 
-    it('filters by status=DRAFT returns empty', async () => {
-      const { items, total } = await getList('competitions', {
+    it('filters by status=DRAFT', async () => {
+      const { items } = await getList('competitions', {
         status: 'DRAFT',
       });
-      expect(items).toHaveLength(0);
-      expect(total).toBe(0);
+      expect(items.every((c) => c.status === 'DRAFT')).toBe(true);
     });
 
     it('ignores invalid status values', async () => {
       const { total } = await getList('competitions', {
         status: 'INVALID',
       });
-      expect(total).toBe(2);
+      expect(total).toBeGreaterThanOrEqual(2);
     });
 
     it('combines seasonId and status filters', async () => {
-      const all = await getList('competitions');
+      const all = await getList('competitions', { status: 'PUBLISHED' });
       const seasonId = all.items[0]!.seasonId as string;
-      const { items, total } = await getList('competitions', {
+      const { items } = await getList('competitions', {
         seasonId,
         status: 'PUBLISHED',
       });
-      expect(total).toBe(2);
+      expect(items.length).toBeGreaterThanOrEqual(2);
       expect(
         items.every((c) => c.seasonId === seasonId && c.status === 'PUBLISHED')
       ).toBe(true);

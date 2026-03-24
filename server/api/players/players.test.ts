@@ -24,7 +24,10 @@ describe('Player endpoints', async () => {
   await setup({ dev: true });
 
   describe('POST /api/players', () => {
+    let createdSlug: string;
+
     it('creates a player with valid data', async () => {
+      createdSlug = `test-player-${Date.now()}`;
       const response = await fetch('/api/players', {
         method: 'POST',
         headers: {
@@ -34,7 +37,7 @@ describe('Player endpoints', async () => {
         body: JSON.stringify({
           firstName: 'Test',
           lastName: 'Player',
-          slug: 'test-player',
+          slug: createdSlug,
         }),
       });
       expect(response.status).toBe(201);
@@ -42,7 +45,7 @@ describe('Player endpoints', async () => {
       expect(player.id).toBeDefined();
       expect(player.firstName).toBe('Test');
       expect(player.lastName).toBe('Player');
-      expect(player.slug).toBe('test-player');
+      expect(player.slug).toBe(createdSlug);
       expect(player.status).toBe('DRAFT');
     });
 
@@ -86,7 +89,7 @@ describe('Player endpoints', async () => {
         body: {
           firstName: 'Another',
           lastName: 'Player',
-          slug: 'test-player',
+          slug: createdSlug,
         },
       }).catch((e: { response: { status: number } }) => e);
       expect((err as { response: { status: number } }).response.status).toBe(
