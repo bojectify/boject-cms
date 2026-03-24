@@ -3,6 +3,7 @@ import type { FieldConfig } from '~/types/contentEditor';
 
 const route = useRoute();
 const id = route.params.id as string;
+const isNew = id === 'new';
 
 const fields: FieldConfig[] = [
   { type: 'text', key: 'name', label: 'Name', required: true },
@@ -20,16 +21,23 @@ watch(
     }
   }
 );
+
+async function handleSave() {
+  const newId = await save();
+  if (newId) {
+    await navigateTo(`/tags/${newId}`);
+  }
+}
 </script>
 
 <template>
   <ContentEditor
     v-model:state="formState"
-    title="Edit Tag"
+    :title="isNew ? 'New Tag' : 'Edit Tag'"
     :fields="fields"
-    :loading="loadingStatus === 'pending'"
+    :loading="!isNew && loadingStatus === 'pending'"
     :saving="isSaving"
     :error="saveError"
-    :on-save="save"
+    :on-save="handleSave"
   />
 </template>

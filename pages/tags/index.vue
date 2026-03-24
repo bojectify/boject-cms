@@ -15,5 +15,9 @@ const { data, status } = await useFetch('/api/tags', {
     :loading="status === 'pending'"
     :total="data?.total ?? 0"
     :row-link="(row) => '/tags/' + row.id"
-  />
+  >
+    <template #actions>
+      <UButton to="/tags/new" icon="i-lucide-plus">New Tag</UButton>
+    </template>
+  </ContentTable>
 </template>

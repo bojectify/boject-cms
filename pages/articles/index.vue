@@ -34,6 +34,9 @@ function getTagNames(row: Record<string, unknown>): string {
     :columns="extraColumns"
     :row-link="(row) => '/articles/' + row.id"
   >
+    <template #actions>
+      <UButton to="/articles/new" icon="i-lucide-plus">New Article</UButton>
+    </template>
     <template #author-cell="{ row }">
       {{ getAuthorName(row.original) }}
     </template>

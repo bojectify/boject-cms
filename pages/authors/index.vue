@@ -15,5 +15,9 @@ const { data, status } = await useFetch('/api/authors', {
     :loading="status === 'pending'"
     :total="data?.total ?? 0"
     :row-link="(row) => '/authors/' + row.id"
-  />
+  >
+    <template #actions>
+      <UButton to="/authors/new" icon="i-lucide-plus">New Author</UButton>
+    </template>
+  </ContentTable>
 </template>

@@ -3,6 +3,7 @@ import type { FieldConfig } from '~/types/contentEditor';
 
 const route = useRoute();
 const id = route.params.id as string;
+const isNew = id === 'new';
 
 const fields: FieldConfig[] = [
   { type: 'text', key: 'title', label: 'Title', required: true },
@@ -45,22 +46,29 @@ watch(
 watch(
   () => formState.tags,
   (tags) => {
-    if (Array.isArray(tags)) {
+    if (!isNew && Array.isArray(tags)) {
       formState.tagIds = (tags as Array<{ id: string }>).map((t) => t.id);
     }
   },
   { immediate: true }
 );
+
+async function handleSave() {
+  const newId = await save();
+  if (newId) {
+    await navigateTo(`/articles/${newId}`);
+  }
+}
 </script>
 
 <template>
   <ContentEditor
     v-model:state="formState"
-    title="Edit Article"
+    :title="isNew ? 'New Article' : 'Edit Article'"
     :fields="fields"
-    :loading="loadingStatus === 'pending'"
+    :loading="!isNew && loadingStatus === 'pending'"
     :saving="isSaving"
     :error="saveError"
-    :on-save="save"
+    :on-save="handleSave"
   />
 </template>

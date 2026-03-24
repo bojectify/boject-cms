@@ -27,6 +27,9 @@ const columns: TableColumn<Record<string, unknown>>[] = [
     :total="data?.total ?? 0"
     :row-link="(row) => '/fixtures/' + row.id"
   >
+    <template #actions>
+      <UButton to="/fixtures/new" icon="i-lucide-plus">New Fixture</UButton>
+    </template>
     <template #kickoff-cell="{ row }">
       {{ formatDate(row.original.kickoff as string) }}
     </template>

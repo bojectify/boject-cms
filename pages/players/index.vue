@@ -15,5 +15,9 @@ const { data, status } = await useFetch('/api/players', {
     :loading="status === 'pending'"
     :total="data?.total ?? 0"
     :row-link="(row) => '/players/' + row.id"
-  />
+  >
+    <template #actions>
+      <UButton to="/players/new" icon="i-lucide-plus">New Player</UButton>
+    </template>
+  </ContentTable>
 </template>
