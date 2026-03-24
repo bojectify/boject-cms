@@ -4,6 +4,10 @@ export default defineConfig({
   test: {
     fileParallelism: false,
     globalSetup: './vitest.globalSetup.ts',
+    coverage: {
+      provider: 'v8', // or 'istanbul'
+    },
+    reporters: ['verbose'],
     // Using plain vitest config instead of @nuxt/test-utils/config because
     // defineVitestConfig's "nuxt" environment is incompatible with Nuxt 4.3.1
     // (publicAssetsURL build error). Our e2e tests only need the "node"
