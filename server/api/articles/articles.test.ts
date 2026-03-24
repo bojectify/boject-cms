@@ -68,8 +68,11 @@ describe('Article endpoints', async () => {
     });
 
     it('filters by authorId', async () => {
-      const authors = await getList('authors');
-      const authorId = authors.items[0]!.id;
+      // Find an author who has at least one article
+      const allArticles = await getList('articles');
+      const articleWithAuthor = allArticles.items.find((a) => a.authorId);
+      expect(articleWithAuthor).toBeDefined();
+      const authorId = articleWithAuthor!.authorId as string;
       const { items } = await getList('articles', { authorId });
       expect(items.length).toBeGreaterThan(0);
       expect(items.every((a) => a.authorId === authorId)).toBe(true);

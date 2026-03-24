@@ -1,5 +1,9 @@
 import { defineConfig } from 'vitest/config';
 
+// Tests use a separate database so dev data is never touched.
+process.env.DATABASE_URL =
+  'postgresql://boject:boject@localhost:5432/boject_test';
+
 export default defineConfig({
   test: {
     fileParallelism: false,
