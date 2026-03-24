@@ -22,7 +22,36 @@ export default defineNuxtConfig({
     databaseUrl: process.env.DATABASE_URL ?? '',
   },
 
+  vite: {
+    server: {
+      // During tests, sequential dev servers fight over the default HMR
+      // WebSocket port (24678). Disable HMR entirely — tests don't need it.
+      ...(process.env.VITEST ? { hmr: false, ws: false } : {}),
+    },
+  },
+
   nitro: {
+    rollupConfig: {
+      onwarn(warning, defaultHandler) {
+        // graphql-yoga's ESM barrel exports trigger Rollup's unused-import
+        // detection — upstream packaging issue, harmless.
+        if (
+          warning.message?.includes('createYoga') &&
+          warning.code === 'UNUSED_EXTERNAL_IMPORT'
+        )
+          return;
+
+        // nuxt-auth-utils and nitropack have circular imports in their
+        // published ESM bundles — upstream issue, nothing we can fix.
+        if (
+          warning.code === 'CIRCULAR_DEPENDENCY' &&
+          warning.message?.includes('node_modules/')
+        )
+          return;
+
+        defaultHandler(warning);
+      },
+    },
     externals: {
       inline: ['@prisma/adapter-pg', 'graphql-yoga'],
       external: ['sharp'],

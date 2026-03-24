@@ -3,7 +3,7 @@ pre-commit:
   jobs:
     - name: lint
       glob: '*.{js,mjs,ts,vue}'
-      run: pnpm lint {staged_files}
+      run: pnpm lint
 
     - name: format
       glob: '*.{js,mjs,ts,vue,json,yml,yaml,css,scss,md}'
