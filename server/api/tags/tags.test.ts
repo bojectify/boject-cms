@@ -121,4 +121,72 @@ describe('Tag endpoints', async () => {
       expect(options[0]!).toHaveProperty('value');
     });
   });
+
+  describe('POST /api/tags', () => {
+    it('creates a tag with valid data', async () => {
+      const name = `Test Tag ${Date.now()}`;
+      const slug = `test-tag-${Date.now()}`;
+      const response = await fetch('/api/tags', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: await getSessionCookie(),
+        },
+        body: JSON.stringify({ name, slug }),
+      });
+
+      expect(response.status).toBe(201);
+      const body = await response.json();
+      expect(body.id).toBeDefined();
+      expect(body.name).toBe(name);
+      expect(body.slug).toBe(slug);
+      expect(body.status).toBe('DRAFT');
+    });
+
+    it('returns 400 when name is missing', async () => {
+      const response = await fetch('/api/tags', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: await getSessionCookie(),
+        },
+        body: JSON.stringify({ slug: 'some-slug' }),
+      });
+
+      expect(response.status).toBe(400);
+    });
+
+    it('returns 400 when slug is missing', async () => {
+      const response = await fetch('/api/tags', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: await getSessionCookie(),
+        },
+        body: JSON.stringify({ name: 'Some Tag' }),
+      });
+
+      expect(response.status).toBe(400);
+    });
+
+    it('returns 409 for duplicate name or slug', async () => {
+      const name = `Dup Tag ${Date.now()}`;
+      const slug = `dup-tag-${Date.now()}`;
+      const cookie = await getSessionCookie();
+
+      await fetch('/api/tags', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify({ name, slug }),
+      });
+
+      const response = await fetch('/api/tags', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify({ name, slug }),
+      });
+
+      expect(response.status).toBe(409);
+    });
+  });
 });

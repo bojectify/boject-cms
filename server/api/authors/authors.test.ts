@@ -174,4 +174,83 @@ describe('Author endpoints', async () => {
       expect(options[0]!).toHaveProperty('value');
     });
   });
+
+  // ── POST /api/authors ────────────────────────────────────────
+
+  describe('POST /api/authors', () => {
+    it('creates an author with valid data', async () => {
+      const response = await fetch('/api/authors', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: await getSessionCookie(),
+        },
+        body: JSON.stringify({
+          name: 'Test Author',
+          slug: 'test-author',
+        }),
+      });
+      expect(response.status).toBe(201);
+      const author = await response.json();
+      expect(author.id).toBeDefined();
+      expect(author.name).toBe('Test Author');
+      expect(author.slug).toBe('test-author');
+      expect(author.status).toBe('DRAFT');
+    });
+
+    it('creates an author with socialLinks', async () => {
+      const response = await fetch('/api/authors', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: await getSessionCookie(),
+        },
+        body: JSON.stringify({
+          name: 'Social Author',
+          slug: 'social-author',
+          socialLinks: [
+            { platform: 'twitter', url: 'https://twitter.com/social' },
+            { platform: 'instagram', url: 'https://instagram.com/social' },
+          ],
+        }),
+      });
+      expect(response.status).toBe(201);
+      const author = await response.json();
+      expect(author.socialLinks).toHaveLength(2);
+      expect(author.socialLinks[0].platform).toBe('twitter');
+    });
+
+    it('returns 400 when name is missing', async () => {
+      const err = await $fetch('/api/authors', {
+        method: 'POST',
+        headers: { Cookie: await getSessionCookie() },
+        body: { slug: 'no-name' },
+      }).catch((e: { response: { status: number } }) => e);
+      expect((err as { response: { status: number } }).response.status).toBe(
+        400
+      );
+    });
+
+    it('returns 400 when slug is missing', async () => {
+      const err = await $fetch('/api/authors', {
+        method: 'POST',
+        headers: { Cookie: await getSessionCookie() },
+        body: { name: 'No Slug Author' },
+      }).catch((e: { response: { status: number } }) => e);
+      expect((err as { response: { status: number } }).response.status).toBe(
+        400
+      );
+    });
+
+    it('returns 409 on duplicate name', async () => {
+      const err = await $fetch('/api/authors', {
+        method: 'POST',
+        headers: { Cookie: await getSessionCookie() },
+        body: { name: 'Test Author', slug: 'test-author-dupe' },
+      }).catch((e: { response: { status: number } }) => e);
+      expect((err as { response: { status: number } }).response.status).toBe(
+        409
+      );
+    });
+  });
 });

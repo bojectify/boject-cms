@@ -197,4 +197,82 @@ describe('Article endpoints', async () => {
       expect(options[0]!).toHaveProperty('value');
     });
   });
+
+  // ── POST /api/articles ───────────────────────────────────────
+
+  describe('POST /api/articles', () => {
+    it('creates an article with valid data', async () => {
+      const response = await fetch('/api/articles', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: await getSessionCookie(),
+        },
+        body: JSON.stringify({
+          title: 'Test Article',
+          slug: 'test-article',
+          summary: 'A test article summary.',
+        }),
+      });
+      expect(response.status).toBe(201);
+      const article = await response.json();
+      expect(article.id).toBeDefined();
+      expect(article.title).toBe('Test Article');
+      expect(article.slug).toBe('test-article');
+      expect(article.status).toBe('DRAFT');
+    });
+
+    it('creates an article with tagIds', async () => {
+      const { items: tags } = await getList('tags');
+      const tagIds = tags.slice(0, 2).map((t) => t.id);
+      const response = await fetch('/api/articles', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: await getSessionCookie(),
+        },
+        body: JSON.stringify({
+          title: 'Tagged Article',
+          slug: 'tagged-article',
+          tagIds,
+        }),
+      });
+      expect(response.status).toBe(201);
+      const article = await response.json();
+      expect(article.tags).toHaveLength(2);
+    });
+
+    it('returns 400 when title is missing', async () => {
+      const err = await $fetch('/api/articles', {
+        method: 'POST',
+        headers: { Cookie: await getSessionCookie() },
+        body: { slug: 'no-title' },
+      }).catch((e: { response: { status: number } }) => e);
+      expect((err as { response: { status: number } }).response.status).toBe(
+        400
+      );
+    });
+
+    it('returns 400 when slug is missing', async () => {
+      const err = await $fetch('/api/articles', {
+        method: 'POST',
+        headers: { Cookie: await getSessionCookie() },
+        body: { title: 'No Slug Article' },
+      }).catch((e: { response: { status: number } }) => e);
+      expect((err as { response: { status: number } }).response.status).toBe(
+        400
+      );
+    });
+
+    it('returns 409 on duplicate title', async () => {
+      const err = await $fetch('/api/articles', {
+        method: 'POST',
+        headers: { Cookie: await getSessionCookie() },
+        body: { title: 'Test Article', slug: 'test-article-dupe' },
+      }).catch((e: { response: { status: number } }) => e);
+      expect((err as { response: { status: number } }).response.status).toBe(
+        409
+      );
+    });
+  });
 });
