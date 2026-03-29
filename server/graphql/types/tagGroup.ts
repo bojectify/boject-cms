@@ -1,19 +1,18 @@
 import { builder } from '../builder';
-import { ArticleWhere } from '../filters';
+import { TagWhere } from '../filters';
 import { contentMetadataFields } from './contentFields';
 
-builder.prismaObject('Tag', {
+builder.prismaObject('TagGroup', {
   fields: (t) => ({
     id: t.exposeID('id'),
     name: t.exposeString('name'),
     slug: t.exposeString('slug'),
-    group: t.relation('group', { nullable: true }),
     ...contentMetadataFields(t),
     createdAt: t.expose('createdAt', { type: 'DateTime' }),
     updatedAt: t.expose('updatedAt', { type: 'DateTime' }),
-    articles: t.relatedConnection('articles', {
+    tags: t.relatedConnection('tags', {
       cursor: 'id',
-      args: { where: t.arg({ type: ArticleWhere }) },
+      args: { where: t.arg({ type: TagWhere }) },
       query: (args) => ({ where: args.where ?? undefined }),
     }),
   }),

@@ -7,16 +7,10 @@ const isNew = id === 'new';
 
 const fields: FieldConfig[] = [
   { type: 'text', key: 'name', label: 'Name', required: true },
-  {
-    type: 'relation',
-    key: 'groupId',
-    label: 'Group',
-    optionsEndpoint: '/api/tag-groups/options',
-  },
 ];
 
 const { formState, loadingStatus, isSaving, saveError, save, generateSlug } =
-  useContentEditor('tags', id);
+  useContentEditor('tag-groups', id);
 
 watch(
   () => formState.name,
@@ -31,7 +25,7 @@ watch(
 async function handleSave() {
   const newId = await save();
   if (newId) {
-    await navigateTo(`/tags/${newId}`);
+    await navigateTo(`/tag-groups/${newId}`);
   }
 }
 </script>
@@ -39,7 +33,7 @@ async function handleSave() {
 <template>
   <ContentEditor
     v-model:state="formState"
-    :title="isNew ? 'New Tag' : 'Edit Tag'"
+    :title="isNew ? 'New Tag Group' : 'Edit Tag Group'"
     :fields="fields"
     :loading="!isNew && loadingStatus === 'pending'"
     :saving="isSaving"

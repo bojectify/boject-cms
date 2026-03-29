@@ -25,6 +25,7 @@ const navItems: NavigationMenuItem[] = [
   { label: 'Articles', icon: 'i-lucide-newspaper', to: '/articles' },
   { label: 'Authors', icon: 'i-lucide-pen-tool', to: '/authors' },
   { label: 'Tags', icon: 'i-lucide-tag', to: '/tags' },
+  { label: 'Tag Groups', icon: 'i-lucide-tags', to: '/tag-groups' },
 ];
 
 const userMenuItems = computed<DropdownMenuItem[][]>(() => [
