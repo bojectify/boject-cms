@@ -15,6 +15,7 @@ import { ScoreTypeEnum } from './types/score';
 import { _registered as _fixture } from './types/fixture';
 import { _registered as _filters } from './filters';
 import { _registered as _author } from './types/author';
+import { _registered as _tagGroup } from './types/tagGroup';
 import { _registered as _tag } from './types/tag';
 import { _registered as _article } from './types/article';
 import { _registered as _query } from './query/index';
@@ -35,6 +36,7 @@ void [
   _fixture,
   _filters,
   _author,
+  _tagGroup,
   _tag,
   _article,
   _query,

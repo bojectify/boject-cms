@@ -573,6 +573,31 @@ async function main() {
     },
   });
 
+  // Tag Groups
+  const groupMatchType = await prisma.tagGroup.upsert({
+    where: { name: 'Match Type' },
+    update: {},
+    create: {
+      name: 'Match Type',
+      slug: 'match-type',
+      entryTitle: 'Match Type',
+      status: 'PUBLISHED',
+      publishedAt: new Date(),
+    },
+  });
+
+  const groupTopic = await prisma.tagGroup.upsert({
+    where: { name: 'Topic' },
+    update: {},
+    create: {
+      name: 'Topic',
+      slug: 'topic',
+      entryTitle: 'Topic',
+      status: 'PUBLISHED',
+      publishedAt: new Date(),
+    },
+  });
+
   // Tags
   const tagMatchReport = await prisma.tag.upsert({
     where: { name: 'Match Report' },
@@ -581,6 +606,7 @@ async function main() {
       name: 'Match Report',
       slug: 'match-report',
       entryTitle: 'Match Report',
+      groupId: groupMatchType.id,
       status: 'PUBLISHED',
       publishedAt: new Date(),
     },
@@ -593,6 +619,7 @@ async function main() {
       name: 'Club News',
       slug: 'club-news',
       entryTitle: 'Club News',
+      groupId: groupTopic.id,
       status: 'PUBLISHED',
       publishedAt: new Date(),
     },
@@ -605,6 +632,7 @@ async function main() {
       name: 'Youth',
       slug: 'youth',
       entryTitle: 'Youth',
+      groupId: groupTopic.id,
       status: 'PUBLISHED',
       publishedAt: new Date(),
     },

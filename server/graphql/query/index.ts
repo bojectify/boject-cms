@@ -11,6 +11,7 @@ import {
   FixtureWhere,
   ScoreWhere,
   AuthorWhere,
+  TagGroupWhere,
   TagWhere,
   ArticleWhere,
 } from '../filters';
@@ -181,6 +182,25 @@ builder.queryType({
       args: { id: t.arg.string({ required: true }) },
       resolve: (query, _root, args) =>
         prisma.author.findUnique({ ...query, where: { id: args.id } }),
+    }),
+
+    // TagGroup
+    tagGroups: t.prismaConnection({
+      type: 'TagGroup',
+      cursor: 'id',
+      args: { where: t.arg({ type: TagGroupWhere }) },
+      resolve: (query, _root, args) =>
+        prisma.tagGroup.findMany({
+          ...query,
+          where: args.where ?? undefined,
+        }),
+    }),
+    tagGroup: t.prismaField({
+      type: 'TagGroup',
+      nullable: true,
+      args: { id: t.arg.string({ required: true }) },
+      resolve: (query, _root, args) =>
+        prisma.tagGroup.findUnique({ ...query, where: { id: args.id } }),
     }),
 
     // Tag

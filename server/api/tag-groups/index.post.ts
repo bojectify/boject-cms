@@ -11,17 +11,14 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'slug is required' });
   }
 
-  const data: Prisma.TagUncheckedCreateInput = {
+  const data: Prisma.TagGroupUncheckedCreateInput = {
     name: body.name as string,
     slug: body.slug as string,
   };
-  if (body.groupId && typeof body.groupId === 'string') {
-    data.groupId = body.groupId;
-  }
   applyContentMetadata(body, data as Record<string, unknown>, null);
 
   try {
-    const created = await prisma.tag.create({ data });
+    const created = await prisma.tagGroup.create({ data });
     setResponseStatus(event, 201);
     return created;
   } catch (err: unknown) {
@@ -31,7 +28,7 @@ export default defineEventHandler(async (event) => {
     ) {
       throw createError({
         statusCode: 409,
-        statusMessage: 'A tag with this name or slug already exists',
+        statusMessage: 'A tag group with this name or slug already exists',
       });
     }
     throw err;

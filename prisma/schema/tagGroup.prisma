@@ -1,11 +1,9 @@
-model Tag {
+model TagGroup {
   id          String        @id @default(uuid())
   entryTitle  String        @default("")
   name        String        @unique
   slug        String        @unique
-  group       TagGroup?     @relation(fields: [groupId], references: [id], onDelete: SetNull)
-  groupId     String?
-  articles    Article[]
+  tags        Tag[]
   status      ContentStatus @default(DRAFT)
   publishedAt DateTime?
   createdBy   String?

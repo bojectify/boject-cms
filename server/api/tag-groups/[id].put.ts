@@ -5,14 +5,16 @@ export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id');
   const body = await readBody<Record<string, unknown>>(event);
 
-  const existing = await prisma.tag.findUnique({ where: { id } });
+  const existing = await prisma.tagGroup.findUnique({ where: { id } });
   if (!existing) {
-    throw createError({ statusCode: 404, statusMessage: 'Tag not found' });
+    throw createError({
+      statusCode: 404,
+      statusMessage: 'Tag group not found',
+    });
   }
 
-  const data: Prisma.TagUncheckedUpdateInput = {};
+  const data: Prisma.TagGroupUncheckedUpdateInput = {};
   if ('name' in body) data.name = body.name as string;
-  if ('groupId' in body) data.groupId = (body.groupId as string | null) || null;
   applyContentMetadata(
     body,
     data as Record<string, unknown>,
@@ -20,7 +22,11 @@ export default defineEventHandler(async (event) => {
   );
 
   try {
-    return await prisma.tag.update({ where: { id }, data });
+    return await prisma.tagGroup.update({
+      where: { id },
+      data,
+      include: { tags: true },
+    });
   } catch (err: unknown) {
     if (
       err instanceof Error &&
@@ -28,7 +34,7 @@ export default defineEventHandler(async (event) => {
     ) {
       throw createError({
         statusCode: 409,
-        statusMessage: 'A tag with this name or slug already exists',
+        statusMessage: 'A tag group with this name or slug already exists',
       });
     }
     throw err;

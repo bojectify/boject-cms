@@ -17,6 +17,7 @@ const CONTENT_TABLES = [
   'Image',
   'Author',
   'Tag',
+  'TagGroup',
   'Article',
 ] as const;
 

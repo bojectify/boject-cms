@@ -164,13 +164,30 @@ export const AuthorWhere = builder.prismaWhere('Author', {
   },
 });
 
-export const TagWhere = builder.prismaWhere('Tag', {
+export const TagGroupWhere = builder.prismaWhere('TagGroup', {
   fields: {
     entryTitle: StringFilter,
     name: StringFilter,
     slug: StringFilter,
     status: ContentStatusFilter,
   },
+});
+
+const TagGroupRelationFilter = builder.inputType('TagGroupRelationFilter', {
+  fields: (t) => ({
+    is: t.field({ type: TagGroupWhere }),
+    isNot: t.field({ type: TagGroupWhere }),
+  }),
+});
+
+export const TagWhere = builder.prismaWhere('Tag', {
+  fields: {
+    entryTitle: StringFilter,
+    name: StringFilter,
+    slug: StringFilter,
+    status: ContentStatusFilter,
+    group: TagGroupRelationFilter,
+  } as never,
 });
 
 // List relation filter for many-to-many Tag
