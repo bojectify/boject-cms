@@ -9,7 +9,7 @@ if (id === 'new') {
 }
 
 const fields: FieldConfig[] = [
-  { type: 'text', key: 'url', label: 'URL', required: true },
+  { type: 'text', key: 'url', label: 'URL', readonly: true },
   { type: 'text', key: 'alt', label: 'Alt Text', required: true },
   { type: 'number', key: 'width', label: 'Width', required: true },
   { type: 'number', key: 'height', label: 'Height', required: true },
