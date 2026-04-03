@@ -114,9 +114,19 @@ The reorder endpoint supports drag-and-drop reordering in the CMS UI.
 
 ## GraphQL API
 
+### LinkTarget union type
+
+The internal link reference is exposed as a GraphQL union type, allowing clients to use `__typename` discrimination and query type-specific fields via inline fragments.
+
+```graphql
+union LinkTarget = Article # add Video, HomePage, etc. as they're added to the CMS
+```
+
+In Pothos, defined as `builder.unionType('LinkTarget', { types: ['Article'], resolveType })`. The resolver checks which FK is set on the Link record and returns the corresponding relation. Adding a new linkable type means: add the nullable FK to the Prisma Link model, add the Pothos type to the union's `types` array, and add a clause to `resolveType`.
+
 ### Type definitions
 
-- **Link** — `prismaObject` with all fields. `article` as `t.relation()`. Content metadata via `contentMetadataFields()`.
+- **Link** — `prismaObject` with `label`, `url`, `openInNewTab`. An `internalLink` field (nullable, type `LinkTarget`) that resolves whichever FK relation is set. Content metadata via `contentMetadataFields()`.
 - **NavigationItem** — `prismaObject` with `order`, `link` as `t.relation()`, `parent` as nullable `t.relation()`, `children` as `t.relatedConnection()` ordered by `order`.
 - **Navigation** — `prismaObject` with `name`, `items` as `t.relatedConnection()` filtered to `parentId: null` and ordered by `order`. Content metadata.
 
@@ -150,9 +160,15 @@ query {
                 label
                 url
                 openInNewTab
-                article {
-                  slug
-                  title
+                internalLink {
+                  __typename
+                  ... on Article {
+                    slug
+                    title
+                    author {
+                      name
+                    }
+                  }
                 }
               }
               children(first: 20) {
@@ -163,9 +179,12 @@ query {
                       label
                       url
                       openInNewTab
-                      article {
-                        slug
-                        title
+                      internalLink {
+                        __typename
+                        ... on Article {
+                          slug
+                          title
+                        }
                       }
                     }
                   }
