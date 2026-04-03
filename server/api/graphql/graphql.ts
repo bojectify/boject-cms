@@ -7,7 +7,7 @@ const yoga = createYoga({
   schema: getSchema(),
   graphqlEndpoint: '/api/graphql',
   graphiql: process.env.NODE_ENV !== 'production',
-  plugins: [maxDepthPlugin({ n: 10 })],
+  plugins: [maxDepthPlugin({ n: 15 })],
 });
 
 export default defineEventHandler(async (event) => {

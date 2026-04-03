@@ -601,7 +601,7 @@ async function main() {
   // Tags
   const tagMatchReport = await prisma.tag.upsert({
     where: { name: 'Match Report' },
-    update: {},
+    update: { groupId: groupMatchType.id },
     create: {
       name: 'Match Report',
       slug: 'match-report',
@@ -614,7 +614,7 @@ async function main() {
 
   const tagClubNews = await prisma.tag.upsert({
     where: { name: 'Club News' },
-    update: {},
+    update: { groupId: groupTopic.id },
     create: {
       name: 'Club News',
       slug: 'club-news',
@@ -627,7 +627,7 @@ async function main() {
 
   const tagYouth = await prisma.tag.upsert({
     where: { name: 'Youth' },
-    update: {},
+    update: { groupId: groupTopic.id },
     create: {
       name: 'Youth',
       slug: 'youth',

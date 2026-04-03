@@ -130,7 +130,7 @@ function onSubmit() {
       <template v-for="field in fields" :key="field.key">
         <UFormField
           v-if="field.type === 'text'"
-          :label="field.label"
+          :label="field.readonly ? `${field.label} (read-only)` : field.label"
           :name="field.key"
           :required="field.required"
           size="xl"
@@ -138,6 +138,7 @@ function onSubmit() {
           <UInput
             :model-value="(state[field.key] as string) ?? ''"
             :placeholder="field.placeholder"
+            :readonly="field.readonly"
             class="w-full"
             @update:model-value="state[field.key] = $event"
           />

@@ -4,6 +4,7 @@ export interface TextFieldConfig {
   label: string;
   required?: boolean;
   placeholder?: string;
+  readonly?: boolean;
 }
 
 export interface TextareaFieldConfig {
