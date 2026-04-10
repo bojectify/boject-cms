@@ -263,7 +263,7 @@ describe('NavigationItem endpoints', async () => {
       expect(response.status).toBe(400);
     });
 
-    it('rejects parentId that does not belong to the same navigation', async () => {
+    it('rejects parentId that does not exist', async () => {
       // Create a top-level item to then update
       const createRes = await fetch('/api/navigation-items', {
         method: 'POST',
@@ -276,7 +276,7 @@ describe('NavigationItem endpoints', async () => {
       const item = await createRes.json();
 
       try {
-        // Try to set parentId to a UUID that doesn't exist
+        // Use a UUID that is well-formed but does not exist in any navigation.
         const phantom = '00000000-0000-0000-0000-00000000c0de';
         const response = await fetch(`/api/navigation-items/${item.id}`, {
           method: 'PUT',

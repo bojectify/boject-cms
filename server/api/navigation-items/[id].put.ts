@@ -83,6 +83,9 @@ export default defineEventHandler(async (event) => {
         data,
         include: { link: { include: { article: true } } },
       }),
-    { notFoundMessage: 'Navigation item not found' }
+    {
+      notFoundMessage: 'Navigation item not found',
+      foreignKeyMessage: 'linkId does not exist',
+    }
   );
 });
