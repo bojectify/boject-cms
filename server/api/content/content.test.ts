@@ -149,4 +149,16 @@ describe('Content API filters', async () => {
       ).toBe(true);
     });
   });
+
+  it('filters by contentType=Link', async () => {
+    const { items, total } = await getContent({ contentType: 'Link' });
+    expect(total).toBeGreaterThanOrEqual(1);
+    expect(items.every((i) => i.contentType === 'Link')).toBe(true);
+  });
+
+  it('filters by contentType=Navigation', async () => {
+    const { items, total } = await getContent({ contentType: 'Navigation' });
+    expect(total).toBeGreaterThanOrEqual(1);
+    expect(items.every((i) => i.contentType === 'Navigation')).toBe(true);
+  });
 });

@@ -19,6 +19,8 @@ const CONTENT_TABLES = [
   'Tag',
   'TagGroup',
   'Article',
+  'Link',
+  'Navigation',
 ] as const;
 
 export default defineEventHandler(async (event) => {
