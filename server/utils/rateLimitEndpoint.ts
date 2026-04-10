@@ -10,8 +10,8 @@ const MUTATION_WINDOW_MS = 60_000;
  */
 export function enforceMutationRateLimit(event: H3Event, endpoint: string) {
   const ip =
-    getRequestHeader(event, 'x-forwarded-for')?.split(',')[0]?.trim() ??
-    event.node.req.socket.remoteAddress ??
+    getRequestHeader(event, 'x-forwarded-for')?.split(',')[0]?.trim() ||
+    getRequestIP(event) ||
     'unknown';
   const key = `mut:${endpoint}:${ip}`;
   const { allowed, retryAfterMs } = rateLimit(
