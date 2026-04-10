@@ -1,8 +1,12 @@
 import type { Prisma } from '#prisma';
 import { applyContentMetadata } from '../../utils/contentUpdate';
+import { assertUuid, assertStringLength } from '../../utils/validation';
+import { withPrismaErrors } from '../../utils/prismaErrors';
+
+const NAME_MAX = 200;
 
 export default defineEventHandler(async (event) => {
-  const id = getRouterParam(event, 'id');
+  const id = assertUuid(getRouterParam(event, 'id'), 'id');
   const body = await readBody<Record<string, unknown>>(event);
 
   const existing = await prisma.navigation.findUnique({ where: { id } });
@@ -15,8 +19,9 @@ export default defineEventHandler(async (event) => {
 
   const data: Prisma.NavigationUncheckedUpdateInput = {};
   if ('name' in body) {
-    data.name = body.name as string;
-    data.entryTitle = body.name as string;
+    const name = assertStringLength(body.name, 'name', NAME_MAX);
+    data.name = name;
+    data.entryTitle = name;
   }
   applyContentMetadata(
     body,
@@ -24,34 +29,28 @@ export default defineEventHandler(async (event) => {
     existing.publishedAt
   );
 
-  try {
-    return await prisma.navigation.update({
-      where: { id },
-      data,
-      include: {
-        items: {
-          where: { parentId: null },
-          orderBy: { order: 'asc' },
-          include: {
-            link: { include: { article: true } },
-            children: {
-              orderBy: { order: 'asc' },
-              include: { link: { include: { article: true } } },
+  return await withPrismaErrors(
+    () =>
+      prisma.navigation.update({
+        where: { id },
+        data,
+        include: {
+          items: {
+            where: { parentId: null },
+            orderBy: { order: 'asc' },
+            include: {
+              link: { include: { article: true } },
+              children: {
+                orderBy: { order: 'asc' },
+                include: { link: { include: { article: true } } },
+              },
             },
           },
         },
-      },
-    });
-  } catch (err: unknown) {
-    if (
-      err instanceof Error &&
-      err.message.includes('Unique constraint failed')
-    ) {
-      throw createError({
-        statusCode: 409,
-        statusMessage: 'A navigation with this name already exists',
-      });
+      }),
+    {
+      uniqueMessage: 'A navigation with this name already exists',
+      notFoundMessage: 'Navigation not found',
     }
-    throw err;
-  }
+  );
 });

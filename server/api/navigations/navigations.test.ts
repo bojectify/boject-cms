@@ -99,5 +99,34 @@ describe('Navigation endpoints', async () => {
       );
       expect(updated.name).toBe('Main Navigation');
     });
+
+    it('rejects invalid UUID in path param', async () => {
+      const response = await fetch('/api/navigations/not-a-uuid', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: await getSessionCookie(),
+        },
+        body: JSON.stringify({ name: 'Irrelevant' }),
+      });
+      expect(response.status).toBe(400);
+    });
+
+    it('rejects a name longer than 200 chars', async () => {
+      const { items } = await $fetch<ListResponse>('/api/navigations', {
+        headers: { Authorization: `Bearer ${TEST_API_KEY}` },
+      });
+      const id = items[0]!.id;
+
+      const response = await fetch(`/api/navigations/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: await getSessionCookie(),
+        },
+        body: JSON.stringify({ name: 'A'.repeat(201) }),
+      });
+      expect(response.status).toBe(400);
+    });
   });
 });
