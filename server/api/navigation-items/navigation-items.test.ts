@@ -250,6 +250,112 @@ describe('NavigationItem endpoints', async () => {
     });
   });
 
+  describe('PUT /api/navigation-items/:id', () => {
+    it('rejects invalid UUID in path param', async () => {
+      const response = await fetch('/api/navigation-items/not-a-uuid', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: await getSessionCookie(),
+        },
+        body: JSON.stringify({ order: 1 }),
+      });
+      expect(response.status).toBe(400);
+    });
+
+    it('rejects parentId that does not belong to the same navigation', async () => {
+      // Create a top-level item to then update
+      const createRes = await fetch('/api/navigation-items', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: await getSessionCookie(),
+        },
+        body: JSON.stringify({ navigationId, linkId, order: 700 }),
+      });
+      const item = await createRes.json();
+
+      try {
+        // Try to set parentId to a UUID that doesn't exist
+        const phantom = '00000000-0000-0000-0000-00000000c0de';
+        const response = await fetch(`/api/navigation-items/${item.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: await getSessionCookie(),
+          },
+          body: JSON.stringify({ parentId: phantom }),
+        });
+        expect(response.status).toBe(400);
+      } finally {
+        await fetch(`/api/navigation-items/${item.id}`, {
+          method: 'DELETE',
+          headers: { Cookie: await getSessionCookie() },
+        });
+      }
+    });
+
+    it('rejects negative order', async () => {
+      const createRes = await fetch('/api/navigation-items', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: await getSessionCookie(),
+        },
+        body: JSON.stringify({ navigationId, linkId, order: 800 }),
+      });
+      const item = await createRes.json();
+
+      try {
+        const response = await fetch(`/api/navigation-items/${item.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: await getSessionCookie(),
+          },
+          body: JSON.stringify({ order: -1 }),
+        });
+        expect(response.status).toBe(400);
+      } finally {
+        await fetch(`/api/navigation-items/${item.id}`, {
+          method: 'DELETE',
+          headers: { Cookie: await getSessionCookie() },
+        });
+      }
+    });
+
+    it('updates order on a valid request', async () => {
+      const createRes = await fetch('/api/navigation-items', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: await getSessionCookie(),
+        },
+        body: JSON.stringify({ navigationId, linkId, order: 900 }),
+      });
+      const item = await createRes.json();
+
+      try {
+        const response = await fetch(`/api/navigation-items/${item.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: await getSessionCookie(),
+          },
+          body: JSON.stringify({ order: 950 }),
+        });
+        expect(response.status).toBe(200);
+        const body = await response.json();
+        expect(body.order).toBe(950);
+      } finally {
+        await fetch(`/api/navigation-items/${item.id}`, {
+          method: 'DELETE',
+          headers: { Cookie: await getSessionCookie() },
+        });
+      }
+    });
+  });
+
   describe('PUT /api/navigation-items/reorder', () => {
     it('bulk updates order values', async () => {
       const { items } = await $fetch<NavResponse>(
