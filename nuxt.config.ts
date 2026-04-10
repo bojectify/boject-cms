@@ -20,6 +20,17 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     databaseUrl: process.env.DATABASE_URL ?? '',
+    session: {
+      // `password` is auto-generated in dev by nuxt-auth-utils and must be
+      // provided via NUXT_SESSION_PASSWORD in production. Declared here only
+      // to satisfy the SessionConfig type on `runtimeConfig.session`.
+      password: process.env.NUXT_SESSION_PASSWORD ?? '',
+      cookie: {
+        sameSite: 'strict',
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+      },
+    },
   },
 
   vite: {
