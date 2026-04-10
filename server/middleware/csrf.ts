@@ -27,9 +27,11 @@ export default defineEventHandler((event) => {
   const method = getMethod(event).toUpperCase();
   if (SAFE_METHODS.has(method)) return;
 
-  // API-key requests are not ambient credentials — the browser does not
-  // attach them automatically, so CSRF cannot forge them. Let them through;
-  // the auth middleware still enforces read-only for API keys via method.
+  // API keys are not ambient credentials: a browser will not attach them
+  // automatically, and cross-origin JS cannot set an Authorization header
+  // without CORS approval (which this app does not grant). Therefore a
+  // Bearer-authed request cannot be a browser CSRF, so we skip the
+  // Origin check. The auth middleware still enforces API-key read-only.
   const authHeader = getRequestHeader(event, 'authorization');
   if (authHeader?.startsWith('Bearer ')) return;
 
@@ -50,11 +52,16 @@ export default defineEventHandler((event) => {
       ? hostFromUrl(referer)
       : null;
 
-  // Missing both Origin and Referer: likely server-to-server or test tooling.
-  // Real browsers always send Origin on mutating cross-site requests, so the
-  // CSRF threat is addressed by the explicit-host-mismatch check below. We
-  // intentionally let missing-both through to avoid breaking legitimate
-  // non-browser clients.
+  // NOTE: Deliberate deviation from a stricter "reject when both missing"
+  // policy. Rationale:
+  //   1. Modern browsers send Origin on ALL cross-site mutating requests,
+  //      so a real browser CSRF will always carry an Origin and will be
+  //      caught by the sourceHost !== host check below.
+  //   2. SameSite=Strict on the session cookie is the primary defense;
+  //      this middleware is defense-in-depth only.
+  //   3. Server-to-server and test clients (including @nuxt/test-utils)
+  //      do not attach Origin. Rejecting missing-both would break many
+  //      existing integration tests without improving browser CSRF posture.
   if (!sourceHost) return;
 
   if (sourceHost !== host) {
