@@ -1,7 +1,16 @@
-export default defineEventHandler(async (event) => {
-  const id = getRouterParam(event, 'id');
+import { assertUuid } from '../../utils/validation';
+import { withPrismaErrors } from '../../utils/prismaErrors';
 
-  const existing = await prisma.navigationItem.findUnique({ where: { id } });
+export default defineEventHandler(async (event) => {
+  const id = assertUuid(getRouterParam(event, 'id'), 'id');
+
+  const query = getQuery(event);
+  const navigationId = assertUuid(query.navigationId, 'navigationId');
+
+  const existing = await prisma.navigationItem.findUnique({
+    where: { id },
+    select: { id: true, navigationId: true },
+  });
   if (!existing) {
     throw createError({
       statusCode: 404,
@@ -9,6 +18,17 @@ export default defineEventHandler(async (event) => {
     });
   }
 
-  await prisma.navigationItem.delete({ where: { id } });
+  // H1: item must belong to the declared navigation
+  if (existing.navigationId !== navigationId) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'Navigation item does not belong to the given navigation',
+    });
+  }
+
+  await withPrismaErrors(
+    () => prisma.navigationItem.delete({ where: { id } }),
+    { notFoundMessage: 'Navigation item not found' }
+  );
   return { success: true };
 });

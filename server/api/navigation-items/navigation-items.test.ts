@@ -180,12 +180,13 @@ describe('NavigationItem endpoints', async () => {
         expect(response.status).toBe(400);
       } finally {
         // Clean up the parent item so it does not pollute later tests.
-        // Task 5 will require navigationId as a query param on DELETE; for
-        // now the endpoint accepts raw DELETEs.
-        await fetch(`/api/navigation-items/${parent.id}`, {
-          method: 'DELETE',
-          headers: { Cookie: await getSessionCookie() },
-        });
+        await fetch(
+          `/api/navigation-items/${parent.id}?navigationId=${navigationId}`,
+          {
+            method: 'DELETE',
+            headers: { Cookie: await getSessionCookie() },
+          }
+        );
       }
     });
 
@@ -235,10 +236,13 @@ describe('NavigationItem endpoints', async () => {
       });
       const created = await createRes.json();
 
-      const deleteRes = await fetch(`/api/navigation-items/${created.id}`, {
-        method: 'DELETE',
-        headers: { Cookie: await getSessionCookie() },
-      });
+      const deleteRes = await fetch(
+        `/api/navigation-items/${created.id}?navigationId=${navigationId}`,
+        {
+          method: 'DELETE',
+          headers: { Cookie: await getSessionCookie() },
+        }
+      );
       expect(deleteRes.status).toBe(200);
 
       // Link should still exist
@@ -247,6 +251,74 @@ describe('NavigationItem endpoints', async () => {
         { headers: { Authorization: `Bearer ${TEST_API_KEY}` } }
       );
       expect(link.id).toBe(linkId);
+    });
+
+    it('rejects invalid UUID in path param', async () => {
+      const response = await fetch('/api/navigation-items/not-a-uuid', {
+        method: 'DELETE',
+        headers: { Cookie: await getSessionCookie() },
+      });
+      expect(response.status).toBe(400);
+    });
+
+    it('rejects delete without navigationId query param', async () => {
+      const createRes = await fetch('/api/navigation-items', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: await getSessionCookie(),
+        },
+        body: JSON.stringify({ navigationId, linkId, order: 1100 }),
+      });
+      const item = await createRes.json();
+
+      try {
+        const response = await fetch(`/api/navigation-items/${item.id}`, {
+          method: 'DELETE',
+          headers: { Cookie: await getSessionCookie() },
+        });
+        expect(response.status).toBe(400);
+      } finally {
+        await fetch(
+          `/api/navigation-items/${item.id}?navigationId=${navigationId}`,
+          {
+            method: 'DELETE',
+            headers: { Cookie: await getSessionCookie() },
+          }
+        );
+      }
+    });
+
+    it('rejects delete when navigationId does not match the item', async () => {
+      const createRes = await fetch('/api/navigation-items', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: await getSessionCookie(),
+        },
+        body: JSON.stringify({ navigationId, linkId, order: 1200 }),
+      });
+      const item = await createRes.json();
+
+      try {
+        const wrongNav = '00000000-0000-0000-0000-00000000dead';
+        const response = await fetch(
+          `/api/navigation-items/${item.id}?navigationId=${wrongNav}`,
+          {
+            method: 'DELETE',
+            headers: { Cookie: await getSessionCookie() },
+          }
+        );
+        expect(response.status).toBe(400);
+      } finally {
+        await fetch(
+          `/api/navigation-items/${item.id}?navigationId=${navigationId}`,
+          {
+            method: 'DELETE',
+            headers: { Cookie: await getSessionCookie() },
+          }
+        );
+      }
     });
   });
 
@@ -288,10 +360,13 @@ describe('NavigationItem endpoints', async () => {
         });
         expect(response.status).toBe(400);
       } finally {
-        await fetch(`/api/navigation-items/${item.id}`, {
-          method: 'DELETE',
-          headers: { Cookie: await getSessionCookie() },
-        });
+        await fetch(
+          `/api/navigation-items/${item.id}?navigationId=${navigationId}`,
+          {
+            method: 'DELETE',
+            headers: { Cookie: await getSessionCookie() },
+          }
+        );
       }
     });
 
@@ -317,10 +392,13 @@ describe('NavigationItem endpoints', async () => {
         });
         expect(response.status).toBe(400);
       } finally {
-        await fetch(`/api/navigation-items/${item.id}`, {
-          method: 'DELETE',
-          headers: { Cookie: await getSessionCookie() },
-        });
+        await fetch(
+          `/api/navigation-items/${item.id}?navigationId=${navigationId}`,
+          {
+            method: 'DELETE',
+            headers: { Cookie: await getSessionCookie() },
+          }
+        );
       }
     });
 
@@ -348,10 +426,13 @@ describe('NavigationItem endpoints', async () => {
         const body = await response.json();
         expect(body.order).toBe(950);
       } finally {
-        await fetch(`/api/navigation-items/${item.id}`, {
-          method: 'DELETE',
-          headers: { Cookie: await getSessionCookie() },
-        });
+        await fetch(
+          `/api/navigation-items/${item.id}?navigationId=${navigationId}`,
+          {
+            method: 'DELETE',
+            headers: { Cookie: await getSessionCookie() },
+          }
+        );
       }
     });
   });

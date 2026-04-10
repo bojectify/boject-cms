@@ -65,7 +65,10 @@ async function addItem() {
 }
 
 async function removeItem(itemId: string) {
-  await fetch(`/api/navigation-items/${itemId}`, { method: 'DELETE' });
+  await fetch(
+    `/api/navigation-items/${itemId}?navigationId=${encodeURIComponent(id)}`,
+    { method: 'DELETE' }
+  );
   await refreshNav();
 }
 
