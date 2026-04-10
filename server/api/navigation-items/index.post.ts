@@ -52,10 +52,7 @@ export default defineEventHandler(async (event) => {
         },
         include: { link: { include: { article: true } } },
       }),
-    {
-      foreignKeyMessage: 'navigationId or linkId does not exist',
-      notFoundMessage: 'Referenced record not found',
-    }
+    { foreignKeyMessage: 'navigationId or linkId does not exist' }
   );
 
   setResponseStatus(event, 201);

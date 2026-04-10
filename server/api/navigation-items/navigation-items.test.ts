@@ -158,25 +158,35 @@ describe('NavigationItem endpoints', async () => {
       });
       const parent = await parentRes.json();
 
-      // POST a child claiming to be in a DIFFERENT navigationId but
-      // referencing the parent we just created. Even if that navigationId
-      // does not exist, the scoping check on parent.navigationId must fire
-      // first and return 400.
-      const otherNavId = '00000000-0000-0000-0000-00000000abcd';
-      const response = await fetch('/api/navigation-items', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Cookie: await getSessionCookie(),
-        },
-        body: JSON.stringify({
-          navigationId: otherNavId,
-          linkId,
-          parentId: parent.id,
-          order: 0,
-        }),
-      });
-      expect(response.status).toBe(400);
+      try {
+        // POST a child claiming to be in a DIFFERENT navigationId but
+        // referencing the parent we just created. Even if that navigationId
+        // does not exist, the scoping check on parent.navigationId must fire
+        // first and return 400.
+        const otherNavId = '00000000-0000-0000-0000-00000000abcd';
+        const response = await fetch('/api/navigation-items', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: await getSessionCookie(),
+          },
+          body: JSON.stringify({
+            navigationId: otherNavId,
+            linkId,
+            parentId: parent.id,
+            order: 0,
+          }),
+        });
+        expect(response.status).toBe(400);
+      } finally {
+        // Clean up the parent item so it does not pollute later tests.
+        // Task 5 will require navigationId as a query param on DELETE; for
+        // now the endpoint accepts raw DELETEs.
+        await fetch(`/api/navigation-items/${parent.id}`, {
+          method: 'DELETE',
+          headers: { Cookie: await getSessionCookie() },
+        });
+      }
     });
 
     it('rejects invalid UUID in navigationId', async () => {
