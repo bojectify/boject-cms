@@ -1,7 +1,9 @@
 import { assertUuid } from '../../utils/validation';
 import { withPrismaErrors } from '../../utils/prismaErrors';
+import { enforceMutationRateLimit } from '../../utils/rateLimitEndpoint';
 
 export default defineEventHandler(async (event) => {
+  enforceMutationRateLimit(event, 'navigation-items.delete');
   const id = assertUuid(getRouterParam(event, 'id'), 'id');
 
   const query = getQuery(event);

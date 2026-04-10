@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { setup, $fetch, fetch } from '@nuxt/test-utils/e2e';
+import { resetRateLimitStore } from '../../utils/rateLimit';
 
 const TEST_API_KEY = 'boject_test_key_for_integration_tests_only';
 
@@ -32,6 +33,10 @@ type ListResponse = { items: ListItem[]; total: number };
 
 describe('Navigation endpoints', async () => {
   await setup({ dev: true });
+
+  beforeEach(() => {
+    resetRateLimitStore();
+  });
 
   describe('GET /api/navigations', () => {
     it('returns all navigations', async () => {

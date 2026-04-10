@@ -1,5 +1,6 @@
 import { assertUuid, assertNonNegativeInt } from '../../utils/validation';
 import { withPrismaErrors } from '../../utils/prismaErrors';
+import { enforceMutationRateLimit } from '../../utils/rateLimitEndpoint';
 
 const MAX_REORDER_ITEMS = 500;
 
@@ -10,6 +11,7 @@ interface ReorderItem {
 }
 
 export default defineEventHandler(async (event) => {
+  enforceMutationRateLimit(event, 'navigation-items.reorder');
   const body = await readBody<{
     navigationId?: unknown;
     items?: unknown;

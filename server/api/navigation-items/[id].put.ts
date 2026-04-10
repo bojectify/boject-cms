@@ -1,7 +1,9 @@
 import { assertUuid, assertNonNegativeInt } from '../../utils/validation';
 import { withPrismaErrors } from '../../utils/prismaErrors';
+import { enforceMutationRateLimit } from '../../utils/rateLimitEndpoint';
 
 export default defineEventHandler(async (event) => {
+  enforceMutationRateLimit(event, 'navigation-items.put');
   const id = assertUuid(getRouterParam(event, 'id'), 'id');
   const body = await readBody<Record<string, unknown>>(event);
 
