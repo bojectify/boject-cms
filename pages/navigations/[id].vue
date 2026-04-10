@@ -98,7 +98,7 @@ async function moveItem(
 
   await $fetch('/api/navigation-items/reorder', {
     method: 'PUT',
-    body: { items: reordered },
+    body: { navigationId: id, items: reordered },
   });
   await refreshNav();
 }

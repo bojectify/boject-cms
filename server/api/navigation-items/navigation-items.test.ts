@@ -457,11 +457,107 @@ describe('NavigationItem endpoints', async () => {
         {
           method: 'PUT',
           headers: { Cookie: await getSessionCookie() },
-          body: { items: reordered },
+          body: { navigationId, items: reordered },
         }
       );
 
       expect(Array.isArray(updated)).toBe(true);
+    });
+
+    it('rejects missing navigationId', async () => {
+      const response = await fetch('/api/navigation-items/reorder', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: await getSessionCookie(),
+        },
+        body: JSON.stringify({
+          items: [
+            {
+              id: '00000000-0000-4000-8000-00000000beef',
+              order: 0,
+              parentId: null,
+            },
+          ],
+        }),
+      });
+      expect(response.status).toBe(400);
+    });
+
+    it('rejects a batch larger than 500 items', async () => {
+      const items = Array.from({ length: 501 }, (_, i) => ({
+        id: '00000000-0000-4000-8000-000000000000',
+        order: i,
+        parentId: null,
+      }));
+      const response = await fetch('/api/navigation-items/reorder', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: await getSessionCookie(),
+        },
+        body: JSON.stringify({ navigationId, items }),
+      });
+      expect(response.status).toBe(400);
+    });
+
+    it('rejects non-integer order values', async () => {
+      const response = await fetch('/api/navigation-items/reorder', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: await getSessionCookie(),
+        },
+        body: JSON.stringify({
+          navigationId,
+          items: [
+            {
+              id: '00000000-0000-4000-8000-000000000000',
+              order: 'zero',
+              parentId: null,
+            },
+          ],
+        }),
+      });
+      expect(response.status).toBe(400);
+    });
+
+    it('rejects items that do not belong to the given navigation', async () => {
+      // Create an item under the current navigation
+      const createRes = await fetch('/api/navigation-items', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: await getSessionCookie(),
+        },
+        body: JSON.stringify({ navigationId, linkId, order: 1400 }),
+      });
+      const item = await createRes.json();
+
+      try {
+        // Send the item under a FAKE navigationId in reorder (valid format UUID)
+        const wrongNav = '00000000-0000-4000-8000-00000000fade';
+        const response = await fetch('/api/navigation-items/reorder', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: await getSessionCookie(),
+          },
+          body: JSON.stringify({
+            navigationId: wrongNav,
+            items: [{ id: item.id, order: 0, parentId: null }],
+          }),
+        });
+        expect(response.status).toBe(400);
+      } finally {
+        await fetch(
+          `/api/navigation-items/${item.id}?navigationId=${navigationId}`,
+          {
+            method: 'DELETE',
+            headers: { Cookie: await getSessionCookie() },
+          }
+        );
+      }
     });
   });
 });
