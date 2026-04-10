@@ -1,0 +1,49 @@
+import { describe, it, expect } from 'vitest';
+import { translatePrismaError } from './prismaErrors';
+
+function fakePrismaError(code: string, message: string, meta?: unknown) {
+  const err = new Error(message);
+  (err as unknown as { code: string; meta?: unknown; name: string }).code =
+    code;
+  (err as unknown as { meta?: unknown }).meta = meta;
+  (err as unknown as { name: string }).name = 'PrismaClientKnownRequestError';
+  return err;
+}
+
+describe('translatePrismaError', () => {
+  it('maps P2002 (unique) to 409', () => {
+    const err = translatePrismaError(
+      fakePrismaError('P2002', 'Unique constraint failed', {
+        target: ['name'],
+      }),
+      { uniqueMessage: 'A navigation with this name already exists' }
+    );
+    expect((err as { statusCode: number }).statusCode).toBe(409);
+  });
+
+  it('maps P2003 (foreign key) to 400', () => {
+    const err = translatePrismaError(
+      fakePrismaError('P2003', 'Foreign key constraint failed')
+    );
+    expect((err as { statusCode: number }).statusCode).toBe(400);
+  });
+
+  it('maps P2025 (record not found) to 404', () => {
+    const err = translatePrismaError(
+      fakePrismaError('P2025', 'Record not found')
+    );
+    expect((err as { statusCode: number }).statusCode).toBe(404);
+  });
+
+  it('returns original error for unknown Prisma codes', () => {
+    const original = fakePrismaError('P9999', 'Something weird');
+    const err = translatePrismaError(original);
+    expect(err).toBe(original);
+  });
+
+  it('returns original error for non-Prisma errors', () => {
+    const original = new Error('Plain error');
+    const err = translatePrismaError(original);
+    expect(err).toBe(original);
+  });
+});
