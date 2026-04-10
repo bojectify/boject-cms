@@ -1,25 +1,39 @@
+import { assertUuid, assertNonNegativeInt } from '../../utils/validation';
+import { withPrismaErrors } from '../../utils/prismaErrors';
+
 export default defineEventHandler(async (event) => {
   const body = await readBody<Record<string, unknown>>(event);
 
-  if (!body.navigationId || typeof body.navigationId !== 'string') {
-    throw createError({
-      statusCode: 400,
-      statusMessage: 'navigationId is required',
-    });
-  }
-  if (!body.linkId || typeof body.linkId !== 'string') {
-    throw createError({
-      statusCode: 400,
-      statusMessage: 'linkId is required',
-    });
-  }
+  const navigationId = assertUuid(body.navigationId, 'navigationId');
+  const linkId = assertUuid(body.linkId, 'linkId');
+  const order = assertNonNegativeInt(body.order ?? 0, 'order');
 
-  // Enforce two-level depth
-  if (body.parentId && typeof body.parentId === 'string') {
+  let parentId: string | null = null;
+  if (body.parentId != null && body.parentId !== '') {
+    parentId = assertUuid(body.parentId, 'parentId');
+
     const parent = await prisma.navigationItem.findUnique({
-      where: { id: body.parentId },
+      where: { id: parentId },
+      select: { id: true, navigationId: true, parentId: true },
     });
-    if (parent?.parentId) {
+
+    if (!parent) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: 'parentId does not exist',
+      });
+    }
+
+    // H1: parent must belong to the same navigation
+    if (parent.navigationId !== navigationId) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: 'parentId does not belong to the same navigation',
+      });
+    }
+
+    // Two-level depth rule
+    if (parent.parentId) {
       throw createError({
         statusCode: 400,
         statusMessage: 'Cannot nest more than two levels deep',
@@ -27,15 +41,23 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  const created = await prisma.navigationItem.create({
-    data: {
-      navigationId: body.navigationId as string,
-      linkId: body.linkId as string,
-      parentId: (body.parentId as string) || null,
-      order: typeof body.order === 'number' ? body.order : 0,
-    },
-    include: { link: { include: { article: true } } },
-  });
+  const created = await withPrismaErrors(
+    () =>
+      prisma.navigationItem.create({
+        data: {
+          navigationId,
+          linkId,
+          parentId,
+          order,
+        },
+        include: { link: { include: { article: true } } },
+      }),
+    {
+      foreignKeyMessage: 'navigationId or linkId does not exist',
+      notFoundMessage: 'Referenced record not found',
+    }
+  );
+
   setResponseStatus(event, 201);
   return created;
 });

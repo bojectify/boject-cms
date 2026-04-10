@@ -145,6 +145,71 @@ describe('NavigationItem endpoints', async () => {
 
       expect(response.status).toBe(400);
     });
+
+    it('rejects parentId that does not belong to the same navigation', async () => {
+      // Create a parent item under the current (seeded) navigation.
+      const parentRes = await fetch('/api/navigation-items', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: await getSessionCookie(),
+        },
+        body: JSON.stringify({ navigationId, linkId, order: 500 }),
+      });
+      const parent = await parentRes.json();
+
+      // POST a child claiming to be in a DIFFERENT navigationId but
+      // referencing the parent we just created. Even if that navigationId
+      // does not exist, the scoping check on parent.navigationId must fire
+      // first and return 400.
+      const otherNavId = '00000000-0000-0000-0000-00000000abcd';
+      const response = await fetch('/api/navigation-items', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: await getSessionCookie(),
+        },
+        body: JSON.stringify({
+          navigationId: otherNavId,
+          linkId,
+          parentId: parent.id,
+          order: 0,
+        }),
+      });
+      expect(response.status).toBe(400);
+    });
+
+    it('rejects invalid UUID in navigationId', async () => {
+      const response = await fetch('/api/navigation-items', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: await getSessionCookie(),
+        },
+        body: JSON.stringify({
+          navigationId: 'not-a-uuid',
+          linkId,
+          order: 0,
+        }),
+      });
+      expect(response.status).toBe(400);
+    });
+
+    it('rejects non-integer order', async () => {
+      const response = await fetch('/api/navigation-items', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: await getSessionCookie(),
+        },
+        body: JSON.stringify({
+          navigationId,
+          linkId,
+          order: 1.5,
+        }),
+      });
+      expect(response.status).toBe(400);
+    });
   });
 
   describe('DELETE /api/navigation-items/:id', () => {
