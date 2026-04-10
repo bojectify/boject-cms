@@ -217,4 +217,21 @@ export const ArticleWhere = builder.prismaWhere('Article', {
   } as never,
 });
 
+export const LinkWhere = builder.prismaWhere('Link', {
+  fields: {
+    entryTitle: StringFilter,
+    label: StringFilter,
+    url: StringFilter,
+    status: ContentStatusFilter,
+  },
+});
+
+export const NavigationWhere = builder.prismaWhere('Navigation', {
+  fields: {
+    entryTitle: StringFilter,
+    name: StringFilter,
+    status: ContentStatusFilter,
+  },
+});
+
 export const _registered = true;

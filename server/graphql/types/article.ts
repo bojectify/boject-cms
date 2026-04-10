@@ -2,7 +2,7 @@ import { builder } from '../builder';
 import { TagWhere } from '../filters';
 import { contentMetadataFields } from './contentFields';
 
-builder.prismaObject('Article', {
+export const ArticleRef = builder.prismaObject('Article', {
   fields: (t) => ({
     id: t.exposeID('id'),
     title: t.exposeString('title'),

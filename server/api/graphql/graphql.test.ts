@@ -462,6 +462,149 @@ describe('GraphQL API', async () => {
     });
   });
 
+  describe('Link queries', () => {
+    it('fetches links with internalLink union', async () => {
+      const { data } = await gql<{
+        links: Connection<{
+          id: string;
+          label: string;
+          url: string | null;
+          openInNewTab: boolean;
+          internalLink: {
+            __typename: string;
+            slug?: string;
+            title?: string;
+          } | null;
+        }>;
+      }>(`{
+        links(first: 10) {
+          edges {
+            node {
+              id
+              label
+              url
+              openInNewTab
+              internalLink {
+                __typename
+                ... on Article {
+                  slug
+                  title
+                }
+              }
+            }
+          }
+        }
+      }`);
+      expect(data.links.edges.length).toBeGreaterThanOrEqual(1);
+      const node = data.links.edges[0]!.node;
+      expect(node.label).toBeDefined();
+    });
+
+    it('fetches a single link by id', async () => {
+      const { data: listData } = await gql<{
+        links: Connection<{ id: string }>;
+      }>(`{
+        links(first: 1) { edges { node { id } } }
+      }`);
+      const id = listData.links.edges[0]!.node.id;
+      const { data } = await gql<{
+        link: {
+          id: string;
+          label: string;
+          internalLink: { __typename: string } | null;
+        };
+      }>(`{
+        link(id: "${id}") {
+          id
+          label
+          internalLink {
+            __typename
+          }
+        }
+      }`);
+      expect(data.link.id).toBe(id);
+    });
+  });
+
+  describe('Navigation queries', () => {
+    it('fetches navigations with nested items and links', async () => {
+      const { data } = await gql<{
+        navigations: Connection<{
+          id: string;
+          name: string;
+          items: Connection<{
+            order: number;
+            link: {
+              label: string;
+              url: string | null;
+              internalLink: { __typename: string; slug?: string } | null;
+            };
+            children: Connection<{
+              order: number;
+              link: { label: string; url: string | null };
+            }>;
+          }>;
+        }>;
+      }>(`{
+        navigations(first: 1) {
+          edges {
+            node {
+              id
+              name
+              items(first: 50) {
+                edges {
+                  node {
+                    order
+                    link {
+                      label
+                      url
+                      internalLink {
+                        __typename
+                        ... on Article {
+                          slug
+                        }
+                      }
+                    }
+                    children(first: 20) {
+                      edges {
+                        node {
+                          order
+                          link { label url }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }`);
+      expect(data.navigations.edges.length).toBeGreaterThanOrEqual(1);
+      const nav = data.navigations.edges[0]!.node;
+      expect(nav.name).toBeDefined();
+      expect(nav.items.edges.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('fetches a single navigation by id', async () => {
+      const { data: listData } = await gql<{
+        navigations: Connection<{ id: string }>;
+      }>(`{
+        navigations(first: 1) { edges { node { id } } }
+      }`);
+      const id = listData.navigations.edges[0]!.node.id;
+      const { data } = await gql<{
+        navigation: { id: string; name: string };
+      }>(`{
+        navigation(id: "${id}") {
+          id
+          name
+        }
+      }`);
+      expect(data.navigation.id).toBe(id);
+    });
+  });
+
   // ── Authentication ──────────────────────────────────────────
 
   describe('authentication', () => {

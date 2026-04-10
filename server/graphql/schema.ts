@@ -18,6 +18,9 @@ import { _registered as _author } from './types/author';
 import { _registered as _tagGroup } from './types/tagGroup';
 import { _registered as _tag } from './types/tag';
 import { _registered as _article } from './types/article';
+import { _registered as _link } from './types/link';
+import { _registered as _navigationItem } from './types/navigationItem';
+import { _registered as _navigation } from './types/navigation';
 import { _registered as _query } from './query/index';
 
 // Reference imports to ensure they're not stripped
@@ -39,6 +42,9 @@ void [
   _tagGroup,
   _tag,
   _article,
+  _link,
+  _navigationItem,
+  _navigation,
   _query,
 ];
 
