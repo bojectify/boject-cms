@@ -527,6 +527,107 @@ describe('NavigationItem endpoints', async () => {
       expect(response.status).toBe(400);
     });
 
+    it('rejects reorder that would nest beyond two levels', async () => {
+      // Create a parent and a child under the current navigation
+      const parentRes = await fetch('/api/navigation-items', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: await getSessionCookie(),
+        },
+        body: JSON.stringify({ navigationId, linkId, order: 1500 }),
+      });
+      const parent = await parentRes.json();
+
+      const childRes = await fetch('/api/navigation-items', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: await getSessionCookie(),
+        },
+        body: JSON.stringify({
+          navigationId,
+          linkId,
+          parentId: parent.id,
+          order: 0,
+        }),
+      });
+      const child = await childRes.json();
+
+      // Create a third item that the attacker wants to nest under the child
+      // (which would make it depth-3)
+      const grandchildRes = await fetch('/api/navigation-items', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: await getSessionCookie(),
+        },
+        body: JSON.stringify({ navigationId, linkId, order: 1600 }),
+      });
+      const grandchild = await grandchildRes.json();
+
+      try {
+        const response = await fetch('/api/navigation-items/reorder', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: await getSessionCookie(),
+          },
+          body: JSON.stringify({
+            navigationId,
+            items: [{ id: grandchild.id, order: 0, parentId: child.id }],
+          }),
+        });
+        expect(response.status).toBe(400);
+      } finally {
+        // Cleanup in reverse order (child parent last)
+        await fetch(
+          `/api/navigation-items/${grandchild.id}?navigationId=${navigationId}`,
+          { method: 'DELETE', headers: { Cookie: await getSessionCookie() } }
+        );
+        await fetch(
+          `/api/navigation-items/${child.id}?navigationId=${navigationId}`,
+          { method: 'DELETE', headers: { Cookie: await getSessionCookie() } }
+        );
+        await fetch(
+          `/api/navigation-items/${parent.id}?navigationId=${navigationId}`,
+          { method: 'DELETE', headers: { Cookie: await getSessionCookie() } }
+        );
+      }
+    });
+
+    it('rejects reorder that self-parents an item', async () => {
+      const createRes = await fetch('/api/navigation-items', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: await getSessionCookie(),
+        },
+        body: JSON.stringify({ navigationId, linkId, order: 1700 }),
+      });
+      const item = await createRes.json();
+
+      try {
+        const response = await fetch('/api/navigation-items/reorder', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: await getSessionCookie(),
+          },
+          body: JSON.stringify({
+            navigationId,
+            items: [{ id: item.id, order: 0, parentId: item.id }],
+          }),
+        });
+        expect(response.status).toBe(400);
+      } finally {
+        await fetch(
+          `/api/navigation-items/${item.id}?navigationId=${navigationId}`,
+          { method: 'DELETE', headers: { Cookie: await getSessionCookie() } }
+        );
+      }
+    });
+
     it('rejects items that do not belong to the given navigation', async () => {
       // Create an item under the current navigation
       const createRes = await fetch('/api/navigation-items', {

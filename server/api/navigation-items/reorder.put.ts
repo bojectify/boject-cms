@@ -47,6 +47,12 @@ export default defineEventHandler(async (event) => {
     let parentId: string | null = null;
     if (item.parentId != null && item.parentId !== '') {
       parentId = assertUuid(item.parentId, `items[${idx}].parentId`);
+      if (parentId === id) {
+        throw createError({
+          statusCode: 400,
+          statusMessage: `items[${idx}] cannot be its own parent`,
+        });
+      }
     }
 
     return { id, order, parentId };
@@ -79,13 +85,20 @@ export default defineEventHandler(async (event) => {
   if (parentIds.length > 0) {
     const parents = await prisma.navigationItem.findMany({
       where: { id: { in: parentIds }, navigationId },
-      select: { id: true },
+      select: { id: true, parentId: true },
     });
     if (parents.length !== parentIds.length) {
       throw createError({
         statusCode: 400,
         statusMessage:
           'one or more parentIds do not belong to the given navigation',
+      });
+    }
+    // Two-level depth rule: a parent cannot itself be a child.
+    if (parents.some((p) => p.parentId !== null)) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: 'Cannot nest more than two levels deep',
       });
     }
   }

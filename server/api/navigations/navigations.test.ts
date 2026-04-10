@@ -133,5 +133,22 @@ describe('Navigation endpoints', async () => {
       });
       expect(response.status).toBe(400);
     });
+
+    it('rejects an entryTitle longer than 200 chars', async () => {
+      const { items } = await $fetch<ListResponse>('/api/navigations', {
+        headers: { Authorization: `Bearer ${TEST_API_KEY}` },
+      });
+      const id = items[0]!.id;
+
+      const response = await fetch(`/api/navigations/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: await getSessionCookie(),
+        },
+        body: JSON.stringify({ name: 'short', entryTitle: 'A'.repeat(201) }),
+      });
+      expect(response.status).toBe(400);
+    });
   });
 });

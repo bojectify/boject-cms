@@ -30,6 +30,11 @@ export default defineEventHandler(async (event) => {
     data as Record<string, unknown>,
     existing.publishedAt
   );
+  // applyContentMetadata can overwrite entryTitle from the request body,
+  // bypassing the length cap above. Re-validate the final value.
+  if (typeof data.entryTitle === 'string') {
+    assertStringLength(data.entryTitle, 'entryTitle', NAME_MAX);
+  }
 
   return await withPrismaErrors(
     () =>
