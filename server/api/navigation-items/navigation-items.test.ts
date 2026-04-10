@@ -163,7 +163,7 @@ describe('NavigationItem endpoints', async () => {
         // referencing the parent we just created. Even if that navigationId
         // does not exist, the scoping check on parent.navigationId must fire
         // first and return 400.
-        const otherNavId = '00000000-0000-0000-0000-00000000abcd';
+        const otherNavId = '00000000-0000-4000-8000-00000000abcd';
         const response = await fetch('/api/navigation-items', {
           method: 'POST',
           headers: {
@@ -301,7 +301,7 @@ describe('NavigationItem endpoints', async () => {
       const item = await createRes.json();
 
       try {
-        const wrongNav = '00000000-0000-0000-0000-00000000dead';
+        const wrongNav = '00000000-0000-4000-8000-00000000dead';
         const response = await fetch(
           `/api/navigation-items/${item.id}?navigationId=${wrongNav}`,
           {
@@ -349,7 +349,7 @@ describe('NavigationItem endpoints', async () => {
 
       try {
         // Use a UUID that is well-formed but does not exist in any navigation.
-        const phantom = '00000000-0000-0000-0000-00000000c0de';
+        const phantom = '00000000-0000-4000-8000-00000000c0de';
         const response = await fetch(`/api/navigation-items/${item.id}`, {
           method: 'PUT',
           headers: {
