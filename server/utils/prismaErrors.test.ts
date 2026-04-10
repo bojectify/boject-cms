@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { translatePrismaError } from './prismaErrors';
+import { translatePrismaError, withPrismaErrors } from './prismaErrors';
 
 function fakePrismaError(code: string, message: string, meta?: unknown) {
   const err = new Error(message);
@@ -45,5 +45,22 @@ describe('translatePrismaError', () => {
     const original = new Error('Plain error');
     const err = translatePrismaError(original);
     expect(err).toBe(original);
+  });
+});
+
+describe('withPrismaErrors', () => {
+  it('re-throws translated H3 error for P2002', async () => {
+    await expect(
+      withPrismaErrors(
+        () => Promise.reject(fakePrismaError('P2002', 'Unique constraint')),
+        { uniqueMessage: 'Already exists' }
+      )
+    ).rejects.toMatchObject({ statusCode: 409 });
+  });
+
+  it('passes through non-object thrown values', async () => {
+    await expect(
+      withPrismaErrors(() => Promise.reject('plain string'))
+    ).rejects.toBe('plain string');
   });
 });

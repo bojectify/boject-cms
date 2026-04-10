@@ -6,13 +6,15 @@ type PrismaLikeError = {
   message?: string;
 };
 
+const PRISMA_CODE_RE = /^P\d{4}$/;
+
 function isPrismaError(err: unknown): err is PrismaLikeError {
   return (
     typeof err === 'object' &&
     err !== null &&
     'code' in err &&
     typeof (err as { code: unknown }).code === 'string' &&
-    (err as { code: string }).code.startsWith('P')
+    PRISMA_CODE_RE.test((err as { code: string }).code)
   );
 }
 
