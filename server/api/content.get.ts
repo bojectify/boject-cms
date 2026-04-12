@@ -45,9 +45,9 @@ export default defineEventHandler(async (event) => {
     if (STATIC_TABLE_SET.has(query.contentType)) {
       staticContentType = query.contentType;
     } else {
-      // Check if it matches a dynamic ContentType name
+      // Check if it matches a dynamic ContentType identifier
       const ct = await prisma.contentType.findUnique({
-        where: { name: query.contentType },
+        where: { identifier: query.contentType },
         select: { id: true, name: true },
       });
       if (ct) {
@@ -97,7 +97,7 @@ export default defineEventHandler(async (event) => {
         : '';
 
     subqueries.push(
-      `SELECT ce.id, COALESCE(ce.data ->> etf.name, 'Untitled') AS "entryTitle", ce.status::text, ce."createdAt", ce."updatedAt", ct.name AS "contentType" FROM "ContentEntry" ce JOIN "ContentType" ct ON ce."contentTypeId" = ct.id LEFT JOIN "ContentTypeField" etf ON etf."contentTypeId" = ct.id AND etf.type = 'ENTRY_TITLE'${dynamicWhere}`
+      `SELECT ce.id, COALESCE(ce.data ->> etf.identifier, 'Untitled') AS "entryTitle", ce.status::text, ce."createdAt", ce."updatedAt", ct.name AS "contentType" FROM "ContentEntry" ce JOIN "ContentType" ct ON ce."contentTypeId" = ct.id LEFT JOIN "ContentTypeField" etf ON etf."contentTypeId" = ct.id AND etf.type = 'ENTRY_TITLE'${dynamicWhere}`
     );
   }
 

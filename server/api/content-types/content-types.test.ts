@@ -24,11 +24,12 @@ async function getSessionCookie(): Promise<string> {
 type ContentTypeResponse = {
   id: string;
   name: string;
+  identifier: string;
   description: string | null;
   fields: Array<{
     id: string;
+    identifier: string;
     name: string;
-    label: string;
     type: string;
     required: boolean;
     order: number;
@@ -38,8 +39,8 @@ type ContentTypeResponse = {
 
 type FieldResponse = {
   id: string;
+  identifier: string;
   name: string;
-  label: string;
   type: string;
   required: boolean;
   order: number;
@@ -69,12 +70,12 @@ describe('Content Type endpoints', async () => {
           description: 'A test content type',
           fields: [
             {
-              name: 'title',
-              label: 'Title',
+              identifier: 'title',
+              name: 'Title',
               type: 'ENTRY_TITLE',
               required: true,
             },
-            { name: 'body', label: 'Body', type: 'TEXTAREA' },
+            { identifier: 'body', name: 'Body', type: 'TEXTAREA' },
           ],
         },
       });
@@ -92,7 +93,7 @@ describe('Content Type endpoints', async () => {
         headers: { cookie, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: `No Title ${Date.now()}`,
-          fields: [{ name: 'body', label: 'Body', type: 'TEXT' }],
+          fields: [{ identifier: 'body', name: 'Body', type: 'TEXT' }],
         }),
       });
       expect(res.status).toBe(400);
@@ -108,8 +109,8 @@ describe('Content Type endpoints', async () => {
           name,
           fields: [
             {
-              name: 'title',
-              label: 'Title',
+              identifier: 'title',
+              name: 'Title',
               type: 'ENTRY_TITLE',
               required: true,
             },
@@ -123,8 +124,8 @@ describe('Content Type endpoints', async () => {
           name,
           fields: [
             {
-              name: 'title',
-              label: 'Title',
+              identifier: 'title',
+              name: 'Title',
               type: 'ENTRY_TITLE',
               required: true,
             },
@@ -134,7 +135,7 @@ describe('Content Type endpoints', async () => {
       expect(res.status).toBe(409);
     });
 
-    it('rejects duplicate field names', async () => {
+    it('rejects duplicate field identifiers', async () => {
       const cookie = await getSessionCookie();
       const res = await fetch('/api/content-types', {
         method: 'POST',
@@ -143,19 +144,19 @@ describe('Content Type endpoints', async () => {
           name: `Dup Fields ${Date.now()}`,
           fields: [
             {
-              name: 'title',
-              label: 'Title',
+              identifier: 'title',
+              name: 'Title',
               type: 'ENTRY_TITLE',
               required: true,
             },
-            { name: 'title', label: 'Title 2', type: 'TEXT' },
+            { identifier: 'title', name: 'Title 2', type: 'TEXT' },
           ],
         }),
       });
       expect(res.status).toBe(400);
     });
 
-    it('rejects invalid field name format', async () => {
+    it('rejects invalid field identifier format', async () => {
       const cookie = await getSessionCookie();
       const res = await fetch('/api/content-types', {
         method: 'POST',
@@ -164,8 +165,8 @@ describe('Content Type endpoints', async () => {
           name: `Bad Name ${Date.now()}`,
           fields: [
             {
+              identifier: 'Title',
               name: 'Title',
-              label: 'Title',
               type: 'ENTRY_TITLE',
               required: true,
             },
@@ -184,13 +185,13 @@ describe('Content Type endpoints', async () => {
           name: `Two Slugs ${Date.now()}`,
           fields: [
             {
-              name: 'title',
-              label: 'Title',
+              identifier: 'title',
+              name: 'Title',
               type: 'ENTRY_TITLE',
               required: true,
             },
-            { name: 'slug', label: 'Slug', type: 'SLUG' },
-            { name: 'slug2', label: 'Slug 2', type: 'SLUG' },
+            { identifier: 'slug', name: 'Slug', type: 'SLUG' },
+            { identifier: 'slug2', name: 'Slug 2', type: 'SLUG' },
           ],
         }),
       });
@@ -221,13 +222,13 @@ describe('Content Type endpoints', async () => {
           name: `Detail Type ${Date.now()}`,
           fields: [
             {
-              name: 'title',
-              label: 'Title',
+              identifier: 'title',
+              name: 'Title',
               type: 'ENTRY_TITLE',
               required: true,
             },
-            { name: 'summary', label: 'Summary', type: 'TEXT' },
-            { name: 'count', label: 'Count', type: 'NUMBER' },
+            { identifier: 'summary', name: 'Summary', type: 'TEXT' },
+            { identifier: 'count', name: 'Count', type: 'NUMBER' },
           ],
         },
       });
@@ -264,8 +265,8 @@ describe('Content Type endpoints', async () => {
           name: `Update Type ${Date.now()}`,
           fields: [
             {
-              name: 'title',
-              label: 'Title',
+              identifier: 'title',
+              name: 'Title',
               type: 'ENTRY_TITLE',
               required: true,
             },
@@ -294,8 +295,8 @@ describe('Content Type endpoints', async () => {
           name: `Delete Type ${Date.now()}`,
           fields: [
             {
-              name: 'title',
-              label: 'Title',
+              identifier: 'title',
+              name: 'Title',
               type: 'ENTRY_TITLE',
               required: true,
             },
@@ -320,8 +321,8 @@ describe('Content Type endpoints', async () => {
           name: `Field Add ${Date.now()}`,
           fields: [
             {
-              name: 'title',
-              label: 'Title',
+              identifier: 'title',
+              name: 'Title',
               type: 'ENTRY_TITLE',
               required: true,
             },
@@ -334,11 +335,11 @@ describe('Content Type endpoints', async () => {
         {
           method: 'POST',
           headers: { cookie },
-          body: { name: 'summary', label: 'Summary', type: 'TEXT' },
+          body: { identifier: 'summary', name: 'Summary', type: 'TEXT' },
         }
       );
       expect(field.id).toBeDefined();
-      expect(field.name).toBe('summary');
+      expect(field.identifier).toBe('summary');
       expect(field.order).toBe(1);
     });
 
@@ -351,8 +352,8 @@ describe('Content Type endpoints', async () => {
           name: `Field Dup ET ${Date.now()}`,
           fields: [
             {
-              name: 'title',
-              label: 'Title',
+              identifier: 'title',
+              name: 'Title',
               type: 'ENTRY_TITLE',
               required: true,
             },
@@ -364,8 +365,8 @@ describe('Content Type endpoints', async () => {
         method: 'POST',
         headers: { cookie, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: 'title2',
-          label: 'Title 2',
+          identifier: 'title2',
+          name: 'Title 2',
           type: 'ENTRY_TITLE',
         }),
       });
@@ -381,12 +382,12 @@ describe('Content Type endpoints', async () => {
           name: `Field Dup Slug ${Date.now()}`,
           fields: [
             {
-              name: 'title',
-              label: 'Title',
+              identifier: 'title',
+              name: 'Title',
               type: 'ENTRY_TITLE',
               required: true,
             },
-            { name: 'slug', label: 'Slug', type: 'SLUG' },
+            { identifier: 'slug', name: 'Slug', type: 'SLUG' },
           ],
         },
       });
@@ -395,15 +396,15 @@ describe('Content Type endpoints', async () => {
         method: 'POST',
         headers: { cookie, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: 'slug2',
-          label: 'Slug 2',
+          identifier: 'slug2',
+          name: 'Slug 2',
           type: 'SLUG',
         }),
       });
       expect(res.status).toBe(400);
     });
 
-    it('rejects invalid field name format', async () => {
+    it('rejects invalid field identifier format', async () => {
       const cookie = await getSessionCookie();
       const ct = await $fetch<ContentTypeResponse>('/api/content-types', {
         method: 'POST',
@@ -412,8 +413,8 @@ describe('Content Type endpoints', async () => {
           name: `Field Bad Name ${Date.now()}`,
           fields: [
             {
-              name: 'title',
-              label: 'Title',
+              identifier: 'title',
+              name: 'Title',
               type: 'ENTRY_TITLE',
               required: true,
             },
@@ -425,15 +426,15 @@ describe('Content Type endpoints', async () => {
         method: 'POST',
         headers: { cookie, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: 'BadName',
-          label: 'Bad',
+          identifier: 'BadName',
+          name: 'Bad',
           type: 'TEXT',
         }),
       });
       expect(res.status).toBe(400);
     });
 
-    it('rejects duplicate field name', async () => {
+    it('rejects duplicate field identifier', async () => {
       const cookie = await getSessionCookie();
       const ct = await $fetch<ContentTypeResponse>('/api/content-types', {
         method: 'POST',
@@ -442,8 +443,8 @@ describe('Content Type endpoints', async () => {
           name: `Field Dup Name ${Date.now()}`,
           fields: [
             {
-              name: 'title',
-              label: 'Title',
+              identifier: 'title',
+              name: 'Title',
               type: 'ENTRY_TITLE',
               required: true,
             },
@@ -455,8 +456,8 @@ describe('Content Type endpoints', async () => {
         method: 'POST',
         headers: { cookie, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: 'title',
-          label: 'Title Dup',
+          identifier: 'title',
+          name: 'Title Dup',
           type: 'TEXT',
         }),
       });
@@ -465,7 +466,7 @@ describe('Content Type endpoints', async () => {
   });
 
   describe('PUT /api/content-types/[id]/fields/[fieldId]', () => {
-    it('updates label and required', async () => {
+    it('updates name and required', async () => {
       const cookie = await getSessionCookie();
       const ct = await $fetch<ContentTypeResponse>('/api/content-types', {
         method: 'POST',
@@ -474,12 +475,12 @@ describe('Content Type endpoints', async () => {
           name: `Field Update ${Date.now()}`,
           fields: [
             {
-              name: 'title',
-              label: 'Title',
+              identifier: 'title',
+              name: 'Title',
               type: 'ENTRY_TITLE',
               required: true,
             },
-            { name: 'body', label: 'Body', type: 'TEXTAREA' },
+            { identifier: 'body', name: 'Body', type: 'TEXTAREA' },
           ],
         },
       });
@@ -490,10 +491,10 @@ describe('Content Type endpoints', async () => {
         {
           method: 'PUT',
           headers: { cookie },
-          body: { label: 'Content Body', required: true },
+          body: { name: 'Content Body', required: true },
         }
       );
-      expect(updated.label).toBe('Content Body');
+      expect(updated.name).toBe('Content Body');
       expect(updated.required).toBe(true);
     });
 
@@ -506,12 +507,12 @@ describe('Content Type endpoints', async () => {
           name: `Field Type Change ${Date.now()}`,
           fields: [
             {
-              name: 'title',
-              label: 'Title',
+              identifier: 'title',
+              name: 'Title',
               type: 'ENTRY_TITLE',
               required: true,
             },
-            { name: 'count', label: 'Count', type: 'NUMBER' },
+            { identifier: 'count', name: 'Count', type: 'NUMBER' },
           ],
         },
       });
@@ -537,8 +538,8 @@ describe('Content Type endpoints', async () => {
           name: `Field Wrong CT ${Date.now()}`,
           fields: [
             {
-              name: 'title',
-              label: 'Title',
+              identifier: 'title',
+              name: 'Title',
               type: 'ENTRY_TITLE',
               required: true,
             },
@@ -551,7 +552,7 @@ describe('Content Type endpoints', async () => {
         {
           method: 'PUT',
           headers: { cookie, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ label: 'Nope' }),
+          body: JSON.stringify({ name: 'Nope' }),
         }
       );
       expect(res.status).toBe(404);
@@ -568,12 +569,12 @@ describe('Content Type endpoints', async () => {
           name: `Field Delete ${Date.now()}`,
           fields: [
             {
-              name: 'title',
-              label: 'Title',
+              identifier: 'title',
+              name: 'Title',
               type: 'ENTRY_TITLE',
               required: true,
             },
-            { name: 'extra', label: 'Extra', type: 'TEXT' },
+            { identifier: 'extra', name: 'Extra', type: 'TEXT' },
           ],
         },
       });
@@ -597,8 +598,8 @@ describe('Content Type endpoints', async () => {
           name: `Field Del ET ${Date.now()}`,
           fields: [
             {
-              name: 'title',
-              label: 'Title',
+              identifier: 'title',
+              name: 'Title',
               type: 'ENTRY_TITLE',
               required: true,
             },
@@ -623,8 +624,8 @@ describe('Content Type endpoints', async () => {
           name: `Field Del 404 ${Date.now()}`,
           fields: [
             {
-              name: 'title',
-              label: 'Title',
+              identifier: 'title',
+              name: 'Title',
               type: 'ENTRY_TITLE',
               required: true,
             },
@@ -653,13 +654,13 @@ describe('Content Type endpoints', async () => {
           name: `Field Reorder ${Date.now()}`,
           fields: [
             {
-              name: 'title',
-              label: 'Title',
+              identifier: 'title',
+              name: 'Title',
               type: 'ENTRY_TITLE',
               required: true,
             },
-            { name: 'summary', label: 'Summary', type: 'TEXT' },
-            { name: 'count', label: 'Count', type: 'NUMBER' },
+            { identifier: 'summary', name: 'Summary', type: 'TEXT' },
+            { identifier: 'count', name: 'Count', type: 'NUMBER' },
           ],
         },
       });
@@ -684,11 +685,11 @@ describe('Content Type endpoints', async () => {
           headers: { Authorization: `Bearer ${TEST_API_KEY}` },
         }
       );
-      expect(fetched.fields[0]!.name).toBe('count');
+      expect(fetched.fields[0]!.identifier).toBe('count');
       expect(fetched.fields[0]!.order).toBe(0);
-      expect(fetched.fields[1]!.name).toBe('summary');
+      expect(fetched.fields[1]!.identifier).toBe('summary');
       expect(fetched.fields[1]!.order).toBe(1);
-      expect(fetched.fields[2]!.name).toBe('title');
+      expect(fetched.fields[2]!.identifier).toBe('title');
       expect(fetched.fields[2]!.order).toBe(2);
     });
 
@@ -701,8 +702,8 @@ describe('Content Type endpoints', async () => {
           name: `Field Reorder Bad ${Date.now()}`,
           fields: [
             {
-              name: 'title',
-              label: 'Title',
+              identifier: 'title',
+              name: 'Title',
               type: 'ENTRY_TITLE',
               required: true,
             },

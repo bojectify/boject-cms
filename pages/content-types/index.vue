@@ -9,6 +9,7 @@ const { data, status } = await useFetch<{
   items: Array<{
     id: string;
     name: string;
+    identifier: string;
     description: string | null;
     createdAt: string;
     updatedAt: string;
@@ -22,6 +23,7 @@ const { data, status } = await useFetch<{
 
 const columns: TableColumn<Record<string, unknown>>[] = [
   { accessorKey: 'name', header: 'Name' },
+  { accessorKey: 'identifier', header: 'Identifier' },
   { accessorKey: 'fieldCount', header: 'Fields' },
   { accessorKey: 'entryCount', header: 'Entries' },
   { accessorKey: 'updatedAt', header: 'Updated' },
@@ -31,6 +33,7 @@ const tableData = computed(() =>
   (data.value?.items ?? []).map((item) => ({
     id: item.id,
     name: item.name,
+    identifier: item.identifier,
     fieldCount: item._count.fields,
     entryCount: item._count.entries,
     updatedAt: item.updatedAt,

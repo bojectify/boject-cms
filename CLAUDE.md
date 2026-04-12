@@ -43,7 +43,7 @@ Note: `prisma migrate dev` requires an interactive terminal. When running from a
 - **Local PostgreSQL** — `docker-compose.yml` runs Postgres 17 on port 5432 (user: `boject`, password: `boject`, db: `boject`). Data persists in a Docker volume (`pgdata`). `DATABASE_URL` in `.env` should be `postgresql://boject:boject@localhost:5432/boject`.
 - **Environment variables** — `.env` is loaded automatically by Nuxt in development. `prisma.config.ts` retains its own `import 'dotenv/config'` for CLI-only use (migrations, generation). `DATABASE_URL` is accessed via `process.env` in server code.
 - **Nuxt UI** — Component library (Tailwind CSS v4 + Reka UI primitives). Registered as a Nuxt module. CSS imported via `assets/css/main.css`. `app.vue` wraps pages in `<UApp>` with `<NuxtLayout>` (required for toasts, tooltips, overlays).
-- **Dashboard layout** — `layouts/default.vue` uses `UDashboardGroup`, `UDashboardSidebar`, and `UDashboardPanel` to provide a sidebar navigation across all CMS pages. The sidebar contains a `UNavigationMenu` (vertical orientation) with links to All Content (index) and all per-model listing pages. Active page is highlighted automatically via `to` prop matching. The panel has a `UDashboardNavbar` in its `#header` slot with a `UDashboardSidebarCollapse` toggle (mobile) on the left and a user `UDropdownMenu` (triggered by `UAvatar` showing initials) on the right. The dropdown shows the user's full name and a logout action. Page content renders in the panel's `#body` slot for scrollability.
+- **Dashboard layout** — `layouts/default.vue` uses `UDashboardGroup`, `UDashboardSidebar`, and `UDashboardPanel` to provide a sidebar navigation across all CMS pages. The sidebar contains a `UNavigationMenu` (vertical orientation) with links to All Content (index) and all per-model listing pages, followed by a separator and a second `UNavigationMenu` with dynamically rendered links for "Content Types" management and per-type entry listings (fetched from `/api/content-types`). Active page is highlighted automatically via `to` prop matching. The panel has a `UDashboardNavbar` in its `#header` slot with a `UDashboardSidebarCollapse` toggle (mobile) on the left and a user `UDropdownMenu` (triggered by `UAvatar` showing initials) on the right. The dropdown shows the user's full name and a logout action. Page content renders in the panel's `#body` slot for scrollability.
 - **ContentTable component** — Reusable table wrapper (`components/ContentTable.vue`) around UTable. Provides standard columns (entryTitle, createdAt, updatedAt, status) with built-in date formatting and status badges. Pages pass `title`, `data`, `loading`, and optional extra `columns` which are inserted after entryTitle. Extra scoped slots are forwarded to UTable. Uses `useContentTable` composable for shared `formatDate` and `statusColor` logic. Optional pagination props (`page`, `total`, `itemsPerPage`) render a `UPagination` below the table when `total` is provided; pages bind via `v-model:page`. Optional `rowLink` prop `(row) => string` renders entryTitle as a NuxtLink to the edit page.
 - **ContentEditor component** — Generic form component (`components/ContentEditor.vue`) for editing any content model. Accepts a `fields: FieldConfig[]` array (discriminated union on `type`: text, textarea, number, boolean, datetime, select, relation, richtext, multirelation) and a reactive `state` object. Renders the appropriate Nuxt UI input per field type. Includes a fixed "Publishing" section with status dropdown and slug field. Uses UForm with custom `validate` prop for required-field validation. Relation and multirelation fields fetch options from an `optionsEndpoint` on mount. Provides an `#after-fields` slot before the Publishing section for custom per-model content (e.g. author social links).
 - **useContentEditor composable** — `composables/useContentEditor.ts` manages content editing lifecycle: fetches item via `useFetch`, populates reactive `formState`, provides `save()` (PUT via `$fetch`), `generateSlug()` helper, and loading/error state. Used by all per-model edit pages.
@@ -51,10 +51,10 @@ Note: `prisma migrate dev` requires an interactive terminal. When running from a
 - **Tiptap rich text editor** — `components/RichTextEditor.vue` provides a full-featured rich text editor using `@tiptap/vue-3`. Extensions: StarterKit (excluding codeBlock), Table/TableRow/TableCell/TableHeader, Link, Image, CodeBlockLowlight (with lowlight syntax highlighting), and a custom CmsEmbed node. Toolbar with formatting buttons. Emits v-model JSON (ProseMirror document). Editor instance is destroyed on `onBeforeUnmount`.
 - **CmsEmbed** — Custom Tiptap ProseMirror node (`extensions/cmsEmbed.ts`) for embedding references to other content models inline. Attributes: `embedType` (team/club/competition/season), `embedId` (UUID). Rendered via `VueNodeViewRenderer` → `components/CmsEmbedNode.vue` (fetches and displays item). Inserted via `components/CmsEmbedModal.vue` (type selector + options dropdown).
 - **Path aliases** — `nuxt.config.ts` defines `#prisma` → `generated/prisma/client` and `#generated` → `generated/`. These are resolved by both Nuxt (app + Nitro server) and TypeScript (via auto-generated `.nuxt/tsconfig.json`). Use `import type { Prisma } from '#prisma'` instead of relative paths. Standalone scripts (`scripts/`, `prisma/seed.ts`) that run via `tsx` outside Nuxt still use relative paths.
-- **REST API filtering** — All per-model list endpoints support optional query param filters alongside pagination (`page`, `perPage`). The `where` clause is passed to both `findMany` and `count` so totals reflect filtered results. Filters by endpoint: fixtures (`teamId`, `opponentId`, `competitionId`, `seasonId`, `isHome`, `status`), players (`positionId`, `status`), competitions (`seasonId`, `status`), teams/clubs/seasons/images (`status`), authors (`status`), tags (`status`), articles (`status`, `authorId`, `tagId`), links (`status`), navigations (`status`). The content endpoint supports `contentType` (filters which UNION subqueries to include, now including 'Author', 'Tag', 'Article', 'Link', 'Navigation') and `status` (adds WHERE clause). All status values are validated against a `VALID_STATUSES` set; invalid values are silently ignored (no filter applied).
+- **REST API filtering** — All per-model list endpoints support optional query param filters alongside pagination (`page`, `perPage`). The `where` clause is passed to both `findMany` and `count` so totals reflect filtered results. Filters by endpoint: fixtures (`teamId`, `opponentId`, `competitionId`, `seasonId`, `isHome`, `status`), players (`positionId`, `status`), competitions (`seasonId`, `status`), teams/clubs/seasons/images (`status`), authors (`status`), tags (`status`), articles (`status`, `authorId`, `tagId`), links (`status`), navigations (`status`). The content endpoint supports `contentType` (filters which UNION subqueries to include; static types by table name, dynamic types by `identifier`) and `status` (adds WHERE clause). All status values are validated against a `VALID_STATUSES` set; invalid values are silently ignored (no filter applied).
 - **CSRF protection** — `server/middleware/csrf.ts` rejects non-GET/HEAD `/api/*` requests whose `Origin`/`Referer` does not match the request `Host`, unless the request carries a `Bearer` API key (API keys are ambient-credential-free). Session cookie is `SameSite=Strict, HttpOnly, Secure` (secure only in production) via `runtimeConfig.session.cookie` in `nuxt.config.ts`. A production boot-time check throws if `NUXT_SESSION_PASSWORD` is unset.
 - **Mutation rate limiting** — `server/utils/rateLimitEndpoint.ts` applies a per-IP, per-endpoint sliding window (30 req/60s) to mutating navigation endpoints via `enforceMutationRateLimit(event, '<id>')`. Uses the existing `rateLimit()` sliding-window helper.
-- **Shared validation** — `server/utils/validation.ts` exports `isUuid`, `assertUuid`, `assertNonNegativeInt`, `assertStringLength` for consistent 400 errors on bad input.
+- **Shared validation** — `server/utils/validation.ts` exports `isUuid`, `assertUuid`, `assertNonNegativeInt`, `assertStringLength`, `toPascalCase`, `toCamelCase`, `assertIdentifier` (PascalCase), and `assertFieldIdentifier` (camelCase) for consistent 400 errors on bad input.
 - **Prisma error translation** — `server/utils/prismaErrors.ts` exports `translatePrismaError` and `withPrismaErrors(fn, opts)` which translate P2002 → 409, P2003 → 400, P2025 → 404 with configurable messages.
 - **Navigation-item scoping** — all mutating nav-item endpoints (POST, PUT `[id]`, DELETE `[id]`, PUT `reorder`) require a `navigationId` and verify that every item (and `parentId`, where relevant) belongs to that navigation. `reorder` additionally caps the batch at 500 items and validates each element's shape.
 - **Authentication** — `nuxt-auth-utils` module provides encrypted cookie sessions. Login page at `/login` (uses `layouts/auth.vue`). Global server middleware (`server/middleware/auth.ts`) protects all `/api/*` routes — accepts either a valid session cookie (CMS users) or an API key in `Authorization: Bearer` header (external consumers). Skips `/api/auth/**`, `/api/_auth/**`, `/api/graphql` (has its own API key gate), and `/api/images/:id/transform` (public image serving). Global client middleware (`middleware/auth.global.ts`) redirects unauthenticated users to `/login` and authenticated users away from `/login` to `/`. Password hashing uses scrypt via `hashPassword()` / `verifyPassword()` (auto-imported in server routes). `NUXT_SESSION_PASSWORD` env var required in production (auto-generated in dev). Default admin credentials: `admin@boject.com` / `password` (seeded via `prisma/seed.ts`). The logged-in user's name and logout action are in the header navbar dropdown.
@@ -64,7 +64,7 @@ Note: `prisma migrate dev` requires an interactive terminal. When running from a
 
 ## Database Schema
 
-Defined across multiple `.prisma` files in `prisma/schema/` (multi-file schema). `prisma.config.ts` points to the directory. Files: `base.prisma` (generators, datasource, enums), `team.prisma`, `club.prisma`, `competition.prisma`, `season.prisma`, `fixture.prisma`, `player.prisma`, `image.prisma`, `auth.prisma`, `author.prisma`, `tag.prisma`, `article.prisma`, `link.prisma`, `navigation.prisma`, `navigationItem.prisma`. All models use UUID primary keys, `createdAt`/`updatedAt` timestamps, and `@unique` constraints on name fields where duplicates don't make sense.
+Defined across multiple `.prisma` files in `prisma/schema/` (multi-file schema). `prisma.config.ts` points to the directory. Files: `base.prisma` (generators, datasource, enums), `team.prisma`, `club.prisma`, `competition.prisma`, `season.prisma`, `fixture.prisma`, `player.prisma`, `image.prisma`, `auth.prisma`, `author.prisma`, `tag.prisma`, `article.prisma`, `link.prisma`, `navigation.prisma`, `navigationItem.prisma`, `contentType.prisma`, `contentEntry.prisma`. All models use UUID primary keys, `createdAt`/`updatedAt` timestamps, and `@unique` constraints on name fields where duplicates don't make sense.
 
 ### Content Metadata
 
@@ -99,6 +99,22 @@ Content models (Team, Club, Competition, Season, Player, Fixture, Image, Author,
 - **Link** — Reusable content link with `label`, optional `url` (free-form), optional `article` relation (internal content reference), and `openInNewTab`. Used standalone for embedding in rich text and as the target of NavigationItems. Either `url` or `articleId` must be provided (enforced at the API layer, not the DB). No slug.
 - **Navigation** — Container for a navigation tree, with a unique `name` (e.g. "Main Navigation") and a list of `NavigationItem`s. No slug.
 - **NavigationItem** — Structural join between Navigation and Link with `order`, optional `parentId` self-relation, and cascade delete from both Navigation and Link. Strictly two-level nesting (parent or child, no grandchildren); enforced at the API layer in POST/PUT handlers. Deleting a NavigationItem does not delete the Link.
+
+### Dynamic Content Types
+
+A JSONB-hybrid system for user-defined content types. Avoids runtime Prisma migrations. Coexists with the existing hardcoded rugby models.
+
+- **ContentType** — User-defined content type. Fields: `name` (unique display name, e.g. "Blog Post"), `identifier` (unique PascalCase API name, e.g. `BlogPost`), optional `description`. Has many `ContentTypeField`s and many `ContentEntry`s. Schema in `prisma/schema/contentType.prisma`.
+- **ContentTypeField** — Field definition within a content type. Fields: `identifier` (unique camelCase within content type, e.g. `publishDate`), `name` (display name, e.g. "Publish Date"), `type` (`FieldType` enum), `required`, `order`, optional `options` (Json, e.g. select choices). Unique constraint on `(contentTypeId, identifier)`. The `identifier` is the key used in the JSONB `data` column of ContentEntry.
+- **FieldType enum** — `ENTRY_TITLE` (required, exactly one per type, used as display name in listings), `SLUG` (optional, at most one per type, unique per content type), `TEXT`, `TEXTAREA`, `NUMBER`, `BOOLEAN`, `DATETIME`, `SELECT`.
+- **ContentEntry** — Instance of a dynamic content type. Fields: `contentTypeId`, `data` (Json — field values keyed by field `identifier`), `slug` (nullable, stored both in `data` and dedicated column for unique constraint), `status` (ContentStatus enum), `publishedAt`, `createdBy`, `updatedBy`. Unique constraint on `(contentTypeId, slug)`. Schema in `prisma/schema/contentEntry.prisma`.
+- **Entry validation** — `server/utils/validateEntryData.ts` validates entry `data` against field definitions: enforces required fields, type-checks values per FieldType, validates SELECT against allowed choices. Also exports `extractSlug()` and `extractEntryTitle()` helpers.
+- **Content type REST API** — `GET /api/content-types` (list), `POST /api/content-types` (create with fields), `GET /api/content-types/[id]` (detail), `PUT /api/content-types/[id]` (update name/identifier/description), `DELETE /api/content-types/[id]` (only if no entries). Field management: `POST /api/content-types/[id]/fields` (add), `PUT /api/content-types/[id]/fields/[fieldId]` (update name/required/options, blocks type change if entries exist), `DELETE /api/content-types/[id]/fields/[fieldId]` (blocks deleting only ENTRY_TITLE), `PUT /api/content-types/[id]/fields/reorder` (bulk reorder).
+- **Content entry REST API** — `GET /api/content-entries` (requires `contentTypeId`, supports `status`/`page`/`perPage`), `POST /api/content-entries` (validates data against fields), `GET /api/content-entries/[id]` (includes contentType and fields), `PUT /api/content-entries/[id]` (re-validates data), `DELETE /api/content-entries/[id]`.
+- **Unified content listing** — `server/api/content.get.ts` UNION ALL query includes dynamic entries. Dynamic types are looked up by `identifier` via the `contentType` query param. Entry title extracted from JSONB via SQL JOIN with ContentTypeField.
+- **CMS UI** — Content type list (`pages/content-types/index.vue`), create (`pages/content-types/new.vue`), edit (`pages/content-types/[id].vue`). Entry list (`pages/content-types/[id]/entries/index.vue`), create (`pages/content-types/[id]/entries/new.vue`), edit (`pages/content-types/[id]/entries/[entryId].vue`). Field definitions are mapped to `FieldConfig[]` for the `ContentEditor` component. Slug fields are excluded from the main editor and rendered in the built-in publishing section.
+- **Sidebar navigation** — `layouts/default.vue` dynamically fetches content types and renders navigation links for "Content Types" management and per-type entry listings.
+- **useContentEntryEditor composable** — `composables/useContentEntryEditor.ts` manages entry editing lifecycle (fetch, save, slug generation) similar to `useContentEditor` but for dynamic entries.
 
 ## GraphQL
 
@@ -138,7 +154,7 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder.
 - `components/ContentTable.vue` — Reusable content listing table (UTable wrapper with standard columns + slot forwarding)
 - `composables/useContentTable.ts` — Shared `formatDate` and `statusColor` helpers
 - `server/api/health.get.ts` — Health check endpoint (returns database connection status)
-- `server/api/content.get.ts` — Paginated content API route (raw SQL `UNION ALL` across all 10 content models, sorted by `updatedAt` desc, accepts `page`/`perPage`/`contentType`/`status` query params, returns `{ items, total }`)
+- `server/api/content.get.ts` — Paginated content API route (raw SQL `UNION ALL` across all static content models plus dynamic ContentEntry, sorted by `updatedAt` desc, accepts `page`/`perPage`/`contentType`/`status` query params, returns `{ items, total }`. Dynamic types are looked up by `identifier` via the `contentType` param.)
 - `server/api/{model}.get.ts` — Per-model list API routes (teams, fixtures, players, clubs, competitions, seasons, images, authors, tags, articles) querying Prisma directly. All support query param filtering (see REST API filtering above).
 - `server/api/{model}/[id].get.ts` — Per-model single-item GET routes (findUnique by UUID, returns 404 if not found)
 - `server/api/{model}/[id].put.ts` — Per-model PUT routes for updating records (readBody, explicit field allow-list, `applyContentMetadata`, handles unique constraint → 409)
@@ -188,7 +204,7 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder.
 - `server/api/navigation-items/[id].delete.ts` — Delete navigation item (link is preserved)
 - `server/api/navigation-items/reorder.put.ts` — Bulk reorder items via Prisma `$transaction`
 - `server/api/articles/options.get.ts` — Article options endpoint for relation dropdowns
-- `prisma/seed.ts` — Database seed script (positions, teams, clubs, seasons, competitions, players, fixtures, scores, authors, tags, articles, links, navigations, navigation items, test API key)
+- `prisma/seed.ts` — Database seed script (positions, teams, clubs, seasons, competitions, players, fixtures, scores, authors, tags, articles, links, navigations, navigation items, test API key, sample Blog Post content type with entries)
 - `docker-compose.yml` — Local PostgreSQL 17 container
 - `server/api/` — Nitro API route handlers (CMS pages use Prisma directly, not GraphQL)
 - `pages/` — Nuxt page components
@@ -206,13 +222,36 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder.
 - `server/api/auth/auth.test.ts` — Auth endpoint and middleware integration tests
 - `server/utils/imageProcessing.ts` — Sharp-based image processing: `processOriginal()` (auto-orient, max dimension), `transformImage()` (resize, format, quality), constants for allowed types/formats/sizes
 - `server/utils/rateLimit.ts` — In-memory sliding window rate limiter per key, with lazy cleanup
-- `server/utils/validation.ts` — Shared input validation helpers
+- `server/utils/validation.ts` — Shared input validation helpers (`isUuid`, `assertUuid`, `assertStringLength`, `toPascalCase`, `toCamelCase`, `assertIdentifier`, `assertFieldIdentifier`)
 - `server/utils/prismaErrors.ts` — Prisma error-code → HTTP error translation
 - `server/utils/rateLimitEndpoint.ts` — Per-endpoint mutation rate limiter
 - `server/middleware/csrf.ts` — CSRF origin/referer check for mutating `/api/*` routes
 - `server/api/images/upload.post.ts` — Multipart image upload endpoint (session auth, 5MB limit, stores via unstorage)
 - `server/api/images/[id]/transform.get.ts` — Public image transform endpoint (resize, format, cache)
 - `server/api/images/images.test.ts` — Image upload and transform integration tests
+- `prisma/schema/contentType.prisma` — ContentType, ContentTypeField models and FieldType enum
+- `prisma/schema/contentEntry.prisma` — ContentEntry model
+- `server/utils/validateEntryData.ts` — Entry data validation against field definitions (type checking, required enforcement, slug/title extraction)
+- `server/api/content-types.get.ts` — Content type list endpoint (paginated, includes field/entry counts)
+- `server/api/content-types/index.post.ts` — Content type create (with nested fields, validates ENTRY_TITLE/SLUG constraints, auto-generates identifier)
+- `server/api/content-types/[id].get.ts` — Content type detail (includes ordered fields and entry count)
+- `server/api/content-types/[id].put.ts` — Content type update (name, identifier, description)
+- `server/api/content-types/[id].delete.ts` — Content type delete (blocks if entries exist)
+- `server/api/content-types/[id]/fields/` — Field CRUD endpoints (add, update, delete, reorder)
+- `server/api/content-entries.get.ts` — Entry list (requires contentTypeId, supports status filter)
+- `server/api/content-entries/index.post.ts` — Entry create (validates data against field definitions)
+- `server/api/content-entries/[id].get.ts` — Entry detail (includes contentType and fields)
+- `server/api/content-entries/[id].put.ts` — Entry update (re-validates data)
+- `server/api/content-entries/[id].delete.ts` — Entry delete
+- `composables/useContentEntryEditor.ts` — Entry editing composable (fetch, save, slug generation)
+- `pages/content-types/index.vue` — Content type listing page
+- `pages/content-types/new.vue` — Content type creation with field builder
+- `pages/content-types/[id].vue` — Content type edit with field management
+- `pages/content-types/[id]/entries/index.vue` — Entry listing for a content type
+- `pages/content-types/[id]/entries/new.vue` — Entry creation with dynamic field mapping
+- `pages/content-types/[id]/entries/[entryId].vue` — Entry editing
+- `server/api/content-types/content-types.test.ts` — Content type and field management integration tests (24 tests)
+- `server/api/content-entries/content-entries.test.ts` — Content entry CRUD integration tests (13 tests)
 
 ## Linting & Formatting
 
@@ -230,7 +269,7 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder.
 - **GraphQL tests** — 30 integration tests covering list queries, single-item lookups, relation resolution, where filtering, Relay cursor pagination, API key authentication, and author/tag/article queries.
 - **Fixtures tests** — 16 integration tests covering default listing, pagination, relation filters (teamId, opponentId, competitionId, seasonId), boolean/enum filters (isHome, status), combined filters, and edge cases.
 - **List endpoint tests** — 29 integration tests covering query param filters on teams, clubs, seasons, images (status), players (positionId, status), and competitions (seasonId, status). Includes combined filter and invalid value tests.
-- **Content tests** — 14 integration tests covering contentType filter (including Author, Tag, Article), status filter, combined filters, and invalid value handling.
+- **Content tests** — 16 integration tests covering contentType filter (including Author, Tag, Article, Link, Navigation), status filter, combined filters, and invalid value handling.
 - **Auth tests** — Integration tests covering login validation, credential checking, session handling, and middleware behaviour.
 - **Image tests** — Integration tests covering upload validation (missing file, wrong mime type, file too large), successful upload, transform validation (invalid params), format conversion, public access, and rate limiting.
 - **Author tests** — 11 integration tests covering listing, pagination, status filter, single-item lookup (with social links and headshot), update (name, bio, social links, content metadata), slug uniqueness (409), and 404 handling.
@@ -239,3 +278,5 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder.
 - **Link tests** — Integration tests covering listing, status filter, pagination, single-item lookup, create (url, missing label, missing url+articleId), update, and options endpoint.
 - **Navigation tests** — Integration tests covering listing, nested item fetching (with children ordered by `order`), 404 handling, and name updates.
 - **NavigationItem tests** — Integration tests covering listing items by navigationId, 400 without navigationId, creating top-level and child items, rejecting beyond two levels, deleting items (link is preserved), and bulk reorder.
+- **Content type tests** — 24 integration tests covering content type CRUD, field management (add, update, delete, reorder), identifier validation (PascalCase for types, camelCase for fields), uniqueness constraints, and ENTRY_TITLE/SLUG field rules.
+- **Content entry tests** — 13 integration tests covering entry CRUD, data validation (required fields, type checking, select choices), slug uniqueness, status transitions, and publishedAt auto-setting.

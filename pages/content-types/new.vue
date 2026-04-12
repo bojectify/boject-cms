@@ -4,11 +4,27 @@ const isSaving = ref(false);
 const saveError = ref<string | null>(null);
 
 const name = ref('');
+const identifier = ref('');
+const identifierTouched = ref(false);
 const description = ref('');
 
+function toPascalCase(str: string): string {
+  return str
+    .trim()
+    .split(/[\s_-]+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join('');
+}
+
+watch(name, (val) => {
+  if (!identifierTouched.value) {
+    identifier.value = toPascalCase(val);
+  }
+});
+
 interface FieldDraft {
+  identifier: string;
   name: string;
-  label: string;
   type: string;
   required: boolean;
   choices: string;
@@ -27,28 +43,34 @@ const fieldTypeOptions = [
 
 const fields = ref<FieldDraft[]>([
   {
-    name: 'title',
-    label: 'Title',
+    identifier: 'title',
+    name: 'Title',
     type: 'ENTRY_TITLE',
     required: true,
     choices: '',
   },
-  { name: 'slug', label: 'Slug', type: 'SLUG', required: false, choices: '' },
+  {
+    identifier: 'slug',
+    name: 'Slug',
+    type: 'SLUG',
+    required: false,
+    choices: '',
+  },
 ]);
 
 const newField = reactive<FieldDraft>({
+  identifier: '',
   name: '',
-  label: '',
   type: 'TEXT',
   required: false,
   choices: '',
 });
 
 function addField() {
-  if (!newField.name || !newField.label) return;
+  if (!newField.identifier || !newField.name) return;
   fields.value.push({ ...newField });
+  newField.identifier = '';
   newField.name = '';
-  newField.label = '';
   newField.type = 'TEXT';
   newField.required = false;
   newField.choices = '';
@@ -85,10 +107,11 @@ async function handleSave() {
   try {
     const payload = {
       name: name.value.trim(),
+      identifier: identifier.value.trim(),
       description: description.value.trim() || null,
       fields: fields.value.map((f, idx) => ({
+        identifier: f.identifier,
         name: f.name,
-        label: f.label,
         type: f.type,
         required: f.required,
         order: idx,
@@ -150,6 +173,20 @@ async function handleSave() {
         <UInput v-model="name" placeholder="e.g. Blog Post" class="w-full" />
       </UFormField>
 
+      <UFormField
+        label="Identifier"
+        required
+        size="xl"
+        hint="PascalCase, used in APIs"
+      >
+        <UInput
+          v-model="identifier"
+          placeholder="e.g. BlogPost"
+          class="w-full"
+          @input="identifierTouched = true"
+        />
+      </UFormField>
+
       <UFormField label="Description" size="xl">
         <UTextarea
           v-model="description"
@@ -169,8 +206,10 @@ async function handleSave() {
         >
           <div class="flex items-center justify-between">
             <div class="flex-1">
-              <span class="font-medium">{{ field.label }}</span>
-              <span class="text-sm text-muted ml-2">({{ field.name }})</span>
+              <span class="font-medium">{{ field.name }}</span>
+              <span class="text-sm text-muted ml-2"
+                >({{ field.identifier }})</span
+              >
               <UBadge class="ml-2" size="sm" variant="subtle">
                 {{ field.type }}
               </UBadge>
@@ -221,16 +260,16 @@ async function handleSave() {
 
       <div class="space-y-3 border rounded-lg p-4">
         <div class="grid grid-cols-2 gap-3">
-          <UFormField label="Machine Name" size="xl">
+          <UFormField label="Identifier" size="xl" hint="camelCase">
             <UInput
-              v-model="newField.name"
+              v-model="newField.identifier"
               placeholder="e.g. subtitle"
               class="w-full"
             />
           </UFormField>
-          <UFormField label="Label" size="xl">
+          <UFormField label="Name" size="xl">
             <UInput
-              v-model="newField.label"
+              v-model="newField.name"
               placeholder="e.g. Subtitle"
               class="w-full"
             />
@@ -262,7 +301,7 @@ async function handleSave() {
         </UFormField>
         <UButton
           icon="i-lucide-plus"
-          :disabled="!newField.name || !newField.label"
+          :disabled="!newField.identifier || !newField.name"
           @click="addField"
         >
           Add Field

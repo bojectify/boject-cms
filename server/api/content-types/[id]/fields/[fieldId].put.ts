@@ -33,8 +33,8 @@ export default defineEventHandler(async (event) => {
 
   const data: Prisma.ContentTypeFieldUpdateInput = {};
 
-  if ('label' in body) {
-    data.label = assertStringLength(body.label, 'label', 200);
+  if ('name' in body) {
+    data.name = assertStringLength(body.name, 'name', 200);
   }
   if ('required' in body) {
     if (typeof body.required !== 'boolean') {

@@ -10,8 +10,8 @@ const { data: contentType } = await useFetch<{
   id: string;
   name: string;
   fields: Array<{
+    identifier: string;
     name: string;
-    label: string;
     type: string;
     required: boolean;
     options: unknown;
@@ -22,9 +22,9 @@ const hasSlugField = computed(
   () => contentType.value?.fields.some((f) => f.type === 'SLUG') ?? false
 );
 
-const entryTitleFieldName = computed(() => {
+const entryTitleFieldIdentifier = computed(() => {
   const field = contentType.value?.fields.find((f) => f.type === 'ENTRY_TITLE');
-  return field?.name ?? 'title';
+  return field?.identifier ?? 'title';
 });
 
 // Map ContentTypeField definitions to FieldConfig for ContentEditor
@@ -37,8 +37,8 @@ const editorFields = computed<FieldConfig[]>(() => {
 });
 
 function mapFieldToConfig(field: {
+  identifier: string;
   name: string;
-  label: string;
   type: string;
   required: boolean;
   options: unknown;
@@ -48,35 +48,35 @@ function mapFieldToConfig(field: {
     case 'TEXT':
       return {
         type: 'text',
-        key: field.name,
-        label: field.label,
+        key: field.identifier,
+        label: field.name,
         required: field.required,
       };
     case 'TEXTAREA':
       return {
         type: 'textarea',
-        key: field.name,
-        label: field.label,
+        key: field.identifier,
+        label: field.name,
         required: field.required,
       };
     case 'NUMBER':
       return {
         type: 'number',
-        key: field.name,
-        label: field.label,
+        key: field.identifier,
+        label: field.name,
         required: field.required,
       };
     case 'BOOLEAN':
       return {
         type: 'boolean',
-        key: field.name,
-        label: field.label,
+        key: field.identifier,
+        label: field.name,
       };
     case 'DATETIME':
       return {
         type: 'datetime',
-        key: field.name,
-        label: field.label,
+        key: field.identifier,
+        label: field.name,
         required: field.required,
       };
     case 'SELECT': {
@@ -84,8 +84,8 @@ function mapFieldToConfig(field: {
       const choices = opts?.choices ?? [];
       return {
         type: 'select',
-        key: field.name,
-        label: field.label,
+        key: field.identifier,
+        label: field.name,
         required: field.required,
         options: choices.map((c) => ({ label: c, value: c })),
       };
@@ -93,8 +93,8 @@ function mapFieldToConfig(field: {
     default:
       return {
         type: 'text',
-        key: field.name,
-        label: field.label,
+        key: field.identifier,
+        label: field.name,
         required: field.required,
       };
   }
@@ -104,7 +104,7 @@ const { formState, loadingStatus, isSaving, saveError, save } =
   useContentEntryEditor(contentTypeId, entryId);
 
 const pageTitle = computed(() => {
-  const titleVal = formState[entryTitleFieldName.value];
+  const titleVal = formState[entryTitleFieldIdentifier.value];
   if (typeof titleVal === 'string' && titleVal) return titleVal;
   return contentType.value?.name ?? 'Entry';
 });

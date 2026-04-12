@@ -1,6 +1,6 @@
 # boject-cms
 
-A TypeScript CMS for a rugby club, built with Nuxt 4 and Prisma v7 on PostgreSQL.
+A TypeScript CMS for a rugby club, built with Nuxt 4 and Prisma v7 on PostgreSQL. Includes hardcoded domain models for rugby content and a dynamic content type system for user-defined types with custom fields.
 
 ## Tech Stack
 
@@ -60,8 +60,7 @@ The app runs at http://localhost:4000. The GraphQL playground (GraphiQL) is avai
 | `pnpm lint:fix`        | Lint and auto-fix                            |
 | `pnpm format`          | Check formatting with Prettier               |
 | `pnpm format:fix`      | Format all files                             |
-| `pnpm test:watch`      | Run tests in watch mode                      |
-| `pnpm test:run`        | Run tests once (CI)                          |
+| `pnpm test`            | Run tests once                               |
 | `pnpm typecheck`       | Run TypeScript type checker                  |
 | `pnpm apikey:create`   | Create a new API key                         |
 | `pnpm apikey:list`     | List all API keys                            |
@@ -84,6 +83,11 @@ prisma/
     author.prisma              # Author, AuthorSocialLink
     tag.prisma                 # Tag
     article.prisma             # Article
+    link.prisma                # Link
+    navigation.prisma          # Navigation
+    navigationItem.prisma      # NavigationItem
+    contentType.prisma         # ContentType, ContentTypeField, FieldType enum
+    contentEntry.prisma        # ContentEntry
   seed.ts                      # Seed script
   migrations/                  # Migration files
 app.vue                        # Root component (UApp + NuxtLayout wrapper)
@@ -96,7 +100,9 @@ server/
     auth/                      # Login/logout endpoints + tests
     graphql/                   # GraphQL Yoga endpoint + tests
     images/                    # Image upload + transform endpoints + tests
-    content.get.ts             # Paginated content route (raw SQL UNION ALL, all 10 models)
+    content.get.ts             # Unified content listing (UNION ALL across static + dynamic)
+    content-types/             # Dynamic content type CRUD + field management
+    content-entries/           # Dynamic content entry CRUD
     {model}.get.ts             # Per-model listing routes (Prisma direct)
     {model}/[id].get.ts        # Per-model single-item routes
     {model}/[id].put.ts        # Per-model update routes
@@ -121,6 +127,7 @@ components/
 composables/
   useContentTable.ts           # Shared formatDate + statusColor helpers
   useContentEditor.ts          # Content editing lifecycle management
+  useContentEntryEditor.ts     # Dynamic entry editing lifecycle
 extensions/
   cmsEmbed.ts                  # Custom Tiptap ProseMirror node for content embeds
 types/
@@ -130,6 +137,7 @@ pages/
   index.vue                    # All content (paginated, sorted by updatedAt)
   {model}/index.vue            # Per-model listing pages
   {model}/[id].vue             # Per-model edit pages
+  content-types/               # Dynamic content type management + entry editing
 storage/                     # Gitignored, local image file storage (dev)
 generated/                   # Gitignored, auto-generated
   prisma/                    # Prisma client
@@ -283,8 +291,12 @@ PostgreSQL 17 runs locally via Docker Compose (port 5432, user/password/db: `boj
 | **AuthorSocialLink**  | Social media links for authors (platform + URL)                                                              |
 | **Tag**               | Content tags with name and slug. Many-to-many with articles                                                  |
 | **Article**           | Blog/news articles with title, slug, summary, rich text body (Tiptap JSON), author, featured image, and tags |
+| **Link**              | Reusable content link with label, optional URL or article reference, and openInNewTab                        |
+| **Navigation**        | Container for a navigation tree with ordered, two-level nested items pointing to Links                       |
+| **ContentType**       | User-defined content type with name, PascalCase identifier, and field definitions                            |
+| **ContentEntry**      | Instance of a dynamic content type, with JSONB data validated against field definitions                      |
 
-All models use UUID primary keys and `createdAt`/`updatedAt` timestamps. Content models (Team, Club, Competition, Season, Player, Fixture, Image, Author, Tag, Article) also have `entryTitle` (CMS display name), `status` (`DRAFT`/`PUBLISHED`/`CHANGED`/`ARCHIVED`), `publishedAt`, `createdBy`, and `updatedBy` metadata fields.
+All models use UUID primary keys and `createdAt`/`updatedAt` timestamps. Static content models (Team, Club, Competition, Season, Player, Fixture, Image, Author, Tag, Article, Link, Navigation) have `entryTitle` (CMS display name), `status` (`DRAFT`/`PUBLISHED`/`CHANGED`/`ARCHIVED`), `publishedAt`, `createdBy`, and `updatedBy` metadata fields. Dynamic content entries have the same status/publishedAt fields but derive their entry title from the ENTRY_TITLE field in their content type definition.
 
 ### Migrations
 
@@ -295,11 +307,11 @@ prisma migrate deploy          # Apply migrations (non-interactive / CI)
 
 ## Testing
 
-149 integration tests using Vitest + `@nuxt/test-utils`. Tests start a Nuxt dev server and run against the seeded database.
+Integration tests using Vitest + `@nuxt/test-utils`. Tests start a Nuxt dev server and run against the seeded database.
 
 ```bash
-pnpm test:watch    # Watch mode
-pnpm test:run      # Single run (CI)
+pnpm test                    # Single run
+pnpm test:integration        # Integration tests only
 ```
 
 - **GraphQL** (30 tests) — list queries, single-item lookups, relation resolution, where filtering, Relay cursor pagination, API key authentication, author/tag/article queries.
@@ -311,6 +323,8 @@ pnpm test:run      # Single run (CI)
 - **Authors** (11 tests) — listing, pagination, status filter, single-item lookup, update, slug uniqueness, 404 handling.
 - **Tags** (9 tests) — listing, pagination, status filter, single-item lookup, update, slug uniqueness, 404 handling.
 - **Articles** (13 tests) — listing with relations, pagination, filters (status, authorId, tagId), single-item lookup, update with tags, slug uniqueness, 404 handling.
+- **Content types** (24 tests) — CRUD, field management (add/update/delete/reorder), identifier validation, uniqueness constraints.
+- **Content entries** (13 tests) — CRUD, data validation against field definitions, slug uniqueness, status transitions.
 
 **Requirement:** Docker PostgreSQL must be running with seeded data.
 

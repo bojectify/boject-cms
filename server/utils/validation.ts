@@ -32,6 +32,51 @@ export function assertNonNegativeInt(value: unknown, field: string): number {
   return value;
 }
 
+/**
+ * Convert a display name to PascalCase identifier.
+ * "Blog Post" → "BlogPost", "my cool type" → "MyCoolType"
+ */
+export function toPascalCase(str: string): string {
+  return str
+    .trim()
+    .split(/[\s_-]+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join('');
+}
+
+/**
+ * Convert a display name to camelCase identifier.
+ * "Publish Date" → "publishDate", "My Field" → "myField"
+ */
+export function toCamelCase(str: string): string {
+  const pascal = toPascalCase(str);
+  return pascal.charAt(0).toLowerCase() + pascal.slice(1);
+}
+
+const FIELD_IDENTIFIER_RE = /^[a-z][a-zA-Z0-9]*$/;
+
+export function assertFieldIdentifier(value: unknown, field: string): string {
+  if (typeof value !== 'string' || !FIELD_IDENTIFIER_RE.test(value)) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: `${field} must be camelCase (start with lowercase, alphanumeric only)`,
+    });
+  }
+  return value;
+}
+
+const IDENTIFIER_RE = /^[A-Z][a-zA-Z0-9]*$/;
+
+export function assertIdentifier(value: unknown, field: string): string {
+  if (typeof value !== 'string' || !IDENTIFIER_RE.test(value)) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: `${field} must be PascalCase (start with uppercase, alphanumeric only)`,
+    });
+  }
+  return value;
+}
+
 export function assertStringLength(
   value: unknown,
   field: string,
