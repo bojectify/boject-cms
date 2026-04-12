@@ -30,18 +30,18 @@ Replace the hardcoded, rugby-specific content models with a dynamic content type
 
 ### ContentTypeField
 
-| Column          | Type     | Constraints                                                                          |
-| --------------- | -------- | ------------------------------------------------------------------------------------ |
-| `id`            | UUID     | PK                                                                                   |
-| `contentTypeId` | UUID     | FK → ContentType, cascade delete                                                     |
-| `name`          | String   | Machine name (lowercase alphanumeric + underscores, no leading digit)                |
-| `label`         | String   | Display label                                                                        |
-| `type`          | Enum     | `ENTRY_TITLE`, `SLUG`, `TEXT`, `TEXTAREA`, `NUMBER`, `BOOLEAN`, `DATETIME`, `SELECT` |
-| `required`      | Boolean  | Default false                                                                        |
-| `order`         | Int      | Field ordering in editor                                                             |
-| `options`       | Json     | Optional, type-specific config (e.g. select choices, placeholder, min/max)           |
-| `createdAt`     | DateTime | Auto                                                                                 |
-| `updatedAt`     | DateTime | Auto                                                                                 |
+| Column          | Type     | Constraints                                                                                       |
+| --------------- | -------- | ------------------------------------------------------------------------------------------------- |
+| `id`            | UUID     | PK                                                                                                |
+| `contentTypeId` | UUID     | FK → ContentType, cascade delete                                                                  |
+| `name`          | String   | Machine name (lowercase alphanumeric + underscores, no leading digit)                             |
+| `label`         | String   | Display label                                                                                     |
+| `type`          | Enum     | `ENTRY_TITLE`, `SLUG`, `TEXT`, `TEXTAREA`, `NUMBER`, `BOOLEAN`, `DATETIME`, `SELECT`              |
+| `required`      | Boolean  | Default false                                                                                     |
+| `order`         | Int      | Field ordering in editor. Auto-set to max + 1 on creation; reorder endpoint for manual adjustment |
+| `options`       | Json     | Optional, type-specific config (e.g. select choices, placeholder, min/max)                        |
+| `createdAt`     | DateTime | Auto                                                                                              |
+| `updatedAt`     | DateTime | Auto                                                                                              |
 
 **Constraints:**
 
@@ -192,7 +192,7 @@ Every entry has these system-managed fields (not user-defined):
 
 ## Future Phases (Out of Scope)
 
-- **Relations** — `relation` and `multirelation` field types pointing at dynamic or static content types
+- **Relations** — `relation` and `multirelation` field types pointing at dynamic or static content types. The data model supports these at the enum level, but the UI for adding/configuring relational fields during content type creation is deferred
 - **Rich text** — `richtext` field type with Tiptap editor
 - **GraphQL** — Expose dynamic content types via the GraphQL API
 - **Migrate existing models** — Convert rugby models into dynamic content types
