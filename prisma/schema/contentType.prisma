@@ -12,6 +12,7 @@ enum FieldType {
 model ContentType {
   id          String             @id @default(uuid())
   name        String             @unique
+  identifier  String             @unique
   description String?
   fields      ContentTypeField[]
   entries     ContentEntry[]
@@ -23,8 +24,8 @@ model ContentTypeField {
   id            String      @id @default(uuid())
   contentType   ContentType @relation(fields: [contentTypeId], references: [id], onDelete: Cascade)
   contentTypeId String
+  identifier    String
   name          String
-  label         String
   type          FieldType
   required      Boolean     @default(false)
   order         Int         @default(0)
@@ -32,5 +33,5 @@ model ContentTypeField {
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
-  @@unique([contentTypeId, name])
+  @@unique([contentTypeId, identifier])
 }

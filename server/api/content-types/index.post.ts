@@ -1,9 +1,12 @@
 import type { FieldType } from '#prisma';
-import { assertStringLength } from '../../utils/validation';
+import {
+  assertStringLength,
+  assertIdentifier,
+  assertFieldIdentifier,
+  toPascalCase,
+} from '../../utils/validation';
 import { withPrismaErrors } from '../../utils/prismaErrors';
 import { enforceMutationRateLimit } from '../../utils/rateLimitEndpoint';
-
-const FIELD_NAME_RE = /^[a-z][a-z0-9_]*$/;
 
 const VALID_FIELD_TYPES = new Set<string>([
   'ENTRY_TITLE',
@@ -23,6 +26,10 @@ export default defineEventHandler(async (event) => {
   const body = await readBody<Record<string, unknown>>(event);
 
   const name = assertStringLength(body.name, 'name', NAME_MAX);
+  const identifier =
+    typeof body.identifier === 'string'
+      ? assertIdentifier(body.identifier, 'identifier')
+      : assertIdentifier(toPascalCase(name), 'identifier');
   const description =
     typeof body.description === 'string' ? body.description : null;
 
@@ -33,7 +40,7 @@ export default defineEventHandler(async (event) => {
     });
   }
 
-  const fieldNames = new Set<string>();
+  const fieldIdentifiers = new Set<string>();
   let entryTitleCount = 0;
   let slugCount = 0;
 
@@ -46,22 +53,19 @@ export default defineEventHandler(async (event) => {
     }
     const f = raw as Record<string, unknown>;
 
-    const fieldName = assertStringLength(f.name, `fields[${idx}].name`, 100);
-    if (!FIELD_NAME_RE.test(fieldName)) {
+    const fieldIdentifier = assertFieldIdentifier(
+      f.identifier,
+      `fields[${idx}].identifier`
+    );
+    if (fieldIdentifiers.has(fieldIdentifier)) {
       throw createError({
         statusCode: 400,
-        statusMessage: `fields[${idx}].name must match /^[a-z][a-z0-9_]*$/`,
+        statusMessage: `Duplicate field identifier: ${fieldIdentifier}`,
       });
     }
-    if (fieldNames.has(fieldName)) {
-      throw createError({
-        statusCode: 400,
-        statusMessage: `Duplicate field name: ${fieldName}`,
-      });
-    }
-    fieldNames.add(fieldName);
+    fieldIdentifiers.add(fieldIdentifier);
 
-    const label = assertStringLength(f.label, `fields[${idx}].label`, 200);
+    const fieldName = assertStringLength(f.name, `fields[${idx}].name`, 200);
 
     if (typeof f.type !== 'string' || !VALID_FIELD_TYPES.has(f.type)) {
       throw createError({
@@ -75,8 +79,8 @@ export default defineEventHandler(async (event) => {
     if (type === 'SLUG') slugCount++;
 
     return {
+      identifier: fieldIdentifier,
       name: fieldName,
-      label,
       type,
       required: typeof f.required === 'boolean' ? f.required : false,
       order: idx,
@@ -100,10 +104,13 @@ export default defineEventHandler(async (event) => {
   const created = await withPrismaErrors(
     () =>
       prisma.contentType.create({
-        data: { name, description, fields: { create: fieldsData } },
+        data: { name, identifier, description, fields: { create: fieldsData } },
         include: { fields: { orderBy: { order: 'asc' } } },
       }),
-    { uniqueMessage: 'A content type with this name already exists' }
+    {
+      uniqueMessage:
+        'A content type with this name or identifier already exists',
+    }
   );
 
   setResponseStatus(event, 201);

@@ -11,11 +11,12 @@ const {
 } = await useFetch<{
   id: string;
   name: string;
+  identifier: string;
   description: string | null;
   fields: Array<{
     id: string;
+    identifier: string;
     name: string;
-    label: string;
     type: string;
     required: boolean;
     order: number;
@@ -25,6 +26,7 @@ const {
 }>(`/api/content-types/${id}`);
 
 const formName = ref('');
+const formIdentifier = ref('');
 const formDescription = ref('');
 const isSaving = ref(false);
 const saveError = ref<string | null>(null);
@@ -34,6 +36,7 @@ watch(
   (val) => {
     if (val) {
       formName.value = val.name;
+      formIdentifier.value = val.identifier;
       formDescription.value = val.description ?? '';
     }
   },
@@ -52,6 +55,7 @@ async function handleSave() {
       method: 'PUT',
       body: {
         name: formName.value.trim(),
+        identifier: formIdentifier.value.trim(),
         description: formDescription.value.trim() || null,
       },
     });
@@ -84,21 +88,21 @@ const fieldTypeOptions = [
 ];
 
 const newField = reactive({
+  identifier: '',
   name: '',
-  label: '',
   type: 'TEXT',
   required: false,
   choices: '',
 });
 
 async function addField() {
-  if (!newField.name || !newField.label) return;
+  if (!newField.identifier || !newField.name) return;
   try {
     await $fetch(`/api/content-types/${id}/fields`, {
       method: 'POST',
       body: {
+        identifier: newField.identifier,
         name: newField.name,
-        label: newField.label,
         type: newField.type,
         required: newField.required,
         ...(newField.type === 'SELECT' && newField.choices.trim()
@@ -113,8 +117,8 @@ async function addField() {
           : {}),
       },
     });
+    newField.identifier = '';
     newField.name = '';
-    newField.label = '';
     newField.type = 'TEXT';
     newField.required = false;
     newField.choices = '';
@@ -229,6 +233,15 @@ function formatChoices(options: unknown): string {
         <UInput v-model="formName" class="w-full" />
       </UFormField>
 
+      <UFormField
+        label="Identifier"
+        required
+        size="xl"
+        hint="PascalCase, used in APIs"
+      >
+        <UInput v-model="formIdentifier" class="w-full" />
+      </UFormField>
+
       <UFormField label="Description" size="xl">
         <UTextarea v-model="formDescription" :rows="3" class="w-full" />
       </UFormField>
@@ -243,8 +256,10 @@ function formatChoices(options: unknown): string {
         >
           <div class="flex items-center justify-between">
             <div class="flex-1">
-              <span class="font-medium">{{ field.label }}</span>
-              <span class="text-sm text-muted ml-2">({{ field.name }})</span>
+              <span class="font-medium">{{ field.name }}</span>
+              <span class="text-sm text-muted ml-2"
+                >({{ field.identifier }})</span
+              >
               <UBadge class="ml-2" size="sm" variant="subtle">
                 {{ field.type }}
               </UBadge>
@@ -295,16 +310,16 @@ function formatChoices(options: unknown): string {
 
       <div class="space-y-3 border rounded-lg p-4">
         <div class="grid grid-cols-2 gap-3">
-          <UFormField label="Machine Name" size="xl">
+          <UFormField label="Identifier" size="xl" hint="camelCase">
             <UInput
-              v-model="newField.name"
+              v-model="newField.identifier"
               placeholder="e.g. subtitle"
               class="w-full"
             />
           </UFormField>
-          <UFormField label="Label" size="xl">
+          <UFormField label="Name" size="xl">
             <UInput
-              v-model="newField.label"
+              v-model="newField.name"
               placeholder="e.g. Subtitle"
               class="w-full"
             />
@@ -336,7 +351,7 @@ function formatChoices(options: unknown): string {
         </UFormField>
         <UButton
           icon="i-lucide-plus"
-          :disabled="!newField.name || !newField.label"
+          :disabled="!newField.identifier || !newField.name"
           @click="addField"
         >
           Add Field

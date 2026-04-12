@@ -2,8 +2,8 @@ import { createError } from 'h3';
 import type { FieldType } from '#prisma';
 
 interface FieldDef {
+  identifier: string;
   name: string;
-  label: string;
   type: FieldType;
   required: boolean;
   options: unknown;
@@ -21,18 +21,18 @@ export function validateEntryData(
   const validated: Record<string, unknown> = {};
 
   for (const field of fields) {
-    const value = data[field.name];
+    const value = data[field.identifier];
     const isEmpty = value === undefined || value === null || value === '';
 
     if (field.required && isEmpty) {
       throw createError({
         statusCode: 400,
-        statusMessage: `${field.label} is required`,
+        statusMessage: `${field.name} is required`,
       });
     }
 
     if (isEmpty) {
-      validated[field.name] = null;
+      validated[field.identifier] = null;
       continue;
     }
 
@@ -44,47 +44,47 @@ export function validateEntryData(
         if (typeof value !== 'string') {
           throw createError({
             statusCode: 400,
-            statusMessage: `${field.label} must be a string`,
+            statusMessage: `${field.name} must be a string`,
           });
         }
-        validated[field.name] = value;
+        validated[field.identifier] = value;
         break;
 
       case 'NUMBER':
         if (typeof value !== 'number' || !Number.isFinite(value)) {
           throw createError({
             statusCode: 400,
-            statusMessage: `${field.label} must be a number`,
+            statusMessage: `${field.name} must be a number`,
           });
         }
-        validated[field.name] = value;
+        validated[field.identifier] = value;
         break;
 
       case 'BOOLEAN':
         if (typeof value !== 'boolean') {
           throw createError({
             statusCode: 400,
-            statusMessage: `${field.label} must be a boolean`,
+            statusMessage: `${field.name} must be a boolean`,
           });
         }
-        validated[field.name] = value;
+        validated[field.identifier] = value;
         break;
 
       case 'DATETIME':
         if (typeof value !== 'string' || isNaN(Date.parse(value))) {
           throw createError({
             statusCode: 400,
-            statusMessage: `${field.label} must be a valid ISO-8601 date string`,
+            statusMessage: `${field.name} must be a valid ISO-8601 date string`,
           });
         }
-        validated[field.name] = value;
+        validated[field.identifier] = value;
         break;
 
       case 'SELECT': {
         if (typeof value !== 'string') {
           throw createError({
             statusCode: 400,
-            statusMessage: `${field.label} must be a string`,
+            statusMessage: `${field.name} must be a string`,
           });
         }
         const opts = field.options as { choices?: string[] } | null;
@@ -92,15 +92,15 @@ export function validateEntryData(
         if (choices.length > 0 && !choices.includes(value)) {
           throw createError({
             statusCode: 400,
-            statusMessage: `${field.label} must be one of: ${choices.join(', ')}`,
+            statusMessage: `${field.name} must be one of: ${choices.join(', ')}`,
           });
         }
-        validated[field.name] = value;
+        validated[field.identifier] = value;
         break;
       }
 
       default:
-        validated[field.name] = value;
+        validated[field.identifier] = value;
     }
   }
 
@@ -118,7 +118,7 @@ export function extractSlug(
 ): string | null {
   const slugField = fields.find((f) => f.type === 'SLUG');
   if (!slugField) return null;
-  const val = data[slugField.name];
+  const val = data[slugField.identifier];
   return typeof val === 'string' && val.trim() ? val.trim() : null;
 }
 
@@ -132,6 +132,6 @@ export function extractEntryTitle(
 ): string {
   const titleField = fields.find((f) => f.type === 'ENTRY_TITLE');
   if (!titleField) return 'Untitled';
-  const val = data[titleField.name];
+  const val = data[titleField.identifier];
   return typeof val === 'string' && val.trim() ? val.trim() : 'Untitled';
 }

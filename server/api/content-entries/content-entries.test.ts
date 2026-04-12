@@ -24,10 +24,11 @@ async function getSessionCookie(): Promise<string> {
 type ContentTypeResponse = {
   id: string;
   name: string;
+  identifier: string;
   fields: Array<{
     id: string;
+    identifier: string;
     name: string;
-    label: string;
     type: string;
     required: boolean;
     order: number;
@@ -68,19 +69,19 @@ describe('Content Entry endpoints', async () => {
         description: 'Content type for entry CRUD tests',
         fields: [
           {
-            name: 'title',
-            label: 'Title',
+            identifier: 'title',
+            name: 'Title',
             type: 'ENTRY_TITLE',
             required: true,
           },
-          { name: 'slug', label: 'Slug', type: 'SLUG' },
-          { name: 'summary', label: 'Summary', type: 'TEXT' },
-          { name: 'count', label: 'Count', type: 'NUMBER' },
-          { name: 'featured', label: 'Featured', type: 'BOOLEAN' },
-          { name: 'publish_date', label: 'Publish Date', type: 'DATETIME' },
+          { identifier: 'slug', name: 'Slug', type: 'SLUG' },
+          { identifier: 'summary', name: 'Summary', type: 'TEXT' },
+          { identifier: 'count', name: 'Count', type: 'NUMBER' },
+          { identifier: 'featured', name: 'Featured', type: 'BOOLEAN' },
+          { identifier: 'publishDate', name: 'Publish Date', type: 'DATETIME' },
           {
-            name: 'category',
-            label: 'Category',
+            identifier: 'category',
+            name: 'Category',
             type: 'SELECT',
             options: { choices: ['news', 'blog', 'update'] },
           },
@@ -103,7 +104,7 @@ describe('Content Entry endpoints', async () => {
             summary: 'A summary',
             count: 42,
             featured: true,
-            publish_date: '2025-01-15T10:00:00.000Z',
+            publishDate: '2025-01-15T10:00:00.000Z',
             category: 'news',
           },
         }),

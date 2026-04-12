@@ -9,15 +9,15 @@ const { data: contentType } = await useFetch<{
   id: string;
   name: string;
   fields: Array<{
+    identifier: string;
     name: string;
-    label: string;
     type: string;
   }>;
 }>(`/api/content-types/${contentTypeId}`);
 
-const entryTitleFieldName = computed(() => {
+const entryTitleFieldIdentifier = computed(() => {
   const field = contentType.value?.fields.find((f) => f.type === 'ENTRY_TITLE');
-  return field?.name ?? 'title';
+  return field?.identifier ?? 'title';
 });
 
 // Fetch entries
@@ -41,7 +41,7 @@ const tableData = computed(() =>
   (data.value?.items ?? []).map((item) => ({
     id: item.id,
     entryTitle:
-      (item.data?.[entryTitleFieldName.value] as string) ?? 'Untitled',
+      (item.data?.[entryTitleFieldIdentifier.value] as string) ?? 'Untitled',
     status: item.status,
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,

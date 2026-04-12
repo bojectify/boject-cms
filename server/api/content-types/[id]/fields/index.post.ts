@@ -1,9 +1,11 @@
 import type { FieldType } from '#prisma';
-import { assertUuid, assertStringLength } from '../../../../utils/validation';
+import {
+  assertUuid,
+  assertStringLength,
+  assertFieldIdentifier,
+} from '../../../../utils/validation';
 import { withPrismaErrors } from '../../../../utils/prismaErrors';
 import { enforceMutationRateLimit } from '../../../../utils/rateLimitEndpoint';
-
-const FIELD_NAME_RE = /^[a-z][a-z0-9_]*$/;
 
 const VALID_FIELD_TYPES = new Set<string>([
   'ENTRY_TITLE',
@@ -21,16 +23,9 @@ export default defineEventHandler(async (event) => {
   const contentTypeId = assertUuid(getRouterParam(event, 'id'), 'id');
   const body = await readBody<Record<string, unknown>>(event);
 
-  // Validate field name
-  const name = assertStringLength(body.name, 'name', 100);
-  if (!FIELD_NAME_RE.test(name)) {
-    throw createError({
-      statusCode: 400,
-      statusMessage: 'name must match /^[a-z][a-z0-9_]*$/',
-    });
-  }
-
-  const label = assertStringLength(body.label, 'label', 200);
+  // Validate field identifier and name
+  const fieldIdentifier = assertFieldIdentifier(body.identifier, 'identifier');
+  const name = assertStringLength(body.name, 'name', 200);
 
   if (typeof body.type !== 'string' || !VALID_FIELD_TYPES.has(body.type)) {
     throw createError({
@@ -80,8 +75,8 @@ export default defineEventHandler(async (event) => {
       prisma.contentTypeField.create({
         data: {
           contentTypeId,
+          identifier: fieldIdentifier,
           name,
-          label,
           type,
           required: typeof body.required === 'boolean' ? body.required : false,
           order: maxOrder + 1,
@@ -90,7 +85,7 @@ export default defineEventHandler(async (event) => {
       }),
     {
       uniqueMessage:
-        'A field with this name already exists on this content type',
+        'A field with this identifier already exists on this content type',
     }
   );
 
