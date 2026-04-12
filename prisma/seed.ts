@@ -867,6 +867,97 @@ async function main() {
     });
   }
 
+  // --- Dynamic content types ---
+  const blogType = await prisma.contentType.upsert({
+    where: { name: 'Blog Post' },
+    update: {},
+    create: {
+      name: 'Blog Post',
+      description: 'Blog articles with rich metadata',
+      fields: {
+        create: [
+          {
+            name: 'title',
+            label: 'Title',
+            type: 'ENTRY_TITLE',
+            required: true,
+            order: 0,
+          },
+          {
+            name: 'slug',
+            label: 'Slug',
+            type: 'SLUG',
+            required: true,
+            order: 1,
+          },
+          { name: 'summary', label: 'Summary', type: 'TEXTAREA', order: 2 },
+          {
+            name: 'publish_date',
+            label: 'Publish Date',
+            type: 'DATETIME',
+            order: 3,
+          },
+          { name: 'featured', label: 'Featured', type: 'BOOLEAN', order: 4 },
+          {
+            name: 'category',
+            label: 'Category',
+            type: 'SELECT',
+            order: 5,
+            options: { choices: ['news', 'match-report', 'community'] },
+          },
+        ],
+      },
+    },
+  });
+
+  await prisma.contentEntry.upsert({
+    where: {
+      contentTypeId_slug: {
+        contentTypeId: blogType.id,
+        slug: 'welcome-to-the-club',
+      },
+    },
+    update: {},
+    create: {
+      contentTypeId: blogType.id,
+      data: {
+        title: 'Welcome to the Club',
+        slug: 'welcome-to-the-club',
+        summary: 'An introduction to our rugby club and what we stand for.',
+        publish_date: '2026-01-15T10:00:00.000Z',
+        featured: true,
+        category: 'community',
+      },
+      slug: 'welcome-to-the-club',
+      status: 'PUBLISHED',
+      publishedAt: new Date('2026-01-15'),
+    },
+  });
+
+  await prisma.contentEntry.upsert({
+    where: {
+      contentTypeId_slug: {
+        contentTypeId: blogType.id,
+        slug: 'season-opener-recap',
+      },
+    },
+    update: {},
+    create: {
+      contentTypeId: blogType.id,
+      data: {
+        title: 'Season Opener Recap',
+        slug: 'season-opener-recap',
+        summary: 'A thrilling start to the 2026 season with a home win.',
+        publish_date: '2026-02-01T18:00:00.000Z',
+        featured: false,
+        category: 'match-report',
+      },
+      slug: 'season-opener-recap',
+      status: 'PUBLISHED',
+      publishedAt: new Date('2026-02-01'),
+    },
+  });
+
   console.log('Seed complete.');
 }
 

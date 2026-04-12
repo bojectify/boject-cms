@@ -1,0 +1,15 @@
+model ContentEntry {
+  id            String        @id @default(uuid())
+  contentType   ContentType   @relation(fields: [contentTypeId], references: [id])
+  contentTypeId String
+  data          Json
+  slug          String?
+  status        ContentStatus @default(DRAFT)
+  publishedAt   DateTime?
+  createdBy     String?
+  updatedBy     String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@unique([contentTypeId, slug])
+}
