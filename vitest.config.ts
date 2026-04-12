@@ -27,5 +27,15 @@ export default defineConfig({
     //   });
     // This will give server tests the "node" env and component/unit tests
     // the "nuxt" env (with auto-imports, Vue runtime, composables, etc.).
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: 'integration',
+          include: ['server/**/*.test.ts'],
+          globals: true,
+        },
+      },
+    ],
   },
 });
