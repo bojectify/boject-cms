@@ -697,6 +697,161 @@ async function main() {
     },
   });
 
+  // Links
+  const linkHome = await prisma.link.upsert({
+    where: { id: '00000000-0000-0000-0000-000000000100' },
+    update: {},
+    create: {
+      id: '00000000-0000-0000-0000-000000000100',
+      entryTitle: 'Home',
+      label: 'Home',
+      url: '/',
+      status: 'PUBLISHED',
+      publishedAt: new Date(),
+    },
+  });
+
+  const linkArticles = await prisma.link.upsert({
+    where: { id: '00000000-0000-0000-0000-000000000101' },
+    update: {},
+    create: {
+      id: '00000000-0000-0000-0000-000000000101',
+      entryTitle: 'Articles',
+      label: 'Articles',
+      url: '/articles',
+      status: 'PUBLISHED',
+      publishedAt: new Date(),
+    },
+  });
+
+  // Look up an article to link to
+  const openingDayArticle = await prisma.article.findUnique({
+    where: { title: 'Opening Day Victory' },
+  });
+
+  const linkOpeningDay = await prisma.link.upsert({
+    where: { id: '00000000-0000-0000-0000-000000000102' },
+    update: {},
+    create: {
+      id: '00000000-0000-0000-0000-000000000102',
+      entryTitle: 'Opening Day Victory',
+      label: 'Opening Day Victory',
+      articleId: openingDayArticle?.id ?? null,
+      status: 'PUBLISHED',
+      publishedAt: new Date(),
+    },
+  });
+
+  const linkYouthProgramme = await prisma.link.upsert({
+    where: { id: '00000000-0000-0000-0000-000000000103' },
+    update: {},
+    create: {
+      id: '00000000-0000-0000-0000-000000000103',
+      entryTitle: 'Youth Programme',
+      label: 'Youth Programme',
+      url: '/youth',
+      status: 'PUBLISHED',
+      publishedAt: new Date(),
+    },
+  });
+
+  const linkContact = await prisma.link.upsert({
+    where: { id: '00000000-0000-0000-0000-000000000104' },
+    update: {},
+    create: {
+      id: '00000000-0000-0000-0000-000000000104',
+      entryTitle: 'Contact Us',
+      label: 'Contact Us',
+      url: '/contact',
+      openInNewTab: false,
+      status: 'PUBLISHED',
+      publishedAt: new Date(),
+    },
+  });
+
+  const linkExternal = await prisma.link.upsert({
+    where: { id: '00000000-0000-0000-0000-000000000105' },
+    update: {},
+    create: {
+      id: '00000000-0000-0000-0000-000000000105',
+      entryTitle: 'WRU Website',
+      label: 'WRU',
+      url: 'https://www.wru.wales',
+      openInNewTab: true,
+      status: 'PUBLISHED',
+      publishedAt: new Date(),
+    },
+  });
+
+  // Navigation
+  const mainNav = await prisma.navigation.upsert({
+    where: { name: 'Main Navigation' },
+    update: {},
+    create: {
+      name: 'Main Navigation',
+      entryTitle: 'Main Navigation',
+      status: 'PUBLISHED',
+      publishedAt: new Date(),
+    },
+  });
+
+  // Clear existing navigation items for this nav, then recreate
+  await prisma.navigationItem.deleteMany({
+    where: { navigationId: mainNav.id },
+  });
+
+  // Top-level items
+  await prisma.navigationItem.create({
+    data: {
+      navigationId: mainNav.id,
+      linkId: linkHome.id,
+      order: 0,
+    },
+  });
+
+  const navItemArticles = await prisma.navigationItem.create({
+    data: {
+      navigationId: mainNav.id,
+      linkId: linkArticles.id,
+      order: 1,
+    },
+  });
+
+  await prisma.navigationItem.create({
+    data: {
+      navigationId: mainNav.id,
+      linkId: linkContact.id,
+      order: 2,
+    },
+  });
+
+  await prisma.navigationItem.create({
+    data: {
+      navigationId: mainNav.id,
+      linkId: linkExternal.id,
+      order: 3,
+    },
+  });
+
+  // Sub-links under Articles
+  await prisma.navigationItem.create({
+    data: {
+      navigationId: mainNav.id,
+      linkId: linkOpeningDay.id,
+      parentId: navItemArticles.id,
+      order: 0,
+    },
+  });
+
+  await prisma.navigationItem.create({
+    data: {
+      navigationId: mainNav.id,
+      linkId: linkYouthProgramme.id,
+      parentId: navItemArticles.id,
+      order: 1,
+    },
+  });
+
   // Test API key (deterministic, for integration tests only)
   if (process.env.NODE_ENV !== 'production') {
     const testKey = 'boject_test_key_for_integration_tests_only';

@@ -51,7 +51,12 @@ Note: `prisma migrate dev` requires an interactive terminal. When running from a
 - **Tiptap rich text editor** — `components/RichTextEditor.vue` provides a full-featured rich text editor using `@tiptap/vue-3`. Extensions: StarterKit (excluding codeBlock), Table/TableRow/TableCell/TableHeader, Link, Image, CodeBlockLowlight (with lowlight syntax highlighting), and a custom CmsEmbed node. Toolbar with formatting buttons. Emits v-model JSON (ProseMirror document). Editor instance is destroyed on `onBeforeUnmount`.
 - **CmsEmbed** — Custom Tiptap ProseMirror node (`extensions/cmsEmbed.ts`) for embedding references to other content models inline. Attributes: `embedType` (team/club/competition/season), `embedId` (UUID). Rendered via `VueNodeViewRenderer` → `components/CmsEmbedNode.vue` (fetches and displays item). Inserted via `components/CmsEmbedModal.vue` (type selector + options dropdown).
 - **Path aliases** — `nuxt.config.ts` defines `#prisma` → `generated/prisma/client` and `#generated` → `generated/`. These are resolved by both Nuxt (app + Nitro server) and TypeScript (via auto-generated `.nuxt/tsconfig.json`). Use `import type { Prisma } from '#prisma'` instead of relative paths. Standalone scripts (`scripts/`, `prisma/seed.ts`) that run via `tsx` outside Nuxt still use relative paths.
-- **REST API filtering** — All per-model list endpoints support optional query param filters alongside pagination (`page`, `perPage`). The `where` clause is passed to both `findMany` and `count` so totals reflect filtered results. Filters by endpoint: fixtures (`teamId`, `opponentId`, `competitionId`, `seasonId`, `isHome`, `status`), players (`positionId`, `status`), competitions (`seasonId`, `status`), teams/clubs/seasons/images (`status`), authors (`status`), tags (`status`), articles (`status`, `authorId`, `tagId`). The content endpoint supports `contentType` (filters which UNION subqueries to include, now including 'Author', 'Tag', 'Article') and `status` (adds WHERE clause). All status values are validated against a `VALID_STATUSES` set; invalid values are silently ignored (no filter applied).
+- **REST API filtering** — All per-model list endpoints support optional query param filters alongside pagination (`page`, `perPage`). The `where` clause is passed to both `findMany` and `count` so totals reflect filtered results. Filters by endpoint: fixtures (`teamId`, `opponentId`, `competitionId`, `seasonId`, `isHome`, `status`), players (`positionId`, `status`), competitions (`seasonId`, `status`), teams/clubs/seasons/images (`status`), authors (`status`), tags (`status`), articles (`status`, `authorId`, `tagId`), links (`status`), navigations (`status`). The content endpoint supports `contentType` (filters which UNION subqueries to include, now including 'Author', 'Tag', 'Article', 'Link', 'Navigation') and `status` (adds WHERE clause). All status values are validated against a `VALID_STATUSES` set; invalid values are silently ignored (no filter applied).
+- **CSRF protection** — `server/middleware/csrf.ts` rejects non-GET/HEAD `/api/*` requests whose `Origin`/`Referer` does not match the request `Host`, unless the request carries a `Bearer` API key (API keys are ambient-credential-free). Session cookie is `SameSite=Strict, HttpOnly, Secure` (secure only in production) via `runtimeConfig.session.cookie` in `nuxt.config.ts`. A production boot-time check throws if `NUXT_SESSION_PASSWORD` is unset.
+- **Mutation rate limiting** — `server/utils/rateLimitEndpoint.ts` applies a per-IP, per-endpoint sliding window (30 req/60s) to mutating navigation endpoints via `enforceMutationRateLimit(event, '<id>')`. Uses the existing `rateLimit()` sliding-window helper.
+- **Shared validation** — `server/utils/validation.ts` exports `isUuid`, `assertUuid`, `assertNonNegativeInt`, `assertStringLength` for consistent 400 errors on bad input.
+- **Prisma error translation** — `server/utils/prismaErrors.ts` exports `translatePrismaError` and `withPrismaErrors(fn, opts)` which translate P2002 → 409, P2003 → 400, P2025 → 404 with configurable messages.
+- **Navigation-item scoping** — all mutating nav-item endpoints (POST, PUT `[id]`, DELETE `[id]`, PUT `reorder`) require a `navigationId` and verify that every item (and `parentId`, where relevant) belongs to that navigation. `reorder` additionally caps the batch at 500 items and validates each element's shape.
 - **Authentication** — `nuxt-auth-utils` module provides encrypted cookie sessions. Login page at `/login` (uses `layouts/auth.vue`). Global server middleware (`server/middleware/auth.ts`) protects all `/api/*` routes — accepts either a valid session cookie (CMS users) or an API key in `Authorization: Bearer` header (external consumers). Skips `/api/auth/**`, `/api/_auth/**`, `/api/graphql` (has its own API key gate), and `/api/images/:id/transform` (public image serving). Global client middleware (`middleware/auth.global.ts`) redirects unauthenticated users to `/login` and authenticated users away from `/login` to `/`. Password hashing uses scrypt via `hashPassword()` / `verifyPassword()` (auto-imported in server routes). `NUXT_SESSION_PASSWORD` env var required in production (auto-generated in dev). Default admin credentials: `admin@boject.com` / `password` (seeded via `prisma/seed.ts`). The logged-in user's name and logout action are in the header navbar dropdown.
 - **Image upload & transform** — File upload via `POST /api/images/upload` (multipart form, session auth required, 5MB limit, accepts JPEG/PNG/WebP/GIF/AVIF). Originals are auto-oriented (EXIF stripped) and downscaled if >4000px wide via Sharp. Stored in Nitro's unstorage (`images:originals` mount, filesystem in dev). On-the-fly transformation via `GET /api/images/:id/transform` (publicly accessible, no auth) with query params: `w` (width), `h` (height), `f` (format: jpeg/png/webp/avif), `q` (quality 1-100), `fit` (cover/contain/fill/inside/outside). Transformed variants are cached in `images:transforms` storage. Responses include `Cache-Control: public, max-age=31536000, immutable`. Rate limited to 100 requests/60s per IP. The `storage/` directory is gitignored. Production storage can be swapped to S3/R2 via `nitro.storage` config.
 - **Prisma MCP server** — Local MCP server configured for Claude Code, providing direct access to migrate-status, migrate-dev, migrate-reset, and Prisma Studio.
@@ -59,11 +64,11 @@ Note: `prisma migrate dev` requires an interactive terminal. When running from a
 
 ## Database Schema
 
-Defined across multiple `.prisma` files in `prisma/schema/` (multi-file schema). `prisma.config.ts` points to the directory. Files: `base.prisma` (generators, datasource, enums), `team.prisma`, `club.prisma`, `competition.prisma`, `season.prisma`, `fixture.prisma`, `player.prisma`, `image.prisma`, `auth.prisma`, `author.prisma`, `tag.prisma`, `article.prisma`. All models use UUID primary keys, `createdAt`/`updatedAt` timestamps, and `@unique` constraints on name fields where duplicates don't make sense.
+Defined across multiple `.prisma` files in `prisma/schema/` (multi-file schema). `prisma.config.ts` points to the directory. Files: `base.prisma` (generators, datasource, enums), `team.prisma`, `club.prisma`, `competition.prisma`, `season.prisma`, `fixture.prisma`, `player.prisma`, `image.prisma`, `auth.prisma`, `author.prisma`, `tag.prisma`, `article.prisma`, `link.prisma`, `navigation.prisma`, `navigationItem.prisma`. All models use UUID primary keys, `createdAt`/`updatedAt` timestamps, and `@unique` constraints on name fields where duplicates don't make sense.
 
 ### Content Metadata
 
-Content models (Team, Club, Competition, Season, Player, Fixture, Image, Author, Tag, Article) have publishing metadata:
+Content models (Team, Club, Competition, Season, Player, Fixture, Image, Author, Tag, Article, Link, Navigation) have publishing metadata:
 
 - `entryTitle` — Display name for the entry in the CMS (e.g. the model's `name`, or `firstName lastName` for players)
 - `status` — `ContentStatus` enum (`DRAFT`, `PUBLISHED`, `CHANGED`, `ARCHIVED`), defaults to `DRAFT`
@@ -91,6 +96,9 @@ Content models (Team, Club, Competition, Season, Player, Fixture, Image, Author,
 - **AuthorSocialLink** — Social media links for authors. Fields: `platform` (String), `url` (String). Belongs to an Author with cascade delete. Managed via delete-and-recreate strategy in a `$transaction` on author update.
 - **Tag** — Content tags with name (unique) and slug (unique). Many-to-many relation with Articles via Prisma implicit join table `_ArticleToTag`.
 - **Article** — Blog/news articles with title (unique), slug (unique), optional summary, optional body (`Json?` — Tiptap ProseMirror JSON), optional Author relation, optional featuredImage (one-to-one Image relation via named relation "ArticleFeaturedImage"), and many-to-many Tags.
+- **Link** — Reusable content link with `label`, optional `url` (free-form), optional `article` relation (internal content reference), and `openInNewTab`. Used standalone for embedding in rich text and as the target of NavigationItems. Either `url` or `articleId` must be provided (enforced at the API layer, not the DB). No slug.
+- **Navigation** — Container for a navigation tree, with a unique `name` (e.g. "Main Navigation") and a list of `NavigationItem`s. No slug.
+- **NavigationItem** — Structural join between Navigation and Link with `order`, optional `parentId` self-relation, and cascade delete from both Navigation and Link. Strictly two-level nesting (parent or child, no grandchildren); enforced at the API layer in POST/PUT handlers. Deleting a NavigationItem does not delete the Link.
 
 ## GraphQL
 
@@ -107,6 +115,7 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder.
 - **Schema assembly** — `server/graphql/schema.ts` imports all type/query files for side effects, then exports `builder.toSchema()`.
 - **Generated types** — `generated/pothos-types.ts` is produced by `prisma generate` alongside the Prisma client. Gitignored, never edit manually.
 - **DateTime scalar** — Registered in the builder. Serialises as ISO-8601 strings, parses string input to `Date`.
+- **LinkTarget union** — `server/graphql/types/link.ts` defines a `LinkTarget` GraphQL union exposing the internal content a Link points to. Currently includes `Article` only. Consumers query with inline fragments: `internalLink { __typename ... on Article { slug title author { name } } }`. The union uses `ArticleRef` (exported from `server/graphql/types/article.ts`) rather than a string identifier. When adding new target models, export their ref and add to both the `types` array and `resolveType`.
 
 ## Key Files
 
@@ -155,14 +164,35 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder.
 - `pages/authors/[id].vue` — Author edit page with social links management via #after-fields slot
 - `pages/tags/index.vue` — Tag listing page
 - `pages/tags/[id].vue` — Tag edit page
+- `pages/links/index.vue` — Link listing page
+- `pages/links/[id].vue` — Link edit page (no slug field via `showSlug={false}`)
+- `pages/navigations/index.vue` — Navigation listing page
+- `pages/navigations/[id].vue` — Navigation edit page with nested item tree manager (add/remove/reorder items)
 - `server/graphql/types/author.ts` — Author + AuthorSocialLink Pothos type definitions
 - `server/graphql/types/tag.ts` — Tag Pothos type definition
-- `server/graphql/types/article.ts` — Article Pothos type definition (body exposed as JSON scalar)
-- `prisma/seed.ts` — Database seed script (positions, teams, clubs, seasons, competitions, players, fixtures, scores, authors, tags, articles, test API key)
+- `server/graphql/types/article.ts` — Article Pothos type definition (body exposed as JSON scalar; exports `ArticleRef` for use in unions)
+- `server/graphql/types/link.ts` — Link Pothos type definition with `internalLink` field resolving via `LinkTarget` union type
+- `server/graphql/types/navigationItem.ts` — NavigationItem Pothos type definition
+- `server/graphql/types/navigation.ts` — Navigation Pothos type definition (items connection filters to top-level items only)
+- `server/api/links.get.ts` — Link list endpoint (status filter, pagination)
+- `server/api/links/[id].get.ts` — Link single-item GET
+- `server/api/links/[id].put.ts` — Link update
+- `server/api/links/index.post.ts` — Link create (requires label and one of url/articleId)
+- `server/api/links/options.get.ts` — Link options for dropdowns (`{ label, value }[]`)
+- `server/api/navigations.get.ts` — Navigation list endpoint
+- `server/api/navigations/[id].get.ts` — Navigation single-item GET (includes nested items with children and link → article)
+- `server/api/navigations/[id].put.ts` — Navigation update (handles name uniqueness → 409)
+- `server/api/navigation-items.get.ts` — List items for a navigation (requires `navigationId`)
+- `server/api/navigation-items/index.post.ts` — Create navigation item (enforces two-level nesting)
+- `server/api/navigation-items/[id].put.ts` — Update navigation item
+- `server/api/navigation-items/[id].delete.ts` — Delete navigation item (link is preserved)
+- `server/api/navigation-items/reorder.put.ts` — Bulk reorder items via Prisma `$transaction`
+- `server/api/articles/options.get.ts` — Article options endpoint for relation dropdowns
+- `prisma/seed.ts` — Database seed script (positions, teams, clubs, seasons, competitions, players, fixtures, scores, authors, tags, articles, links, navigations, navigation items, test API key)
 - `docker-compose.yml` — Local PostgreSQL 17 container
 - `server/api/` — Nitro API route handlers (CMS pages use Prisma directly, not GraphQL)
 - `pages/` — Nuxt page components
-- `prisma/schema/` — Multi-file Prisma schema (base, team, club, competition, season, fixture, player, image, auth, author, tag, article)
+- `prisma/schema/` — Multi-file Prisma schema (base, team, club, competition, season, fixture, player, image, auth, author, tag, article, link, navigation, navigationItem)
 - `prisma.config.ts` — Prisma CLI configuration (schema directory, datasource, migrations path; dotenv-loaded for CLI use)
 - `generated/prisma/client.ts` — Server-side entry (PrismaClient + model types; gitignored, regenerated)
 - `generated/pothos-types.ts` — Pothos-Prisma type bridge (gitignored, regenerated)
@@ -176,6 +206,10 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder.
 - `server/api/auth/auth.test.ts` — Auth endpoint and middleware integration tests
 - `server/utils/imageProcessing.ts` — Sharp-based image processing: `processOriginal()` (auto-orient, max dimension), `transformImage()` (resize, format, quality), constants for allowed types/formats/sizes
 - `server/utils/rateLimit.ts` — In-memory sliding window rate limiter per key, with lazy cleanup
+- `server/utils/validation.ts` — Shared input validation helpers
+- `server/utils/prismaErrors.ts` — Prisma error-code → HTTP error translation
+- `server/utils/rateLimitEndpoint.ts` — Per-endpoint mutation rate limiter
+- `server/middleware/csrf.ts` — CSRF origin/referer check for mutating `/api/*` routes
 - `server/api/images/upload.post.ts` — Multipart image upload endpoint (session auth, 5MB limit, stores via unstorage)
 - `server/api/images/[id]/transform.get.ts` — Public image transform endpoint (resize, format, cache)
 - `server/api/images/images.test.ts` — Image upload and transform integration tests
@@ -202,3 +236,6 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder.
 - **Author tests** — 11 integration tests covering listing, pagination, status filter, single-item lookup (with social links and headshot), update (name, bio, social links, content metadata), slug uniqueness (409), and 404 handling.
 - **Tag tests** — 9 integration tests covering listing, pagination, status filter, single-item lookup, update (name, content metadata), slug uniqueness (409), and 404 handling.
 - **Article tests** — 13 integration tests covering listing with relations, pagination, status/authorId/tagId filters, single-item lookup (with author, tags, featuredImage), update (title, summary, body, authorId, featuredImageId, tags), slug uniqueness (409), and 404 handling.
+- **Link tests** — Integration tests covering listing, status filter, pagination, single-item lookup, create (url, missing label, missing url+articleId), update, and options endpoint.
+- **Navigation tests** — Integration tests covering listing, nested item fetching (with children ordered by `order`), 404 handling, and name updates.
+- **NavigationItem tests** — Integration tests covering listing items by navigationId, 400 without navigationId, creating top-level and child items, rejecting beyond two levels, deleting items (link is preserved), and bulk reorder.
