@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import draggable from 'vuedraggable';
+
 const toast = useToast();
 const isSaving = ref(false);
 const saveError = ref<string | null>(null);
@@ -78,14 +80,6 @@ function addField() {
 
 function removeField(index: number) {
   fields.value.splice(index, 1);
-}
-
-function moveField(index: number, direction: 'up' | 'down') {
-  const swapIdx = direction === 'up' ? index - 1 : index + 1;
-  if (swapIdx < 0 || swapIdx >= fields.value.length) return;
-  const temp = fields.value[index]!;
-  fields.value[index] = fields.value[swapIdx]!;
-  fields.value[swapIdx] = temp;
 }
 
 const hasEntryTitle = computed(() =>
@@ -198,46 +192,38 @@ async function handleSave() {
 
       <USeparator label="Fields" />
 
-      <div class="space-y-3">
-        <div
-          v-for="(field, idx) in fields"
-          :key="idx"
-          class="border rounded-lg p-3"
-        >
-          <div class="flex items-center justify-between">
-            <div class="flex-1">
-              <span class="font-medium">{{ field.name }}</span>
-              <span class="text-sm text-muted ml-2"
-                >({{ field.identifier }})</span
-              >
-              <UBadge class="ml-2" size="sm" variant="subtle">
-                {{ field.type }}
-              </UBadge>
-              <UBadge
-                v-if="field.required"
-                color="warning"
-                size="sm"
-                variant="subtle"
-                class="ml-1"
-              >
-                Required
-              </UBadge>
-            </div>
-            <div class="flex gap-1">
-              <UButton
-                size="xs"
-                variant="ghost"
-                icon="i-lucide-chevron-up"
-                :disabled="idx === 0"
-                @click="moveField(idx, 'up')"
+      <draggable
+        v-model="fields"
+        item-key="identifier"
+        handle=".drag-handle"
+        animation="150"
+        class="space-y-3"
+      >
+        <template #item="{ element: field, index: idx }">
+          <div class="border rounded-lg p-3">
+            <div class="flex items-center gap-2">
+              <UIcon
+                name="i-lucide-grip-vertical"
+                class="drag-handle cursor-grab active:cursor-grabbing text-muted shrink-0"
               />
-              <UButton
-                size="xs"
-                variant="ghost"
-                icon="i-lucide-chevron-down"
-                :disabled="idx === fields.length - 1"
-                @click="moveField(idx, 'down')"
-              />
+              <div class="flex-1 min-w-0">
+                <span class="font-medium">{{ field.name }}</span>
+                <span class="text-sm text-muted ml-2"
+                  >({{ field.identifier }})</span
+                >
+                <UBadge class="ml-2" size="sm" variant="subtle">
+                  {{ field.type }}
+                </UBadge>
+                <UBadge
+                  v-if="field.required"
+                  color="warning"
+                  size="sm"
+                  variant="subtle"
+                  class="ml-1"
+                >
+                  Required
+                </UBadge>
+              </div>
               <UButton
                 size="xs"
                 variant="ghost"
@@ -246,15 +232,15 @@ async function handleSave() {
                 @click="removeField(idx)"
               />
             </div>
+            <p
+              v-if="field.type === 'SELECT' && field.choices"
+              class="text-sm text-muted mt-1 pl-7"
+            >
+              Choices: {{ field.choices }}
+            </p>
           </div>
-          <p
-            v-if="field.type === 'SELECT' && field.choices"
-            class="text-sm text-muted mt-1"
-          >
-            Choices: {{ field.choices }}
-          </p>
-        </div>
-      </div>
+        </template>
+      </draggable>
 
       <USeparator label="Add Field" />
 
