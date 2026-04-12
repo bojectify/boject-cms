@@ -23,40 +23,85 @@ const CONTENT_TABLES = [
   'Navigation',
 ] as const;
 
+const STATIC_TABLE_SET = new Set<string>(CONTENT_TABLES);
+
 export default defineEventHandler(async (event) => {
   const query = getQuery(event);
   const page = Math.max(1, Number(query.page) || 1);
   const perPage = Math.min(100, Math.max(1, Number(query.perPage) || 15));
   const offset = (page - 1) * perPage;
 
-  const contentType =
-    typeof query.contentType === 'string' &&
-    CONTENT_TABLES.includes(
-      query.contentType as (typeof CONTENT_TABLES)[number]
-    )
-      ? query.contentType
-      : null;
-
   const status =
     typeof query.status === 'string' && VALID_STATUSES.has(query.status)
       ? query.status
       : null;
 
-  const tables = contentType
-    ? CONTENT_TABLES.filter((t) => t === contentType)
-    : CONTENT_TABLES;
+  // Determine whether the contentType filter targets a static table,
+  // a dynamic ContentType, or nothing (show all).
+  let staticContentType: string | null = null;
+  let dynamicContentType: { id: string; name: string } | null = null;
 
-  // Both table names and status values come from validated allowlists
-  const statusWhere = status
-    ? ` WHERE status = '${status}'::"ContentStatus"`
-    : '';
+  if (typeof query.contentType === 'string' && query.contentType.length > 0) {
+    if (STATIC_TABLE_SET.has(query.contentType)) {
+      staticContentType = query.contentType;
+    } else {
+      // Check if it matches a dynamic ContentType name
+      const ct = await prisma.contentType.findUnique({
+        where: { name: query.contentType },
+        select: { id: true, name: true },
+      });
+      if (ct) {
+        dynamicContentType = ct;
+      }
+      // If neither static nor dynamic, fall through with no filter (all content)
+    }
+  }
 
-  const unionSql = tables
-    .map(
-      (t) =>
+  const subqueries: string[] = [];
+
+  // Build static table subqueries unless filtering to a specific dynamic type
+  if (!dynamicContentType) {
+    const tables = staticContentType
+      ? CONTENT_TABLES.filter((t) => t === staticContentType)
+      : CONTENT_TABLES;
+
+    // Both table names and status values come from validated allowlists
+    const statusWhere = status
+      ? ` WHERE status = '${status}'::"ContentStatus"`
+      : '';
+
+    for (const t of tables) {
+      subqueries.push(
         `SELECT id, "entryTitle", status::text, "createdAt", "updatedAt", '${t}' AS "contentType" FROM "${t}"${statusWhere}`
-    )
-    .join(' UNION ALL ');
+      );
+    }
+  }
+
+  // Build dynamic ContentEntry subquery unless filtering to a specific static table
+  if (!staticContentType) {
+    const dynamicConditions: string[] = [];
+
+    if (dynamicContentType) {
+      // Filter to a specific dynamic content type by its id (safe UUID)
+      dynamicConditions.push(`ce."contentTypeId" = '${dynamicContentType.id}'`);
+    }
+
+    if (status) {
+      // status is validated against VALID_STATUSES allowlist
+      dynamicConditions.push(`ce.status = '${status}'::"ContentStatus"`);
+    }
+
+    const dynamicWhere =
+      dynamicConditions.length > 0
+        ? ` WHERE ${dynamicConditions.join(' AND ')}`
+        : '';
+
+    subqueries.push(
+      `SELECT ce.id, COALESCE(ce.data ->> etf.name, 'Untitled') AS "entryTitle", ce.status::text, ce."createdAt", ce."updatedAt", ct.name AS "contentType" FROM "ContentEntry" ce JOIN "ContentType" ct ON ce."contentTypeId" = ct.id LEFT JOIN "ContentTypeField" etf ON etf."contentTypeId" = ct.id AND etf.type = 'ENTRY_TITLE'${dynamicWhere}`
+    );
+  }
+
+  const unionSql = subqueries.join(' UNION ALL ');
 
   const rows = await prisma.$queryRaw<
     Array<{
