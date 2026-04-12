@@ -30,6 +30,25 @@ const navItems: NavigationMenuItem[] = [
   { label: 'Navigations', icon: 'i-lucide-menu', to: '/navigations' },
 ];
 
+// Dynamic content types section
+const { data: contentTypes } = await useFetch<{
+  items: Array<{ id: string; name: string }>;
+}>('/api/content-types', { query: { perPage: 50 } });
+
+const dynamicNavItems = computed<NavigationMenuItem[]>(() => {
+  const items: NavigationMenuItem[] = [
+    { label: 'Content Types', icon: 'i-lucide-blocks', to: '/content-types' },
+  ];
+  for (const ct of contentTypes.value?.items ?? []) {
+    items.push({
+      label: ct.name,
+      icon: 'i-lucide-file-text',
+      to: `/content-types/${ct.id}/entries`,
+    });
+  }
+  return items;
+});
+
 const userMenuItems = computed<DropdownMenuItem[][]>(() => [
   [
     {
@@ -55,6 +74,8 @@ const userMenuItems = computed<DropdownMenuItem[][]>(() => [
       </template>
 
       <UNavigationMenu :items="navItems" orientation="vertical" />
+      <USeparator class="my-2" />
+      <UNavigationMenu :items="dynamicNavItems" orientation="vertical" />
     </UDashboardSidebar>
 
     <UDashboardPanel>
