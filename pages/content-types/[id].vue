@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import draggable from 'vuedraggable';
+
 const route = useRoute();
 const id = route.params.id as string;
 const toast = useToast();
@@ -24,6 +26,15 @@ const {
   }>;
   _count: { entries: number };
 }>(`/api/content-types/${id}`);
+
+const draggableFields = computed({
+  get: () => contentType.value?.fields ?? [],
+  set: (val) => {
+    if (contentType.value) {
+      contentType.value.fields = val;
+    }
+  },
+});
 
 const formName = ref('');
 const formIdentifier = ref('');
@@ -152,20 +163,11 @@ async function removeField(fieldId: string) {
   }
 }
 
-async function moveField(fieldId: string, direction: 'up' | 'down') {
+async function onFieldReorder() {
   const currentFields = contentType.value?.fields ?? [];
-  const idx = currentFields.findIndex((f) => f.id === fieldId);
-  const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
-  if (swapIdx < 0 || swapIdx >= currentFields.length) return;
-
   const reordered = currentFields.map((field, i) => ({
     id: field.id,
-    order:
-      i === idx
-        ? currentFields[swapIdx]!.order
-        : i === swapIdx
-          ? currentFields[idx]!.order
-          : field.order,
+    order: i,
   }));
 
   try {
@@ -178,6 +180,7 @@ async function moveField(fieldId: string, direction: 'up' | 'down') {
     const message =
       err instanceof Error ? err.message : 'Failed to reorder fields.';
     toast.add({ title: 'Error', description: message, color: 'error' });
+    await refresh();
   }
 }
 
@@ -248,46 +251,39 @@ function formatChoices(options: unknown): string {
 
       <USeparator label="Fields" />
 
-      <div class="space-y-3">
-        <div
-          v-for="(field, idx) in contentType?.fields ?? []"
-          :key="field.id"
-          class="border rounded-lg p-3"
-        >
-          <div class="flex items-center justify-between">
-            <div class="flex-1">
-              <span class="font-medium">{{ field.name }}</span>
-              <span class="text-sm text-muted ml-2"
-                >({{ field.identifier }})</span
-              >
-              <UBadge class="ml-2" size="sm" variant="subtle">
-                {{ field.type }}
-              </UBadge>
-              <UBadge
-                v-if="field.required"
-                color="warning"
-                size="sm"
-                variant="subtle"
-                class="ml-1"
-              >
-                Required
-              </UBadge>
-            </div>
-            <div class="flex gap-1">
-              <UButton
-                size="xs"
-                variant="ghost"
-                icon="i-lucide-chevron-up"
-                :disabled="idx === 0"
-                @click="moveField(field.id, 'up')"
+      <draggable
+        v-model="draggableFields"
+        item-key="id"
+        handle=".drag-handle"
+        animation="150"
+        class="space-y-3"
+        @end="onFieldReorder"
+      >
+        <template #item="{ element: field }">
+          <div class="border rounded-lg p-3">
+            <div class="flex items-center gap-2">
+              <UIcon
+                name="i-lucide-grip-vertical"
+                class="drag-handle cursor-grab active:cursor-grabbing text-muted shrink-0"
               />
-              <UButton
-                size="xs"
-                variant="ghost"
-                icon="i-lucide-chevron-down"
-                :disabled="idx === (contentType?.fields.length ?? 1) - 1"
-                @click="moveField(field.id, 'down')"
-              />
+              <div class="flex-1 min-w-0">
+                <span class="font-medium">{{ field.name }}</span>
+                <span class="text-sm text-muted ml-2"
+                  >({{ field.identifier }})</span
+                >
+                <UBadge class="ml-2" size="sm" variant="subtle">
+                  {{ field.type }}
+                </UBadge>
+                <UBadge
+                  v-if="field.required"
+                  color="warning"
+                  size="sm"
+                  variant="subtle"
+                  class="ml-1"
+                >
+                  Required
+                </UBadge>
+              </div>
               <UButton
                 size="xs"
                 variant="ghost"
@@ -296,15 +292,15 @@ function formatChoices(options: unknown): string {
                 @click="removeField(field.id)"
               />
             </div>
+            <p
+              v-if="field.type === 'SELECT' && formatChoices(field.options)"
+              class="text-sm text-muted mt-1 pl-7"
+            >
+              Choices: {{ formatChoices(field.options) }}
+            </p>
           </div>
-          <p
-            v-if="field.type === 'SELECT' && formatChoices(field.options)"
-            class="text-sm text-muted mt-1"
-          >
-            Choices: {{ formatChoices(field.options) }}
-          </p>
-        </div>
-      </div>
+        </template>
+      </draggable>
 
       <USeparator label="Add Field" />
 
