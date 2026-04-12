@@ -1,0 +1,12 @@
+model Navigation {
+  id          String           @id @default(uuid())
+  entryTitle  String           @default("")
+  name        String           @unique
+  items       NavigationItem[]
+  status      ContentStatus    @default(DRAFT)
+  publishedAt DateTime?
+  createdBy   String?
+  updatedBy   String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}

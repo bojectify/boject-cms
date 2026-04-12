@@ -14,6 +14,8 @@ import {
   TagGroupWhere,
   TagWhere,
   ArticleWhere,
+  LinkWhere,
+  NavigationWhere,
 } from '../filters';
 
 builder.queryType({
@@ -236,6 +238,41 @@ builder.queryType({
       args: { id: t.arg.string({ required: true }) },
       resolve: (query, _root, args) =>
         prisma.article.findUnique({ ...query, where: { id: args.id } }),
+    }),
+
+    // Link
+    links: t.prismaConnection({
+      type: 'Link',
+      cursor: 'id',
+      args: { where: t.arg({ type: LinkWhere }) },
+      resolve: (query, _root, args) =>
+        prisma.link.findMany({ ...query, where: args.where ?? undefined }),
+    }),
+    link: t.prismaField({
+      type: 'Link',
+      nullable: true,
+      args: { id: t.arg.string({ required: true }) },
+      resolve: (query, _root, args) =>
+        prisma.link.findUnique({ ...query, where: { id: args.id } }),
+    }),
+
+    // Navigation
+    navigations: t.prismaConnection({
+      type: 'Navigation',
+      cursor: 'id',
+      args: { where: t.arg({ type: NavigationWhere }) },
+      resolve: (query, _root, args) =>
+        prisma.navigation.findMany({
+          ...query,
+          where: args.where ?? undefined,
+        }),
+    }),
+    navigation: t.prismaField({
+      type: 'Navigation',
+      nullable: true,
+      args: { id: t.arg.string({ required: true }) },
+      resolve: (query, _root, args) =>
+        prisma.navigation.findUnique({ ...query, where: { id: args.id } }),
     }),
   }),
 });

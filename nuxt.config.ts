@@ -20,6 +20,27 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     databaseUrl: process.env.DATABASE_URL ?? '',
+    session: {
+      cookie: {
+        sameSite: 'strict',
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+      },
+      // `password` is read from NUXT_SESSION_PASSWORD at runtime by
+      // nuxt-auth-utils; this stub satisfies the SessionConfig type on
+      // `runtimeConfig.session`. In production, missing the env var is
+      // a fatal misconfiguration — throw at boot so it can't silently
+      // produce broken/weakly-sealed cookies.
+      password:
+        process.env.NUXT_SESSION_PASSWORD ??
+        (process.env.NODE_ENV === 'production'
+          ? (() => {
+              throw new Error(
+                'NUXT_SESSION_PASSWORD must be set in production'
+              );
+            })()
+          : ''),
+    },
   },
 
   vite: {
