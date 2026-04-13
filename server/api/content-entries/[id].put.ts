@@ -29,7 +29,7 @@ export default defineEventHandler(async (event) => {
 
   if (typeof body.data === 'object' && body.data !== null) {
     const rawData = body.data as Record<string, unknown>;
-    const validatedData = validateEntryData(
+    const validatedData = await validateEntryData(
       rawData,
       existing.contentType.fields
     );
