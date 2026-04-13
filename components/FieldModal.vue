@@ -37,15 +37,6 @@ const formType = ref('TEXT');
 const formRequired = ref(false);
 const formOptions = ref<unknown>(null);
 
-function toCamelCase(str: string): string {
-  const pascal = str
-    .trim()
-    .split(/[\s_-]+/)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join('');
-  return pascal.charAt(0).toLowerCase() + pascal.slice(1);
-}
-
 watch(
   () => props.open,
   (isOpen) => {

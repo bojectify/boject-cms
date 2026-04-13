@@ -10,14 +10,6 @@ const identifier = ref('');
 const identifierTouched = ref(false);
 const description = ref('');
 
-function toPascalCase(str: string): string {
-  return str
-    .trim()
-    .split(/[\s_-]+/)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join('');
-}
-
 watch(name, (val) => {
   if (!identifierTouched.value) {
     identifier.value = toPascalCase(val);
