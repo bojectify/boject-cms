@@ -32,7 +32,7 @@ export default defineEventHandler(async (event) => {
       ? (body.data as Record<string, unknown>)
       : {};
 
-  const validatedData = validateEntryData(rawData, contentType.fields);
+  const validatedData = await validateEntryData(rawData, contentType.fields);
   const slug = extractSlug(validatedData, contentType.fields);
 
   let status = 'DRAFT';

@@ -13,6 +13,8 @@ const VALID_FIELD_TYPES = new Set<string>([
   'DATETIME',
   'SELECT',
   'RICHTEXT',
+  'RELATION',
+  'MULTIRELATION',
 ]);
 
 export default defineEventHandler(async (event) => {
