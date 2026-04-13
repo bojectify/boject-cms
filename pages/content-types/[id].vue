@@ -96,6 +96,7 @@ const fieldTypeOptions = [
   { label: 'Boolean', value: 'BOOLEAN' },
   { label: 'Date/Time', value: 'DATETIME' },
   { label: 'Select', value: 'SELECT' },
+  { label: 'Rich Text', value: 'RICHTEXT' },
 ];
 
 const newField = reactive({
