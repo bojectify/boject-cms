@@ -119,7 +119,14 @@ function handleCreate(contentTypeId: string) {
 </script>
 
 <template>
-  <UModal :open="open" @close="emit('close')">
+  <UModal
+    :open="open"
+    @update:open="
+      (val: boolean) => {
+        if (!val) emit('close');
+      }
+    "
+  >
     <template #header>
       <h3 class="text-lg font-semibold">Link Entry</h3>
     </template>
