@@ -99,58 +99,94 @@ const fieldTypeOptions = [
   { label: 'Rich Text', value: 'RICHTEXT' },
 ];
 
-const newField = reactive({
-  identifier: '',
-  name: '',
-  type: 'TEXT',
-  required: false,
-  choices: '',
-});
+// Modal state
+const fieldModalOpen = ref(false);
+const fieldModalMode = ref<'add' | 'edit'>('add');
+const fieldModalField = ref<{
+  id: string;
+  identifier: string;
+  name: string;
+  type: string;
+  required: boolean;
+  options: unknown;
+} | null>(null);
 
-async function addField() {
-  if (!newField.identifier || !newField.name) return;
+function openAddFieldModal() {
+  fieldModalMode.value = 'add';
+  fieldModalField.value = null;
+  fieldModalOpen.value = true;
+}
+
+function openEditFieldModal(field: {
+  id: string;
+  identifier: string;
+  name: string;
+  type: string;
+  required: boolean;
+  options: unknown;
+}) {
+  fieldModalMode.value = 'edit';
+  fieldModalField.value = field;
+  fieldModalOpen.value = true;
+}
+
+async function handleFieldSave(data: {
+  identifier: string;
+  name: string;
+  type: string;
+  required: boolean;
+  options: unknown;
+}) {
   try {
-    await $fetch(`/api/content-types/${id}/fields`, {
-      method: 'POST',
-      body: {
-        identifier: newField.identifier,
-        name: newField.name,
-        type: newField.type,
-        required: newField.required,
-        ...(newField.type === 'SELECT' && newField.choices.trim()
-          ? {
-              options: {
-                choices: newField.choices
-                  .split(',')
-                  .map((c) => c.trim())
-                  .filter(Boolean),
-              },
-            }
-          : {}),
-      },
-    });
-    newField.identifier = '';
-    newField.name = '';
-    newField.type = 'TEXT';
-    newField.required = false;
-    newField.choices = '';
+    if (fieldModalMode.value === 'add') {
+      await $fetch(`/api/content-types/${id}/fields`, {
+        method: 'POST',
+        body: {
+          identifier: data.identifier,
+          name: data.name,
+          type: data.type,
+          required: data.required,
+          ...(data.options ? { options: data.options } : {}),
+        },
+      });
+      toast.add({
+        title: 'Added',
+        description: 'Field added successfully.',
+        color: 'success',
+      });
+    } else {
+      await $fetch(
+        `/api/content-types/${id}/fields/${fieldModalField.value!.id}`,
+        {
+          method: 'PUT',
+          body: {
+            name: data.name,
+            required: data.required,
+            ...(data.options ? { options: data.options } : {}),
+          },
+        }
+      );
+      toast.add({
+        title: 'Saved',
+        description: 'Field updated successfully.',
+        color: 'success',
+      });
+    }
+    fieldModalOpen.value = false;
     await refresh();
-    toast.add({
-      title: 'Added',
-      description: 'Field added successfully.',
-      color: 'success',
-    });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Failed to add field.';
+    const message =
+      err instanceof Error ? err.message : 'Failed to save field.';
     toast.add({ title: 'Error', description: message, color: 'error' });
   }
 }
 
-async function removeField(fieldId: string) {
+async function handleFieldDelete(fieldId: string) {
   try {
     await fetch(`/api/content-types/${id}/fields/${fieldId}`, {
       method: 'DELETE',
     });
+    fieldModalOpen.value = false;
     await refresh();
     toast.add({
       title: 'Removed',
@@ -162,6 +198,25 @@ async function removeField(fieldId: string) {
       err instanceof Error ? err.message : 'Failed to remove field.';
     toast.add({ title: 'Error', description: message, color: 'error' });
   }
+}
+
+function fieldMenuItems(field: {
+  id: string;
+  identifier: string;
+  name: string;
+  type: string;
+  required: boolean;
+  options: unknown;
+}) {
+  return [
+    [
+      {
+        label: 'Edit',
+        icon: 'i-lucide-pencil',
+        onSelect: () => openEditFieldModal(field),
+      },
+    ],
+  ];
 }
 
 async function onFieldReorder() {
@@ -184,176 +239,164 @@ async function onFieldReorder() {
     await refresh();
   }
 }
-
-function formatChoices(options: unknown): string {
-  if (!options || typeof options !== 'object') return '';
-  const opts = options as { choices?: string[] };
-  return opts.choices?.join(', ') ?? '';
-}
 </script>
 
 <template>
-  <div class="p-6">
-    <div class="flex items-center justify-between mb-6">
-      <h1 class="text-2xl font-bold">
-        {{ contentType?.name ?? 'Content Type' }}
-      </h1>
-      <div class="flex gap-2">
-        <UButton
-          :to="`/content-types/${id}/entries`"
-          variant="outline"
-          icon="i-lucide-list"
-        >
-          View Entries
-          <UBadge
-            v-if="contentType?._count.entries"
-            size="sm"
-            variant="subtle"
-            class="ml-1"
+  <div>
+    <div class="p-6">
+      <div class="flex items-center justify-between mb-6">
+        <h1 class="text-2xl font-bold">
+          {{ contentType?.name ?? 'Content Type' }}
+        </h1>
+        <div class="flex gap-2">
+          <UButton
+            :to="`/content-types/${id}/entries`"
+            variant="outline"
+            icon="i-lucide-list"
           >
-            {{ contentType._count.entries }}
-          </UBadge>
-        </UButton>
-        <UButton :loading="isSaving" icon="i-lucide-save" @click="handleSave">
-          Save
-        </UButton>
+            View Entries
+            <UBadge
+              v-if="contentType?._count.entries"
+              size="sm"
+              variant="subtle"
+              class="ml-1"
+            >
+              {{ contentType._count.entries }}
+            </UBadge>
+          </UButton>
+          <UButton :loading="isSaving" icon="i-lucide-save" @click="handleSave">
+            Save
+          </UButton>
+        </div>
+      </div>
+
+      <UAlert
+        v-if="saveError"
+        color="error"
+        icon="i-lucide-alert-circle"
+        :title="saveError"
+        class="mb-6"
+      />
+
+      <div v-if="loadingStatus === 'pending'" class="flex justify-center py-12">
+        <UIcon
+          name="i-lucide-loader-2"
+          class="animate-spin size-8 text-muted"
+        />
+      </div>
+
+      <div v-else class="space-y-6 max-w-2xl">
+        <UFormField label="Name" required size="xl">
+          <UInput v-model="formName" class="w-full" />
+        </UFormField>
+
+        <UFormField
+          label="Identifier"
+          required
+          size="xl"
+          hint="PascalCase, used in APIs"
+        >
+          <UInput v-model="formIdentifier" class="w-full" />
+        </UFormField>
+
+        <UFormField label="Description" size="xl">
+          <UTextarea v-model="formDescription" :rows="3" class="w-full" />
+        </UFormField>
+
+        <div class="flex items-center gap-4">
+          <USeparator class="flex-1" />
+          <span class="text-sm font-medium text-muted shrink-0">Fields</span>
+          <UButton
+            size="xs"
+            variant="outline"
+            icon="i-lucide-plus"
+            @click="openAddFieldModal"
+          >
+            Add Field
+          </UButton>
+          <USeparator class="flex-1" />
+        </div>
+
+        <draggable
+          v-model="draggableFields"
+          item-key="id"
+          handle=".drag-handle"
+          animation="150"
+          class="space-y-3"
+          @end="onFieldReorder"
+        >
+          <template #item="{ element: field }">
+            <div class="border rounded-lg p-3">
+              <div class="flex items-center gap-2">
+                <UIcon
+                  name="i-lucide-grip-vertical"
+                  class="drag-handle cursor-grab active:cursor-grabbing text-muted shrink-0"
+                />
+                <div class="flex-1 min-w-0">
+                  <span class="font-medium">{{ field.name }}</span>
+                  <span class="text-sm text-muted ml-2"
+                    >({{ field.identifier }})</span
+                  >
+                  <UBadge class="ml-2" size="sm" variant="subtle">
+                    {{ field.type }}
+                  </UBadge>
+                  <UBadge
+                    v-if="field.required"
+                    color="warning"
+                    size="sm"
+                    variant="subtle"
+                    class="ml-1"
+                  >
+                    Required
+                  </UBadge>
+                </div>
+                <UDropdownMenu :items="fieldMenuItems(field)">
+                  <UButton
+                    size="xs"
+                    variant="ghost"
+                    color="neutral"
+                    icon="i-lucide-ellipsis"
+                  />
+                </UDropdownMenu>
+              </div>
+            </div>
+          </template>
+        </draggable>
       </div>
     </div>
 
-    <UAlert
-      v-if="saveError"
-      color="error"
-      icon="i-lucide-alert-circle"
-      :title="saveError"
-      class="mb-6"
-    />
-
-    <div v-if="loadingStatus === 'pending'" class="flex justify-center py-12">
-      <UIcon name="i-lucide-loader-2" class="animate-spin size-8 text-muted" />
-    </div>
-
-    <div v-else class="space-y-6 max-w-2xl">
-      <UFormField label="Name" required size="xl">
-        <UInput v-model="formName" class="w-full" />
-      </UFormField>
-
-      <UFormField
-        label="Identifier"
-        required
-        size="xl"
-        hint="PascalCase, used in APIs"
-      >
-        <UInput v-model="formIdentifier" class="w-full" />
-      </UFormField>
-
-      <UFormField label="Description" size="xl">
-        <UTextarea v-model="formDescription" :rows="3" class="w-full" />
-      </UFormField>
-
-      <USeparator label="Fields" />
-
-      <draggable
-        v-model="draggableFields"
-        item-key="id"
-        handle=".drag-handle"
-        animation="150"
-        class="space-y-3"
-        @end="onFieldReorder"
-      >
-        <template #item="{ element: field }">
-          <div class="border rounded-lg p-3">
-            <div class="flex items-center gap-2">
-              <UIcon
-                name="i-lucide-grip-vertical"
-                class="drag-handle cursor-grab active:cursor-grabbing text-muted shrink-0"
-              />
-              <div class="flex-1 min-w-0">
-                <span class="font-medium">{{ field.name }}</span>
-                <span class="text-sm text-muted ml-2"
-                  >({{ field.identifier }})</span
-                >
-                <UBadge class="ml-2" size="sm" variant="subtle">
-                  {{ field.type }}
-                </UBadge>
-                <UBadge
-                  v-if="field.required"
-                  color="warning"
-                  size="sm"
-                  variant="subtle"
-                  class="ml-1"
-                >
-                  Required
-                </UBadge>
-              </div>
-              <UButton
-                size="xs"
-                variant="ghost"
-                color="error"
-                icon="i-lucide-trash-2"
-                @click="removeField(field.id)"
-              />
-            </div>
-            <p
-              v-if="field.type === 'SELECT' && formatChoices(field.options)"
-              class="text-sm text-muted mt-1 pl-7"
-            >
-              Choices: {{ formatChoices(field.options) }}
-            </p>
-          </div>
-        </template>
-      </draggable>
-
-      <USeparator label="Add Field" />
-
-      <div class="space-y-3 border rounded-lg p-4">
-        <div class="grid grid-cols-2 gap-3">
-          <UFormField label="Identifier" size="xl" hint="camelCase">
-            <UInput
-              v-model="newField.identifier"
-              placeholder="e.g. subtitle"
-              class="w-full"
-            />
-          </UFormField>
-          <UFormField label="Name" size="xl">
-            <UInput
-              v-model="newField.name"
-              placeholder="e.g. Subtitle"
-              class="w-full"
-            />
-          </UFormField>
-        </div>
-        <div class="grid grid-cols-2 gap-3">
-          <UFormField label="Type" size="xl">
-            <USelect
-              v-model="newField.type"
-              :items="fieldTypeOptions"
-              value-key="value"
-              class="w-full"
-            />
-          </UFormField>
-          <UFormField label=" " size="xl">
-            <USwitch v-model="newField.required" label="Required" />
-          </UFormField>
-        </div>
-        <UFormField
-          v-if="newField.type === 'SELECT'"
-          label="Choices (comma-separated)"
-          size="xl"
-        >
+    <FieldModal
+      :open="fieldModalOpen"
+      :mode="fieldModalMode"
+      :field="fieldModalField"
+      :field-type-options="fieldTypeOptions"
+      :entry-count="contentType?._count.entries"
+      @close="fieldModalOpen = false"
+      @save="handleFieldSave"
+      @delete="handleFieldDelete"
+    >
+      <template #type-options="{ type, options, updateOptions }">
+        <UFormField v-if="type === 'SELECT'" label="Choices (comma-separated)">
           <UInput
-            v-model="newField.choices"
+            :model-value="
+              options && typeof options === 'object' && 'choices' in options
+                ? (options as { choices: string[] }).choices.join(', ')
+                : ''
+            "
             placeholder="e.g. option_a, option_b, option_c"
             class="w-full"
+            @update:model-value="
+              (val: string) =>
+                updateOptions({
+                  choices: val
+                    .split(',')
+                    .map((c: string) => c.trim())
+                    .filter(Boolean),
+                })
+            "
           />
         </UFormField>
-        <UButton
-          icon="i-lucide-plus"
-          :disabled="!newField.identifier || !newField.name"
-          @click="addField"
-        >
-          Add Field
-        </UButton>
-      </div>
-    </div>
+      </template>
+    </FieldModal>
   </div>
 </template>
