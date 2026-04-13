@@ -34,7 +34,14 @@ function confirm() {
 </script>
 
 <template>
-  <UModal :open="open" @close="emit('close')">
+  <UModal
+    :open="open"
+    @update:open="
+      (val: boolean) => {
+        if (!val) emit('close');
+      }
+    "
+  >
     <template #header>
       <h3 class="text-lg font-semibold">Embed Content</h3>
     </template>

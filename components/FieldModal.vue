@@ -100,7 +100,14 @@ const canDelete = computed(() => {
 </script>
 
 <template>
-  <UModal :open="open" @close="emit('close')">
+  <UModal
+    :open="open"
+    @update:open="
+      (val: boolean) => {
+        if (!val) emit('close');
+      }
+    "
+  >
     <template #header>
       <div class="flex items-center gap-2">
         <h3 class="text-lg font-semibold">

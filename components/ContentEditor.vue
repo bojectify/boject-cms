@@ -99,12 +99,7 @@ function onSubmit() {
   <div class="p-6">
     <div class="flex items-center justify-between mb-6">
       <h1 class="text-2xl font-bold">{{ title }}</h1>
-      <UButton
-        :loading="saving"
-        :disabled="!form?.dirty"
-        icon="i-lucide-save"
-        @click="form?.submit()"
-      >
+      <UButton :loading="saving" icon="i-lucide-save" @click="form?.submit()">
         Save
       </UButton>
     </div>
@@ -130,148 +125,155 @@ function onSubmit() {
       @submit="onSubmit"
     >
       <template v-for="field in fields" :key="field.key">
-        <UFormField
-          v-if="field.type === 'text'"
-          :label="field.readonly ? `${field.label} (read-only)` : field.label"
-          :name="field.key"
-          :required="field.required"
-          size="xl"
+        <slot
+          name="field"
+          :field="field"
+          :value="state[field.key]"
+          :update="(val: unknown) => (state[field.key] = val)"
         >
-          <UInput
-            :model-value="(state[field.key] as string) ?? ''"
-            :placeholder="field.placeholder"
-            :readonly="field.readonly"
-            class="w-full"
-            @update:model-value="state[field.key] = $event"
-          />
-        </UFormField>
+          <UFormField
+            v-if="field.type === 'text'"
+            :label="field.readonly ? `${field.label} (read-only)` : field.label"
+            :name="field.key"
+            :required="field.required"
+            size="xl"
+          >
+            <UInput
+              :model-value="(state[field.key] as string) ?? ''"
+              :placeholder="field.placeholder"
+              :readonly="field.readonly"
+              class="w-full"
+              @update:model-value="state[field.key] = $event"
+            />
+          </UFormField>
 
-        <UFormField
-          v-else-if="field.type === 'textarea'"
-          :label="field.label"
-          :name="field.key"
-          :required="field.required"
-          size="xl"
-        >
-          <UTextarea
-            :model-value="(state[field.key] as string) ?? ''"
-            :placeholder="field.placeholder"
-            :rows="field.rows ?? 4"
-            class="w-full"
-            @update:model-value="state[field.key] = $event"
-          />
-        </UFormField>
-
-        <UFormField
-          v-else-if="field.type === 'number'"
-          :label="field.label"
-          :name="field.key"
-          :required="field.required"
-          size="xl"
-        >
-          <UInput
-            type="number"
-            :model-value="
-              state[field.key] != null ? String(state[field.key]) : ''
-            "
-            :placeholder="field.placeholder"
-            class="w-full"
-            @update:model-value="
-              state[field.key] = $event === '' ? null : Number($event)
-            "
-          />
-        </UFormField>
-
-        <UFormField
-          v-else-if="field.type === 'boolean'"
-          :name="field.key"
-          size="xl"
-        >
-          <USwitch
-            :model-value="(state[field.key] as boolean) ?? false"
+          <UFormField
+            v-else-if="field.type === 'textarea'"
             :label="field.label"
-            @update:model-value="state[field.key] = $event"
-          />
-        </UFormField>
+            :name="field.key"
+            :required="field.required"
+            size="xl"
+          >
+            <UTextarea
+              :model-value="(state[field.key] as string) ?? ''"
+              :placeholder="field.placeholder"
+              :rows="field.rows ?? 4"
+              class="w-full"
+              @update:model-value="state[field.key] = $event"
+            />
+          </UFormField>
 
-        <UFormField
-          v-else-if="field.type === 'datetime'"
-          :label="field.label"
-          :name="field.key"
-          :required="field.required"
-          size="xl"
-        >
-          <UInput
-            type="datetime-local"
-            :model-value="toDatetimeLocal(state[field.key])"
-            class="w-full"
-            @update:model-value="
-              state[field.key] = fromDatetimeLocal($event as string)
-            "
-          />
-        </UFormField>
+          <UFormField
+            v-else-if="field.type === 'number'"
+            :label="field.label"
+            :name="field.key"
+            :required="field.required"
+            size="xl"
+          >
+            <UInput
+              type="number"
+              :model-value="
+                state[field.key] != null ? String(state[field.key]) : ''
+              "
+              :placeholder="field.placeholder"
+              class="w-full"
+              @update:model-value="
+                state[field.key] = $event === '' ? null : Number($event)
+              "
+            />
+          </UFormField>
 
-        <UFormField
-          v-else-if="field.type === 'select'"
-          :label="field.label"
-          :name="field.key"
-          :required="field.required"
-          size="xl"
-        >
-          <USelect
-            :model-value="(state[field.key] as string) ?? ''"
-            :items="field.options"
-            value-key="value"
-            class="w-full"
-            @update:model-value="state[field.key] = $event"
-          />
-        </UFormField>
+          <UFormField
+            v-else-if="field.type === 'boolean'"
+            :name="field.key"
+            size="xl"
+          >
+            <USwitch
+              :model-value="(state[field.key] as boolean) ?? false"
+              :label="field.label"
+              @update:model-value="state[field.key] = $event"
+            />
+          </UFormField>
 
-        <UFormField
-          v-else-if="field.type === 'relation'"
-          :label="field.label"
-          :name="field.key"
-          :required="field.required"
-          size="xl"
-        >
-          <USelect
-            :model-value="(state[field.key] as string) ?? ''"
-            :items="relationOptions[field.key] ?? []"
-            value-key="value"
-            placeholder="Select..."
-            class="w-full"
-            @update:model-value="state[field.key] = $event || null"
-          />
-        </UFormField>
+          <UFormField
+            v-else-if="field.type === 'datetime'"
+            :label="field.label"
+            :name="field.key"
+            :required="field.required"
+            size="xl"
+          >
+            <UInput
+              type="datetime-local"
+              :model-value="toDatetimeLocal(state[field.key])"
+              class="w-full"
+              @update:model-value="
+                state[field.key] = fromDatetimeLocal($event as string)
+              "
+            />
+          </UFormField>
 
-        <UFormField
-          v-else-if="field.type === 'multirelation'"
-          :label="field.label"
-          :name="field.key"
-          size="xl"
-        >
-          <USelectMenu
-            :model-value="(state[field.key] as string[]) ?? []"
-            :items="relationOptions[field.key] ?? []"
-            value-key="value"
-            multiple
-            placeholder="Select..."
-            class="w-full"
-            @update:model-value="state[field.key] = $event"
-          />
-        </UFormField>
+          <UFormField
+            v-else-if="field.type === 'select'"
+            :label="field.label"
+            :name="field.key"
+            :required="field.required"
+            size="xl"
+          >
+            <USelect
+              :model-value="(state[field.key] as string) ?? ''"
+              :items="field.options"
+              value-key="value"
+              class="w-full"
+              @update:model-value="state[field.key] = $event"
+            />
+          </UFormField>
 
-        <UFormField
-          v-else-if="field.type === 'richtext'"
-          :label="field.label"
-          :name="field.key"
-          size="xl"
-        >
-          <RichTextEditor
-            :model-value="state[field.key]"
-            @update:model-value="state[field.key] = $event"
-          />
-        </UFormField>
+          <UFormField
+            v-else-if="field.type === 'relation'"
+            :label="field.label"
+            :name="field.key"
+            :required="field.required"
+            size="xl"
+          >
+            <USelect
+              :model-value="(state[field.key] as string) ?? ''"
+              :items="relationOptions[field.key] ?? []"
+              value-key="value"
+              placeholder="Select..."
+              class="w-full"
+              @update:model-value="state[field.key] = $event || null"
+            />
+          </UFormField>
+
+          <UFormField
+            v-else-if="field.type === 'multirelation'"
+            :label="field.label"
+            :name="field.key"
+            size="xl"
+          >
+            <USelectMenu
+              :model-value="(state[field.key] as string[]) ?? []"
+              :items="relationOptions[field.key] ?? []"
+              value-key="value"
+              multiple
+              placeholder="Select..."
+              class="w-full"
+              @update:model-value="state[field.key] = $event"
+            />
+          </UFormField>
+
+          <UFormField
+            v-else-if="field.type === 'richtext'"
+            :label="field.label"
+            :name="field.key"
+            size="xl"
+          >
+            <RichTextEditor
+              :model-value="state[field.key]"
+              @update:model-value="state[field.key] = $event"
+            />
+          </UFormField>
+        </slot>
       </template>
 
       <slot name="after-fields" />
