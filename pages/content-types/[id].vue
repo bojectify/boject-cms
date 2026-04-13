@@ -62,13 +62,14 @@ async function handleSave() {
   isSaving.value = true;
   saveError.value = null;
   try {
-    await $fetch(`/api/content-types/${id}`, {
+    await fetch(`/api/content-types/${id}`, {
       method: 'PUT',
-      body: {
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         name: formName.value.trim(),
         identifier: formIdentifier.value.trim(),
         description: formDescription.value.trim() || null,
-      },
+      }),
     });
     await refresh();
     toast.add({
