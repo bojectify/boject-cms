@@ -85,6 +85,11 @@ describe('Content Entry endpoints', async () => {
             type: 'SELECT',
             options: { choices: ['news', 'blog', 'update'] },
           },
+          {
+            identifier: 'content',
+            name: 'Content',
+            type: 'RICHTEXT',
+          },
         ],
       },
     });
@@ -166,6 +171,52 @@ describe('Content Entry endpoints', async () => {
           data: {
             title: 'Bad Category',
             category: 'invalid-category',
+          },
+        }),
+      });
+
+      expect(res.status).toBe(400);
+    });
+
+    it('creates an entry with RICHTEXT data', async () => {
+      const cookie = await getSessionCookie();
+      const proseMirrorDoc = {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [{ type: 'text', text: 'Hello world' }],
+          },
+        ],
+      };
+
+      const res = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contentTypeId: testContentType.id,
+          data: {
+            title: `Richtext Entry ${Date.now()}`,
+            content: proseMirrorDoc,
+          },
+        }),
+      });
+
+      expect(res.status).toBe(201);
+      const body = (await res.json()) as EntryResponse;
+      expect(body.data.content).toEqual(proseMirrorDoc);
+    });
+
+    it('rejects non-object RICHTEXT value', async () => {
+      const cookie = await getSessionCookie();
+      const res = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contentTypeId: testContentType.id,
+          data: {
+            title: `Bad Richtext ${Date.now()}`,
+            content: 'this is a string not an object',
           },
         }),
       });
