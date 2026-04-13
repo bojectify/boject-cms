@@ -407,6 +407,218 @@ describe('Content Entry endpoints', async () => {
     });
   });
 
+  let relationContentType: ContentTypeResponse;
+  let targetEntry: EntryResponse;
+
+  beforeAll(async () => {
+    const cookie = await getSessionCookie();
+
+    const targetType = await $fetch<ContentTypeResponse>('/api/content-types', {
+      method: 'POST',
+      headers: { cookie },
+      body: {
+        name: `Relation Target ${Date.now()}`,
+        fields: [
+          {
+            identifier: 'title',
+            name: 'Title',
+            type: 'ENTRY_TITLE',
+            required: true,
+          },
+        ],
+      },
+    });
+
+    const entryRes = await fetch('/api/content-entries', {
+      method: 'POST',
+      headers: { cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contentTypeId: targetType.id,
+        data: { title: 'Target Entry' },
+      }),
+    });
+    targetEntry = (await entryRes.json()) as EntryResponse;
+
+    relationContentType = await $fetch<ContentTypeResponse>(
+      '/api/content-types',
+      {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: `Relation Test ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+            {
+              identifier: 'link',
+              name: 'Link',
+              type: 'RELATION',
+              options: { targetContentTypeIds: [targetType.id] },
+            },
+            {
+              identifier: 'relatedItems',
+              name: 'Related Items',
+              type: 'MULTIRELATION',
+              options: { targetContentTypeIds: [targetType.id] },
+            },
+          ],
+        },
+      }
+    );
+  });
+
+  describe('RELATION/MULTIRELATION entries', () => {
+    it('creates an entry with a valid RELATION value', async () => {
+      const cookie = await getSessionCookie();
+      const res = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contentTypeId: relationContentType.id,
+          data: {
+            title: `Rel Entry ${Date.now()}`,
+            link: {
+              contentTypeId: targetEntry.contentTypeId,
+              entryId: targetEntry.id,
+            },
+          },
+        }),
+      });
+      expect(res.status).toBe(201);
+      const body = (await res.json()) as EntryResponse;
+      expect(body.data.link).toEqual({
+        contentTypeId: targetEntry.contentTypeId,
+        entryId: targetEntry.id,
+      });
+    });
+
+    it('creates an entry with a valid MULTIRELATION value', async () => {
+      const cookie = await getSessionCookie();
+      const res = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contentTypeId: relationContentType.id,
+          data: {
+            title: `Multi Rel ${Date.now()}`,
+            relatedItems: [
+              {
+                contentTypeId: targetEntry.contentTypeId,
+                entryId: targetEntry.id,
+              },
+            ],
+          },
+        }),
+      });
+      expect(res.status).toBe(201);
+      const body = (await res.json()) as EntryResponse;
+      expect(body.data.relatedItems).toEqual([
+        {
+          contentTypeId: targetEntry.contentTypeId,
+          entryId: targetEntry.id,
+        },
+      ]);
+    });
+
+    it('accepts null RELATION value for non-required field', async () => {
+      const cookie = await getSessionCookie();
+      const res = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contentTypeId: relationContentType.id,
+          data: {
+            title: `No Link ${Date.now()}`,
+          },
+        }),
+      });
+      expect(res.status).toBe(201);
+    });
+
+    it('accepts empty array for MULTIRELATION', async () => {
+      const cookie = await getSessionCookie();
+      const res = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contentTypeId: relationContentType.id,
+          data: {
+            title: `Empty Multi ${Date.now()}`,
+            relatedItems: [],
+          },
+        }),
+      });
+      expect(res.status).toBe(201);
+    });
+
+    it('rejects RELATION with non-existent entryId', async () => {
+      const cookie = await getSessionCookie();
+      const res = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contentTypeId: relationContentType.id,
+          data: {
+            title: `Bad Link ${Date.now()}`,
+            link: {
+              contentTypeId: targetEntry.contentTypeId,
+              entryId: '00000000-0000-0000-0000-000000000000',
+            },
+          },
+        }),
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('rejects RELATION with disallowed contentTypeId', async () => {
+      const cookie = await getSessionCookie();
+      const res = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contentTypeId: relationContentType.id,
+          data: {
+            title: `Wrong Type ${Date.now()}`,
+            link: {
+              contentTypeId: '00000000-0000-0000-0000-000000000000',
+              entryId: targetEntry.id,
+            },
+          },
+        }),
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('rejects MULTIRELATION with duplicate entryIds', async () => {
+      const cookie = await getSessionCookie();
+      const res = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contentTypeId: relationContentType.id,
+          data: {
+            title: `Dup Multi ${Date.now()}`,
+            relatedItems: [
+              {
+                contentTypeId: targetEntry.contentTypeId,
+                entryId: targetEntry.id,
+              },
+              {
+                contentTypeId: targetEntry.contentTypeId,
+                entryId: targetEntry.id,
+              },
+            ],
+          },
+        }),
+      });
+      expect(res.status).toBe(400);
+    });
+  });
+
   describe('DELETE /api/content-entries/:id', () => {
     it('deletes an entry', async () => {
       const cookie = await getSessionCookie();
