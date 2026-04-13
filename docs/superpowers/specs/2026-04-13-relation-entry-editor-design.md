@@ -106,7 +106,7 @@ Modal for selecting an existing entry to link, or creating a new one.
 - Search input filtering entries by title (client-side filter on fetched results, or query param if list is large)
 - Scrollable list of entry cards (entry title + content type badge)
 - Clicking an entry emits `select` and closes
-- "Create new [Type]" button at the bottom — if multiple types, a dropdown to pick which type. Emits `create(contentTypeId)`.
+- "Create new..." button in the footer. When only one target type, clicking goes straight to the pane in create mode. When multiple target types, clicking opens a popover listing the allowed types (with colored initials). Selecting a type from the popover emits `create(contentTypeId)` and closes the modal.
 - Fetches entries from `GET /api/content-entries?contentTypeId=X` for each target type
 
 ### `EntryEditorPane.vue`
