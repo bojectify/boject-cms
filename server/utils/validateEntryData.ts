@@ -99,6 +99,16 @@ export function validateEntryData(
         break;
       }
 
+      case 'RICHTEXT':
+        if (typeof value !== 'object' || Array.isArray(value)) {
+          throw createError({
+            statusCode: 400,
+            statusMessage: `${field.name} must be a JSON object`,
+          });
+        }
+        validated[field.identifier] = value;
+        break;
+
       default:
         validated[field.identifier] = value;
     }

@@ -463,6 +463,37 @@ describe('Content Type endpoints', async () => {
       });
       expect(res.status).toBe(409);
     });
+
+    it('adds a RICHTEXT field', async () => {
+      const cookie = await getSessionCookie();
+      const ct = await $fetch<ContentTypeResponse>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: `Richtext Test ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+          ],
+        },
+      });
+
+      const field = await $fetch<FieldResponse>(
+        `/api/content-types/${ct.id}/fields`,
+        {
+          method: 'POST',
+          headers: { cookie },
+          body: { identifier: 'body', name: 'Body', type: 'RICHTEXT' },
+        }
+      );
+
+      expect(field.type).toBe('RICHTEXT');
+      expect(field.identifier).toBe('body');
+    });
   });
 
   describe('PUT /api/content-types/[id]/fields/[fieldId]', () => {
