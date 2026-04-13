@@ -66,6 +66,21 @@ export interface MultirelationFieldConfig {
   optionsEndpoint: string;
 }
 
+export interface DynamicRelationFieldConfig {
+  type: 'dynamic-relation';
+  key: string;
+  label: string;
+  required?: boolean;
+  targetContentTypeIds: string[];
+}
+
+export interface DynamicMultirelationFieldConfig {
+  type: 'dynamic-multirelation';
+  key: string;
+  label: string;
+  targetContentTypeIds: string[];
+}
+
 export type FieldConfig =
   | TextFieldConfig
   | TextareaFieldConfig
@@ -75,4 +90,6 @@ export type FieldConfig =
   | SelectFieldConfig
   | RelationFieldConfig
   | RichtextFieldConfig
-  | MultirelationFieldConfig;
+  | MultirelationFieldConfig
+  | DynamicRelationFieldConfig
+  | DynamicMultirelationFieldConfig;
