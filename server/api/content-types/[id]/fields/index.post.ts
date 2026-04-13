@@ -16,6 +16,7 @@ const VALID_FIELD_TYPES = new Set<string>([
   'BOOLEAN',
   'DATETIME',
   'SELECT',
+  'RICHTEXT',
 ]);
 
 export default defineEventHandler(async (event) => {

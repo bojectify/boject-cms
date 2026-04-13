@@ -17,6 +17,7 @@ const VALID_FIELD_TYPES = new Set<string>([
   'BOOLEAN',
   'DATETIME',
   'SELECT',
+  'RICHTEXT',
 ]);
 
 const NAME_MAX = 200;

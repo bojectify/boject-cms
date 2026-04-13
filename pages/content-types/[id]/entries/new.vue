@@ -89,6 +89,12 @@ function mapFieldToConfig(field: {
         options: choices.map((c) => ({ label: c, value: c })),
       };
     }
+    case 'RICHTEXT':
+      return {
+        type: 'richtext',
+        key: field.identifier,
+        label: field.name,
+      };
     default:
       return {
         type: 'text',
