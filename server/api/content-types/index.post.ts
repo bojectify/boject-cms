@@ -4,6 +4,7 @@ import {
   assertIdentifier,
   assertFieldIdentifier,
   toPascalCase,
+  isUuid,
 } from '../../utils/validation';
 import { withPrismaErrors } from '../../utils/prismaErrors';
 import { enforceMutationRateLimit } from '../../utils/rateLimitEndpoint';
@@ -18,6 +19,8 @@ const VALID_FIELD_TYPES = new Set<string>([
   'DATETIME',
   'SELECT',
   'RICHTEXT',
+  'RELATION',
+  'MULTIRELATION',
 ]);
 
 const NAME_MAX = 200;
@@ -75,6 +78,28 @@ export default defineEventHandler(async (event) => {
       });
     }
     const type = f.type as FieldType;
+
+    if (type === 'RELATION' || type === 'MULTIRELATION') {
+      const opts = f.options as { targetContentTypeIds?: unknown } | null;
+      if (
+        !opts ||
+        !Array.isArray(opts.targetContentTypeIds) ||
+        opts.targetContentTypeIds.length === 0
+      ) {
+        throw createError({
+          statusCode: 400,
+          statusMessage: `fields[${idx}].options.targetContentTypeIds is required for relation fields`,
+        });
+      }
+      for (const targetId of opts.targetContentTypeIds) {
+        if (!isUuid(targetId)) {
+          throw createError({
+            statusCode: 400,
+            statusMessage: `Invalid UUID in fields[${idx}].options.targetContentTypeIds`,
+          });
+        }
+      }
+    }
 
     if (type === 'ENTRY_TITLE') entryTitleCount++;
     if (type === 'SLUG') slugCount++;
