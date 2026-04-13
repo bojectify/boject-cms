@@ -38,6 +38,11 @@ const fieldTypeOptions = [
   { label: 'Multi Relation', value: 'MULTIRELATION' },
 ];
 
+// Content type options for relation field target picker
+const { data: contentTypeOptions } = useFetch<
+  { label: string; value: string }[]
+>('/api/content-types/options');
+
 const fields = ref<FieldDraft[]>([
   {
     identifier: 'title',
@@ -340,6 +345,84 @@ async function handleSave() {
                 })
             "
           />
+        </UFormField>
+        <UFormField
+          v-else-if="type === 'RELATION' || type === 'MULTIRELATION'"
+          label="Target Content Types"
+          required
+        >
+          <div class="space-y-2">
+            <div
+              v-if="
+                options &&
+                typeof options === 'object' &&
+                'targetContentTypeIds' in options &&
+                ((options as { targetContentTypeIds: string[] })
+                  .targetContentTypeIds?.length ?? 0) > 0
+              "
+              class="flex flex-wrap gap-2"
+            >
+              <UBadge
+                v-for="targetId in (
+                  options as { targetContentTypeIds: string[] }
+                ).targetContentTypeIds"
+                :key="targetId"
+                size="md"
+                variant="subtle"
+                color="info"
+                class="cursor-pointer"
+                @click="
+                  updateOptions({
+                    targetContentTypeIds: (
+                      options as { targetContentTypeIds: string[] }
+                    ).targetContentTypeIds.filter(
+                      (id: string) => id !== targetId
+                    ),
+                  })
+                "
+              >
+                {{
+                  contentTypeOptions?.find((o) => o.value === targetId)
+                    ?.label ?? targetId
+                }}
+                <UIcon name="i-lucide-x" class="size-3 ml-1" />
+              </UBadge>
+            </div>
+            <USelect
+              :model-value="''"
+              :items="
+                (contentTypeOptions ?? []).filter(
+                  (o) =>
+                    !(
+                      options &&
+                      typeof options === 'object' &&
+                      'targetContentTypeIds' in options &&
+                      (
+                        options as { targetContentTypeIds: string[] }
+                      ).targetContentTypeIds.includes(o.value)
+                    )
+                )
+              "
+              value-key="value"
+              placeholder="Add content type..."
+              class="w-full"
+              @update:model-value="
+                (val: string) => {
+                  if (!val) return;
+                  const current =
+                    options &&
+                    typeof options === 'object' &&
+                    'targetContentTypeIds' in options
+                      ? (options as { targetContentTypeIds: string[] })
+                          .targetContentTypeIds
+                      : [];
+                  updateOptions({
+                    targetContentTypeIds: [...current, val],
+                  });
+                }
+              "
+            />
+          </div>
         </UFormField>
       </template>
     </FieldModal>
