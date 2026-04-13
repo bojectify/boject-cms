@@ -34,6 +34,8 @@ const fieldTypeOptions = [
   { label: 'Date/Time', value: 'DATETIME' },
   { label: 'Select', value: 'SELECT' },
   { label: 'Rich Text', value: 'RICHTEXT' },
+  { label: 'Relation', value: 'RELATION' },
+  { label: 'Multi Relation', value: 'MULTIRELATION' },
 ];
 
 const fields = ref<FieldDraft[]>([
