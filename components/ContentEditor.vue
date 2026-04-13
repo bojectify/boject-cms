@@ -99,12 +99,7 @@ function onSubmit() {
   <div class="p-6">
     <div class="flex items-center justify-between mb-6">
       <h1 class="text-2xl font-bold">{{ title }}</h1>
-      <UButton
-        :loading="saving"
-        :disabled="!form?.dirty"
-        icon="i-lucide-save"
-        @click="form?.submit()"
-      >
+      <UButton :loading="saving" icon="i-lucide-save" @click="form?.submit()">
         Save
       </UButton>
     </div>
