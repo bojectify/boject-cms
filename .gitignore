@@ -27,6 +27,7 @@ Thumbs.db
 # IDE/Editor
 .vscode/
 .idea/
+.mcp.json
 *.swp
 *.swo
 *~

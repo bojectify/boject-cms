@@ -3,6 +3,7 @@ import {
   assertUuid,
   assertStringLength,
   assertFieldIdentifier,
+  isUuid,
 } from '../../../../utils/validation';
 import { withPrismaErrors } from '../../../../utils/prismaErrors';
 import { enforceMutationRateLimit } from '../../../../utils/rateLimitEndpoint';
@@ -17,6 +18,8 @@ const VALID_FIELD_TYPES = new Set<string>([
   'DATETIME',
   'SELECT',
   'RICHTEXT',
+  'RELATION',
+  'MULTIRELATION',
 ]);
 
 export default defineEventHandler(async (event) => {
@@ -35,6 +38,40 @@ export default defineEventHandler(async (event) => {
     });
   }
   const type = body.type as FieldType;
+
+  // Validate targetContentTypeIds for relation fields
+  if (type === 'RELATION' || type === 'MULTIRELATION') {
+    const opts = body.options as { targetContentTypeIds?: unknown } | null;
+    if (
+      !opts ||
+      !Array.isArray(opts.targetContentTypeIds) ||
+      opts.targetContentTypeIds.length === 0
+    ) {
+      throw createError({
+        statusCode: 400,
+        statusMessage:
+          'options.targetContentTypeIds is required for relation fields and must be a non-empty array',
+      });
+    }
+    for (const targetId of opts.targetContentTypeIds) {
+      if (!isUuid(targetId)) {
+        throw createError({
+          statusCode: 400,
+          statusMessage: `Invalid UUID in targetContentTypeIds: ${targetId}`,
+        });
+      }
+    }
+    const existingCount = await prisma.contentType.count({
+      where: { id: { in: opts.targetContentTypeIds as string[] } },
+    });
+    if (existingCount !== (opts.targetContentTypeIds as string[]).length) {
+      throw createError({
+        statusCode: 400,
+        statusMessage:
+          'One or more targetContentTypeIds do not reference existing content types',
+      });
+    }
+  }
 
   // Check content type exists and load existing fields
   const contentType = await prisma.contentType.findUnique({

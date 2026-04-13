@@ -494,6 +494,117 @@ describe('Content Type endpoints', async () => {
       expect(field.type).toBe('RICHTEXT');
       expect(field.identifier).toBe('body');
     });
+
+    it('creates a RELATION field with targetContentTypeIds', async () => {
+      const cookie = await getSessionCookie();
+      const target = await $fetch<ContentTypeResponse>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: `Relation Target ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+          ],
+        },
+      });
+
+      const ct = await $fetch<ContentTypeResponse>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: `Has Relation ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+            {
+              identifier: 'relatedItem',
+              name: 'Related Item',
+              type: 'RELATION',
+              options: { targetContentTypeIds: [target.id] },
+            },
+          ],
+        },
+      });
+
+      const relField = ct.fields.find((f) => f.type === 'RELATION');
+      expect(relField).toBeDefined();
+      expect(
+        (relField!.options as { targetContentTypeIds: string[] })
+          .targetContentTypeIds
+      ).toContain(target.id);
+    });
+
+    it('rejects RELATION field without targetContentTypeIds', async () => {
+      const cookie = await getSessionCookie();
+      const ct = await $fetch<ContentTypeResponse>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: `No Targets ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+          ],
+        },
+      });
+
+      const res = await fetch(`/api/content-types/${ct.id}/fields`, {
+        method: 'POST',
+        headers: { cookie, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          identifier: 'link',
+          name: 'Link',
+          type: 'RELATION',
+        }),
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('rejects RELATION field with non-existent targetContentTypeId', async () => {
+      const cookie = await getSessionCookie();
+      const ct = await $fetch<ContentTypeResponse>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: `Bad Target ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+          ],
+        },
+      });
+
+      const res = await fetch(`/api/content-types/${ct.id}/fields`, {
+        method: 'POST',
+        headers: { cookie, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          identifier: 'link',
+          name: 'Link',
+          type: 'RELATION',
+          options: {
+            targetContentTypeIds: ['00000000-0000-0000-0000-000000000000'],
+          },
+        }),
+      });
+      expect(res.status).toBe(400);
+    });
   });
 
   describe('PUT /api/content-types/[id]/fields/[fieldId]', () => {
@@ -672,6 +783,20 @@ describe('Content Type endpoints', async () => {
         }
       );
       expect(res.status).toBe(404);
+    });
+  });
+
+  describe('GET /api/content-types/options', () => {
+    it('returns content types as label/value pairs', async () => {
+      const cookie = await getSessionCookie();
+      const options = await $fetch<{ label: string; value: string }[]>(
+        '/api/content-types/options',
+        { headers: { cookie } }
+      );
+      expect(Array.isArray(options)).toBe(true);
+      expect(options.length).toBeGreaterThan(0);
+      expect(options[0]).toHaveProperty('label');
+      expect(options[0]).toHaveProperty('value');
     });
   });
 

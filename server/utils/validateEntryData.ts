@@ -1,5 +1,6 @@
 import { createError } from 'h3';
 import type { FieldType } from '#prisma';
+import { isUuid } from './validation';
 
 interface FieldDef {
   identifier: string;
@@ -14,10 +15,10 @@ interface FieldDef {
  * Returns the validated/cleaned data object.
  * Throws 400 on validation failure.
  */
-export function validateEntryData(
+export async function validateEntryData(
   data: Record<string, unknown>,
   fields: FieldDef[]
-): Record<string, unknown> {
+): Promise<Record<string, unknown>> {
   const validated: Record<string, unknown> = {};
 
   for (const field of fields) {
@@ -108,6 +109,130 @@ export function validateEntryData(
         }
         validated[field.identifier] = value;
         break;
+
+      case 'RELATION': {
+        if (
+          typeof value !== 'object' ||
+          value === null ||
+          Array.isArray(value)
+        ) {
+          throw createError({
+            statusCode: 400,
+            statusMessage: `${field.name} must be an object with contentTypeId and entryId`,
+          });
+        }
+        const rel = value as Record<string, unknown>;
+        if (!isUuid(rel.contentTypeId) || !isUuid(rel.entryId)) {
+          throw createError({
+            statusCode: 400,
+            statusMessage: `${field.name} must have valid contentTypeId and entryId UUIDs`,
+          });
+        }
+        const opts = field.options as {
+          targetContentTypeIds?: string[];
+        } | null;
+        const allowedTypes = opts?.targetContentTypeIds ?? [];
+        if (
+          allowedTypes.length > 0 &&
+          !allowedTypes.includes(rel.contentTypeId as string)
+        ) {
+          throw createError({
+            statusCode: 400,
+            statusMessage: `${field.name} references a content type that is not allowed for this field`,
+          });
+        }
+        const entryExists = await prisma.contentEntry.findFirst({
+          where: {
+            id: rel.entryId as string,
+            contentTypeId: rel.contentTypeId as string,
+          },
+          select: { id: true },
+        });
+        if (!entryExists) {
+          throw createError({
+            statusCode: 400,
+            statusMessage: `${field.name} references an entry that does not exist`,
+          });
+        }
+        validated[field.identifier] = {
+          contentTypeId: rel.contentTypeId,
+          entryId: rel.entryId,
+        };
+        break;
+      }
+
+      case 'MULTIRELATION': {
+        if (!Array.isArray(value)) {
+          throw createError({
+            statusCode: 400,
+            statusMessage: `${field.name} must be an array`,
+          });
+        }
+        const opts = field.options as {
+          targetContentTypeIds?: string[];
+        } | null;
+        const allowedTypes = opts?.targetContentTypeIds ?? [];
+        const seenEntryIds = new Set<string>();
+        const validatedRefs: Array<{
+          contentTypeId: string;
+          entryId: string;
+        }> = [];
+
+        for (const item of value) {
+          if (
+            typeof item !== 'object' ||
+            item === null ||
+            Array.isArray(item)
+          ) {
+            throw createError({
+              statusCode: 400,
+              statusMessage: `${field.name} items must be objects with contentTypeId and entryId`,
+            });
+          }
+          const rel = item as Record<string, unknown>;
+          if (!isUuid(rel.contentTypeId) || !isUuid(rel.entryId)) {
+            throw createError({
+              statusCode: 400,
+              statusMessage: `${field.name} items must have valid contentTypeId and entryId UUIDs`,
+            });
+          }
+          if (
+            allowedTypes.length > 0 &&
+            !allowedTypes.includes(rel.contentTypeId as string)
+          ) {
+            throw createError({
+              statusCode: 400,
+              statusMessage: `${field.name} references a content type that is not allowed for this field`,
+            });
+          }
+          if (seenEntryIds.has(rel.entryId as string)) {
+            throw createError({
+              statusCode: 400,
+              statusMessage: `${field.name} contains duplicate entry references`,
+            });
+          }
+          seenEntryIds.add(rel.entryId as string);
+          const entryExists = await prisma.contentEntry.findFirst({
+            where: {
+              id: rel.entryId as string,
+              contentTypeId: rel.contentTypeId as string,
+            },
+            select: { id: true },
+          });
+          if (!entryExists) {
+            throw createError({
+              statusCode: 400,
+              statusMessage: `${field.name} references an entry that does not exist`,
+            });
+          }
+          validatedRefs.push({
+            contentTypeId: rel.contentTypeId as string,
+            entryId: rel.entryId as string,
+          });
+        }
+        validated[field.identifier] = validatedRefs;
+        break;
+      }
 
       default:
         validated[field.identifier] = value;
