@@ -10,14 +10,6 @@ const identifier = ref('');
 const identifierTouched = ref(false);
 const description = ref('');
 
-function toPascalCase(str: string): string {
-  return str
-    .trim()
-    .split(/[\s_-]+/)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join('');
-}
-
 watch(name, (val) => {
   if (!identifierTouched.value) {
     identifier.value = toPascalCase(val);
@@ -29,7 +21,7 @@ interface FieldDraft {
   name: string;
   type: string;
   required: boolean;
-  choices: string;
+  options: unknown;
 }
 
 const fieldTypeOptions = [
@@ -50,37 +42,111 @@ const fields = ref<FieldDraft[]>([
     name: 'Title',
     type: 'ENTRY_TITLE',
     required: true,
-    choices: '',
+    options: null,
   },
   {
     identifier: 'slug',
     name: 'Slug',
     type: 'SLUG',
     required: false,
-    choices: '',
+    options: null,
   },
 ]);
 
-const newField = reactive<FieldDraft>({
-  identifier: '',
-  name: '',
-  type: 'TEXT',
-  required: false,
-  choices: '',
-});
+// Modal state
+const fieldModalOpen = ref(false);
+const fieldModalMode = ref<'add' | 'edit'>('add');
+const fieldModalField = ref<{
+  id?: string;
+  identifier: string;
+  name: string;
+  type: string;
+  required: boolean;
+  options: unknown;
+} | null>(null);
+const editingIndex = ref<number | null>(null);
 
-function addField() {
-  if (!newField.identifier || !newField.name) return;
-  fields.value.push({ ...newField });
-  newField.identifier = '';
-  newField.name = '';
-  newField.type = 'TEXT';
-  newField.required = false;
-  newField.choices = '';
+function openAddFieldModal() {
+  fieldModalMode.value = 'add';
+  fieldModalField.value = null;
+  editingIndex.value = null;
+  fieldModalOpen.value = true;
 }
 
-function removeField(index: number) {
-  fields.value.splice(index, 1);
+function openEditFieldModal(index: number) {
+  const f = fields.value[index];
+  if (!f) return;
+  fieldModalMode.value = 'edit';
+  fieldModalField.value = {
+    identifier: f.identifier,
+    name: f.name,
+    type: f.type,
+    required: f.required,
+    options: f.options,
+  };
+  editingIndex.value = index;
+  fieldModalOpen.value = true;
+}
+
+function handleFieldSave(data: {
+  identifier: string;
+  name: string;
+  type: string;
+  required: boolean;
+  options: unknown;
+}) {
+  if (fieldModalMode.value === 'add') {
+    fields.value.push({
+      identifier: data.identifier,
+      name: data.name,
+      type: data.type,
+      required: data.required,
+      options: data.options ?? null,
+    });
+    toast.add({
+      title: 'Added',
+      description: 'Field added.',
+      color: 'success',
+    });
+  } else if (editingIndex.value !== null) {
+    fields.value[editingIndex.value] = {
+      identifier: data.identifier,
+      name: data.name,
+      type: data.type,
+      required: data.required,
+      options: data.options ?? null,
+    };
+    toast.add({
+      title: 'Updated',
+      description: 'Field updated.',
+      color: 'success',
+    });
+  }
+  fieldModalOpen.value = false;
+}
+
+function handleFieldDelete() {
+  if (editingIndex.value !== null) {
+    fields.value.splice(editingIndex.value, 1);
+    toast.add({
+      title: 'Removed',
+      description: 'Field removed.',
+      color: 'success',
+    });
+  }
+  fieldModalOpen.value = false;
+}
+
+function fieldMenuItems(index: number) {
+  return [
+    [
+      {
+        label: 'Edit',
+        icon: 'i-lucide-pencil',
+        onSelect: () => openEditFieldModal(index),
+      },
+    ],
+  ];
 }
 
 const hasEntryTitle = computed(() =>
@@ -110,16 +176,7 @@ async function handleSave() {
         type: f.type,
         required: f.required,
         order: idx,
-        ...(f.type === 'SELECT' && f.choices.trim()
-          ? {
-              options: {
-                choices: f.choices
-                  .split(',')
-                  .map((c) => c.trim())
-                  .filter(Boolean),
-              },
-            }
-          : {}),
+        ...(f.options ? { options: f.options } : {}),
       })),
     };
 
@@ -191,7 +248,19 @@ async function handleSave() {
         />
       </UFormField>
 
-      <USeparator label="Fields" />
+      <div class="flex items-center gap-4">
+        <USeparator class="flex-1" />
+        <span class="text-sm font-medium text-muted shrink-0">Fields</span>
+        <UButton
+          size="xs"
+          variant="outline"
+          icon="i-lucide-plus"
+          @click="openAddFieldModal"
+        >
+          Add Field
+        </UButton>
+        <USeparator class="flex-1" />
+      </div>
 
       <draggable
         v-model="fields"
@@ -225,75 +294,52 @@ async function handleSave() {
                   Required
                 </UBadge>
               </div>
-              <UButton
-                size="xs"
-                variant="ghost"
-                color="error"
-                icon="i-lucide-trash-2"
-                @click="removeField(idx)"
-              />
+              <UDropdownMenu :items="fieldMenuItems(idx)">
+                <UButton
+                  size="xs"
+                  variant="ghost"
+                  color="neutral"
+                  icon="i-lucide-ellipsis"
+                />
+              </UDropdownMenu>
             </div>
-            <p
-              v-if="field.type === 'SELECT' && field.choices"
-              class="text-sm text-muted mt-1 pl-7"
-            >
-              Choices: {{ field.choices }}
-            </p>
           </div>
         </template>
       </draggable>
+    </div>
 
-      <USeparator label="Add Field" />
-
-      <div class="space-y-3 border rounded-lg p-4">
-        <div class="grid grid-cols-2 gap-3">
-          <UFormField label="Identifier" size="xl" hint="camelCase">
-            <UInput
-              v-model="newField.identifier"
-              placeholder="e.g. subtitle"
-              class="w-full"
-            />
-          </UFormField>
-          <UFormField label="Name" size="xl">
-            <UInput
-              v-model="newField.name"
-              placeholder="e.g. Subtitle"
-              class="w-full"
-            />
-          </UFormField>
-        </div>
-        <div class="grid grid-cols-2 gap-3">
-          <UFormField label="Type" size="xl">
-            <USelect
-              v-model="newField.type"
-              :items="fieldTypeOptions"
-              value-key="value"
-              class="w-full"
-            />
-          </UFormField>
-          <UFormField label=" " size="xl">
-            <USwitch v-model="newField.required" label="Required" />
-          </UFormField>
-        </div>
-        <UFormField
-          v-if="newField.type === 'SELECT'"
-          label="Choices (comma-separated)"
-          size="xl"
-        >
+    <FieldModal
+      :open="fieldModalOpen"
+      :mode="fieldModalMode"
+      :field="fieldModalField"
+      :field-type-options="fieldTypeOptions"
+      :entry-count="0"
+      @close="fieldModalOpen = false"
+      @save="handleFieldSave"
+      @delete="handleFieldDelete"
+    >
+      <template #type-options="{ type, options, updateOptions }">
+        <UFormField v-if="type === 'SELECT'" label="Choices (comma-separated)">
           <UInput
-            v-model="newField.choices"
+            :model-value="
+              options && typeof options === 'object' && 'choices' in options
+                ? (options as { choices: string[] }).choices.join(', ')
+                : ''
+            "
             placeholder="e.g. option_a, option_b, option_c"
             class="w-full"
+            @update:model-value="
+              (val: string) =>
+                updateOptions({
+                  choices: val
+                    .split(',')
+                    .map((c: string) => c.trim())
+                    .filter(Boolean),
+                })
+            "
           />
         </UFormField>
-        <UButton
-          icon="i-lucide-plus"
-          :disabled="!newField.identifier || !newField.name"
-          @click="addField"
-        >
-          Add Field
-        </UButton>
-      </div>
-    </div>
+      </template>
+    </FieldModal>
   </div>
 </template>
