@@ -129,24 +129,27 @@ async function handleSave() {
 
 <template>
   <Transition name="slide-pane">
-    <div v-if="open" class="fixed inset-0 z-50 flex">
+    <div v-if="open" class="absolute inset-0 z-30 flex">
       <!-- Backdrop / sliver -->
       <div
         class="w-10 shrink-0 bg-gray-200/50 dark:bg-gray-900/50 backdrop-blur-sm cursor-pointer"
         @click="emit('close')"
       />
       <!-- Pane -->
-      <div class="flex-1 flex flex-col bg-white dark:bg-gray-900 shadow-2xl">
+      <div
+        class="flex-1 flex flex-col bg-white dark:bg-gray-900 shadow-2xl overflow-hidden"
+      >
         <!-- Header -->
         <div
-          class="flex items-center gap-4 px-6 py-4 border-b border-gray-200 dark:border-gray-700"
+          class="flex items-center gap-4 px-6 py-3 border-b border-gray-200 dark:border-gray-700 shrink-0"
         >
           <UButton
             variant="ghost"
             icon="i-lucide-arrow-left"
+            size="sm"
             @click="emit('close')"
           />
-          <USeparator orientation="vertical" class="h-5" />
+          <USeparator orientation="vertical" class="h-4" />
           <NuxtLink
             :to="`/content-types/${contentTypeId}`"
             target="_blank"
@@ -158,7 +161,6 @@ async function handleSave() {
           <div class="flex-1" />
           <span class="text-sm font-semibold">{{ pageTitle }}</span>
           <div class="flex-1" />
-          <UButton :loading="isSaving" @click="handleSave"> Save </UButton>
         </div>
         <!-- Body -->
         <div class="flex-1 overflow-y-auto">

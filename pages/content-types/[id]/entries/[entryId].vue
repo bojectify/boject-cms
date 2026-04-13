@@ -321,56 +321,78 @@ function handlePaneSaved(data: {
 </script>
 
 <template>
-  <div>
-    <ContentEditor
-      v-model:state="formState"
-      :title="pageTitle"
-      :fields="editorFields"
-      :loading="loadingStatus === 'pending'"
-      :saving="isSaving"
-      :error="saveError"
-      :show-slug="hasSlugField"
-      :on-save="handleSave"
-    >
-      <template #field="{ field, value, update }">
-        <RelationField
-          v-if="field.type === 'dynamic-relation'"
-          :label="field.label"
-          :required="field.required"
-          :value="getRelationValue(value)"
-          :entry-title="resolvedRelations[field.key]?.entryTitle ?? null"
-          :content-type-name="
-            resolvedRelations[field.key]?.contentTypeName ?? null
-          "
-          @add="openPicker(field.key, getTargetContentTypeIds(field))"
-          @edit="handleRelationEdit(value, field.key)"
-          @remove="update(null)"
+  <div class="relative h-full overflow-hidden">
+    <div class="h-full overflow-y-auto">
+      <!-- Nav header -->
+      <div
+        class="flex items-center gap-4 px-6 py-3 border-b border-gray-200 dark:border-gray-700"
+      >
+        <UButton
+          variant="ghost"
+          icon="i-lucide-arrow-left"
+          size="sm"
+          :to="`/content-types/${contentTypeId}/entries`"
         />
-        <MultiRelationField
-          v-else-if="field.type === 'dynamic-multirelation'"
-          :label="field.label"
-          :items="resolvedMultiRelations[field.key] ?? []"
-          @add="openPicker(field.key, getTargetContentTypeIds(field))"
-          @edit="
-            (idx: number) => {
-              const refs = getMultiRelationValue(value);
-              const ref = refs[idx];
-              if (ref) {
-                openPane(ref.contentTypeId, ref.entryId, field.key);
+        <USeparator orientation="vertical" class="h-4" />
+        <NuxtLink
+          :to="`/content-types/${contentTypeId}`"
+          class="flex items-center gap-1.5 text-xs text-muted hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+        >
+          {{ contentType?.name ?? 'Content Type' }}
+          <UIcon name="i-lucide-external-link" class="size-3" />
+        </NuxtLink>
+      </div>
+
+      <ContentEditor
+        v-model:state="formState"
+        :title="pageTitle"
+        :fields="editorFields"
+        :loading="loadingStatus === 'pending'"
+        :saving="isSaving"
+        :error="saveError"
+        :show-slug="hasSlugField"
+        :on-save="handleSave"
+      >
+        <template #field="{ field, value, update }">
+          <RelationField
+            v-if="field.type === 'dynamic-relation'"
+            :label="field.label"
+            :required="field.required"
+            :value="getRelationValue(value)"
+            :entry-title="resolvedRelations[field.key]?.entryTitle ?? null"
+            :content-type-name="
+              resolvedRelations[field.key]?.contentTypeName ?? null
+            "
+            @add="openPicker(field.key, getTargetContentTypeIds(field))"
+            @edit="handleRelationEdit(value, field.key)"
+            @remove="update(null)"
+          />
+          <MultiRelationField
+            v-else-if="field.type === 'dynamic-multirelation'"
+            :label="field.label"
+            :items="resolvedMultiRelations[field.key] ?? []"
+            @add="openPicker(field.key, getTargetContentTypeIds(field))"
+            @edit="
+              (idx: number) => {
+                const refs = getMultiRelationValue(value);
+                const ref = refs[idx];
+                if (ref) {
+                  openPane(ref.contentTypeId, ref.entryId, field.key);
+                }
               }
-            }
-          "
-          @remove="
-            (idx: number) => {
-              const refs = [...getMultiRelationValue(value)];
-              refs.splice(idx, 1);
-              update(refs);
-            }
-          "
-          @reorder="(items) => update(items)"
-        />
-      </template>
-    </ContentEditor>
+            "
+            @remove="
+              (idx: number) => {
+                const refs = [...getMultiRelationValue(value)];
+                refs.splice(idx, 1);
+                update(refs);
+              }
+            "
+            @reorder="(items) => update(items)"
+          />
+        </template>
+      </ContentEditor>
+    </div>
 
     <EntryPickerModal
       :open="pickerOpen"
