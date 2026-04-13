@@ -96,6 +96,29 @@ function mapFieldToConfig(field: {
         key: field.identifier,
         label: field.name,
       };
+    case 'RELATION': {
+      const opts = field.options as {
+        targetContentTypeIds?: string[];
+      } | null;
+      return {
+        type: 'dynamic-relation' as const,
+        key: field.identifier,
+        label: field.name,
+        required: field.required,
+        targetContentTypeIds: opts?.targetContentTypeIds ?? [],
+      };
+    }
+    case 'MULTIRELATION': {
+      const opts = field.options as {
+        targetContentTypeIds?: string[];
+      } | null;
+      return {
+        type: 'dynamic-multirelation' as const,
+        key: field.identifier,
+        label: field.name,
+        targetContentTypeIds: opts?.targetContentTypeIds ?? [],
+      };
+    }
     default:
       return {
         type: 'text',
@@ -118,17 +141,251 @@ const pageTitle = computed(() => {
 async function handleSave() {
   await save();
 }
+
+// Template helpers to avoid `as` casts in templates
+type RelationRef = {
+  contentTypeId: string;
+  entryId: string;
+};
+
+function getRelationValue(value: unknown): RelationRef | null {
+  return (value as RelationRef | null) ?? null;
+}
+
+function getMultiRelationValue(value: unknown): RelationRef[] {
+  return (value as RelationRef[]) ?? [];
+}
+
+function getTargetContentTypeIds(field: FieldConfig): string[] {
+  if (
+    field.type === 'dynamic-relation' ||
+    field.type === 'dynamic-multirelation'
+  ) {
+    return field.targetContentTypeIds;
+  }
+  return [];
+}
+
+function handleRelationEdit(value: unknown, fieldKey: string) {
+  const ref = value as RelationRef | null;
+  if (ref) {
+    openPane(ref.contentTypeId, ref.entryId, fieldKey);
+  }
+}
+
+// Relation field state
+const { resolveRef, resolveRefs, updateCache } = useRelationResolver();
+
+const resolvedRelations = reactive<
+  Record<string, { entryTitle: string; contentTypeName: string }>
+>({});
+const resolvedMultiRelations = reactive<
+  Record<
+    string,
+    Array<{
+      contentTypeId: string;
+      entryId: string;
+      entryTitle: string;
+      contentTypeName: string;
+    }>
+  >
+>({});
+
+// Resolve references when formState changes
+watch(
+  () => ({ ...formState }),
+  async () => {
+    for (const field of editorFields.value) {
+      if (field.type === 'dynamic-relation') {
+        const val = formState[field.key] as {
+          contentTypeId: string;
+          entryId: string;
+        } | null;
+        if (val?.contentTypeId && val?.entryId) {
+          const resolved = await resolveRef(val);
+          resolvedRelations[field.key] = {
+            entryTitle: resolved.entryTitle,
+            contentTypeName: resolved.contentTypeName,
+          };
+        } else {
+          delete resolvedRelations[field.key];
+        }
+      }
+      if (field.type === 'dynamic-multirelation') {
+        const val = formState[field.key] as Array<{
+          contentTypeId: string;
+          entryId: string;
+        }> | null;
+        if (val && val.length > 0) {
+          resolvedMultiRelations[field.key] = await resolveRefs(val);
+        } else {
+          resolvedMultiRelations[field.key] = [];
+        }
+      }
+    }
+  },
+  { immediate: true }
+);
+
+// Picker modal state
+const pickerOpen = ref(false);
+const pickerFieldKey = ref('');
+const pickerTargetTypeIds = ref<string[]>([]);
+
+function openPicker(fieldKey: string, targetContentTypeIds: string[]) {
+  pickerFieldKey.value = fieldKey;
+  pickerTargetTypeIds.value = targetContentTypeIds;
+  pickerOpen.value = true;
+}
+
+function handlePickerSelect(data: {
+  contentTypeId: string;
+  entryId: string;
+  entryTitle: string;
+}) {
+  const fieldKey = pickerFieldKey.value;
+  const field = editorFields.value.find((f) => f.key === fieldKey);
+  if (!field) return;
+  if (field.type === 'dynamic-relation') {
+    formState[fieldKey] = {
+      contentTypeId: data.contentTypeId,
+      entryId: data.entryId,
+    };
+  } else if (field.type === 'dynamic-multirelation') {
+    const current =
+      (formState[fieldKey] as Array<{
+        contentTypeId: string;
+        entryId: string;
+      }>) ?? [];
+    formState[fieldKey] = [
+      ...current,
+      { contentTypeId: data.contentTypeId, entryId: data.entryId },
+    ];
+  }
+  pickerOpen.value = false;
+}
+
+// Editor pane state
+const paneOpen = ref(false);
+const paneContentTypeId = ref('');
+const paneEntryId = ref<string | null>(null);
+const paneFieldKey = ref('');
+
+function openPane(
+  targetContentTypeId: string,
+  targetEntryId: string | null,
+  fieldKey: string
+) {
+  paneContentTypeId.value = targetContentTypeId;
+  paneEntryId.value = targetEntryId;
+  paneFieldKey.value = fieldKey;
+  paneOpen.value = true;
+}
+
+function handlePickerCreate(contentTypeId: string) {
+  pickerOpen.value = false;
+  openPane(contentTypeId, null, pickerFieldKey.value);
+}
+
+function handlePaneSaved(data: {
+  contentTypeId: string;
+  entryId: string;
+  entryTitle: string;
+}) {
+  const fieldKey = paneFieldKey.value;
+  const field = editorFields.value.find((f) => f.key === fieldKey);
+  updateCache(data.contentTypeId, data.entryId, data.entryTitle);
+  if (field?.type === 'dynamic-relation') {
+    formState[fieldKey] = {
+      contentTypeId: data.contentTypeId,
+      entryId: data.entryId,
+    };
+  } else if (field?.type === 'dynamic-multirelation') {
+    const current =
+      (formState[fieldKey] as Array<{
+        contentTypeId: string;
+        entryId: string;
+      }>) ?? [];
+    if (!current.some((r) => r.entryId === data.entryId)) {
+      formState[fieldKey] = [
+        ...current,
+        {
+          contentTypeId: data.contentTypeId,
+          entryId: data.entryId,
+        },
+      ];
+    }
+  }
+  paneOpen.value = false;
+}
 </script>
 
 <template>
-  <ContentEditor
-    v-model:state="formState"
-    :title="pageTitle"
-    :fields="editorFields"
-    :loading="loadingStatus === 'pending'"
-    :saving="isSaving"
-    :error="saveError"
-    :show-slug="hasSlugField"
-    :on-save="handleSave"
-  />
+  <div>
+    <ContentEditor
+      v-model:state="formState"
+      :title="pageTitle"
+      :fields="editorFields"
+      :loading="loadingStatus === 'pending'"
+      :saving="isSaving"
+      :error="saveError"
+      :show-slug="hasSlugField"
+      :on-save="handleSave"
+    >
+      <template #field="{ field, value, update }">
+        <RelationField
+          v-if="field.type === 'dynamic-relation'"
+          :label="field.label"
+          :required="field.required"
+          :value="getRelationValue(value)"
+          :entry-title="resolvedRelations[field.key]?.entryTitle ?? null"
+          :content-type-name="
+            resolvedRelations[field.key]?.contentTypeName ?? null
+          "
+          @add="openPicker(field.key, getTargetContentTypeIds(field))"
+          @edit="handleRelationEdit(value, field.key)"
+          @remove="update(null)"
+        />
+        <MultiRelationField
+          v-else-if="field.type === 'dynamic-multirelation'"
+          :label="field.label"
+          :items="resolvedMultiRelations[field.key] ?? []"
+          @add="openPicker(field.key, getTargetContentTypeIds(field))"
+          @edit="
+            (idx: number) => {
+              const refs = getMultiRelationValue(value);
+              const ref = refs[idx];
+              if (ref) {
+                openPane(ref.contentTypeId, ref.entryId, field.key);
+              }
+            }
+          "
+          @remove="
+            (idx: number) => {
+              const refs = [...getMultiRelationValue(value)];
+              refs.splice(idx, 1);
+              update(refs);
+            }
+          "
+          @reorder="(items) => update(items)"
+        />
+      </template>
+    </ContentEditor>
+
+    <EntryPickerModal
+      :open="pickerOpen"
+      :target-content-type-ids="pickerTargetTypeIds"
+      @select="handlePickerSelect"
+      @create="handlePickerCreate"
+      @close="pickerOpen = false"
+    />
+
+    <EntryEditorPane
+      :open="paneOpen"
+      :content-type-id="paneContentTypeId"
+      :entry-id="paneEntryId"
+      @close="paneOpen = false"
+      @saved="handlePaneSaved"
+    />
+  </div>
 </template>
