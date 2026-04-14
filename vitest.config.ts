@@ -36,6 +36,14 @@ export default defineConfig({
           globals: true,
         },
       },
+      {
+        extends: true,
+        test: {
+          name: 'unit',
+          include: ['scripts/**/*.test.ts'],
+          globals: true,
+        },
+      },
     ],
   },
 });
