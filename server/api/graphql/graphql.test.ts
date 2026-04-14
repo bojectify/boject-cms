@@ -634,4 +634,102 @@ describe('GraphQL API', async () => {
       expect(data.teams.edges).toBeInstanceOf(Array);
     });
   });
+
+  describe('Dynamic content type queries', () => {
+    it('queries a dynamic type list with typed fields', async () => {
+      const { data } = await gql<{
+        blogPostList: Connection<{
+          id: string;
+          contentType: string;
+          status: string;
+          title: string;
+          slug: string;
+          summary: string | null;
+          publishDate: string | null;
+          featured: boolean | null;
+          category: string | null;
+        }>;
+      }>(`{
+        blogPostList(first: 10) {
+          edges {
+            node {
+              id contentType status title slug summary
+              publishDate featured category
+            }
+            cursor
+          }
+          pageInfo { hasNextPage endCursor }
+        }
+      }`);
+      expect(data.blogPostList.edges.length).toBe(2);
+      const node = data.blogPostList.edges[0]!.node;
+      expect(node.contentType).toBe('BlogPost');
+      expect(node.title).toBeTruthy();
+      expect(node.status).toBe('PUBLISHED');
+    });
+
+    it('fetches a single dynamic entry by ID', async () => {
+      const { data: list } = await gql<{
+        blogPostList: Connection<{ id: string }>;
+      }>('{ blogPostList(first: 1) { edges { node { id } } } }');
+      const id = list.blogPostList.edges[0]!.node.id;
+
+      const { data } = await gql<{
+        blogPost: { id: string; title: string; contentType: string } | null;
+      }>(`{ blogPost(id: "${id}") { id title contentType } }`);
+      expect(data.blogPost).not.toBeNull();
+      expect(data.blogPost!.id).toBe(id);
+      expect(data.blogPost!.contentType).toBe('BlogPost');
+    });
+
+    it('fetches a single dynamic entry by slug', async () => {
+      const { data } = await gql<{
+        blogPostBySlug: { id: string; title: string; slug: string } | null;
+      }>('{ blogPostBySlug(slug: "welcome-to-the-club") { id title slug } }');
+      expect(data.blogPostBySlug).not.toBeNull();
+      expect(data.blogPostBySlug!.slug).toBe('welcome-to-the-club');
+      expect(data.blogPostBySlug!.title).toBe('Welcome to the Club');
+    });
+
+    it('returns null for non-existent ID on dynamic type', async () => {
+      const { data } = await gql<{ blogPost: null }>(
+        '{ blogPost(id: "00000000-0000-0000-0000-000000000000") { id } }'
+      );
+      expect(data.blogPost).toBeNull();
+    });
+
+    it('returns null for non-existent slug on dynamic type', async () => {
+      const { data } = await gql<{ blogPostBySlug: null }>(
+        '{ blogPostBySlug(slug: "does-not-exist") { id } }'
+      );
+      expect(data.blogPostBySlug).toBeNull();
+    });
+
+    it('paginates dynamic type list with first/after', async () => {
+      const { data: page1 } = await gql<{
+        blogPostList: Connection<{ id: string; title: string }>;
+      }>(`{
+        blogPostList(first: 1) {
+          edges { node { id title } cursor }
+          pageInfo { hasNextPage endCursor }
+        }
+      }`);
+      expect(page1.blogPostList.edges.length).toBe(1);
+      expect(page1.blogPostList.pageInfo.hasNextPage).toBe(true);
+
+      const cursor = page1.blogPostList.pageInfo.endCursor!;
+      const { data: page2 } = await gql<{
+        blogPostList: Connection<{ id: string; title: string }>;
+      }>(`{
+        blogPostList(first: 1, after: "${cursor}") {
+          edges { node { id title } cursor }
+          pageInfo { hasNextPage endCursor }
+        }
+      }`);
+      expect(page2.blogPostList.edges.length).toBe(1);
+      expect(page2.blogPostList.edges[0]!.node.id).not.toBe(
+        page1.blogPostList.edges[0]!.node.id
+      );
+    });
+  });
 });

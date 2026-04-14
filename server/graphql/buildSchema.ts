@@ -21,6 +21,8 @@ import { registerLinkType } from './types/link';
 import { registerNavigationItemType } from './types/navigationItem';
 import { registerNavigationType } from './types/navigation';
 import { registerStaticQueries } from './query/index';
+import { registerDynamicTypes } from './dynamicTypes';
+import { prisma } from '../utils/prisma';
 
 export async function buildSchema(): Promise<GraphQLSchema> {
   const builder = createBuilder();
@@ -62,9 +64,11 @@ export async function buildSchema(): Promise<GraphQLSchema> {
   // 4. Static queries
   registerStaticQueries(builder, filters);
 
-  // 5. Dynamic types (Task 6 adds this)
-  // const contentTypes = await prisma.contentType.findMany({ include: { fields: { orderBy: { order: 'asc' } } } });
-  // registerDynamicTypes(builder, contentTypes, ContentStatusEnum);
+  // 5. Dynamic types
+  const contentTypes = await prisma.contentType.findMany({
+    include: { fields: { orderBy: { order: 'asc' } } },
+  });
+  registerDynamicTypes(builder, contentTypes, ContentStatusEnum);
 
   return builder.toSchema();
 }
