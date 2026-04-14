@@ -1,6 +1,7 @@
 import { assertUuid } from '../../utils/validation';
 import { withPrismaErrors } from '../../utils/prismaErrors';
 import { enforceMutationRateLimit } from '../../utils/rateLimitEndpoint';
+import { invalidateSchema } from '../../graphql/schema';
 
 export default defineEventHandler(async (event) => {
   enforceMutationRateLimit(event, 'content-types.delete');
@@ -27,6 +28,8 @@ export default defineEventHandler(async (event) => {
   await withPrismaErrors(() => prisma.contentType.delete({ where: { id } }), {
     notFoundMessage: 'Content type not found',
   });
+
+  invalidateSchema();
 
   return { success: true };
 });

@@ -2,6 +2,7 @@ import type { FieldType, Prisma } from '#prisma';
 import { assertUuid, assertStringLength } from '../../../../utils/validation';
 import { withPrismaErrors } from '../../../../utils/prismaErrors';
 import { enforceMutationRateLimit } from '../../../../utils/rateLimitEndpoint';
+import { invalidateSchema } from '../../../../graphql/schema';
 
 const VALID_FIELD_TYPES = new Set<string>([
   'ENTRY_TITLE',
@@ -86,6 +87,8 @@ export default defineEventHandler(async (event) => {
         'A field with this name already exists on this content type',
     }
   );
+
+  invalidateSchema();
 
   return updated;
 });

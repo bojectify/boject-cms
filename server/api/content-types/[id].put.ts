@@ -6,6 +6,7 @@ import {
 } from '../../utils/validation';
 import { withPrismaErrors } from '../../utils/prismaErrors';
 import { enforceMutationRateLimit } from '../../utils/rateLimitEndpoint';
+import { invalidateSchema } from '../../graphql/schema';
 
 const NAME_MAX = 200;
 
@@ -31,7 +32,7 @@ export default defineEventHandler(async (event) => {
     data.description =
       typeof body.description === 'string' ? body.description : null;
 
-  return await withPrismaErrors(
+  const updated = await withPrismaErrors(
     () =>
       prisma.contentType.update({
         where: { id },
@@ -46,4 +47,8 @@ export default defineEventHandler(async (event) => {
         'A content type with this name or identifier already exists',
     }
   );
+
+  invalidateSchema();
+
+  return updated;
 });
