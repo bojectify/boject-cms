@@ -30,8 +30,8 @@ docker compose up -d
 # Install dependencies (auto-runs nuxt prepare + prisma generate)
 pnpm install
 
-# Create a .env file
-echo 'DATABASE_URL=postgresql://boject:boject@localhost:5432/boject' > .env
+# Copy the .env template
+cp .env.example .env
 
 # Run database migrations
 pnpm prisma:migrate
@@ -47,24 +47,27 @@ The app runs at http://localhost:4000. The GraphQL playground (GraphiQL) is avai
 
 ## Scripts
 
-| Script                 | Description                                  |
-| ---------------------- | -------------------------------------------- |
-| `pnpm dev`             | Start Nuxt development server                |
-| `pnpm build`           | Build for production (outputs to `.output/`) |
-| `pnpm preview`         | Preview production build locally             |
-| `pnpm db:up`           | Start local PostgreSQL container             |
-| `pnpm prisma:generate` | Regenerate Prisma client + Pothos types      |
-| `pnpm prisma:migrate`  | Run database migrations                      |
-| `pnpm prisma:seed`     | Seed database with test data                 |
-| `pnpm lint`            | Lint with ESLint                             |
-| `pnpm lint:fix`        | Lint and auto-fix                            |
-| `pnpm format`          | Check formatting with Prettier               |
-| `pnpm format:fix`      | Format all files                             |
-| `pnpm test`            | Run tests once                               |
-| `pnpm typecheck`       | Run TypeScript type checker                  |
-| `pnpm apikey:create`   | Create a new API key                         |
-| `pnpm apikey:list`     | List all API keys                            |
-| `pnpm apikey:revoke`   | Revoke an API key by prefix                  |
+| Script                  | Description                                   |
+| ----------------------- | --------------------------------------------- |
+| `pnpm dev`              | Start Nuxt development server                 |
+| `pnpm build`            | Build for production (outputs to `.output/`)  |
+| `pnpm preview`          | Preview production build locally              |
+| `pnpm db:up`            | Start local PostgreSQL container              |
+| `pnpm prisma:generate`  | Regenerate Prisma client + Pothos types       |
+| `pnpm prisma:migrate`   | Run database migrations                       |
+| `pnpm prisma:seed`      | Seed database with test data                  |
+| `pnpm lint`             | Lint with ESLint                              |
+| `pnpm lint:fix`         | Lint and auto-fix                             |
+| `pnpm format`           | Check formatting with Prettier                |
+| `pnpm format:fix`       | Format all files                              |
+| `pnpm test`             | Run tests once                                |
+| `pnpm typecheck`        | Run TypeScript type checker                   |
+| `pnpm apikey:create`    | Create a new API key                          |
+| `pnpm apikey:list`      | List all API keys                             |
+| `pnpm apikey:revoke`    | Revoke an API key by prefix                   |
+| `pnpm content:export`   | Export dynamic content types/entries as JSON  |
+| `pnpm content:import`   | Import a dynamic content bundle               |
+| `pnpm content:validate` | Validate a bundle's shape without touching DB |
 
 ## Project Structure
 
@@ -130,6 +133,16 @@ composables/
   useContentEntryEditor.ts     # Dynamic entry editing lifecycle
 extensions/
   cmsEmbed.ts                  # Custom Tiptap ProseMirror node for content embeds
+scripts/
+  content-bundle/              # CLI to export/import dynamic content bundles
+    types.ts                   # Shared Bundle, BundleField, BundleEntry types
+    validate.ts                # Bundle shape validation (no DB)
+    portable.ts                # Portable reference rewriting helpers
+    export.ts                  # exportBundle(prisma, { mode, portable })
+    import.ts                  # importBundle(prisma, bundle, { mode, author })
+    index.ts                   # CLI entry (export/import/validate subcommands)
+    fixtures/                  # Known-good bundles for tests and starters
+  manage-api-keys.ts           # CLI for API key create/list/revoke
 types/
   contentEditor.ts             # FieldConfig discriminated union (auto-imported)
 pages/
@@ -158,6 +171,7 @@ CMS pages → Nuxt server routes → Prisma → PostgreSQL
 - **Prisma v7** uses the `@prisma/adapter-pg` driver adapter (not the traditional Rust engine). A singleton client in `server/utils/prisma.ts` is auto-imported into all server routes.
 - **Generated types** live in `generated/` (gitignored). Run `pnpm prisma:generate` after any schema change.
 - **Image upload & transform** — `POST /api/images/upload` accepts multipart file uploads (5MB limit, JPEG/PNG/WebP/GIF/AVIF). Originals are processed via Sharp (auto-orient, max 4000px). `GET /api/images/:id/transform` serves images with on-the-fly resize/format conversion (publicly accessible, cached, rate limited). Stored in `storage/` (gitignored, filesystem in dev, swappable to S3/R2 in production via Nitro storage config).
+- **Content bundle CLI** — `scripts/content-bundle/` exports and imports dynamic content types and entries as JSON bundles. Portable mode (`--portable`) rewrites UUID references to `identifier`/`slug` keys for cross-instance migration; import does the reverse lookup in a transactional two-pass resolve. Functions are importable so a future scaffolder (e.g. `create-boject-cms`) can invoke them directly.
 
 ## GraphQL API
 
@@ -324,7 +338,10 @@ pnpm test:integration        # Integration tests only
 - **Tags** (9 tests) — listing, pagination, status filter, single-item lookup, update, slug uniqueness, 404 handling.
 - **Articles** (13 tests) — listing with relations, pagination, filters (status, authorId, tagId), single-item lookup, update with tags, slug uniqueness, 404 handling.
 - **Content types** (24 tests) — CRUD, field management (add/update/delete/reorder), identifier validation, uniqueness constraints.
-- **Content entries** (13 tests) — CRUD, data validation against field definitions, slug uniqueness, status transitions.
+- **Content entries** (16 tests) — CRUD, data validation against field definitions, slug uniqueness, status transitions, `entryTitle` populate + uniqueness.
+- **Content bundle** (22 tests) — bundle shape validation (6), portable reference walkers (7), export (4), import (4), fixture shape regression (3), export → import round-trip (1), plus two end-to-end subsets.
+
+Total: 369 tests across 29 files.
 
 **Requirement:** Docker PostgreSQL must be running with seeded data.
 
