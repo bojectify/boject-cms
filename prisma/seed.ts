@@ -134,7 +134,7 @@ async function main() {
 
   // Admin user
   const adminEmail =
-    process.env.INTEGRATION_TEST_USERNAME ?? 'admin@boject.com';
+    process.env.INTEGRATION_TEST_USERNAME ?? 'admin@example.com';
   const adminPassword = process.env.INTEGRATION_TEST_PASSWORD ?? 'password';
   const hashedPassword = await hashPasswordForSeed(adminPassword);
   await prisma.user.upsert({

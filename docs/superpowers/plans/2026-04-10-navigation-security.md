@@ -1362,7 +1362,7 @@ async function getSessionCookie(): Promise<string> {
   const response = await fetch('/api/auth/login', {
     method: 'POST',
     body: JSON.stringify({
-      email: 'admin@boject.com',
+      email: 'admin@example.com',
       password: 'password',
     }),
     headers: { 'Content-Type': 'application/json' },
@@ -1567,7 +1567,7 @@ async function getSessionCookie(): Promise<string> {
   const response = await fetch('/api/auth/login', {
     method: 'POST',
     body: JSON.stringify({
-      email: 'admin@boject.com',
+      email: 'admin@example.com',
       password: 'password',
     }),
     headers: { 'Content-Type': 'application/json' },
