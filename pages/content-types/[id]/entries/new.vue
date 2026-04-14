@@ -118,6 +118,13 @@ function mapFieldToConfig(field: {
         targetContentTypeIds: opts?.targetContentTypeIds ?? [],
       };
     }
+    case 'IMAGE':
+      return {
+        type: 'image' as const,
+        key: field.identifier,
+        label: field.name,
+        required: field.required,
+      };
     default:
       return {
         type: 'text',
