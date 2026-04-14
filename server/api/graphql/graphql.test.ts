@@ -830,6 +830,170 @@ describe('GraphQL API', async () => {
     });
   });
 
+  describe('Dynamic type relations', () => {
+    let tagTypeId: string;
+    let postTypeId: string;
+    let tagEntryId: string;
+    let postEntryId: string;
+
+    it('sets up relation test data', async () => {
+      const tagType = await $fetch<any>('/api/content-types', {
+        method: 'POST',
+        headers: { Cookie: await getSessionCookie() },
+        body: {
+          name: 'Test Tag',
+          identifier: 'TestTag',
+          fields: [
+            {
+              identifier: 'name',
+              name: 'Name',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+            { identifier: 'slug', name: 'Slug', type: 'SLUG' },
+          ],
+        },
+      });
+      tagTypeId = tagType.id;
+
+      const postType = await $fetch<any>('/api/content-types', {
+        method: 'POST',
+        headers: { Cookie: await getSessionCookie() },
+        body: {
+          name: 'Test Post',
+          identifier: 'TestPost',
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+            {
+              identifier: 'mainTag',
+              name: 'Main Tag',
+              type: 'RELATION',
+              options: { targetContentTypeIds: [tagTypeId] },
+            },
+            {
+              identifier: 'tags',
+              name: 'Tags',
+              type: 'MULTIRELATION',
+              options: { targetContentTypeIds: [tagTypeId] },
+            },
+          ],
+        },
+      });
+      postTypeId = postType.id;
+
+      const tag1 = await $fetch<any>('/api/content-entries', {
+        method: 'POST',
+        headers: { Cookie: await getSessionCookie() },
+        body: {
+          contentTypeId: tagTypeId,
+          data: { name: 'GraphQL', slug: 'graphql' },
+          status: 'PUBLISHED',
+        },
+      });
+      tagEntryId = tag1.id;
+
+      const tag2 = await $fetch<any>('/api/content-entries', {
+        method: 'POST',
+        headers: { Cookie: await getSessionCookie() },
+        body: {
+          contentTypeId: tagTypeId,
+          data: { name: 'TypeScript', slug: 'typescript' },
+          status: 'PUBLISHED',
+        },
+      });
+
+      const post = await $fetch<any>('/api/content-entries', {
+        method: 'POST',
+        headers: { Cookie: await getSessionCookie() },
+        body: {
+          contentTypeId: postTypeId,
+          data: {
+            title: 'Relation Test Post',
+            mainTag: { contentTypeId: tagTypeId, entryId: tagEntryId },
+            tags: [
+              { contentTypeId: tagTypeId, entryId: tagEntryId },
+              { contentTypeId: tagTypeId, entryId: tag2.id },
+            ],
+          },
+          status: 'PUBLISHED',
+        },
+      });
+      postEntryId = post.id;
+    });
+
+    it('resolves RELATION field to target type', async () => {
+      const { data } = await gql<{
+        testPost: {
+          id: string;
+          title: string;
+          mainTag: { id: string; name: string; contentType: string } | null;
+        } | null;
+      }>(`{
+        testPost(id: "${postEntryId}") {
+          id title
+          mainTag { ... on TestTag { id name contentType } }
+        }
+      }`);
+      expect(data.testPost).not.toBeNull();
+      expect(data.testPost!.mainTag).not.toBeNull();
+      expect(data.testPost!.mainTag!.name).toBe('GraphQL');
+      expect(data.testPost!.mainTag!.contentType).toBe('TestTag');
+    });
+
+    it('resolves MULTIRELATION field as connection', async () => {
+      const { data } = await gql<{
+        testPost: {
+          id: string;
+          tags: Connection<{ id: string; name: string }>;
+        } | null;
+      }>(`{
+        testPost(id: "${postEntryId}") {
+          id
+          tags(first: 10) {
+            edges { node { ... on TestTag { id name } } }
+          }
+        }
+      }`);
+      expect(data.testPost).not.toBeNull();
+      expect(data.testPost!.tags.edges.length).toBe(2);
+      const names = data.testPost!.tags.edges.map((e) => e.node.name);
+      expect(names).toContain('GraphQL');
+      expect(names).toContain('TypeScript');
+    });
+
+    it('cleans up relation test data', async () => {
+      await $fetch<unknown>(`/api/content-entries/${postEntryId}`, {
+        method: 'DELETE',
+        headers: { Cookie: await getSessionCookie() },
+      });
+      const tagEntries = await $fetch<any>(
+        `/api/content-entries?contentTypeId=${tagTypeId}`,
+        {
+          headers: { Cookie: await getSessionCookie() },
+        }
+      );
+      for (const entry of tagEntries.items) {
+        await $fetch<unknown>(`/api/content-entries/${entry.id}`, {
+          method: 'DELETE',
+          headers: { Cookie: await getSessionCookie() },
+        });
+      }
+      await $fetch<unknown>(`/api/content-types/${postTypeId}`, {
+        method: 'DELETE',
+        headers: { Cookie: await getSessionCookie() },
+      });
+      await $fetch<unknown>(`/api/content-types/${tagTypeId}`, {
+        method: 'DELETE',
+        headers: { Cookie: await getSessionCookie() },
+      });
+    });
+  });
+
   describe('Schema rebuild on content type changes', () => {
     it('rebuilds schema when a new content type is created', async () => {
       const cookie = await getSessionCookie();

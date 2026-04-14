@@ -177,6 +177,137 @@ export function registerDynamicTypes(
           });
         }
 
+        // RELATION fields (single polymorphic reference)
+        const relationFields = ct.fields.filter((f) => f.type === 'RELATION');
+        for (const field of relationFields) {
+          const opts = field.options as {
+            targetContentTypeIds?: string[];
+          } | null;
+          const targetIds = opts?.targetContentTypeIds ?? [];
+
+          const resolveRef = async (entry: ContentEntryShape) => {
+            const data =
+              typeof entry.data === 'string'
+                ? (JSON.parse(entry.data) as Record<string, unknown>)
+                : (entry.data as Record<string, unknown> | null);
+            const ref = data?.[field.identifier] as {
+              entryId?: string;
+            } | null;
+            if (!ref?.entryId) return null;
+            return prisma.contentEntry.findUnique({
+              where: { id: ref.entryId },
+            });
+          };
+
+          if (targetIds.length === 1) {
+            const targetRef = typeRefs.get(targetIds[0]!);
+            if (!targetRef) continue;
+            fields[field.identifier] = t.field({
+              type: targetRef,
+              nullable: !field.required,
+              resolve: resolveRef as never,
+            });
+          } else if (targetIds.length > 1) {
+            const targetRefs = targetIds
+              .map((id) => typeRefs.get(id))
+              .filter((r): r is NonNullable<typeof r> => Boolean(r));
+            if (targetRefs.length === 0) continue;
+            const pascalField =
+              field.identifier.charAt(0).toUpperCase() +
+              field.identifier.slice(1);
+            const unionRef = builder.unionType(
+              `${ct.identifier}${pascalField}Union`,
+              {
+                types: targetRefs as never,
+                resolveType: (value: unknown) => {
+                  const v = value as { contentTypeId?: string } | null;
+                  return (
+                    (v?.contentTypeId &&
+                      typeIdToIdentifier.get(v.contentTypeId)) ||
+                    ct.identifier
+                  );
+                },
+              }
+            );
+            fields[field.identifier] = t.field({
+              type: unionRef,
+              nullable: !field.required,
+              resolve: resolveRef as never,
+            });
+          }
+        }
+
+        // MULTIRELATION fields (ordered list of polymorphic references)
+        const multiRelationFields = ct.fields.filter(
+          (f) => f.type === 'MULTIRELATION'
+        );
+        for (const field of multiRelationFields) {
+          const opts = field.options as {
+            targetContentTypeIds?: string[];
+          } | null;
+          const targetIds = opts?.targetContentTypeIds ?? [];
+
+          let nodeType: ReturnType<Builder['objectRef']> | undefined;
+          if (targetIds.length === 1) {
+            nodeType = typeRefs.get(targetIds[0]!);
+          } else if (targetIds.length > 1) {
+            const targetRefs = targetIds
+              .map((id) => typeRefs.get(id))
+              .filter((r): r is NonNullable<typeof r> => Boolean(r));
+            if (targetRefs.length === 0) continue;
+            const pascalField =
+              field.identifier.charAt(0).toUpperCase() +
+              field.identifier.slice(1);
+            nodeType = builder.unionType(
+              `${ct.identifier}${pascalField}Union`,
+              {
+                types: targetRefs as never,
+                resolveType: (value: unknown) => {
+                  const v = value as { contentTypeId?: string } | null;
+                  return (
+                    (v?.contentTypeId &&
+                      typeIdToIdentifier.get(v.contentTypeId)) ||
+                    ct.identifier
+                  );
+                },
+              }
+            ) as never;
+          }
+          if (!nodeType) continue;
+
+          fields[field.identifier] = t.connection({
+            type: nodeType,
+            resolve: (entry: ContentEntryShape, args: unknown) =>
+              resolveOffsetConnection(
+                {
+                  args: args as Parameters<
+                    typeof resolveOffsetConnection
+                  >[0]['args'],
+                },
+                async ({ limit, offset }) => {
+                  const data =
+                    typeof entry.data === 'string'
+                      ? (JSON.parse(entry.data) as Record<string, unknown>)
+                      : (entry.data as Record<string, unknown> | null);
+                  const refs = data?.[field.identifier];
+                  if (!Array.isArray(refs) || refs.length === 0) return [];
+                  const entryIds = refs
+                    .slice(offset, offset + limit)
+                    .map((r: { entryId?: string }) => r.entryId)
+                    .filter((id): id is string => Boolean(id));
+                  if (entryIds.length === 0) return [];
+                  const entries = await prisma.contentEntry.findMany({
+                    where: { id: { in: entryIds } },
+                  });
+                  const byId = new Map(entries.map((e) => [e.id, e]));
+                  return entryIds
+                    .map((id) => byId.get(id))
+                    .filter((e): e is NonNullable<typeof e> => Boolean(e));
+                }
+              ),
+          }) as never;
+        }
+
         return fields as never;
       },
     });
