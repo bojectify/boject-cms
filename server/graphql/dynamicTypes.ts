@@ -2,6 +2,11 @@ import type { Builder } from './builder';
 import type { ContentStatusEnumRef } from './types/contentStatus';
 import { resolveOffsetConnection } from '@pothos/plugin-relay';
 import { prisma } from '../utils/prisma';
+import {
+  registerDynamicFilterInputs,
+  getFilterKeyForFieldType,
+  queryDynamicEntries,
+} from './jsonbFilters';
 
 interface ContentTypeWithFields {
   id: string;
@@ -90,12 +95,37 @@ export function registerDynamicTypes(
         typeIdToIdentifier.get(entry.contentTypeId) ?? 'ContentEntry',
     });
 
+  const dynFilters = registerDynamicFilterInputs(builder, ContentStatusEnum);
+
   const typeRefs = new Map<string, ReturnType<Builder['objectRef']>>();
 
   for (const ct of contentTypes) {
     const scalarFields = ct.fields.filter(
       (f) => FIELD_TYPE_TO_SCALAR[f.type] !== undefined
     );
+
+    const filterableFields = ct.fields.filter(
+      (f) => getFilterKeyForFieldType(f.type) !== null
+    );
+
+    const WhereInput = builder.inputType(`${ct.identifier}Where`, {
+      fields: (t) => {
+        const whereFields: Record<string, unknown> = {
+          status: t.field({ type: dynFilters.DynContentStatusFilter }),
+          createdAt: t.field({ type: dynFilters.DynDateTimeFilter }),
+          updatedAt: t.field({ type: dynFilters.DynDateTimeFilter }),
+        };
+        for (const field of filterableFields) {
+          const filterKey = getFilterKeyForFieldType(field.type);
+          if (filterKey) {
+            whereFields[field.identifier] = t.field({
+              type: dynFilters[filterKey],
+            });
+          }
+        }
+        return whereFields as never;
+      },
+    });
 
     const implRef = builder.objectRef<ContentEntryShape>(ct.identifier);
     const ref = implRef.implement({
@@ -157,14 +187,16 @@ export function registerDynamicTypes(
     builder.queryField(`${camelName}List`, (t) =>
       t.connection({
         type: ref,
+        args: { where: t.arg({ type: WhereInput }) },
         resolve: (_root, args) =>
           resolveOffsetConnection({ args }, async ({ limit, offset }) => {
-            return prisma.contentEntry.findMany({
-              where: { contentTypeId: ct.id },
-              take: limit,
-              skip: offset,
-              orderBy: { createdAt: 'desc' },
-            });
+            return queryDynamicEntries(
+              ct.id,
+              args.where as never,
+              ct.fields,
+              limit,
+              offset
+            );
           }),
       })
     );

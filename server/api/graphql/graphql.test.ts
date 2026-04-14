@@ -732,4 +732,84 @@ describe('GraphQL API', async () => {
       );
     });
   });
+
+  describe('Dynamic type filtering', () => {
+    it('filters by status', async () => {
+      const { data } = await gql<{
+        blogPostList: Connection<{ id: string; status: string }>;
+      }>(`{
+        blogPostList(first: 10, where: { status: { equals: PUBLISHED } }) {
+          edges { node { id status } }
+        }
+      }`);
+      expect(data.blogPostList.edges.length).toBe(2);
+      data.blogPostList.edges.forEach((edge) => {
+        expect(edge.node.status).toBe('PUBLISHED');
+      });
+    });
+
+    it('filters by string field equals', async () => {
+      const { data } = await gql<{
+        blogPostList: Connection<{ id: string; category: string | null }>;
+      }>(`{
+        blogPostList(first: 10, where: { category: { equals: "community" } }) {
+          edges { node { id category } }
+        }
+      }`);
+      expect(data.blogPostList.edges.length).toBe(1);
+      expect(data.blogPostList.edges[0]!.node.category).toBe('community');
+    });
+
+    it('filters by string field contains', async () => {
+      const { data } = await gql<{
+        blogPostList: Connection<{ id: string; title: string }>;
+      }>(`{
+        blogPostList(first: 10, where: { title: { contains: "welcome" } }) {
+          edges { node { id title } }
+        }
+      }`);
+      expect(data.blogPostList.edges.length).toBe(1);
+      expect(data.blogPostList.edges[0]!.node.title).toContain('Welcome');
+    });
+
+    it('filters by boolean field equals', async () => {
+      const { data } = await gql<{
+        blogPostList: Connection<{ id: string; featured: boolean | null }>;
+      }>(`{
+        blogPostList(first: 10, where: { featured: { equals: true } }) {
+          edges { node { id featured } }
+        }
+      }`);
+      expect(data.blogPostList.edges.length).toBe(1);
+      expect(data.blogPostList.edges[0]!.node.featured).toBe(true);
+    });
+
+    it('filters by datetime field range', async () => {
+      const { data } = await gql<{
+        blogPostList: Connection<{
+          id: string;
+          publishDate: string | null;
+        }>;
+      }>(`{
+        blogPostList(first: 10, where: { publishDate: { gte: "2026-01-20T00:00:00.000Z" } }) {
+          edges { node { id publishDate } }
+        }
+      }`);
+      expect(data.blogPostList.edges.length).toBe(1);
+      expect(
+        new Date(data.blogPostList.edges[0]!.node.publishDate!).getTime()
+      ).toBeGreaterThanOrEqual(new Date('2026-01-20').getTime());
+    });
+
+    it('returns empty connection for no filter matches', async () => {
+      const { data } = await gql<{
+        blogPostList: Connection<{ id: string }>;
+      }>(`{
+        blogPostList(first: 10, where: { title: { equals: "Nonexistent" } }) {
+          edges { node { id } }
+        }
+      }`);
+      expect(data.blogPostList.edges).toEqual([]);
+    });
+  });
 });
