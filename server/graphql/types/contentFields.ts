@@ -1,6 +1,9 @@
-import { ContentStatusEnum } from './contentStatus';
+import type { ContentStatusEnumRef } from './contentStatus';
 
-export const contentMetadataFields = (t: any) => ({
+export const contentMetadataFields = (
+  t: any,
+  ContentStatusEnum: ContentStatusEnumRef
+) => ({
   entryTitle: t.exposeString('entryTitle'),
   status: t.expose('status', { type: ContentStatusEnum }),
   publishedAt: t.expose('publishedAt', { type: 'DateTime', nullable: true }),
