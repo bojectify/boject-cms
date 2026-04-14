@@ -35,6 +35,10 @@ export default defineEventHandler(async (event) => {
     );
     data.data = validatedData;
     data.slug = extractSlug(validatedData, existing.contentType.fields);
+    data.entryTitle = extractEntryTitle(
+      validatedData,
+      existing.contentType.fields
+    );
   }
 
   if (typeof body.status === 'string' && VALID_STATUSES.has(body.status)) {
@@ -48,7 +52,7 @@ export default defineEventHandler(async (event) => {
     () => prisma.contentEntry.update({ where: { id }, data }),
     {
       uniqueMessage:
-        'An entry with this slug already exists for this content type',
+        'An entry with this slug or title already exists for this content type',
     }
   );
 });

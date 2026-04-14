@@ -34,6 +34,7 @@ export default defineEventHandler(async (event) => {
 
   const validatedData = await validateEntryData(rawData, contentType.fields);
   const slug = extractSlug(validatedData, contentType.fields);
+  const entryTitle = extractEntryTitle(validatedData, contentType.fields);
 
   let status = 'DRAFT';
   if (typeof body.status === 'string' && VALID_STATUSES.has(body.status)) {
@@ -46,6 +47,7 @@ export default defineEventHandler(async (event) => {
         data: {
           contentTypeId,
           data: validatedData as Prisma.InputJsonValue,
+          entryTitle,
           slug,
           status: status as 'DRAFT',
           publishedAt: status === 'PUBLISHED' ? new Date() : undefined,
@@ -53,7 +55,7 @@ export default defineEventHandler(async (event) => {
       }),
     {
       uniqueMessage:
-        'An entry with this slug already exists for this content type',
+        'An entry with this slug or title already exists for this content type',
     }
   );
 

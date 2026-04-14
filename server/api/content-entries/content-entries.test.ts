@@ -225,6 +225,70 @@ describe('Content Entry endpoints', async () => {
       expect(res.status).toBe(400);
     });
 
+    it('populates entryTitle column from the ENTRY_TITLE field value on create', async () => {
+      const cookie = await getSessionCookie();
+      const created = await $fetch<{ id: string; entryTitle: string }>(
+        '/api/content-entries',
+        {
+          method: 'POST',
+          body: {
+            contentTypeId: testContentType.id,
+            data: { title: 'Hello entryTitle', summary: 'x' },
+            status: 'DRAFT',
+          },
+          headers: { cookie },
+        }
+      );
+      expect(created.entryTitle).toBe('Hello entryTitle');
+    });
+
+    it('rejects duplicate entryTitle within a content type with 409', async () => {
+      const cookie = await getSessionCookie();
+      await $fetch('/api/content-entries', {
+        method: 'POST',
+        body: {
+          contentTypeId: testContentType.id,
+          data: { title: 'Unique Title', summary: 'x' },
+          status: 'DRAFT',
+        },
+        headers: { cookie },
+      });
+
+      await expect(
+        $fetch('/api/content-entries', {
+          method: 'POST',
+          body: {
+            contentTypeId: testContentType.id,
+            data: { title: 'Unique Title', summary: 'x' },
+            status: 'DRAFT',
+          },
+          headers: { cookie },
+        })
+      ).rejects.toMatchObject({ statusCode: 409 });
+    });
+
+    it('updates entryTitle column when title field changes via PUT', async () => {
+      const cookie = await getSessionCookie();
+      const created = await $fetch<{ id: string }>('/api/content-entries', {
+        method: 'POST',
+        body: {
+          contentTypeId: testContentType.id,
+          data: { title: 'Original', summary: 'x' },
+          status: 'DRAFT',
+        },
+        headers: { cookie },
+      });
+      const updated = await $fetch<{ entryTitle: string }>(
+        `/api/content-entries/${created.id}`,
+        {
+          method: 'PUT',
+          body: { data: { title: 'Renamed', summary: 'x' } },
+          headers: { cookie },
+        }
+      );
+      expect(updated.entryTitle).toBe('Renamed');
+    });
+
     it('enforces slug uniqueness within content type', async () => {
       const cookie = await getSessionCookie();
 
