@@ -1116,4 +1116,62 @@ describe('GraphQL API', async () => {
       expect(result.errors!.length).toBeGreaterThan(0);
     });
   });
+
+  describe('Cross-type contentEntryList query', () => {
+    it('returns entries from all dynamic types', async () => {
+      const { data } = await gql<{
+        contentEntryList: Connection<{
+          id: string;
+          contentType: string;
+          status: string;
+        }>;
+      }>(`{
+        contentEntryList(first: 50) {
+          edges {
+            node {
+              id contentType status
+              ... on BlogPost { title slug }
+            }
+          }
+        }
+      }`);
+      expect(data.contentEntryList.edges.length).toBeGreaterThanOrEqual(2);
+      const types = new Set(
+        data.contentEntryList.edges.map((e) => e.node.contentType)
+      );
+      expect(types.has('BlogPost')).toBe(true);
+    });
+
+    it('filters contentEntryList by contentType', async () => {
+      const { data } = await gql<{
+        contentEntryList: Connection<{
+          id: string;
+          contentType: string;
+        }>;
+      }>(`{
+        contentEntryList(first: 50, where: { contentType: { equals: "BlogPost" } }) {
+          edges { node { id contentType } }
+        }
+      }`);
+      data.contentEntryList.edges.forEach((edge) => {
+        expect(edge.node.contentType).toBe('BlogPost');
+      });
+    });
+
+    it('filters contentEntryList by status', async () => {
+      const { data } = await gql<{
+        contentEntryList: Connection<{
+          id: string;
+          status: string;
+        }>;
+      }>(`{
+        contentEntryList(first: 50, where: { status: { equals: PUBLISHED } }) {
+          edges { node { id status } }
+        }
+      }`);
+      data.contentEntryList.edges.forEach((edge) => {
+        expect(edge.node.status).toBe('PUBLISHED');
+      });
+    });
+  });
 });

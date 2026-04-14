@@ -6,7 +6,10 @@ import {
   registerDynamicFilterInputs,
   getFilterKeyForFieldType,
   queryDynamicEntries,
+  buildDateConditions,
+  registerContentEntryWhere,
 } from './jsonbFilters';
+import { Prisma } from '#prisma';
 
 interface ContentTypeWithFields {
   id: string;
@@ -361,6 +364,82 @@ export function registerDynamicTypes(
       );
     }
   }
+
+  // Cross-type root query: contentEntryList
+  const ContentEntryWhere = registerContentEntryWhere(
+    builder,
+    ContentStatusEnum,
+    dynFilters
+  );
+
+  builder.queryField('contentEntryList', (t) =>
+    t.connection({
+      type: ContentEntryInterface as never,
+      args: { where: t.arg({ type: ContentEntryWhere }) },
+      resolve: (_root, args) =>
+        resolveOffsetConnection({ args }, async ({ limit, offset }) => {
+          const conditions: Prisma.Sql[] = [];
+          const whereArgs = args.where as {
+            status?: { equals?: string } | null;
+            contentType?: { equals?: string; contains?: string } | null;
+            createdAt?: Record<string, unknown> | null;
+            updatedAt?: Record<string, unknown> | null;
+          } | null;
+
+          if (whereArgs?.status?.equals) {
+            conditions.push(Prisma.sql`"status" = ${whereArgs.status.equals}`);
+          }
+          if (whereArgs?.contentType?.equals) {
+            const ct = contentTypes.find(
+              (c) => c.identifier === whereArgs.contentType!.equals
+            );
+            if (ct) {
+              conditions.push(Prisma.sql`"contentTypeId" = ${ct.id}`);
+            } else {
+              return [];
+            }
+          }
+          if (whereArgs?.contentType?.contains) {
+            const matchingIds = contentTypes
+              .filter((c) =>
+                c.identifier
+                  .toLowerCase()
+                  .includes(
+                    String(whereArgs.contentType!.contains).toLowerCase()
+                  )
+              )
+              .map((c) => c.id);
+            if (matchingIds.length === 0) return [];
+            conditions.push(
+              Prisma.sql`"contentTypeId" IN (${Prisma.join(matchingIds)})`
+            );
+          }
+
+          for (const sysField of ['createdAt', 'updatedAt'] as const) {
+            if (whereArgs?.[sysField]) {
+              const dateConditions = buildDateConditions(
+                sysField,
+                whereArgs[sysField] as Record<string, unknown>,
+                false
+              );
+              conditions.push(...dateConditions.map((c) => c.sql));
+            }
+          }
+
+          const whereClause =
+            conditions.length > 0
+              ? Prisma.join(conditions, ' AND ')
+              : Prisma.sql`1=1`;
+
+          return (await prisma.$queryRaw`
+            SELECT * FROM "ContentEntry"
+            WHERE ${whereClause}
+            ORDER BY "createdAt" DESC
+            LIMIT ${limit} OFFSET ${offset}
+          `) as unknown[];
+        }) as never,
+    })
+  );
 
   return { typeRefs, ContentEntryInterface, typeIdToIdentifier };
 }

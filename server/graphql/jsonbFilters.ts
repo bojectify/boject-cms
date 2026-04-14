@@ -93,7 +93,7 @@ interface FieldDef {
   type: string;
 }
 
-function buildDateConditions(
+export function buildDateConditions(
   identifier: string,
   filter: Record<string, unknown>,
   isJsonb: boolean
@@ -126,6 +126,21 @@ function buildDateConditions(
     }
   }
   return conditions;
+}
+
+export function registerContentEntryWhere(
+  builder: Builder,
+  _ContentStatusEnum: ContentStatusEnumRef,
+  dynFilters: DynFilterRefs
+) {
+  return builder.inputType('ContentEntryWhere', {
+    fields: (t) => ({
+      status: t.field({ type: dynFilters.DynContentStatusFilter }),
+      contentType: t.field({ type: dynFilters.DynStringFilter }),
+      createdAt: t.field({ type: dynFilters.DynDateTimeFilter }),
+      updatedAt: t.field({ type: dynFilters.DynDateTimeFilter }),
+    }),
+  });
 }
 
 export async function queryDynamicEntries(
