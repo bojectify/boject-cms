@@ -22,6 +22,7 @@ const VALID_FIELD_TYPES = new Set<string>([
   'RICHTEXT',
   'RELATION',
   'MULTIRELATION',
+  'IMAGE',
 ]);
 
 const NAME_MAX = 200;

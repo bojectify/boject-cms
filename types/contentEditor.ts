@@ -81,6 +81,13 @@ export interface DynamicMultirelationFieldConfig {
   targetContentTypeIds: string[];
 }
 
+export interface ImageFieldConfig {
+  type: 'image';
+  key: string;
+  label: string;
+  required?: boolean;
+}
+
 export type FieldConfig =
   | TextFieldConfig
   | TextareaFieldConfig
@@ -92,4 +99,5 @@ export type FieldConfig =
   | RichtextFieldConfig
   | MultirelationFieldConfig
   | DynamicRelationFieldConfig
-  | DynamicMultirelationFieldConfig;
+  | DynamicMultirelationFieldConfig
+  | ImageFieldConfig;

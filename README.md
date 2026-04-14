@@ -103,6 +103,7 @@ server/
     auth/                      # Login/logout endpoints + tests
     graphql/                   # GraphQL Yoga endpoint + tests
     images/                    # Image upload + transform endpoints + tests
+    files/                     # Primitive file upload + transform endpoints
     content.get.ts             # Unified content listing (UNION ALL across static + dynamic)
     content-types/             # Dynamic content type CRUD + field management
     content-entries/           # Dynamic content entry CRUD
@@ -171,6 +172,7 @@ CMS pages → Nuxt server routes → Prisma → PostgreSQL
 - **Prisma v7** uses the `@prisma/adapter-pg` driver adapter (not the traditional Rust engine). A singleton client in `server/utils/prisma.ts` is auto-imported into all server routes.
 - **Generated types** live in `generated/` (gitignored). Run `pnpm prisma:generate` after any schema change.
 - **Image upload & transform** — `POST /api/images/upload` accepts multipart file uploads (5MB limit, JPEG/PNG/WebP/GIF/AVIF). Originals are processed via Sharp (auto-orient, max 4000px). `GET /api/images/:id/transform` serves images with on-the-fly resize/format conversion (publicly accessible, cached, rate limited). Stored in `storage/` (gitignored, filesystem in dev, swappable to S3/R2 in production via Nitro storage config).
+- **Primitive file pipeline** — `POST /api/files/upload` + `GET /api/files/:storageKey/transform` provide a decoupled upload → storage-key → transform flow used by the `IMAGE` field type on dynamic content types. Shares the `images:*` unstorage buckets with the legacy `/api/images/*` pipeline.
 - **Content bundle CLI** — `scripts/content-bundle/` exports and imports dynamic content types and entries as JSON bundles. Portable mode (`--portable`) rewrites UUID references to `identifier`/`slug` keys for cross-instance migration; import does the reverse lookup in a transactional two-pass resolve. Functions are importable so a future scaffolder (e.g. `create-boject-cms`) can invoke them directly.
 
 ## GraphQL API
@@ -334,14 +336,15 @@ pnpm test:integration        # Integration tests only
 - **Content** (14 tests) — contentType filter (including Author, Tag, Article), status filter, combined filters, invalid value handling.
 - **Auth** (7 tests) — login validation, credential checking, session handling, middleware behaviour.
 - **Image upload & transform** (12 tests) — upload validation (missing file, wrong mime type, file too large), successful upload, transform validation (invalid params), format conversion, public access, rate limiting.
+- **Files** (14 tests) — primitive upload (auth, mime/size validation, successful upload returning `{ storageKey, ... }`), transform endpoint (resize, format conversion, public access, rate limiting), shared-bucket sanity (storage keys are isolated from the legacy `/api/images/*` pipeline).
 - **Authors** (11 tests) — listing, pagination, status filter, single-item lookup, update, slug uniqueness, 404 handling.
 - **Tags** (9 tests) — listing, pagination, status filter, single-item lookup, update, slug uniqueness, 404 handling.
 - **Articles** (13 tests) — listing with relations, pagination, filters (status, authorId, tagId), single-item lookup, update with tags, slug uniqueness, 404 handling.
 - **Content types** (24 tests) — CRUD, field management (add/update/delete/reorder), identifier validation, uniqueness constraints.
-- **Content entries** (16 tests) — CRUD, data validation against field definitions, slug uniqueness, status transitions, `entryTitle` populate + uniqueness.
+- **Content entries** (30 tests) — CRUD, data validation against field definitions, slug uniqueness, status transitions, `entryTitle` populate + uniqueness, plus IMAGE field end-to-end coverage (accepts/rejects values, required enforcement, persists through update, is served via `/api/files/:storageKey/transform`).
 - **Content bundle** (22 tests) — bundle shape validation (6), portable reference walkers (7), export (4), import (4), fixture shape regression (3), export → import round-trip (1), plus two end-to-end subsets.
 
-Total: 369 tests across 29 files.
+Total: 397 tests across 31 files.
 
 **Requirement:** Docker PostgreSQL must be running with seeded data.
 

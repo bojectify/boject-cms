@@ -684,6 +684,111 @@ describe('Content Entry endpoints', async () => {
     });
   });
 
+  describe('IMAGE field end-to-end', () => {
+    const sampleImage = {
+      storageKey: 'e2e-test.webp',
+      mimeType: 'image/webp',
+      width: 800,
+      height: 600,
+      fileSize: 50000,
+      originalName: 'e2e.jpg',
+      focalPointX: 0.25,
+      focalPointY: 0.75,
+    };
+
+    let imageTypeId: string;
+    let entryId: string;
+
+    it('creates a content type with an IMAGE field', async () => {
+      const cookie = await getSessionCookie();
+      const created = await $fetch<ContentTypeResponse>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: `HasImage_${Date.now()}`,
+          description: null,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+              order: 0,
+            },
+            {
+              identifier: 'hero',
+              name: 'Hero',
+              type: 'IMAGE',
+              required: false,
+              order: 1,
+            },
+          ],
+        },
+      });
+
+      expect(created.fields.some((f) => f.type === 'IMAGE')).toBe(true);
+      imageTypeId = created.id;
+    });
+
+    it('creates an entry with an IMAGE value', async () => {
+      const cookie = await getSessionCookie();
+      const entry = await $fetch<EntryResponse>('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: imageTypeId,
+          data: {
+            title: 'IMAGE field test entry',
+            hero: sampleImage,
+          },
+          status: 'DRAFT',
+        },
+      });
+      expect(entry.data.hero).toEqual(sampleImage);
+      entryId = entry.id;
+    });
+
+    it('reads the entry back with the IMAGE value intact', async () => {
+      const cookie = await getSessionCookie();
+      const entry = await $fetch<EntryResponse>(
+        `/api/content-entries/${entryId}`,
+        { headers: { cookie } }
+      );
+      expect(entry.data.hero).toEqual(sampleImage);
+    });
+
+    it('updates the IMAGE value to a new object', async () => {
+      const cookie = await getSessionCookie();
+      const nextImage = { ...sampleImage, storageKey: 'next.webp' };
+      const updated = await $fetch<EntryResponse>(
+        `/api/content-entries/${entryId}`,
+        {
+          method: 'PUT',
+          headers: { cookie },
+          body: {
+            data: { title: 'IMAGE field test entry', hero: nextImage },
+          },
+        }
+      );
+      expect(updated.data.hero).toEqual(nextImage);
+    });
+
+    it('clears the IMAGE value with null', async () => {
+      const cookie = await getSessionCookie();
+      const updated = await $fetch<EntryResponse>(
+        `/api/content-entries/${entryId}`,
+        {
+          method: 'PUT',
+          headers: { cookie },
+          body: {
+            data: { title: 'IMAGE field test entry', hero: null },
+          },
+        }
+      );
+      expect(updated.data.hero).toBeNull();
+    });
+  });
+
   describe('DELETE /api/content-entries/:id', () => {
     it('deletes an entry', async () => {
       const cookie = await getSessionCookie();

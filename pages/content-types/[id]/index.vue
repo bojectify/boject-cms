@@ -100,6 +100,7 @@ const fieldTypeOptions = [
   { label: 'Rich Text', value: 'RICHTEXT' },
   { label: 'Relation', value: 'RELATION' },
   { label: 'Multi Relation', value: 'MULTIRELATION' },
+  { label: 'Image', value: 'IMAGE' },
 ];
 
 // Content type options for relation field target picker
