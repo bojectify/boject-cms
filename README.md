@@ -30,8 +30,8 @@ docker compose up -d
 # Install dependencies (auto-runs nuxt prepare + prisma generate)
 pnpm install
 
-# Create a .env file
-echo 'DATABASE_URL=postgresql://boject:boject@localhost:5432/boject' > .env
+# Copy the .env template
+cp .env.example .env
 
 # Run database migrations
 pnpm prisma:migrate
