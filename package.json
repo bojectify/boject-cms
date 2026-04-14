@@ -25,7 +25,10 @@
     "typecheck": "nuxi typecheck",
     "apikey:create": "tsx scripts/manage-api-keys.ts create",
     "apikey:list": "tsx scripts/manage-api-keys.ts list",
-    "apikey:revoke": "tsx scripts/manage-api-keys.ts revoke"
+    "apikey:revoke": "tsx scripts/manage-api-keys.ts revoke",
+    "content:export": "tsx scripts/content-bundle/index.ts export",
+    "content:import": "tsx scripts/content-bundle/index.ts import",
+    "content:validate": "tsx scripts/content-bundle/index.ts validate"
   },
   "keywords": [],
   "author": "",

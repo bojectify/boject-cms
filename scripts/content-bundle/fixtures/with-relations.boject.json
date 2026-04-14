@@ -1,0 +1,78 @@
+{
+  "version": 1,
+  "exportedAt": "2026-04-14T10:00:00.000Z",
+  "portable": true,
+  "contentTypes": [
+    {
+      "id": null,
+      "identifier": "Category",
+      "name": "Category",
+      "description": null,
+      "fields": [
+        {
+          "id": null,
+          "identifier": "name",
+          "name": "Name",
+          "type": "ENTRY_TITLE",
+          "required": true,
+          "order": 0,
+          "options": null
+        }
+      ]
+    },
+    {
+      "id": null,
+      "identifier": "Post",
+      "name": "Post",
+      "description": null,
+      "fields": [
+        {
+          "id": null,
+          "identifier": "title",
+          "name": "Title",
+          "type": "ENTRY_TITLE",
+          "required": true,
+          "order": 0,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "category",
+          "name": "Category",
+          "type": "RELATION",
+          "required": false,
+          "order": 1,
+          "options": {
+            "targetContentTypeIds": [null],
+            "targetContentTypeIdentifiers": ["Category"]
+          }
+        }
+      ]
+    }
+  ],
+  "entries": [
+    {
+      "id": null,
+      "contentTypeId": null,
+      "contentTypeIdentifier": "Category",
+      "entryTitle": "News",
+      "slug": "news",
+      "status": "PUBLISHED",
+      "publishedAt": null,
+      "data": { "name": "News" }
+    },
+    {
+      "id": null,
+      "contentTypeId": null,
+      "contentTypeIdentifier": "Post",
+      "entryTitle": "Welcome",
+      "slug": "welcome",
+      "status": "DRAFT",
+      "publishedAt": null,
+      "data": {
+        "title": "Welcome",
+        "category": { "contentTypeIdentifier": "Category", "entryKey": "news" }
+      }
+    }
+  ]
+}

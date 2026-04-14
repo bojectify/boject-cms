@@ -53,3 +53,8 @@ storage/
 # Nuxt
 .nuxt/
 .output/
+
+# Claude Code host-local
+.claude/*.lock
+.claude/settings.local.json
+.claude/worktrees/

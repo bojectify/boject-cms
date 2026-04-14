@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "exportedAt": "2026-04-14T10:00:00.000Z",
+  "portable": true,
+  "contentTypes": [
+    {
+      "id": null,
+      "identifier": "Page",
+      "name": "Page",
+      "description": null,
+      "fields": [
+        {
+          "id": null,
+          "identifier": "title",
+          "name": "Title",
+          "type": "ENTRY_TITLE",
+          "required": true,
+          "order": 0,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "slug",
+          "name": "Slug",
+          "type": "SLUG",
+          "required": false,
+          "order": 1,
+          "options": null
+        }
+      ]
+    }
+  ]
+}
