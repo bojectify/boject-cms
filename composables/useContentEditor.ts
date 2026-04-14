@@ -19,11 +19,15 @@ export function useContentEditor(modelPath: string, id: string) {
     Object.assign(formState, { status: 'DRAFT' });
   }
 
-  watch(item, (val) => {
-    if (val) {
-      Object.assign(formState, val);
-    }
-  });
+  watch(
+    item,
+    (val) => {
+      if (val) {
+        Object.assign(formState, val);
+      }
+    },
+    { immediate: true }
+  );
 
   async function save(): Promise<string | void> {
     isSaving.value = true;

@@ -34,7 +34,8 @@ export function useContentEntryEditor(contentTypeId: string, entryId: string) {
         Object.assign(formState, data);
         formState.status = val.status;
       }
-    }
+    },
+    { immediate: true }
   );
 
   async function save(): Promise<string | void> {
