@@ -31,10 +31,6 @@ Portable-mode references resolve entries by `slug || entryTitle`. `slug` is alre
 - Pre-check for duplicates before applying the constraint
 - If duplicates exist, fail the migration with an error listing the offending `(contentType, entryTitle)` pairs — user resolves manually. Seed data is small, this is a dev-time concern.
 
-**`validateEntryData` update:**
-
-- Add an optional `{ skipRelationRequired?: boolean }` option so the two-pass portable import can defer required-on-relation checks to pass 2 without duplicating validation logic. Default behaviour (no option passed) is unchanged for existing callers.
-
 ## Bundle Format
 
 Single JSON file per bundle. Convention: `*.boject.json`. Pretty-printed with 2-space indent so bundles diff cleanly in git.
@@ -217,10 +213,10 @@ This assumes `CmsEmbed` has been rewired to reference dynamic content types. The
      - Portable: resolve via `targetContentTypeIdentifiers` through the identifier→UUID map. Error if any identifier cannot be resolved.
 
 4. **Write entries** (if mode is `entries` or `all`)
-   - **Non-portable path**: single pass. `data` already has UUIDs; insert directly after running `validateEntryData`. Sync `entryTitle` and `slug` columns from `data` (same as normal API routes).
+   - **Non-portable path**: single pass. `data` already has UUIDs; insert directly. Sync `entryTitle` and `slug` columns from the bundle entry's explicit `entryTitle` / `slug` values. The CLI does not re-run per-field validation — the bundle's shape was checked by `validateBundle` and the source of a non-portable bundle is a prior export from a valid DB state.
    - **Portable path**: two passes.
-     - **Pass 1**: for each entry, resolve `contentTypeIdentifier` → UUID. Insert entry with `data` stripped of RELATION / MULTIRELATION values and RICHTEXT `cmsEmbed` node refs — scalar fields (TEXT, NUMBER, BOOLEAN, DATETIME, SELECT, ENTRY_TITLE, SLUG, plain RICHTEXT body) are written as-is. `validateEntryData` runs in "pass 1 mode" which skips required-check on relation fields (deferred to pass 2) but still enforces scalar type checks. Build a lookup map keyed by `contentTypeIdentifier + entryKey` → new entry UUID.
-     - **Pass 2**: for each entry, walk the bundle's original `data` and resolve RELATION, MULTIRELATION, and `cmsEmbed` refs. Resolution order per ref: (a) lookup map for entries inside the bundle, (b) DB query by `(contentTypeId, slug)` for existing entries, (c) fallback to `(contentTypeId, entryTitle)`. Write the fully-resolved `data` via `prisma.contentEntry.update`, then run the complete `validateEntryData` including required-on-relation checks.
+     - **Pass 1**: for each entry, resolve `contentTypeIdentifier` → UUID. Insert entry with `data` stripped of RELATION / MULTIRELATION values (resolved in pass 2). Scalar fields (TEXT, NUMBER, BOOLEAN, DATETIME, SELECT, ENTRY_TITLE, SLUG, RICHTEXT body including `cmsEmbed` nodes) are written as-is — the bundle's shape was validated up front by `validateBundle` and no additional per-field type check is run in the CLI path. Build a lookup map keyed by `contentTypeIdentifier + entryKey` → new entry UUID.
+     - **Pass 2**: for each entry, walk the bundle's original `data` and resolve RELATION, MULTIRELATION, and `cmsEmbed` refs. Resolution order per ref: (a) lookup map for entries inside the bundle, (b) DB query by `(contentTypeId, slug)` for existing entries, (c) fallback to `(contentTypeId, entryTitle)`. Write the fully-resolved `data` via `prisma.contentEntry.update`.
    - `publishedAt` preserved from bundle; `createdAt` / `updatedAt` set to now; `createdBy` / `updatedBy` set from `--author` flag or null.
    - All entry writes are validated by `validateEntryData`.
 
