@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "exportedAt": "2026-04-14T10:00:00.000Z",
+  "portable": true,
+  "contentTypes": [
+    {
+      "id": null,
+      "identifier": "Article",
+      "name": "Article",
+      "description": null,
+      "fields": [
+        {
+          "id": null,
+          "identifier": "title",
+          "name": "Title",
+          "type": "ENTRY_TITLE",
+          "required": true,
+          "order": 0,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "body",
+          "name": "Body",
+          "type": "RICHTEXT",
+          "required": false,
+          "order": 1,
+          "options": null
+        }
+      ]
+    }
+  ],
+  "entries": [
+    {
+      "id": null,
+      "contentTypeId": null,
+      "contentTypeIdentifier": "Article",
+      "entryTitle": "First Article",
+      "slug": "first-article",
+      "status": "PUBLISHED",
+      "publishedAt": "2026-04-01T00:00:00.000Z",
+      "data": {
+        "title": "First Article",
+        "body": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [{ "type": "text", "text": "Hello world" }]
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
