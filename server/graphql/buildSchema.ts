@@ -50,7 +50,11 @@ export async function buildSchema(): Promise<GraphQLSchema> {
   registerAuthorType(builder, filters, ContentStatusEnum);
   registerTagGroupType(builder, filters, ContentStatusEnum);
   registerTagType(builder, filters, ContentStatusEnum);
-  const ArticleRef = registerArticleType(builder, filters, ContentStatusEnum);
+  const { ArticleRef } = registerArticleType(
+    builder,
+    filters,
+    ContentStatusEnum
+  );
   registerLinkType(builder, ContentStatusEnum, ArticleRef);
   registerNavigationItemType(builder);
   registerNavigationType(builder, ContentStatusEnum);
