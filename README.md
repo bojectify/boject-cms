@@ -132,6 +132,8 @@ composables/
   useContentTable.ts           # Shared formatDate + statusColor helpers
   useContentEditor.ts          # Content editing lifecycle management
   useContentEntryEditor.ts     # Dynamic entry editing lifecycle
+  useAuthedFetch.ts            # useFetch wrapper that forwards cookies during SSR
+  useRelationResolver.ts       # Resolves relation refs via useRequestFetch
 extensions/
   cmsEmbed.ts                  # Custom Tiptap ProseMirror node for content embeds
 scripts/
