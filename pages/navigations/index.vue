@@ -1,6 +1,6 @@
 <script setup lang="ts">
 const page = ref(1);
-const { data, status } = await useFetch('/api/navigations', {
+const { data, status } = await useAuthedFetch('/api/navigations', {
   query: { page, perPage: 15 },
   watch: [page],
 });

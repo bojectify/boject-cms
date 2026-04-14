@@ -40,7 +40,7 @@ const fieldTypeOptions = [
 ];
 
 // Content type options for relation field target picker
-const { data: contentTypeOptions } = useFetch<
+const { data: contentTypeOptions } = useAuthedFetch<
   { label: string; value: string }[]
 >('/api/content-types/options');
 

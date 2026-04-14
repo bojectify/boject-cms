@@ -5,7 +5,7 @@ import { useContentTable } from '~/composables/useContentTable';
 const { formatDate } = useContentTable();
 
 const page = ref(1);
-const { data, status } = await useFetch<{
+const { data, status } = await useAuthedFetch<{
   items: Array<{
     id: string;
     name: string;

@@ -3,7 +3,7 @@ import type { TableColumn } from '@nuxt/ui';
 
 const page = ref(1);
 
-const { data, status } = await useFetch('/api/content', {
+const { data, status } = await useAuthedFetch('/api/content', {
   query: { page, perPage: 15 },
   watch: [page],
 });

@@ -4,7 +4,7 @@ import { useContentTable } from '~/composables/useContentTable';
 
 const page = ref(1);
 
-const { data, status } = await useFetch('/api/fixtures', {
+const { data, status } = await useAuthedFetch('/api/fixtures', {
   query: { page, perPage: 15 },
   watch: [page],
 });

@@ -5,7 +5,7 @@ const contentTypeId = route.params.id as string;
 const page = ref(1);
 
 // Fetch the content type to get the name and ENTRY_TITLE field
-const { data: contentType } = await useFetch<{
+const { data: contentType } = await useAuthedFetch<{
   id: string;
   name: string;
   fields: Array<{
@@ -21,7 +21,7 @@ const entryTitleFieldIdentifier = computed(() => {
 });
 
 // Fetch entries
-const { data, status } = await useFetch<{
+const { data, status } = await useAuthedFetch<{
   items: Array<{
     id: string;
     data: Record<string, unknown>;

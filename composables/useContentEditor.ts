@@ -8,7 +8,7 @@ export function useContentEditor(modelPath: string, id: string) {
     refresh,
   } = isNew
     ? { data: ref(null), status: ref('success'), refresh: async () => {} }
-    : useFetch<Record<string, unknown>>(`/api/${modelPath}/${id}`);
+    : useAuthedFetch<Record<string, unknown>>(`/api/${modelPath}/${id}`);
 
   const formState = reactive<Record<string, unknown>>({});
   const isSaving = ref(false);
