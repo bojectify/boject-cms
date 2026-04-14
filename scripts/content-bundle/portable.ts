@@ -33,7 +33,7 @@ export function encodeRelationRef(
       `Cannot encode relation ref: entry ${ref.entryId} not found for ${identifier}`
     );
   }
-  const entryKey = keys.slug ?? keys.entryTitle;
+  const entryKey = keys.slug || keys.entryTitle;
   if (!entryKey) {
     throw new Error(
       `Cannot encode relation ref: entry ${ref.entryId} has no slug or entryTitle`
@@ -90,15 +90,23 @@ export function encodeDataRefs(
       );
     } else if (type === 'RICHTEXT') {
       out[key] = rewriteCmsEmbeds(value, (attrs) => {
-        const { embedType, embedId } = attrs;
+        const { embedType, embedId, ...rest } = attrs;
         if (!embedType || !embedId) return attrs;
         const ident = typeIdToIdentifier.get(embedType);
-        if (!ident) return attrs;
+        if (!ident) {
+          throw new Error(
+            `Cannot encode cmsEmbed: unknown contentTypeId ${embedType}`
+          );
+        }
         const entryMap = typeIdentifierToEntryKeys.get(ident);
         const keys = entryMap?.get(embedId);
-        if (!keys) return attrs;
-        const entryKey = keys.slug ?? keys.entryTitle;
-        return { embedType: ident, embedKey: entryKey };
+        if (!keys) {
+          throw new Error(
+            `Cannot encode cmsEmbed: entry ${embedId} not found for ${ident}`
+          );
+        }
+        const entryKey = keys.slug || keys.entryTitle;
+        return { ...rest, embedType: ident, embedKey: entryKey };
       });
     } else {
       out[key] = value;
@@ -132,14 +140,22 @@ export function decodeDataRefs(
       );
     } else if (type === 'RICHTEXT') {
       out[key] = rewriteCmsEmbeds(value, (attrs) => {
-        const { embedType, embedKey } = attrs;
+        const { embedType, embedKey, ...rest } = attrs;
         if (!embedType || !embedKey) return attrs;
         const contentTypeId = identifierToTypeId.get(embedType);
-        if (!contentTypeId) return attrs;
+        if (!contentTypeId) {
+          throw new Error(
+            `Cannot decode cmsEmbed: unknown identifier ${embedType}`
+          );
+        }
         const keyMap = typeIdentifierToKeyToEntry.get(embedType);
         const entryId = keyMap?.get(embedKey);
-        if (!entryId) return attrs;
-        return { embedType: contentTypeId, embedId: entryId };
+        if (!entryId) {
+          throw new Error(
+            `Cannot decode cmsEmbed: entry ${embedType}:${embedKey} not found`
+          );
+        }
+        return { ...rest, embedType: contentTypeId, embedId: entryId };
       });
     } else {
       out[key] = value;
