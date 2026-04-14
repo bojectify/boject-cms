@@ -6,7 +6,7 @@ const props = defineProps(nodeViewProps);
 const embedType = computed(() => props.node.attrs.embedType as string);
 const embedId = computed(() => props.node.attrs.embedId as string);
 
-const { data: item } = useFetch<Record<string, unknown>>(
+const { data: item } = useAuthedFetch<Record<string, unknown>>(
   () => `/api/${embedType.value}s/${embedId.value}`,
   { watch: [embedType, embedId] }
 );

@@ -11,6 +11,10 @@ interface ResolvedRelation {
 }
 
 export function useRelationResolver() {
+  // useRequestFetch returns a $fetch instance that forwards the incoming
+  // request's cookies/headers when running during SSR. No-op on client.
+  const request$fetch = useRequestFetch();
+
   const cache = reactive<
     Record<string, { entryTitle: string; contentTypeName: string }>
   >({});
@@ -21,7 +25,7 @@ export function useRelationResolver() {
     contentTypeId: string
   ): Promise<string> {
     if (contentTypeNames[contentTypeId]) return contentTypeNames[contentTypeId];
-    const ct = await $fetch<{ name: string }>(
+    const ct = await request$fetch<{ name: string }>(
       `/api/content-types/${contentTypeId}`
     );
     contentTypeNames[contentTypeId] = ct.name;
@@ -39,7 +43,7 @@ export function useRelationResolver() {
     }
 
     const [entry, contentTypeName] = await Promise.all([
-      $fetch<{
+      request$fetch<{
         data: Record<string, unknown>;
         contentType?: {
           name: string;

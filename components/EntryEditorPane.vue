@@ -13,7 +13,7 @@ const emit = defineEmits<{
 }>();
 
 // Fetch content type for field definitions
-const { data: contentType } = useFetch<{
+const { data: contentType } = useAuthedFetch<{
   id: string;
   name: string;
   identifier: string;

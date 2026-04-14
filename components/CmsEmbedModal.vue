@@ -17,7 +17,7 @@ const modelTypes = [
 ];
 
 const selectedType = ref('team');
-const { data: options } = useFetch<{ label: string; value: string }[]>(
+const { data: options } = useAuthedFetch<{ label: string; value: string }[]>(
   () => `/api/${selectedType.value}s/options`,
   { watch: [selectedType] }
 );

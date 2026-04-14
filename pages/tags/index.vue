@@ -1,7 +1,7 @@
 <script setup lang="ts">
 const page = ref(1);
 
-const { data, status } = await useFetch('/api/tags', {
+const { data, status } = await useAuthedFetch('/api/tags', {
   query: { page, perPage: 15 },
   watch: [page],
 });

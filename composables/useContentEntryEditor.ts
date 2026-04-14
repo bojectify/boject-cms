@@ -14,7 +14,9 @@ export function useContentEntryEditor(contentTypeId: string, entryId: string) {
         status: ref('success'),
         refresh: async () => {},
       }
-    : useFetch<Record<string, unknown>>(`/api/content-entries/${entryId}`);
+    : useAuthedFetch<Record<string, unknown>>(
+        `/api/content-entries/${entryId}`
+      );
 
   const formState = reactive<Record<string, unknown>>({});
   const isSaving = ref(false);
@@ -32,7 +34,8 @@ export function useContentEntryEditor(contentTypeId: string, entryId: string) {
         Object.assign(formState, data);
         formState.status = val.status;
       }
-    }
+    },
+    { immediate: true }
   );
 
   async function save(): Promise<string | void> {

@@ -6,7 +6,7 @@ const contentTypeId = route.params.id as string;
 const entryId = route.params.entryId as string;
 
 // Fetch content type to get field definitions
-const { data: contentType } = await useFetch<{
+const { data: contentType } = await useAuthedFetch<{
   id: string;
   name: string;
   fields: Array<{
