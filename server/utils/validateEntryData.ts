@@ -234,6 +234,81 @@ export async function validateEntryData(
         break;
       }
 
+      case 'IMAGE': {
+        if (
+          typeof value !== 'object' ||
+          value === null ||
+          Array.isArray(value)
+        ) {
+          throw createError({
+            statusCode: 400,
+            statusMessage: `${field.name} must be an object`,
+          });
+        }
+        const img = value as Record<string, unknown>;
+
+        if (typeof img.storageKey !== 'string' || !img.storageKey) {
+          throw createError({
+            statusCode: 400,
+            statusMessage: `${field.name} must have a storageKey`,
+          });
+        }
+        if (typeof img.mimeType !== 'string' || !img.mimeType) {
+          throw createError({
+            statusCode: 400,
+            statusMessage: `${field.name} must have a mimeType`,
+          });
+        }
+        if (typeof img.width !== 'number' || !Number.isFinite(img.width)) {
+          throw createError({
+            statusCode: 400,
+            statusMessage: `${field.name} must have a numeric width`,
+          });
+        }
+        if (typeof img.height !== 'number' || !Number.isFinite(img.height)) {
+          throw createError({
+            statusCode: 400,
+            statusMessage: `${field.name} must have a numeric height`,
+          });
+        }
+        if (
+          typeof img.fileSize !== 'number' ||
+          !Number.isFinite(img.fileSize)
+        ) {
+          throw createError({
+            statusCode: 400,
+            statusMessage: `${field.name} must have a numeric fileSize`,
+          });
+        }
+
+        const originalName =
+          typeof img.originalName === 'string' ? img.originalName : null;
+        const focalPointX =
+          typeof img.focalPointX === 'number' &&
+          img.focalPointX >= 0 &&
+          img.focalPointX <= 1
+            ? img.focalPointX
+            : 0.5;
+        const focalPointY =
+          typeof img.focalPointY === 'number' &&
+          img.focalPointY >= 0 &&
+          img.focalPointY <= 1
+            ? img.focalPointY
+            : 0.5;
+
+        validated[field.identifier] = {
+          storageKey: img.storageKey,
+          mimeType: img.mimeType,
+          width: img.width,
+          height: img.height,
+          fileSize: img.fileSize,
+          originalName,
+          focalPointX,
+          focalPointY,
+        };
+        break;
+      }
+
       default:
         validated[field.identifier] = value;
     }

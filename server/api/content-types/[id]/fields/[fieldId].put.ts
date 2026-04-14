@@ -16,6 +16,7 @@ const VALID_FIELD_TYPES = new Set<string>([
   'RICHTEXT',
   'RELATION',
   'MULTIRELATION',
+  'IMAGE',
 ]);
 
 export default defineEventHandler(async (event) => {
