@@ -40,7 +40,7 @@ export default defineConfig({
         extends: true,
         test: {
           name: 'unit',
-          include: ['scripts/**/*.test.ts'],
+          include: ['scripts/**/*.test.ts', 'starters/**/*.test.ts'],
           globals: true,
         },
       },
