@@ -18,7 +18,8 @@ pnpm preview                  # Preview production build locally
 pnpm db:up                    # Start local PostgreSQL container (alias for docker compose up -d)
 pnpm prisma:generate          # Regenerate Prisma client + Pothos types (required after schema changes)
 pnpm prisma:migrate           # Run database migrations
-pnpm prisma:seed              # Seed database with test data
+pnpm prisma:seed              # Seed database with test data (uses DATABASE_URL — typically dev db)
+pnpm prisma:seed:test         # Seed the `boject_test` database (hardcoded URL — mirrors prisma:studio:test)
 pnpm lint                     # Lint with ESLint
 pnpm lint:fix                 # Lint and auto-fix
 pnpm format                   # Check formatting with Prettier

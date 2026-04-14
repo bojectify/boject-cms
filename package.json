@@ -13,6 +13,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:generate": "prisma generate",
     "prisma:seed": "tsx prisma/seed.ts",
+    "prisma:seed:test": "DATABASE_URL=postgresql://boject:boject@localhost:5432/boject_test tsx prisma/seed.ts",
     "prisma:studio": "prisma studio",
     "prisma:studio:test": "DATABASE_URL=postgresql://boject:boject@localhost:5432/boject_test prisma studio",
     "lint": "eslint .",
