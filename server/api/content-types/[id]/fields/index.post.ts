@@ -7,6 +7,7 @@ import {
 } from '../../../../utils/validation';
 import { withPrismaErrors } from '../../../../utils/prismaErrors';
 import { enforceMutationRateLimit } from '../../../../utils/rateLimitEndpoint';
+import { invalidateSchema } from '../../../../graphql/schema';
 
 const VALID_FIELD_TYPES = new Set<string>([
   'ENTRY_TITLE',
@@ -126,6 +127,8 @@ export default defineEventHandler(async (event) => {
         'A field with this identifier already exists on this content type',
     }
   );
+
+  invalidateSchema();
 
   setResponseStatus(event, 201);
   return created;

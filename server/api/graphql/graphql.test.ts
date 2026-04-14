@@ -1,7 +1,24 @@
 import { describe, it, expect } from 'vitest';
-import { setup, $fetch } from '@nuxt/test-utils/e2e';
+import { setup, $fetch, fetch } from '@nuxt/test-utils/e2e';
 
 const TEST_API_KEY = 'boject_test_key_for_integration_tests_only';
+
+let _sessionCookie: string | null = null;
+
+async function getSessionCookie(): Promise<string> {
+  if (_sessionCookie) return _sessionCookie;
+  const response = await fetch('/api/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({
+      email: 'admin@boject.com',
+      password: 'password',
+    }),
+    headers: { 'Content-Type': 'application/json' },
+  });
+  const cookies = response.headers.getSetCookie();
+  _sessionCookie = cookies.join('; ');
+  return _sessionCookie;
+}
 
 type GqlResponse<T> = { data: T; errors?: { message: string }[] };
 
@@ -810,6 +827,129 @@ describe('GraphQL API', async () => {
         }
       }`);
       expect(data.blogPostList.edges).toEqual([]);
+    });
+  });
+
+  describe('Schema rebuild on content type changes', () => {
+    it('rebuilds schema when a new content type is created', async () => {
+      const cookie = await getSessionCookie();
+      const created = await $fetch<any>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: 'Schema Test Type',
+          identifier: 'SchemaTestType',
+          fields: [
+            {
+              identifier: 'label',
+              name: 'Label',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+          ],
+        },
+      });
+
+      const { data, errors } = await gql<{
+        schemaTestTypeList: Connection<{ id: string }>;
+      }>('{ schemaTestTypeList(first: 1) { edges { node { id } } } }');
+      expect(errors).toBeUndefined();
+      expect(data.schemaTestTypeList.edges).toEqual([]);
+
+      await $fetch<unknown>(`/api/content-types/${created.id}`, {
+        method: 'DELETE',
+        headers: { cookie },
+      });
+    });
+
+    it('rebuilds schema when a field is added', async () => {
+      const cookie = await getSessionCookie();
+      const created = await $fetch<any>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: 'Field Add Test',
+          identifier: 'FieldAddTest',
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+          ],
+        },
+      });
+
+      await $fetch(`/api/content-types/${created.id}/fields`, {
+        method: 'POST',
+        headers: { cookie },
+        body: { identifier: 'description', name: 'Description', type: 'TEXT' },
+      });
+
+      const entry = await $fetch<any>('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: created.id,
+          data: { title: 'Test', description: 'A description' },
+          status: 'DRAFT',
+        },
+      });
+
+      const { data } = await gql<{
+        fieldAddTest: {
+          title: string;
+          description: string | null;
+        } | null;
+      }>(`{ fieldAddTest(id: "${entry.id}") { title description } }`);
+      expect(data.fieldAddTest).not.toBeNull();
+      expect(data.fieldAddTest!.description).toBe('A description');
+
+      await $fetch<unknown>(`/api/content-entries/${entry.id}`, {
+        method: 'DELETE',
+        headers: { cookie },
+      });
+      await $fetch<unknown>(`/api/content-types/${created.id}`, {
+        method: 'DELETE',
+        headers: { cookie },
+      });
+    });
+
+    it('rebuilds schema when a content type is deleted', async () => {
+      const cookie = await getSessionCookie();
+      const created = await $fetch<any>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: 'Delete Test',
+          identifier: 'DeleteTest',
+          fields: [
+            {
+              identifier: 'name',
+              name: 'Name',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+          ],
+        },
+      });
+
+      const { data: before } = await gql<{
+        deleteTestList: Connection<{ id: string }>;
+      }>('{ deleteTestList(first: 1) { edges { node { id } } } }');
+      expect(before.deleteTestList).toBeDefined();
+
+      await $fetch<unknown>(`/api/content-types/${created.id}`, {
+        method: 'DELETE',
+        headers: { cookie },
+      });
+
+      const result = await gql<any>(
+        '{ deleteTestList(first: 1) { edges { node { id } } } }'
+      );
+      expect(result.errors).toBeDefined();
+      expect(result.errors!.length).toBeGreaterThan(0);
     });
   });
 });

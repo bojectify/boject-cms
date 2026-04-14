@@ -1,6 +1,7 @@
 import { assertUuid } from '../../../../utils/validation';
 import { withPrismaErrors } from '../../../../utils/prismaErrors';
 import { enforceMutationRateLimit } from '../../../../utils/rateLimitEndpoint';
+import { invalidateSchema } from '../../../../graphql/schema';
 
 export default defineEventHandler(async (event) => {
   enforceMutationRateLimit(event, 'content-type-fields.delete');
@@ -36,6 +37,8 @@ export default defineEventHandler(async (event) => {
     () => prisma.contentTypeField.delete({ where: { id: fieldId } }),
     { notFoundMessage: 'Field not found' }
   );
+
+  invalidateSchema();
 
   return { success: true };
 });
