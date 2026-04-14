@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { FormError } from '@nuxt/ui';
 import type { FieldConfig } from '~/types/contentEditor';
+import type { ImageFieldValue } from './ImageField.vue';
 
 const props = defineProps<{
   title: string;
@@ -273,6 +274,16 @@ function onSubmit() {
               @update:model-value="state[field.key] = $event"
             />
           </UFormField>
+
+          <template v-else-if="field.type === 'image'">
+            <ImageField
+              :field="field"
+              :model-value="
+                (state[field.key] as ImageFieldValue | null) ?? null
+              "
+              @update:model-value="state[field.key] = $event"
+            />
+          </template>
         </slot>
       </template>
 
