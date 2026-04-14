@@ -6,7 +6,9 @@ import type PrismaTypes from '#generated/pothos-types';
 import { getDatamodel } from '#generated/pothos-types';
 import { prisma } from '../utils/prisma';
 
-export const builder = new SchemaBuilder<{
+export type Builder = InstanceType<typeof SchemaBuilder<BuilderTypes>>;
+
+type BuilderTypes = {
   PrismaTypes: PrismaTypes;
   Scalars: {
     DateTime: { Input: Date | string; Output: Date | string };
@@ -15,22 +17,28 @@ export const builder = new SchemaBuilder<{
       Output: unknown;
     };
   };
-}>({
-  plugins: [PrismaPlugin, PrismaUtilsPlugin, RelayPlugin],
-  prisma: {
-    client: prisma,
-    dmmf: getDatamodel(),
-  },
-  relay: {},
-});
+};
 
-builder.scalarType('DateTime', {
-  serialize: (value) =>
-    value instanceof Date ? value.toISOString() : String(value),
-  parseValue: (value) => new Date(String(value)),
-});
+export function createBuilder(): Builder {
+  const builder = new SchemaBuilder<BuilderTypes>({
+    plugins: [PrismaPlugin, PrismaUtilsPlugin, RelayPlugin],
+    prisma: {
+      client: prisma,
+      dmmf: getDatamodel(),
+    },
+    relay: {},
+  });
 
-builder.scalarType('JSON', {
-  serialize: (value) => value,
-  parseValue: (value) => value,
-});
+  builder.scalarType('DateTime', {
+    serialize: (value) =>
+      value instanceof Date ? value.toISOString() : String(value),
+    parseValue: (value) => new Date(String(value)),
+  });
+
+  builder.scalarType('JSON', {
+    serialize: (value) => value,
+    parseValue: (value) => value,
+  });
+
+  return builder;
+}
