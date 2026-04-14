@@ -3,6 +3,7 @@ model ContentEntry {
   contentType   ContentType   @relation(fields: [contentTypeId], references: [id])
   contentTypeId String
   data          Json
+  entryTitle    String
   slug          String?
   status        ContentStatus @default(DRAFT)
   publishedAt   DateTime?
@@ -12,4 +13,5 @@ model ContentEntry {
   updatedAt     DateTime      @updatedAt
 
   @@unique([contentTypeId, slug])
+  @@unique([contentTypeId, entryTitle])
 }
