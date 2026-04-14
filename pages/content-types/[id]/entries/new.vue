@@ -5,7 +5,7 @@ const route = useRoute();
 const contentTypeId = route.params.id as string;
 
 // Fetch content type to get field definitions
-const { data: contentType } = await useFetch<{
+const { data: contentType } = await useAuthedFetch<{
   id: string;
   name: string;
   fields: Array<{

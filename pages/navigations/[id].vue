@@ -34,7 +34,7 @@ type NavItemData = {
   children?: NavItemData[];
 };
 
-const { data: navData, refresh: refreshNav } = await useFetch<{
+const { data: navData, refresh: refreshNav } = await useAuthedFetch<{
   items: NavItemData[];
 }>(`/api/navigations/${id}`, {
   transform: (data) => data as { items: NavItemData[] },

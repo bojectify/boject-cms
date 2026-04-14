@@ -10,7 +10,7 @@ const {
   data: contentType,
   status: loadingStatus,
   refresh,
-} = await useFetch<{
+} = await useAuthedFetch<{
   id: string;
   name: string;
   identifier: string;
@@ -104,7 +104,7 @@ const fieldTypeOptions = [
 ];
 
 // Content type options for relation field target picker
-const { data: contentTypeOptions } = useFetch<
+const { data: contentTypeOptions } = useAuthedFetch<
   { label: string; value: string }[]
 >('/api/content-types/options');
 
