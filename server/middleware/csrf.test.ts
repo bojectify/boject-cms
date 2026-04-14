@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { setup, fetch, url } from '@nuxt/test-utils/e2e';
+import { TEST_USERNAME, TEST_PASSWORD } from '../test/credentials';
 import { resetRateLimitStore } from '../utils/rateLimit';
 
 let _sessionCookie: string | null = null;
@@ -9,8 +10,8 @@ async function getSessionCookie(): Promise<string> {
   const response = await fetch('/api/auth/login', {
     method: 'POST',
     body: JSON.stringify({
-      email: 'admin@boject.com',
-      password: 'password',
+      email: TEST_USERNAME,
+      password: TEST_PASSWORD,
     }),
     headers: { 'Content-Type': 'application/json' },
   });

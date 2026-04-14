@@ -45,7 +45,7 @@ async function login() {
         <UInput
           v-model="email"
           type="email"
-          placeholder="admin@boject.com"
+          placeholder="admin@example.com"
           required
           class="w-full"
         />

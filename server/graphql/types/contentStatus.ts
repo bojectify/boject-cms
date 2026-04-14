@@ -1,5 +1,9 @@
-import { builder } from '../builder';
+import type { Builder } from '../builder';
 
-export const ContentStatusEnum = builder.enumType('ContentStatus', {
-  values: ['DRAFT', 'PUBLISHED', 'CHANGED', 'ARCHIVED'] as const,
-});
+export function registerContentStatusEnum(builder: Builder) {
+  return builder.enumType('ContentStatus', {
+    values: ['DRAFT', 'PUBLISHED', 'CHANGED', 'ARCHIVED'] as const,
+  });
+}
+
+export type ContentStatusEnumRef = ReturnType<typeof registerContentStatusEnum>;
