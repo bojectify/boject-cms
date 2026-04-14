@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { setup, $fetch, fetch } from '@nuxt/test-utils/e2e';
+import { TEST_USERNAME, TEST_PASSWORD } from '../../test/credentials';
 
 // 1x1 red PNG (68 bytes)
 const TINY_PNG = Buffer.from(
@@ -322,8 +323,8 @@ async function getSessionCookie(): Promise<string> {
   const response = await fetch('/api/auth/login', {
     method: 'POST',
     body: JSON.stringify({
-      email: 'admin@boject.com',
-      password: 'password',
+      email: TEST_USERNAME,
+      password: TEST_PASSWORD,
     }),
     headers: { 'Content-Type': 'application/json' },
   });

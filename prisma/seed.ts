@@ -133,12 +133,15 @@ async function main() {
   });
 
   // Admin user
-  const hashedPassword = await hashPasswordForSeed('password');
+  const adminEmail =
+    process.env.INTEGRATION_TEST_USERNAME ?? 'admin@boject.com';
+  const adminPassword = process.env.INTEGRATION_TEST_PASSWORD ?? 'password';
+  const hashedPassword = await hashPasswordForSeed(adminPassword);
   await prisma.user.upsert({
-    where: { email: 'admin@boject.com' },
+    where: { email: adminEmail },
     update: { firstName: 'Admin', lastName: 'User' },
     create: {
-      email: 'admin@boject.com',
+      email: adminEmail,
       password: hashedPassword,
       firstName: 'Admin',
       lastName: 'User',
