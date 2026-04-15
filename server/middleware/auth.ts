@@ -9,8 +9,6 @@ export default defineEventHandler(async (event) => {
     path.startsWith('/api/auth/') ||
     path.startsWith('/api/_auth/') ||
     path.startsWith('/api/graphql') ||
-    /^\/api\/images\/[^/]+\/transform$/.test(path) ||
-    /^\/api\/images\/[^/]+\/placeholder$/.test(path) ||
     /^\/api\/files\/[^/]+\/transform$/.test(path)
   ) {
     return;

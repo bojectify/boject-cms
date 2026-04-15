@@ -4,8 +4,6 @@ const SKIP_PREFIXES = ['/api/auth/', '/api/_auth/', '/api/graphql'];
 
 function isSkipped(path: string): boolean {
   if (SKIP_PREFIXES.some((p) => path.startsWith(p))) return true;
-  if (/^\/api\/images\/[^/]+\/transform$/.test(path)) return true;
-  if (/^\/api\/images\/[^/]+\/placeholder$/.test(path)) return true;
   return false;
 }
 
