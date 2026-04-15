@@ -641,34 +641,6 @@ describe('mergeOverlay', () => {
     expect(bio.name).toBe('Biography');
   });
 
-  it('rejects patch field type change', () => {
-    const overlay: Overlay = {
-      version: 1,
-      name: 'x',
-      extends: 'base',
-      contentTypes: [
-        {
-          identifier: 'Player',
-          mode: 'patch',
-          fields: [
-            {
-              id: null,
-              identifier: 'name',
-              name: 'Name',
-              type: 'NUMBER',
-              required: true,
-              order: 0,
-              options: null,
-            },
-          ],
-        },
-      ],
-    };
-    expect(() => mergeOverlay(parent, overlay)).toThrow(
-      /cannot change field type/i
-    );
-  });
-
   it('rejects patch on missing content type', () => {
     const overlay: Overlay = {
       version: 1,
@@ -805,12 +777,6 @@ function applyPatch(bundle: Bundle, overlayCt: OverlayContentType): void {
       target.fields.push(cloneField(field));
       continue;
     }
-    const existing = target.fields[existingIndex];
-    if (existing.type !== field.type) {
-      throw new Error(
-        `Cannot change field type for "${overlayCt.identifier}.${field.identifier}": ${existing.type} -> ${field.type}`
-      );
-    }
     target.fields[existingIndex] = cloneField(field);
   }
 }
@@ -841,7 +807,7 @@ function cloneField(f: BundleField): BundleField {
 - [ ] **Step 4: Run tests and confirm they pass**
 
 Run: `pnpm vitest run scripts/build-starters/merge.test.ts`
-Expected: PASS (all 8 tests green).
+Expected: PASS (all 7 tests green).
 
 - [ ] **Step 5: Commit**
 
@@ -1873,7 +1839,7 @@ At the end of the file, add this new section verbatim (keep existing content unt
 An overlay declares a parent bundle via `extends` and a list of content-type changes. Each change has a `mode`:
 
 - `create` — add a brand-new content type. Fails if the identifier already exists in the parent chain. Requires `name` and exactly one `ENTRY_TITLE` field.
-- `patch` — modify an existing content type. Fields are matched by `identifier`; matching fields are replaced wholesale; new fields are appended. The field `type` cannot change, and new `ENTRY_TITLE`/`SLUG` fields cannot be introduced via patch.
+- `patch` — modify an existing content type. Fields are matched by `identifier`; matching fields are replaced wholesale (including their `type`); new fields are appended. New `ENTRY_TITLE`/`SLUG` fields cannot be introduced via patch.
 
 ### Build
 
@@ -1932,7 +1898,7 @@ starters/
 Find the existing line (single bullet, starts with `- **Starter bundles**`). Immediately **after** that bullet, insert this new bullet as a sibling:
 
 ```markdown
-- **Starter overlays** — `starters/base.boject.json` is authored directly. `sport.boject.json` and `rugby.boject.json` are built from `starters/src/*.overlay.json` via `pnpm starters:build`. Each overlay declares an `extends` parent and a list of content-type changes with `mode: "create"` (append a new type) or `mode: "patch"` (add/replace fields on a parent type; field type changes and new ENTRY_TITLE/SLUG fields are rejected). The build script resolves the `extends` chain (topo-sorted, cycles error out), runs `validateBundle` on every output, and writes deterministic 2-space JSON so `pnpm starters:check` can diff against committed outputs in CI. Build outputs are committed.
+- **Starter overlays** — `starters/base.boject.json` is authored directly. `sport.boject.json` and `rugby.boject.json` are built from `starters/src/*.overlay.json` via `pnpm starters:build`. Each overlay declares an `extends` parent and a list of content-type changes with `mode: "create"` (append a new type) or `mode: "patch"` (add/replace fields on a parent type; new ENTRY_TITLE/SLUG fields are rejected). The build script resolves the `extends` chain (topo-sorted, cycles error out), runs `validateBundle` on every output, and writes deterministic 2-space JSON so `pnpm starters:check` can diff against committed outputs in CI. Build outputs are committed.
 ```
 
 - [ ] **Step 4: Update `CLAUDE.md` — Commands block**
