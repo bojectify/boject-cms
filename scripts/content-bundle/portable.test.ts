@@ -124,17 +124,14 @@ describe('encodeDataRefs / decodeDataRefs round-trip', () => {
     expect(decoded).toEqual(data);
   });
 
-  it('rewrites cmsEmbed nodes inside RICHTEXT data', () => {
+  it('passes RICHTEXT data through untouched', () => {
     const data = {
       body: {
         type: 'doc',
         content: [
           {
-            type: 'cmsEmbed',
-            attrs: {
-              embedType: 'aaa-uuid-ct',
-              embedId: 'post-uuid-1',
-            },
+            type: 'paragraph',
+            content: [{ type: 'text', text: 'Hello world' }],
           },
         ],
       },
@@ -147,12 +144,14 @@ describe('encodeDataRefs / decodeDataRefs round-trip', () => {
       typeIdToIdent,
       typeIdentToEntryKeys
     );
-    const embed = (
-      encoded.body as { content: Array<{ attrs: Record<string, unknown> }> }
-    ).content[0]?.attrs;
-    expect(embed).toMatchObject({
-      embedType: 'BlogPost',
-      embedKey: 'hello',
-    });
+    expect(encoded.body).toEqual(data.body);
+
+    const decoded = decodeDataRefs(
+      encoded,
+      fieldTypes,
+      identToTypeId,
+      typeIdentToKeyToEntry
+    );
+    expect(decoded.body).toEqual(data.body);
   });
 });

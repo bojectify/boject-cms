@@ -88,26 +88,6 @@ export function encodeDataRefs(
       out[key] = (value as UuidRelationRef[]).map((ref) =>
         encodeRelationRef(ref, typeIdToIdentifier, typeIdentifierToEntryKeys)
       );
-    } else if (type === 'RICHTEXT') {
-      out[key] = rewriteCmsEmbeds(value, (attrs) => {
-        const { embedType, embedId, ...rest } = attrs;
-        if (!embedType || !embedId) return attrs;
-        const ident = typeIdToIdentifier.get(embedType);
-        if (!ident) {
-          throw new Error(
-            `Cannot encode cmsEmbed: unknown contentTypeId ${embedType}`
-          );
-        }
-        const entryMap = typeIdentifierToEntryKeys.get(ident);
-        const keys = entryMap?.get(embedId);
-        if (!keys) {
-          throw new Error(
-            `Cannot encode cmsEmbed: entry ${embedId} not found for ${ident}`
-          );
-        }
-        const entryKey = keys.slug || keys.entryTitle;
-        return { ...rest, embedType: ident, embedKey: entryKey };
-      });
     } else {
       out[key] = value;
     }
@@ -138,47 +118,9 @@ export function decodeDataRefs(
       out[key] = (value as PortableRelationRef[]).map((ref) =>
         decodeRelationRef(ref, identifierToTypeId, typeIdentifierToKeyToEntry)
       );
-    } else if (type === 'RICHTEXT') {
-      out[key] = rewriteCmsEmbeds(value, (attrs) => {
-        const { embedType, embedKey, ...rest } = attrs;
-        if (!embedType || !embedKey) return attrs;
-        const contentTypeId = identifierToTypeId.get(embedType);
-        if (!contentTypeId) {
-          throw new Error(
-            `Cannot decode cmsEmbed: unknown identifier ${embedType}`
-          );
-        }
-        const keyMap = typeIdentifierToKeyToEntry.get(embedType);
-        const entryId = keyMap?.get(embedKey);
-        if (!entryId) {
-          throw new Error(
-            `Cannot decode cmsEmbed: entry ${embedType}:${embedKey} not found`
-          );
-        }
-        return { ...rest, embedType: contentTypeId, embedId: entryId };
-      });
     } else {
       out[key] = value;
     }
-  }
-  return out;
-}
-
-function rewriteCmsEmbeds(
-  doc: unknown,
-  rewrite: (attrs: Record<string, string>) => Record<string, unknown>
-): unknown {
-  if (!doc || typeof doc !== 'object') return doc;
-  if (Array.isArray(doc)) return doc.map((n) => rewriteCmsEmbeds(n, rewrite));
-  const node = doc as Record<string, unknown>;
-  if (node.type === 'cmsEmbed' && typeof node.attrs === 'object') {
-    return { ...node, attrs: rewrite(node.attrs as Record<string, string>) };
-  }
-  const out: Record<string, unknown> = { ...node };
-  if (Array.isArray(node.content)) {
-    out.content = (node.content as unknown[]).map((n) =>
-      rewriteCmsEmbeds(n, rewrite)
-    );
   }
   return out;
 }
