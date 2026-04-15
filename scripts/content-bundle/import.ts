@@ -58,6 +58,17 @@ export async function importBundle(
       map.set(entry.entryTitle, entry.id);
     }
 
+    // Pending field-target resolutions — in portable mode, RELATION/
+    // MULTIRELATION targetContentTypeIdentifiers may point to content types
+    // declared later in the bundle. Pass 1 creates fields with an empty
+    // targetContentTypeIds array; pass 2 resolves and updates them below.
+    const pendingFieldTargets: Array<{
+      fieldId: string;
+      fieldIdentifier: string;
+      identifiers: string[];
+      otherOptions: Record<string, unknown>;
+    }> = [];
+
     if (wantsSchema && bundle.contentTypes) {
       for (const ct of bundle.contentTypes) {
         if (identifierToTypeId.has(ct.identifier)) {
@@ -82,17 +93,14 @@ export async function importBundle(
                   opts &&
                   Array.isArray(opts.targetContentTypeIdentifiers)
                 ) {
-                  const ids = opts.targetContentTypeIdentifiers.map((ident) => {
-                    const resolved = identifierToTypeId.get(ident);
-                    if (!resolved) {
-                      throw new Error(
-                        `RELATION field "${f.identifier}" targets unknown content type "${ident}"`
-                      );
-                    }
-                    return resolved;
-                  });
-                  const { targetContentTypeIdentifiers: _omit, ...rest } = opts;
-                  opts = { ...rest, targetContentTypeIds: ids };
+                  // Defer target resolution to pass 2 — other content types
+                  // in this bundle may not yet be created.
+                  const {
+                    targetContentTypeIdentifiers: _omitIdents,
+                    targetContentTypeIds: _omitIds,
+                    ...rest
+                  } = opts;
+                  opts = { ...rest, targetContentTypeIds: [] };
                 }
                 return {
                   id: bundle.portable ? undefined : (f.id ?? undefined),
@@ -114,6 +122,53 @@ export async function importBundle(
         const fieldTypes: Record<string, FieldType> = {};
         for (const f of created.fields) fieldTypes[f.identifier] = f.type;
         fieldTypesByTypeId.set(created.id, fieldTypes);
+
+        if (bundle.portable) {
+          for (const bundleField of ct.fields) {
+            const opts = bundleField.options;
+            if (!opts || !Array.isArray(opts.targetContentTypeIdentifiers)) {
+              continue;
+            }
+            const createdField = created.fields.find(
+              (cf) => cf.identifier === bundleField.identifier
+            );
+            if (!createdField) continue;
+            const {
+              targetContentTypeIdentifiers: _omitIdents,
+              targetContentTypeIds: _omitIds,
+              ...otherOptions
+            } = opts;
+            pendingFieldTargets.push({
+              fieldId: createdField.id,
+              fieldIdentifier: bundleField.identifier,
+              identifiers: opts.targetContentTypeIdentifiers,
+              otherOptions,
+            });
+          }
+        }
+      }
+
+      // Pass 2: resolve deferred RELATION/MULTIRELATION field targets now
+      // that every content type declared in this bundle exists.
+      for (const pending of pendingFieldTargets) {
+        const resolved = pending.identifiers.map((ident) => {
+          const id = identifierToTypeId.get(ident);
+          if (!id) {
+            throw new Error(
+              `RELATION field "${pending.fieldIdentifier}" targets unknown content type "${ident}"`
+            );
+          }
+          return id;
+        });
+        await tx.contentTypeField.update({
+          where: { id: pending.fieldId },
+          data: {
+            options: {
+              ...pending.otherOptions,
+              targetContentTypeIds: resolved,
+            } as import('#prisma').Prisma.InputJsonValue,
+          },
+        });
       }
     }
 

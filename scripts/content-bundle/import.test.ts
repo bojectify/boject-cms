@@ -174,6 +174,127 @@ describe('importBundle', () => {
     });
   });
 
+  it('resolves RELATION field targets that forward-reference later content types', async () => {
+    const forwardRef: Bundle = {
+      version: 1,
+      exportedAt: '2026-04-14T10:00:00.000Z',
+      portable: true,
+      contentTypes: [
+        {
+          id: null,
+          identifier: 'TypeA',
+          name: 'Type A',
+          description: null,
+          fields: [
+            {
+              id: null,
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+              order: 0,
+              options: null,
+            },
+            {
+              id: null,
+              identifier: 'bs',
+              name: 'Bs',
+              type: 'MULTIRELATION',
+              required: false,
+              order: 1,
+              options: {
+                targetContentTypeIds: [null],
+                targetContentTypeIdentifiers: ['TypeB'],
+              },
+            },
+          ],
+        },
+        {
+          id: null,
+          identifier: 'TypeB',
+          name: 'Type B',
+          description: null,
+          fields: [
+            {
+              id: null,
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+              order: 0,
+              options: null,
+            },
+          ],
+        },
+      ],
+    };
+
+    const result = await importBundle(prisma, forwardRef, { mode: 'all' });
+    expect(result.contentTypesCreated).toBe(2);
+
+    const typeA = await prisma.contentType.findUnique({
+      where: { identifier: 'TypeA' },
+      include: { fields: true },
+    });
+    const typeB = await prisma.contentType.findUnique({
+      where: { identifier: 'TypeB' },
+    });
+    expect(typeA).not.toBeNull();
+    expect(typeB).not.toBeNull();
+
+    const bsField = typeA!.fields.find((f) => f.identifier === 'bs');
+    expect(bsField).toBeDefined();
+    const opts = bsField!.options as Record<string, unknown> | null;
+    expect(opts).not.toBeNull();
+    expect(opts!.targetContentTypeIds).toEqual([typeB!.id]);
+    expect(opts!.targetContentTypeIdentifiers).toBeUndefined();
+  });
+
+  it('throws a clear error when a RELATION field targets an undeclared content type', async () => {
+    const danglingRef: Bundle = {
+      version: 1,
+      exportedAt: '2026-04-14T10:00:00.000Z',
+      portable: true,
+      contentTypes: [
+        {
+          id: null,
+          identifier: 'Orphan',
+          name: 'Orphan',
+          description: null,
+          fields: [
+            {
+              id: null,
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+              order: 0,
+              options: null,
+            },
+            {
+              id: null,
+              identifier: 'ref',
+              name: 'Ref',
+              type: 'RELATION',
+              required: false,
+              order: 1,
+              options: {
+                targetContentTypeIds: [null],
+                targetContentTypeIdentifiers: ['DoesNotExist'],
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    await expect(
+      importBundle(prisma, danglingRef, { mode: 'schema' })
+    ).rejects.toThrow(
+      /RELATION field "ref" targets unknown content type "DoesNotExist"/
+    );
+  });
+
   it('rolls back on failure mid-import', async () => {
     const badBundle: Bundle = {
       ...schemaOnly,
