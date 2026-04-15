@@ -29,13 +29,14 @@ describe('CSRF Origin check', async () => {
     resetRateLimitStore();
 
     // Create a throwaway content type for the PUT probes below. We use a
-    // nonce-suffixed name so parallel test files don't collide.
+    // nonce-suffixed name so parallel test files don't collide. POST must go
+    // through the session cookie — API keys are read-only.
     const nonce = Math.random().toString(36).slice(2, 10);
     const createRes = await fetch('/api/content-types', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer boject_test_key_for_integration_tests_only`,
+        Cookie: await getSessionCookie(),
       },
       body: JSON.stringify({
         name: `Csrf Probe ${nonce}`,
@@ -50,6 +51,11 @@ describe('CSRF Origin check', async () => {
         ],
       }),
     });
+    if (createRes.status !== 201) {
+      throw new Error(
+        `CSRF test setup: POST failed (${createRes.status}): ${await createRes.text()}`
+      );
+    }
     const created = (await createRes.json()) as { id: string };
     typeId = created.id;
   });
@@ -62,7 +68,7 @@ describe('CSRF Origin check', async () => {
         Origin: 'https://evil.example.com',
         Cookie: await getSessionCookie(),
       },
-      body: JSON.stringify({}),
+      body: JSON.stringify({ description: 'foreign-origin probe' }),
     });
     expect(response.status).toBe(403);
   });
@@ -80,7 +86,7 @@ describe('CSRF Origin check', async () => {
         Origin: baseUrl,
         Cookie: await getSessionCookie(),
       },
-      body: JSON.stringify({}),
+      body: JSON.stringify({ description: 'same-origin probe' }),
     });
     expect(response.status).toBe(200);
   });
