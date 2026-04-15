@@ -1,6 +1,6 @@
 # boject-cms
 
-A TypeScript CMS for a rugby club, built with Nuxt 4 and Prisma v7 on PostgreSQL. Includes hardcoded domain models for rugby content and a dynamic content type system for user-defined types with custom fields.
+A general-purpose TypeScript headless CMS built with Nuxt 4 and Prisma v7 on PostgreSQL. Content is modelled entirely through user-defined ContentTypes — there are no hardcoded domain models.
 
 ## Tech Stack
 
@@ -10,7 +10,7 @@ A TypeScript CMS for a rugby club, built with Nuxt 4 and Prisma v7 on PostgreSQL
 - **PostgreSQL 17** — Database (local via Docker)
 - **GraphQL Yoga** — GraphQL server at `/api/graphql`
 - **Pothos** — Code-first GraphQL schema builder with Prisma plugin
-- **Tiptap** — Rich text editor (`@tiptap/vue-3`) with custom CmsEmbed extension
+- **Tiptap** — Rich text editor (`@tiptap/vue-3`)
 - **Sharp** — Image processing for upload and on-the-fly transforms
 - **Vue 3** — Frontend framework
 - **TypeScript** — ESM-only (`"type": "module"`)
@@ -36,10 +36,10 @@ cp .env.example .env
 # Run database migrations
 pnpm prisma:migrate
 
-# Seed the database with test data
+# Seed the database with admin user + test API key
 pnpm prisma:seed
 
-# Optionally apply the base starter bundle
+# Optionally apply the base starter bundle (8 content types + a SiteSettings entry)
 pnpm content:import ./starters/base.boject.json
 
 # Start the dev server
@@ -58,43 +58,32 @@ The app runs at http://localhost:4000. The GraphQL playground (GraphiQL) is avai
 | `pnpm db:up`            | Start local PostgreSQL container              |
 | `pnpm prisma:generate`  | Regenerate Prisma client + Pothos types       |
 | `pnpm prisma:migrate`   | Run database migrations                       |
-| `pnpm prisma:seed`      | Seed database with test data                  |
+| `pnpm prisma:seed`      | Seed admin user + test API key                |
 | `pnpm lint`             | Lint with ESLint                              |
 | `pnpm lint:fix`         | Lint and auto-fix                             |
 | `pnpm format`           | Check formatting with Prettier                |
 | `pnpm format:fix`       | Format all files                              |
-| `pnpm test`             | Run tests once                                |
+| `pnpm test:run`         | Run tests once                                |
 | `pnpm typecheck`        | Run TypeScript type checker                   |
 | `pnpm apikey:create`    | Create a new API key                          |
 | `pnpm apikey:list`      | List all API keys                             |
 | `pnpm apikey:revoke`    | Revoke an API key by prefix                   |
 | `pnpm content:export`   | Export dynamic content types/entries as JSON  |
-| `pnpm content:import`   | Import a dynamic content bundle               |
+| `pnpm content:import`   | Import a content bundle                       |
 | `pnpm content:validate` | Validate a bundle's shape without touching DB |
+| `pnpm starters:build`   | Build overlay-based starter bundles           |
+| `pnpm starters:check`   | Verify committed starter outputs are current  |
 
 ## Project Structure
 
 ```
 prisma/
   schema/                      # Multi-file Prisma schema
-    base.prisma                # Generators, datasource, enums
-    team.prisma                # Team, TeamsOnCompetitions
-    club.prisma                # Club
-    competition.prisma         # Competition
-    season.prisma              # Season
-    fixture.prisma             # Fixture, Score
-    player.prisma              # Player, Position, PlayerTeamHistory
-    image.prisma               # Image
+    base.prisma                # Generators, datasource, ContentStatus + FieldType enums
     auth.prisma                # User, ApiKey
-    author.prisma              # Author, AuthorSocialLink
-    tag.prisma                 # Tag
-    article.prisma             # Article
-    link.prisma                # Link
-    navigation.prisma          # Navigation
-    navigationItem.prisma      # NavigationItem
-    contentType.prisma         # ContentType, ContentTypeField, FieldType enum
+    contentType.prisma         # ContentType, ContentTypeField
     contentEntry.prisma        # ContentEntry
-  seed.ts                      # Seed script
+  seed.ts                      # Seed script (admin user + test API key)
   migrations/                  # Migration files
 app.vue                        # Root component (UApp + NuxtLayout wrapper)
 layouts/
@@ -105,116 +94,97 @@ server/
   api/
     auth/                      # Login/logout endpoints + tests
     graphql/                   # GraphQL Yoga endpoint + tests
-    images/                    # Image upload + transform endpoints + tests
     files/                     # Primitive file upload + transform endpoints
-    content.get.ts             # Unified content listing (UNION ALL across static + dynamic)
+    content.get.ts             # Unified content listing (ContentEntry join ContentType)
     content-types/             # Dynamic content type CRUD + field management
     content-entries/           # Dynamic content entry CRUD
-    {model}.get.ts             # Per-model listing routes (Prisma direct)
-    {model}/[id].get.ts        # Per-model single-item routes
-    {model}/[id].put.ts        # Per-model update routes
+    health.get.ts              # Database health check
   graphql/
     builder.ts                 # Pothos SchemaBuilder singleton (JSON + DateTime scalars)
-    schema.ts                  # Schema assembly
-    filters.ts                 # Prisma-style where filter inputs
-    query/index.ts             # Root Query field definitions
-    types/                     # Per-model Pothos type definitions
+    buildSchema.ts             # Loads ContentType rows, registers dynamic types
+    schema.ts                  # Caches built schema; exposes invalidateSchema()
+    dynamicTypes.ts            # registerDynamicTypes(builder, contentTypes)
+    jsonbFilters.ts            # Prisma-style where inputs for dynamic ContentTypes
+    types/contentStatus.ts     # ContentStatus enum
   utils/
     prisma.ts                  # Singleton PrismaClient (auto-imported)
-    imageProcessing.ts         # Sharp-based image processing (upload + transform)
+    imageProcessing.ts         # Sharp-based image processing
     rateLimit.ts               # In-memory sliding window rate limiter
   middleware/
-    auth.ts                    # Global server auth middleware
+    auth.ts                    # Global server auth middleware (session or API key)
+    csrf.ts                    # CSRF origin/referer enforcement
 components/
   ContentTable.vue             # Reusable content listing table
   ContentEditor.vue            # Generic content editing form
   RichTextEditor.vue           # Tiptap rich text editor with toolbar
-  CmsEmbedNode.vue             # Vue NodeView for CmsEmbed nodes
-  CmsEmbedModal.vue            # Modal for selecting content to embed
+  ImageField.vue               # IMAGE field upload/preview
+  FieldModal.vue               # Modal for adding/editing content type fields
+  RelationField.vue            # Single-relation entry card
+  MultiRelationField.vue       # Multi-relation draggable list
+  EntryPickerModal.vue         # Entry picker with type tabs + search
+  EntryEditorPane.vue          # Sliding pane for editing related entries
 composables/
   useContentTable.ts           # Shared formatDate + statusColor helpers
-  useContentEditor.ts          # Content editing lifecycle management
-  useContentEntryEditor.ts     # Dynamic entry editing lifecycle
+  useContentEntryEditor.ts     # Entry editing lifecycle
   useAuthedFetch.ts            # useFetch wrapper that forwards cookies during SSR
   useRelationResolver.ts       # Resolves relation refs via useRequestFetch
-extensions/
-  cmsEmbed.ts                  # Custom Tiptap ProseMirror node for content embeds
 scripts/
-  content-bundle/              # CLI to export/import dynamic content bundles
-    types.ts                   # Shared Bundle, BundleField, BundleEntry types
-    validate.ts                # Bundle shape validation (no DB)
-    portable.ts                # Portable reference rewriting helpers
-    export.ts                  # exportBundle(prisma, { mode, portable })
-    import.ts                  # importBundle(prisma, bundle, { mode, author })
-    index.ts                   # CLI entry (export/import/validate subcommands)
-    fixtures/                  # Known-good bundles for tests and starters
+  content-bundle/              # CLI to export/import content bundles
+  build-starters/              # CLI to build overlay-based starter bundles
   manage-api-keys.ts           # CLI for API key create/list/revoke
+starters/
+  base.boject.json             # v1 base starter bundle
+  sport.boject.json            # built-from-overlay sport bundle
+  rugby.boject.json            # built-from-overlay rugby bundle
+  src/*.overlay.json           # overlay sources
 types/
   contentEditor.ts             # FieldConfig discriminated union (auto-imported)
 pages/
   login.vue                    # Login page
   index.vue                    # All content (paginated, sorted by updatedAt)
-  {model}/index.vue            # Per-model listing pages
-  {model}/[id].vue             # Per-model edit pages
-  content-types/               # Dynamic content type management + entry editing
-storage/                     # Gitignored, local image file storage (dev)
-generated/                   # Gitignored, auto-generated
-  prisma/                    # Prisma client
-  pothos-types.ts            # Pothos-Prisma type bridge
+  content-types/               # Content type management + entry editing
+storage/                       # Gitignored, local file storage (dev)
+generated/                     # Gitignored, auto-generated
+  prisma/                      # Prisma client
+  pothos-types.ts              # Pothos-Prisma type bridge
 ```
 
 ## Architecture
 
 ```
-External clients → GraphQL Yoga → Pothos → Prisma → PostgreSQL
+External clients → GraphQL Yoga → dynamic schema → Prisma → PostgreSQL
 CMS pages → Nuxt server routes → Prisma → PostgreSQL
 ```
 
-- **Nuxt 4** serves pages and API routes. Nitro is the server engine. A default layout (`layouts/default.vue`) provides a dashboard shell with sidebar navigation and a header navbar (user avatar/dropdown menu) across all CMS pages using Nuxt UI's dashboard components.
-- **GraphQL Yoga** handles external client requests at `POST /api/graphql`.
-- **CMS pages** use dedicated Nuxt server API routes that query Prisma directly (not via GraphQL).
-- **Pothos** builds the GraphQL schema from Prisma model definitions, with auto-generated types.
+- **Nuxt 4** serves pages and API routes. Nitro is the server engine. A default layout (`layouts/default.vue`) provides a dashboard shell with sidebar navigation and a header navbar (user avatar/dropdown menu) using Nuxt UI's dashboard components.
+- **GraphQL Yoga** handles external client requests at `POST /api/graphql`. The schema is built dynamically at startup from `ContentType` rows via `server/graphql/buildSchema.ts`, then cached; `invalidateSchema()` is called after every ContentType mutation so the next request rebuilds.
+- **CMS pages** use dedicated Nuxt server API routes that query Prisma directly.
 - **Prisma v7** uses the `@prisma/adapter-pg` driver adapter (not the traditional Rust engine). A singleton client in `server/utils/prisma.ts` is auto-imported into all server routes.
 - **Generated types** live in `generated/` (gitignored). Run `pnpm prisma:generate` after any schema change.
-- **Image upload & transform** — `POST /api/images/upload` accepts multipart file uploads (5MB limit, JPEG/PNG/WebP/GIF/AVIF). Originals are processed via Sharp (auto-orient, max 4000px). `GET /api/images/:id/transform` serves images with on-the-fly resize/format conversion (publicly accessible, cached, rate limited). Stored in `storage/` (gitignored, filesystem in dev, swappable to S3/R2 in production via Nitro storage config).
-- **Primitive file pipeline** — `POST /api/files/upload` + `GET /api/files/:storageKey/transform` provide a decoupled upload → storage-key → transform flow used by the `IMAGE` field type on dynamic content types. Shares the `images:*` unstorage buckets with the legacy `/api/images/*` pipeline.
+- **Primitive file pipeline** — `POST /api/files/upload` accepts multipart uploads (5MB limit, JPEG/PNG/WebP/GIF/AVIF), processes originals via Sharp (auto-orient, max 4000px), writes them to `useStorage('images:originals')`, and returns `{ storageKey, mimeType, width, height, fileSize, originalName }` without creating a DB row. `GET /api/files/:storageKey/transform` serves variants with on-the-fly resize/format conversion (publicly accessible, cached, rate limited). Used by the `IMAGE` field type on dynamic content types. Production storage can be swapped to S3/R2 via Nitro storage config.
 - **Content bundle CLI** — `scripts/content-bundle/` exports and imports dynamic content types and entries as JSON bundles. Portable mode (`--portable`) rewrites UUID references to `identifier`/`slug` keys for cross-instance migration; import does the reverse lookup in a transactional two-pass resolve. Functions are importable so a future scaffolder (e.g. `create-boject-cms`) can invoke them directly.
+- **Starters** — `starters/base.boject.json` defines the 8 content types every content-driven site needs (Image, Tag, Author, Article, Page, SiteSettings, Navigation, NavigationItem) plus one SiteSettings seed entry. `sport.boject.json` and `rugby.boject.json` are built from overlay sources in `starters/src/` via `pnpm starters:build`.
 
 ## GraphQL API
 
 **Endpoint:** `POST /api/graphql`
 
-### Queries
+The schema is generated from your `ContentType` rows. Each ContentType produces:
 
-All list queries return [Relay-style cursor connections](https://relay.dev/graphql/connections.htm) with `edges`, `node`, `cursor`, and `pageInfo`. Single-item lookups return the model directly.
+- an object type with one field per `ContentTypeField` (typed by `FieldType`)
+- a Relay connection root query (plural, camelCase: e.g. a `BlogPost` type yields `blogPosts(first, after, where)`)
+- a single-item root query (singular: `blogPost(id)`)
 
-| Query                              | Args                                        | Returns                             |
-| ---------------------------------- | ------------------------------------------- | ----------------------------------- |
-| `teams` / `team(id)`               | `first`, `after`, `last`, `before`, `where` | TeamConnection / Team               |
-| `clubs` / `club(id)`               | `first`, `after`, `last`, `before`, `where` | ClubConnection / Club               |
-| `players` / `player(id)`           | `first`, `after`, `last`, `before`, `where` | PlayerConnection / Player           |
-| `fixtures` / `fixture(id)`         | `first`, `after`, `last`, `before`, `where` | FixtureConnection / Fixture         |
-| `scores` / `score(id)`             | `first`, `after`, `last`, `before`, `where` | ScoreConnection / Score             |
-| `competitions` / `competition(id)` | `first`, `after`, `last`, `before`, `where` | CompetitionConnection / Competition |
-| `seasons` / `season(id)`           | `first`, `after`, `last`, `before`, `where` | SeasonConnection / Season           |
-| `positions` / `position(id)`       | `first`, `after`, `last`, `before`, `where` | PositionConnection / Position       |
-| `images` / `image(id)`             | `first`, `after`, `last`, `before`, `where` | ImageConnection / Image             |
-| `authors` / `author(id)`           | `first`, `after`, `last`, `before`, `where` | AuthorConnection / Author           |
-| `tags` / `tag(id)`                 | `first`, `after`, `last`, `before`, `where` | TagConnection / Tag                 |
-| `articles` / `article(id)`         | `first`, `after`, `last`, `before`, `where` | ArticleConnection / Article         |
-
-One-to-many relation fields (e.g. `team.fixtures`, `player.scores`) also use connections with the same pagination and filtering args. One-to-one relations (e.g. `fixture.season`, `player.position`) return the model directly.
-
-### Pagination
+All list queries return [Relay-style cursor connections](https://relay.dev/graphql/connections.htm) with `edges`, `node`, `cursor`, and `pageInfo`, and accept `first`/`after`/`last`/`before` alongside an optional `where` filter.
 
 ```graphql
-# First page
 {
-  teams(first: 10) {
+  blogPosts(first: 10, where: { status: { equals: PUBLISHED } }) {
     edges {
       node {
         id
-        name
+        entryTitle
+        slug
       }
       cursor
     }
@@ -224,57 +194,9 @@ One-to-many relation fields (e.g. `team.fixtures`, `player.scores`) also use con
     }
   }
 }
-
-# Next page (pass endCursor from previous response)
-{
-  teams(first: 10, after: "cursor-value") {
-    edges {
-      node {
-        id
-        name
-      }
-    }
-    pageInfo {
-      hasNextPage
-      endCursor
-    }
-  }
-}
 ```
 
-### Where Filtering
-
-All list queries accept an optional `where` argument with Prisma-style filters, combinable with pagination args:
-
-```graphql
-{
-  clubs(where: { name: { contains: "RFC" } }) {
-    edges {
-      node {
-        id
-        name
-      }
-    }
-  }
-
-  fixtures(first: 10, where: { isHome: { equals: true } }) {
-    edges {
-      node {
-        id
-        name
-        kickoff
-        venue
-      }
-    }
-    pageInfo {
-      hasNextPage
-      endCursor
-    }
-  }
-}
-```
-
-**Available filter operations:**
+### Filter Operations
 
 | Type          | Operations                                            |
 | ------------- | ----------------------------------------------------- |
@@ -282,48 +204,44 @@ All list queries accept an optional `where` argument with Prisma-style filters, 
 | Int           | `equals`, `gt`, `gte`, `lt`, `lte`, `not`             |
 | Boolean       | `equals`, `not`                                       |
 | DateTime      | `equals`, `gt`, `gte`, `lt`, `lte`, `not`             |
-| ScoreType     | `equals`, `not`                                       |
 | ContentStatus | `equals`, `not`                                       |
 
 ### Custom Scalars
 
 - **DateTime** — Serialises as ISO-8601 strings, parses string input to `Date`.
-- **JSON** — Pass-through scalar for Article body (Tiptap ProseMirror JSON).
+- **JSON** — Pass-through scalar for RICHTEXT fields (Tiptap ProseMirror JSON).
+
+### Authentication
+
+All `POST /api/graphql` requests require an `Authorization: Bearer boject_...` header with a valid API key. Manage keys via:
+
+```bash
+pnpm apikey:create "My integration"   # prints the raw key once
+pnpm apikey:list
+pnpm apikey:revoke <prefix>
+```
 
 ## Database
 
 PostgreSQL 17 runs locally via Docker Compose (port 5432, user/password/db: `boject`).
 
-### Domain Models
+### Models
 
-| Model                 | Description                                                                                                  |
-| --------------------- | ------------------------------------------------------------------------------------------------------------ |
-| **Team**              | Internal club squads (e.g. 1st XV, Veterans, Colts)                                                          |
-| **Club**              | External opponent clubs with optional crest image                                                            |
-| **Competition**       | Leagues and cups, linked to a season and teams                                                               |
-| **Season**            | Has name, start/end dates. Competitions and fixtures belong to a season                                      |
-| **Fixture**           | A match with team, opponent, competition, season, home/away, kickoff, venue                                  |
-| **Score**             | Scoring events (TRY, CONVERSION, PENALTY, DROP_GOAL) with optional player and minute                         |
-| **Player**            | Has name, position, bio, headshot, action shot, team history                                                 |
-| **PlayerTeamHistory** | Tracks which team a player belongs to over time                                                              |
-| **Position**          | Rugby positions (e.g. Fly-half, Hooker)                                                                      |
-| **Image**             | Reusable image with url, alt, dimensions, optional file storage (upload + transform)                         |
-| **Author**            | Article authors with name, slug, bio, headshot image, and social links                                       |
-| **AuthorSocialLink**  | Social media links for authors (platform + URL)                                                              |
-| **Tag**               | Content tags with name and slug. Many-to-many with articles                                                  |
-| **Article**           | Blog/news articles with title, slug, summary, rich text body (Tiptap JSON), author, featured image, and tags |
-| **Link**              | Reusable content link with label, optional URL or article reference, and openInNewTab                        |
-| **Navigation**        | Container for a navigation tree with ordered, two-level nested items pointing to Links                       |
-| **ContentType**       | User-defined content type with name, PascalCase identifier, and field definitions                            |
-| **ContentEntry**      | Instance of a dynamic content type, with JSONB data validated against field definitions                      |
+| Model                | Description                                                                                               |
+| -------------------- | --------------------------------------------------------------------------------------------------------- |
+| **User**             | CMS admin accounts (email, scrypt-hashed password, firstName, lastName)                                   |
+| **ApiKey**           | Hashed API keys for GraphQL + REST (keyPrefix, keyHash, revokedAt, lastUsedAt)                            |
+| **ContentType**      | User-defined content type with unique name, PascalCase identifier, and ordered field definitions          |
+| **ContentTypeField** | Field definition (name, camelCase identifier, FieldType, required, order, options JSON)                   |
+| **ContentEntry**     | Instance of a ContentType. JSONB `data` validated against field definitions; includes publishing metadata |
 
-All models use UUID primary keys and `createdAt`/`updatedAt` timestamps. Static content models (Team, Club, Competition, Season, Player, Fixture, Image, Author, Tag, Article, Link, Navigation) have `entryTitle` (CMS display name), `status` (`DRAFT`/`PUBLISHED`/`CHANGED`/`ARCHIVED`), `publishedAt`, `createdBy`, and `updatedBy` metadata fields. Dynamic content entries have the same status/publishedAt fields but derive their entry title from the ENTRY_TITLE field in their content type definition.
+All models use UUID primary keys and `createdAt`/`updatedAt` timestamps. `ContentEntry` carries publishing metadata: `entryTitle` (synced from the ENTRY_TITLE field), `status` (`DRAFT`/`PUBLISHED`/`CHANGED`/`ARCHIVED`), `publishedAt`, `createdBy`, `updatedBy`.
 
 ### Migrations
 
 ```bash
 pnpm prisma:migrate           # Apply migrations (interactive)
-prisma migrate deploy          # Apply migrations (non-interactive / CI)
+pnpx prisma migrate deploy    # Apply migrations (non-interactive / CI)
 ```
 
 ## Testing
@@ -331,25 +249,19 @@ prisma migrate deploy          # Apply migrations (non-interactive / CI)
 Integration tests using Vitest + `@nuxt/test-utils`. Tests start a Nuxt dev server and run against the seeded database.
 
 ```bash
-pnpm test                    # Single run
-pnpm test:integration        # Integration tests only
+pnpm test:run                # Single run (CI)
+pnpm test:watch              # Watch mode
 ```
 
-- **GraphQL** (30 tests) — list queries, single-item lookups, relation resolution, where filtering, Relay cursor pagination, API key authentication, author/tag/article queries.
-- **Fixtures REST API** (16 tests) — default listing, pagination, relation filters (teamId, opponentId, competitionId, seasonId), boolean/enum filters (isHome, status), combined filters.
-- **List endpoints** (29 tests) — query param filters on teams, clubs, seasons, images (status), players (positionId, status), competitions (seasonId, status).
-- **Content** (14 tests) — contentType filter (including Author, Tag, Article), status filter, combined filters, invalid value handling.
-- **Auth** (7 tests) — login validation, credential checking, session handling, middleware behaviour.
-- **Image upload & transform** (12 tests) — upload validation (missing file, wrong mime type, file too large), successful upload, transform validation (invalid params), format conversion, public access, rate limiting.
-- **Files** (14 tests) — primitive upload (auth, mime/size validation, successful upload returning `{ storageKey, ... }`), transform endpoint (resize, format conversion, public access, rate limiting), shared-bucket sanity (storage keys are isolated from the legacy `/api/images/*` pipeline).
-- **Authors** (11 tests) — listing, pagination, status filter, single-item lookup, update, slug uniqueness, 404 handling.
-- **Tags** (9 tests) — listing, pagination, status filter, single-item lookup, update, slug uniqueness, 404 handling.
-- **Articles** (13 tests) — listing with relations, pagination, filters (status, authorId, tagId), single-item lookup, update with tags, slug uniqueness, 404 handling.
-- **Content types** (24 tests) — CRUD, field management (add/update/delete/reorder), identifier validation, uniqueness constraints.
-- **Content entries** (30 tests) — CRUD, data validation against field definitions, slug uniqueness, status transitions, `entryTitle` populate + uniqueness, plus IMAGE field end-to-end coverage (accepts/rejects values, required enforcement, persists through update, is served via `/api/files/:storageKey/transform`).
-- **Content bundle** (22 tests) — bundle shape validation (6), portable reference walkers (7), export (4), import (4), fixture shape regression (3), export → import round-trip (1), plus two end-to-end subsets.
-
-Total: 397 tests across 31 files.
+- **GraphQL** — dynamic-type list queries, single-item lookups, where filtering, Relay cursor pagination, API key authentication.
+- **Content** — `/api/content` contentType-identifier filter, status filter, combined filters, invalid-value handling.
+- **Auth** — login validation, credential checking, session handling, middleware behaviour.
+- **Files** — primitive upload (auth, mime/size validation, successful upload), transform endpoint (resize, format conversion, public access, rate limiting).
+- **Content types** — CRUD, field management (add/update/delete/reorder), identifier validation, uniqueness constraints.
+- **Content entries** — CRUD, data validation against field definitions, slug uniqueness, status transitions, `entryTitle` populate + uniqueness, IMAGE field end-to-end.
+- **CSRF** — origin/referer enforcement and Bearer-key bypass.
+- **Content bundle** — shape validation, portable reference walkers, export, import, fixture regression, export → import round-trip.
+- **Starters** — shape regression + overlay-drift check against committed outputs.
 
 **Requirement:** Docker PostgreSQL must be running with seeded data.
 
