@@ -20,6 +20,7 @@ const FIELD_TYPES = new Set([
   'RICHTEXT',
   'RELATION',
   'MULTIRELATION',
+  'IMAGE',
 ]);
 
 const STATUSES = new Set(['DRAFT', 'PUBLISHED', 'CHANGED', 'ARCHIVED']);
