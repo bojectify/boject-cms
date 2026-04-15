@@ -66,12 +66,6 @@ function applyPatch(bundle: Bundle, overlayCt: OverlayContentType): void {
       target.fields.push(cloneField(field));
       continue;
     }
-    const existing = target.fields[existingIndex]!;
-    if (existing.type !== field.type) {
-      throw new Error(
-        `Cannot change field type for "${overlayCt.identifier}.${field.identifier}": ${existing.type} -> ${field.type}`
-      );
-    }
     target.fields[existingIndex] = cloneField(field);
   }
 }

@@ -151,7 +151,7 @@ describe('mergeOverlay', () => {
               id: null,
               identifier: 'bio',
               name: 'Biography',
-              type: 'TEXTAREA',
+              type: 'RICHTEXT',
               required: true,
               order: 1,
               options: null,
@@ -163,37 +163,9 @@ describe('mergeOverlay', () => {
     const out = mergeOverlay(parent, overlay);
     const player = out.contentTypes!.find((c) => c.identifier === 'Player')!;
     const bio = player.fields.find((f) => f.identifier === 'bio')!;
-    expect(bio.type).toBe('TEXTAREA');
-    expect(bio.name).toBe('Biography');
+    expect(bio.type).toBe('RICHTEXT');
     expect(bio.required).toBe(true);
-  });
-
-  it('rejects patch field type change', () => {
-    const overlay: Overlay = {
-      version: 1,
-      name: 'x',
-      extends: 'base',
-      contentTypes: [
-        {
-          identifier: 'Player',
-          mode: 'patch',
-          fields: [
-            {
-              id: null,
-              identifier: 'name',
-              name: 'Name',
-              type: 'NUMBER',
-              required: true,
-              order: 0,
-              options: null,
-            },
-          ],
-        },
-      ],
-    };
-    expect(() => mergeOverlay(parent, overlay)).toThrow(
-      /cannot change field type/i
-    );
+    expect(bio.name).toBe('Biography');
   });
 
   it('rejects patch on missing content type', () => {
