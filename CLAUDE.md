@@ -33,6 +33,8 @@ pnpm apikey:revoke <prefix>   # Revoke an API key by its prefix
 pnpm content:export [--schema|--entries|--all] [--portable] [--out <path>]   # Export dynamic content types and/or entries as a JSON bundle
 pnpm content:import <path> [--schema|--entries|--all] [--author <string>]     # Import a JSON bundle into the CMS
 pnpm content:validate <path>                                                  # Validate a JSON bundle's shape without touching the DB
+pnpm starters:build           # Build sport.boject.json / rugby.boject.json from overlays in starters/src/
+pnpm starters:check           # Verify committed starter outputs are up to date (CI)
 ```
 
 Note: `prisma migrate dev` requires an interactive terminal. When running from a non-interactive context, use `prisma migrate diff` to generate the SQL and `prisma migrate deploy` to apply it.
@@ -73,6 +75,7 @@ Note: `prisma migrate dev` requires an interactive terminal. When running from a
 - **Primitive file pipeline** — `POST /api/files/upload` (session auth required, rate limited) accepts multipart image uploads, processes originals via Sharp (auto-orient + max-dimension clamp), writes to `useStorage('images:originals')`, and returns `{ storageKey, mimeType, width, height, fileSize, originalName }`. Does not create a DB row. `GET /api/files/:storageKey/transform` (public, rate limited 100/60s per IP, cached in `useStorage('images:transforms')`) serves transformed variants keyed directly by storage key — no DB lookup. Both endpoints share the `images:originals` / `images:transforms` unstorage buckets with the legacy `/api/images/*` pipeline; storage keys are UUID-prefixed so collisions cannot occur.
 - **Content bundle CLI** — `scripts/content-bundle/` is a standalone CLI module for exporting/importing dynamic content types and entries as JSON bundles. Functions are exported from `export.ts`, `import.ts`, `validate.ts`, with shared types in `types.ts` and the CLI entry at `index.ts`. Fixture bundles live under `fixtures/` for tests. Portable mode (`--portable`) rewrites UUID references to `identifier`/`slug` keys for cross-instance migration; import does the reverse lookup in a transactional two-pass resolve.
 - **Starter bundles** — `starters/` at the repo root holds production-ready JSON bundles applied via `pnpm content:import`. `starters/base.boject.json` defines the 8 content types every content-driven website needs (Image, Tag, Author, Article, Page, SiteSettings, Navigation, NavigationItem) plus one SiteSettings seed entry. Distinct from `scripts/content-bundle/fixtures/`, which holds test-only bundles. See `starters/README.md` for usage and conventions.
+- **Starter overlays** — `starters/base.boject.json` is authored directly. `sport.boject.json` and `rugby.boject.json` are built from `starters/src/*.overlay.json` via `pnpm starters:build`. Each overlay declares an `extends` parent and a list of content-type changes with `mode: "create"` (append a new type) or `mode: "patch"` (add/replace fields on a parent type; new ENTRY_TITLE/SLUG fields are rejected). The build script resolves the `extends` chain (topo-sorted, cycles error out), runs `validateBundle` on every output, and writes deterministic Prettier-formatted JSON so `pnpm starters:check` can diff against committed outputs in CI (the diff ignores `exportedAt`). Build outputs are committed.
 - **Prisma MCP server** — Local MCP server configured for Claude Code, providing direct access to migrate-status, migrate-dev, migrate-reset, and Prisma Studio.
 - **Nuxt UI MCP server** — Remote MCP server at `https://ui.nuxt.com/mcp` for component docs, examples, and metadata.
 
@@ -280,6 +283,14 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder.
 - `server/api/content-entries/content-entries.test.ts` — Content entry CRUD integration tests (13 tests)
 - `starters/base.boject.json` — v1 base starter bundle (8 content types + SiteSettings entry)
 - `starters/README.md` — starter bundle documentation + usage conventions
+- `scripts/build-starters/types.ts` — `Overlay`, `OverlayContentType`, `OverlayField` types
+- `scripts/build-starters/validate.ts` — overlay-specific shape validator (separate from `validateBundle`; allows patch mode to omit ENTRY_TITLE)
+- `scripts/build-starters/merge.ts` — pure `mergeOverlay(parent, overlay)` function implementing create/patch semantics
+- `scripts/build-starters/build.ts` — async `buildAll(root)` orchestrator (topo-sort + per-overlay merge + validate + Prettier-format + write)
+- `scripts/build-starters/index.ts` — `pnpm starters:build` / `pnpm starters:check` CLI entry
+- `scripts/build-starters/drift.test.ts` — guards committed outputs match a fresh rebuild
+- `starters/src/sport.overlay.json` — sport content types (Team, Club, Season, Competition, Fixture, Player) as a delta on top of `base`
+- `starters/src/rugby.overlay.json` — rugby content types (Position + Player patch) as a delta on top of `sport`
 - `starters/starters.test.ts` — shape regression test for every bundle under `starters/`
 - `scripts/content-bundle/types.ts` — Shared `Bundle`, `BundleField`, `BundleEntry`, `ValidationResult`, etc.
 - `scripts/content-bundle/validate.ts` — Bundle shape validation (no DB access)

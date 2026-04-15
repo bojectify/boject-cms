@@ -56,3 +56,63 @@ Later tiers assume prior tiers are already imported. Apply them in order.
 ## Testing
 
 `starters.test.ts` runs every `*.boject.json` under this directory through `validateBundle` from `scripts/content-bundle/validate.ts`. This catches shape drift as the bundle format evolves. Run it via `pnpm test starters/starters.test.ts`.
+
+## Overlay system
+
+`base.boject.json` is authored directly. `sport.boject.json` and `rugby.boject.json` are **built** from small overlay files under `starters/src/` — they should not be edited by hand.
+
+An overlay declares a parent bundle via `extends` and a list of content-type changes. Each change has a `mode`:
+
+- `create` — add a brand-new content type. Fails if the identifier already exists in the parent chain. Requires `name` and exactly one `ENTRY_TITLE` field.
+- `patch` — modify an existing content type. Fields are matched by `identifier`; matching fields are replaced wholesale (including their `type`); new fields are appended. New `ENTRY_TITLE`/`SLUG` fields cannot be introduced via patch.
+
+### Build
+
+```bash
+pnpm starters:build   # read src/*.overlay.json, write *.boject.json outputs
+pnpm starters:check   # rebuild in memory and diff against committed outputs (CI)
+```
+
+Overlays resolve their parent recursively. `rugby` extends `sport`, which extends `base`. Cycles and unknown parents are build-time errors. Every built output is validated with `validateBundle` before being written. `starters:check` ignores the `exportedAt` field when comparing.
+
+Build outputs are committed so `pnpm content:import starters/sport.boject.json` works without a prior build step.
+
+### Layout
+
+```
+starters/
+  base.boject.json           # authored directly
+  sport.boject.json          # built
+  rugby.boject.json          # built
+  src/
+    sport.overlay.json
+    rugby.overlay.json
+```
+
+### Overlay shape
+
+```json
+{
+  "version": 1,
+  "name": "sport",
+  "extends": "base",
+  "contentTypes": [
+    {
+      "identifier": "Team",
+      "mode": "create",
+      "name": "Team",
+      "description": null,
+      "fields": [
+        /* BundleField[] */
+      ]
+    },
+    {
+      "identifier": "Player",
+      "mode": "patch",
+      "fields": [
+        /* fields to add or replace */
+      ]
+    }
+  ]
+}
+```
