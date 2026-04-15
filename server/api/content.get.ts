@@ -44,6 +44,7 @@ export default defineEventHandler(async (event) => {
         status: true,
         createdAt: true,
         updatedAt: true,
+        contentTypeId: true,
         contentType: { select: { name: true } },
       },
     }),
@@ -57,6 +58,7 @@ export default defineEventHandler(async (event) => {
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
     contentType: r.contentType.name,
+    contentTypeId: r.contentTypeId,
   }));
 
   return { items, total };

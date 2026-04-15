@@ -11,6 +11,7 @@ type ContentItem = {
   createdAt: string;
   updatedAt: string;
   contentType: string;
+  contentTypeId: string;
 };
 
 type ContentResponse = { items: ContentItem[]; total: number };
@@ -152,14 +153,20 @@ describe('Content API filters', async () => {
 
   // ── Default listing ───────────────────────────────────────────
 
+  const UUID_RE =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
   it('returns all content items', async () => {
     const { items, total } = await getContent({ perPage: 50 });
     expect(total).toBeGreaterThanOrEqual(4);
     expect(items.length).toBeGreaterThanOrEqual(4);
     expect(items[0]).toHaveProperty('contentType');
+    expect(items[0]).toHaveProperty('contentTypeId');
     expect(items[0]).toHaveProperty('entryTitle');
     expect(items[0]).toHaveProperty('status');
     expect(typeof items[0]!.contentType).toBe('string');
+    expect(typeof items[0]!.contentTypeId).toBe('string');
+    expect(items[0]!.contentTypeId).toMatch(UUID_RE);
   });
 
   it('paginates results', async () => {
@@ -203,6 +210,12 @@ describe('Content API filters', async () => {
       expect(total).toBeGreaterThanOrEqual(3);
       expect(items.every((i) => i.status === 'PUBLISHED')).toBe(true);
       expect(items.every((i) => typeof i.contentType === 'string')).toBe(true);
+      expect(
+        items.every(
+          (i) =>
+            typeof i.contentTypeId === 'string' && UUID_RE.test(i.contentTypeId)
+        )
+      ).toBe(true);
     });
 
     it('filters by status=DRAFT', async () => {

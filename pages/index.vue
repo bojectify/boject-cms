@@ -21,8 +21,6 @@ const columns: TableColumn<Record<string, unknown>>[] = [
     :loading="status === 'pending'"
     :columns="columns"
     :total="data?.total ?? 0"
-    :row-link="
-      (row) => '/' + (row.contentType as string).toLowerCase() + 's/' + row.id
-    "
+    :row-link="(row) => `/content-types/${row.contentTypeId}/entries/${row.id}`"
   />
 </template>
