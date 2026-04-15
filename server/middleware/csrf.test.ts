@@ -23,61 +23,70 @@ async function getSessionCookie(): Promise<string> {
 describe('CSRF Origin check', async () => {
   await setup({ dev: true });
 
-  beforeAll(() => {
+  let typeId: string;
+
+  beforeAll(async () => {
     resetRateLimitStore();
+
+    // Create a throwaway content type for the PUT probes below. We use a
+    // nonce-suffixed name so parallel test files don't collide.
+    const nonce = Math.random().toString(36).slice(2, 10);
+    const createRes = await fetch('/api/content-types', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer boject_test_key_for_integration_tests_only`,
+      },
+      body: JSON.stringify({
+        name: `Csrf Probe ${nonce}`,
+        identifier: `CsrfProbe${nonce}`,
+        fields: [
+          {
+            identifier: 'title',
+            name: 'Title',
+            type: 'ENTRY_TITLE',
+            required: true,
+          },
+        ],
+      }),
+    });
+    const created = (await createRes.json()) as { id: string };
+    typeId = created.id;
   });
 
   it('rejects a mutating request with a foreign Origin header', async () => {
-    const navsRes = await fetch('/api/navigations', {
-      headers: {
-        Authorization: `Bearer boject_test_key_for_integration_tests_only`,
-      },
-    });
-    const navs = (await navsRes.json()) as { items: { id: string }[] };
-    const navId = navs.items[0]!.id;
-
-    const response = await fetch(`/api/navigations/${navId}`, {
+    const response = await fetch(`/api/content-types/${typeId}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
         Origin: 'https://evil.example.com',
         Cookie: await getSessionCookie(),
       },
-      body: JSON.stringify({ name: 'anything' }),
+      body: JSON.stringify({}),
     });
     expect(response.status).toBe(403);
   });
 
   it('allows a mutating request from the same Origin', async () => {
-    const navsRes = await fetch('/api/navigations', {
-      headers: {
-        Authorization: `Bearer boject_test_key_for_integration_tests_only`,
-      },
-    });
-    const navs = (await navsRes.json()) as {
-      items: { id: string; name: string }[];
-    };
-    const nav = navs.items[0]!;
-
     // Use the test-utils `url()` helper to get the actual test server URL
     // (it runs on 127.0.0.1:<random-port>). Origin must match exactly the
     // Host header the server sees.
     const fullUrl = new URL(url('/'));
     const baseUrl = `${fullUrl.protocol}//${fullUrl.host}`;
-    const response = await fetch(`/api/navigations/${nav.id}`, {
+    const response = await fetch(`/api/content-types/${typeId}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
         Origin: baseUrl,
         Cookie: await getSessionCookie(),
       },
-      body: JSON.stringify({ name: nav.name }),
+      body: JSON.stringify({}),
     });
     expect(response.status).toBe(200);
   });
 
   it('allows requests without an Origin header (server-to-server, e.g. API key)', async () => {
-    const response = await fetch('/api/navigations', {
+    const response = await fetch('/api/content-types', {
       method: 'GET',
       headers: {
         Authorization: `Bearer boject_test_key_for_integration_tests_only`,
