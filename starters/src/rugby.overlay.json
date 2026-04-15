@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "name": "rugby",
+  "extends": "sport",
+  "contentTypes": [
+    {
+      "identifier": "Position",
+      "mode": "create",
+      "name": "Position",
+      "description": "A rugby playing position (e.g. Fly-half, Hooker).",
+      "fields": [
+        {
+          "id": null,
+          "identifier": "name",
+          "name": "Name",
+          "type": "ENTRY_TITLE",
+          "required": true,
+          "order": 0,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "slug",
+          "name": "Slug",
+          "type": "SLUG",
+          "required": false,
+          "order": 1,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "abbreviation",
+          "name": "Abbreviation",
+          "type": "TEXT",
+          "required": false,
+          "order": 2,
+          "options": null
+        }
+      ]
+    },
+    {
+      "identifier": "Player",
+      "mode": "patch",
+      "fields": [
+        {
+          "id": null,
+          "identifier": "position",
+          "name": "Position",
+          "type": "RELATION",
+          "required": false,
+          "order": 10,
+          "options": {
+            "targetContentTypeIds": [null],
+            "targetContentTypeIdentifiers": ["Position"]
+          }
+        }
+      ]
+    }
+  ]
+}

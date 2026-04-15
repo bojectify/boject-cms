@@ -1,0 +1,307 @@
+{
+  "version": 1,
+  "name": "sport",
+  "extends": "base",
+  "contentTypes": [
+    {
+      "identifier": "Team",
+      "mode": "create",
+      "name": "Team",
+      "description": "An internal club squad (e.g. 1st XV, Veterans).",
+      "fields": [
+        {
+          "id": null,
+          "identifier": "name",
+          "name": "Name",
+          "type": "ENTRY_TITLE",
+          "required": true,
+          "order": 0,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "slug",
+          "name": "Slug",
+          "type": "SLUG",
+          "required": false,
+          "order": 1,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "description",
+          "name": "Description",
+          "type": "TEXTAREA",
+          "required": false,
+          "order": 2,
+          "options": null
+        }
+      ]
+    },
+    {
+      "identifier": "Club",
+      "mode": "create",
+      "name": "Club",
+      "description": "An external opponent club.",
+      "fields": [
+        {
+          "id": null,
+          "identifier": "name",
+          "name": "Name",
+          "type": "ENTRY_TITLE",
+          "required": true,
+          "order": 0,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "slug",
+          "name": "Slug",
+          "type": "SLUG",
+          "required": false,
+          "order": 1,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "crest",
+          "name": "Crest",
+          "type": "RELATION",
+          "required": false,
+          "order": 2,
+          "options": {
+            "targetContentTypeIds": [null],
+            "targetContentTypeIdentifiers": ["Image"]
+          }
+        }
+      ]
+    },
+    {
+      "identifier": "Season",
+      "mode": "create",
+      "name": "Season",
+      "description": "A time-bounded competitive season.",
+      "fields": [
+        {
+          "id": null,
+          "identifier": "name",
+          "name": "Name",
+          "type": "ENTRY_TITLE",
+          "required": true,
+          "order": 0,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "startDate",
+          "name": "Start date",
+          "type": "DATETIME",
+          "required": true,
+          "order": 1,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "endDate",
+          "name": "End date",
+          "type": "DATETIME",
+          "required": true,
+          "order": 2,
+          "options": null
+        }
+      ]
+    },
+    {
+      "identifier": "Competition",
+      "mode": "create",
+      "name": "Competition",
+      "description": "A league, cup, or tournament.",
+      "fields": [
+        {
+          "id": null,
+          "identifier": "name",
+          "name": "Name",
+          "type": "ENTRY_TITLE",
+          "required": true,
+          "order": 0,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "slug",
+          "name": "Slug",
+          "type": "SLUG",
+          "required": false,
+          "order": 1,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "season",
+          "name": "Season",
+          "type": "RELATION",
+          "required": false,
+          "order": 2,
+          "options": {
+            "targetContentTypeIds": [null],
+            "targetContentTypeIdentifiers": ["Season"]
+          }
+        },
+        {
+          "id": null,
+          "identifier": "teams",
+          "name": "Teams",
+          "type": "MULTIRELATION",
+          "required": false,
+          "order": 3,
+          "options": {
+            "targetContentTypeIds": [null],
+            "targetContentTypeIdentifiers": ["Team"]
+          }
+        }
+      ]
+    },
+    {
+      "identifier": "Fixture",
+      "mode": "create",
+      "name": "Fixture",
+      "description": "A scheduled or completed match.",
+      "fields": [
+        {
+          "id": null,
+          "identifier": "matchup",
+          "name": "Matchup",
+          "type": "ENTRY_TITLE",
+          "required": true,
+          "order": 0,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "team",
+          "name": "Team",
+          "type": "RELATION",
+          "required": true,
+          "order": 1,
+          "options": {
+            "targetContentTypeIds": [null],
+            "targetContentTypeIdentifiers": ["Team"]
+          }
+        },
+        {
+          "id": null,
+          "identifier": "opponent",
+          "name": "Opponent",
+          "type": "RELATION",
+          "required": false,
+          "order": 2,
+          "options": {
+            "targetContentTypeIds": [null],
+            "targetContentTypeIdentifiers": ["Club"]
+          }
+        },
+        {
+          "id": null,
+          "identifier": "competition",
+          "name": "Competition",
+          "type": "RELATION",
+          "required": false,
+          "order": 3,
+          "options": {
+            "targetContentTypeIds": [null],
+            "targetContentTypeIdentifiers": ["Competition"]
+          }
+        },
+        {
+          "id": null,
+          "identifier": "season",
+          "name": "Season",
+          "type": "RELATION",
+          "required": false,
+          "order": 4,
+          "options": {
+            "targetContentTypeIds": [null],
+            "targetContentTypeIdentifiers": ["Season"]
+          }
+        },
+        {
+          "id": null,
+          "identifier": "kickoff",
+          "name": "Kickoff",
+          "type": "DATETIME",
+          "required": true,
+          "order": 5,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "isHome",
+          "name": "Home fixture",
+          "type": "BOOLEAN",
+          "required": false,
+          "order": 6,
+          "options": null
+        }
+      ]
+    },
+    {
+      "identifier": "Player",
+      "mode": "create",
+      "name": "Player",
+      "description": "An individual player profile.",
+      "fields": [
+        {
+          "id": null,
+          "identifier": "name",
+          "name": "Name",
+          "type": "ENTRY_TITLE",
+          "required": true,
+          "order": 0,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "slug",
+          "name": "Slug",
+          "type": "SLUG",
+          "required": false,
+          "order": 1,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "bio",
+          "name": "Bio",
+          "type": "TEXTAREA",
+          "required": false,
+          "order": 2,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "headshot",
+          "name": "Headshot",
+          "type": "RELATION",
+          "required": false,
+          "order": 3,
+          "options": {
+            "targetContentTypeIds": [null],
+            "targetContentTypeIdentifiers": ["Image"]
+          }
+        },
+        {
+          "id": null,
+          "identifier": "team",
+          "name": "Team",
+          "type": "RELATION",
+          "required": false,
+          "order": 4,
+          "options": {
+            "targetContentTypeIds": [null],
+            "targetContentTypeIdentifiers": ["Team"]
+          }
+        }
+      ]
+    }
+  ]
+}

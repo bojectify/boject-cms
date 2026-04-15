@@ -29,7 +29,9 @@
     "apikey:revoke": "tsx scripts/manage-api-keys.ts revoke",
     "content:export": "tsx scripts/content-bundle/index.ts export",
     "content:import": "tsx scripts/content-bundle/index.ts import",
-    "content:validate": "tsx scripts/content-bundle/index.ts validate"
+    "content:validate": "tsx scripts/content-bundle/index.ts validate",
+    "starters:build": "tsx scripts/build-starters/index.ts build",
+    "starters:check": "tsx scripts/build-starters/index.ts check"
   },
   "keywords": [],
   "author": "",
