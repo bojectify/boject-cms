@@ -36,6 +36,12 @@ export async function buildAll(
         `Invalid overlay ${file}:\n${formatErrors(result.errors)}`
       );
     }
+    const expectedName = file.replace(/\.overlay\.json$/, '');
+    if (overlay.name !== expectedName) {
+      throw new Error(
+        `Overlay file ${file} declares name "${overlay.name}"; expected "${expectedName}" to match the filename`
+      );
+    }
     if (overlays.has(overlay.name)) {
       throw new Error(`Duplicate overlay name "${overlay.name}" in ${file}`);
     }

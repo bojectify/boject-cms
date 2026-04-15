@@ -3,6 +3,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { buildAll } from './build';
+import { normalize } from './normalize';
 
 const DEFAULT_ROOT = resolve(process.cwd(), 'starters');
 
@@ -60,12 +61,6 @@ function getOverlayNames(root: string): string[] {
   return readdirSync(join(root, 'src'))
     .filter((f) => f.endsWith('.overlay.json'))
     .map((f) => f.replace(/\.overlay\.json$/, ''));
-}
-
-function normalize(content: string): string {
-  const parsed = JSON.parse(content) as Record<string, unknown>;
-  parsed.exportedAt = '';
-  return JSON.stringify(parsed, null, 2) + '\n';
 }
 
 main().catch((err) => {

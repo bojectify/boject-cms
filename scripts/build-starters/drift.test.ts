@@ -5,14 +5,9 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildAll } from './build';
+import { normalize } from './normalize';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
-
-function normalize(content: string): string {
-  const parsed = JSON.parse(content) as Record<string, unknown>;
-  parsed.exportedAt = '';
-  return JSON.stringify(parsed, null, 2) + '\n';
-}
 
 describe('starter outputs are up to date', () => {
   it('re-building from committed overlays produces equivalent output', async () => {

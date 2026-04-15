@@ -249,4 +249,20 @@ describe('buildAll', () => {
     };
     expect(stripExported(second)).toEqual(stripExported(first));
   });
+
+  it('throws when overlay name does not match filename', async () => {
+    writeFileSync(join(root, 'base.boject.json'), JSON.stringify(baseBundle));
+    writeFileSync(
+      join(root, 'src', 'sport.overlay.json'),
+      JSON.stringify({
+        version: 1,
+        name: 'football',
+        extends: 'base',
+        contentTypes: [],
+      })
+    );
+    await expect(buildAll(root)).rejects.toThrow(
+      /sport\.overlay\.json declares name "football"/
+    );
+  });
 });
