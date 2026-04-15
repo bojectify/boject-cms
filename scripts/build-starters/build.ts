@@ -74,13 +74,22 @@ function loadParent(
     return JSON.parse(readFileSync(builtParent.path, 'utf8')) as Bundle;
   }
   const rootPath = join(root, `${parentName}.boject.json`);
+  let raw: string;
   try {
-    return JSON.parse(readFileSync(rootPath, 'utf8')) as Bundle;
-  } catch {
-    throw new Error(
-      `unknown parent bundle "${parentName}" (expected ${rootPath} or a built overlay)`
-    );
+    raw = readFileSync(rootPath, 'utf8');
+  } catch (err) {
+    if (
+      err instanceof Error &&
+      'code' in err &&
+      (err as { code?: string }).code === 'ENOENT'
+    ) {
+      throw new Error(
+        `unknown parent bundle "${parentName}" (expected ${rootPath} or a built overlay)`
+      );
+    }
+    throw err;
   }
+  return JSON.parse(raw) as Bundle;
 }
 
 function topoSort(overlays: Map<string, Overlay>): Overlay[] {

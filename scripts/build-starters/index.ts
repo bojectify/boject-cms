@@ -38,7 +38,7 @@ function main(): void {
     for (const name of overlayNames) {
       const path = join(root, `${name}.boject.json`);
       const after = readFileSync(path, 'utf8');
-      if (after !== before.get(name)) {
+      if (normalize(after) !== normalize(before.get(name)!)) {
         drift.push(name);
       }
     }
@@ -60,6 +60,12 @@ function getOverlayNames(root: string): string[] {
   return readdirSync(join(root, 'src'))
     .filter((f) => f.endsWith('.overlay.json'))
     .map((f) => f.replace(/\.overlay\.json$/, ''));
+}
+
+function normalize(content: string): string {
+  const parsed = JSON.parse(content) as Record<string, unknown>;
+  parsed.exportedAt = '';
+  return JSON.stringify(parsed, null, 2) + '\n';
 }
 
 main();

@@ -223,4 +223,30 @@ describe('buildAll', () => {
     expect(content.endsWith('\n')).toBe(true);
     expect(content).toContain('  "version": 1');
   });
+
+  it('successive rebuilds differ only by exportedAt', () => {
+    writeFileSync(join(root, 'base.boject.json'), JSON.stringify(baseBundle));
+    writeFileSync(
+      join(root, 'src', 'sport.overlay.json'),
+      JSON.stringify({
+        version: 1,
+        name: 'sport',
+        extends: 'base',
+        contentTypes: [],
+      })
+    );
+    buildAll(root);
+    const first = JSON.parse(
+      readFileSync(join(root, 'sport.boject.json'), 'utf8')
+    );
+    buildAll(root);
+    const second = JSON.parse(
+      readFileSync(join(root, 'sport.boject.json'), 'utf8')
+    );
+    const stripExported = (b: Record<string, unknown>) => {
+      const { exportedAt: _, ...rest } = b;
+      return rest;
+    };
+    expect(stripExported(second)).toEqual(stripExported(first));
+  });
 });
