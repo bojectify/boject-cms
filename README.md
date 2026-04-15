@@ -39,6 +39,9 @@ pnpm prisma:migrate
 # Seed the database with test data
 pnpm prisma:seed
 
+# Optionally apply the base starter bundle
+pnpm content:import ./starters/base.boject.json
+
 # Start the dev server
 pnpm dev
 ```

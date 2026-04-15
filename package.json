@@ -22,6 +22,7 @@
     "format:fix": "prettier --write .",
     "test": "vitest run",
     "test:integration": "vitest run --project integration",
+    "test:unit": "vitest run --project unit",
     "typecheck": "nuxi typecheck",
     "apikey:create": "tsx scripts/manage-api-keys.ts create",
     "apikey:list": "tsx scripts/manage-api-keys.ts list",

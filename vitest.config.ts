@@ -7,7 +7,6 @@ process.env.DATABASE_URL =
 export default defineConfig({
   test: {
     fileParallelism: false,
-    globalSetup: './vitest.globalSetup.ts',
     coverage: {
       provider: 'v8', // or 'istanbul'
     },
@@ -32,15 +31,23 @@ export default defineConfig({
         extends: true,
         test: {
           name: 'integration',
-          include: ['server/**/*.test.ts'],
+          include: [
+            'server/api/**/*.test.ts',
+            'server/middleware/**/*.test.ts',
+          ],
           globals: true,
+          globalSetup: './vitest.globalSetup.ts',
         },
       },
       {
         extends: true,
         test: {
           name: 'unit',
-          include: ['scripts/**/*.test.ts'],
+          include: [
+            'scripts/**/*.test.ts',
+            'starters/**/*.test.ts',
+            'server/utils/**/*.test.ts',
+          ],
           globals: true,
         },
       },
