@@ -124,18 +124,28 @@ describe('encodeDataRefs / decodeDataRefs round-trip', () => {
     expect(decoded).toEqual(data);
   });
 
-  it('passes RICHTEXT data through untouched', () => {
-    const data = {
-      body: {
-        type: 'doc',
-        content: [
-          {
-            type: 'paragraph',
-            content: [{ type: 'text', text: 'Hello world' }],
+  it('leaves RICHTEXT data untouched in portable mode (cmsEmbed nodes no longer rewritten)', () => {
+    const body = {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Before embed.' }],
+        },
+        {
+          type: 'cmsEmbed',
+          attrs: {
+            embedType: '11111111-1111-1111-1111-111111111111',
+            embedId: '22222222-2222-2222-2222-222222222222',
           },
-        ],
-      },
+        },
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'After embed.' }],
+        },
+      ],
     };
+    const data = { body };
     const fieldTypes = { body: 'RICHTEXT' as const };
 
     const encoded = encodeDataRefs(
@@ -144,7 +154,7 @@ describe('encodeDataRefs / decodeDataRefs round-trip', () => {
       typeIdToIdent,
       typeIdentToEntryKeys
     );
-    expect(encoded.body).toEqual(data.body);
+    expect(encoded.body).toEqual(body);
 
     const decoded = decodeDataRefs(
       encoded,
@@ -152,6 +162,6 @@ describe('encodeDataRefs / decodeDataRefs round-trip', () => {
       identToTypeId,
       typeIdentToKeyToEntry
     );
-    expect(decoded.body).toEqual(data.body);
+    expect(decoded.body).toEqual(body);
   });
 });
