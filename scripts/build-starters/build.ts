@@ -1,6 +1,7 @@
 // scripts/build-starters/build.ts
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import prettier from 'prettier';
 import type { Bundle } from '../content-bundle/types';
 import { validateBundle } from '../content-bundle/validate';
 import { mergeOverlay } from './merge';
@@ -16,7 +17,10 @@ export interface BuildResult {
   path: string;
 }
 
-export function buildAll(root: string, opts: BuildOptions = {}): BuildResult[] {
+export async function buildAll(
+  root: string,
+  opts: BuildOptions = {}
+): Promise<BuildResult[]> {
   const srcDir = join(root, 'src');
   const overlayFiles = safeReaddir(srcDir).filter((f) =>
     f.endsWith('.overlay.json')
@@ -56,7 +60,12 @@ export function buildAll(root: string, opts: BuildOptions = {}): BuildResult[] {
       );
     }
     const outPath = join(root, `${overlay.name}.boject.json`);
-    writeFileSync(outPath, JSON.stringify(merged, null, 2) + '\n');
+    const json = JSON.stringify(merged, null, 2) + '\n';
+    const formatted = await prettier.format(json, {
+      parser: 'json',
+      filepath: outPath,
+    });
+    writeFileSync(outPath, formatted);
     results.push({ name: overlay.name, path: outPath });
   }
 

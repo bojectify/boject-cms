@@ -44,7 +44,7 @@ describe('buildAll', () => {
     root = makeWorkspace();
   });
 
-  it('builds a single overlay extending base', () => {
+  it('builds a single overlay extending base', async () => {
     writeFileSync(join(root, 'base.boject.json'), JSON.stringify(baseBundle));
     writeFileSync(
       join(root, 'src', 'sport.overlay.json'),
@@ -73,7 +73,7 @@ describe('buildAll', () => {
         ],
       })
     );
-    buildAll(root);
+    await buildAll(root);
     const out = JSON.parse(
       readFileSync(join(root, 'sport.boject.json'), 'utf8')
     );
@@ -82,7 +82,7 @@ describe('buildAll', () => {
     ).toEqual(['Image', 'Team']);
   });
 
-  it('builds chained overlays (rugby extends sport extends base)', () => {
+  it('builds chained overlays (rugby extends sport extends base)', async () => {
     writeFileSync(join(root, 'base.boject.json'), JSON.stringify(baseBundle));
     writeFileSync(
       join(root, 'src', 'sport.overlay.json'),
@@ -136,7 +136,7 @@ describe('buildAll', () => {
         ],
       })
     );
-    buildAll(root);
+    await buildAll(root);
     const rugby = JSON.parse(
       readFileSync(join(root, 'rugby.boject.json'), 'utf8')
     );
@@ -148,7 +148,7 @@ describe('buildAll', () => {
     ).toEqual(['name', 'position']);
   });
 
-  it('throws on cycle', () => {
+  it('throws on cycle', async () => {
     writeFileSync(join(root, 'base.boject.json'), JSON.stringify(baseBundle));
     writeFileSync(
       join(root, 'src', 'a.overlay.json'),
@@ -158,10 +158,10 @@ describe('buildAll', () => {
       join(root, 'src', 'b.overlay.json'),
       JSON.stringify({ version: 1, name: 'b', extends: 'a', contentTypes: [] })
     );
-    expect(() => buildAll(root)).toThrow(/cycle/i);
+    await expect(buildAll(root)).rejects.toThrow(/cycle/i);
   });
 
-  it('throws on unknown parent', () => {
+  it('throws on unknown parent', async () => {
     writeFileSync(join(root, 'base.boject.json'), JSON.stringify(baseBundle));
     writeFileSync(
       join(root, 'src', 'orphan.overlay.json'),
@@ -172,10 +172,10 @@ describe('buildAll', () => {
         contentTypes: [],
       })
     );
-    expect(() => buildAll(root)).toThrow(/unknown parent.*missing/i);
+    await expect(buildAll(root)).rejects.toThrow(/unknown parent.*missing/i);
   });
 
-  it('validates each built bundle with validateBundle', () => {
+  it('validates each built bundle with validateBundle', async () => {
     writeFileSync(join(root, 'base.boject.json'), JSON.stringify(baseBundle));
     writeFileSync(
       join(root, 'src', 'bad.overlay.json'),
@@ -204,10 +204,10 @@ describe('buildAll', () => {
         ],
       })
     );
-    expect(() => buildAll(root)).toThrow();
+    await expect(buildAll(root)).rejects.toThrow();
   });
 
-  it('writes deterministic JSON (2-space indent, trailing newline)', () => {
+  it('writes deterministic JSON (2-space indent, trailing newline)', async () => {
     writeFileSync(join(root, 'base.boject.json'), JSON.stringify(baseBundle));
     writeFileSync(
       join(root, 'src', 'sport.overlay.json'),
@@ -218,13 +218,13 @@ describe('buildAll', () => {
         contentTypes: [],
       })
     );
-    buildAll(root, { now: '2026-04-15T12:00:00.000Z' });
+    await buildAll(root, { now: '2026-04-15T12:00:00.000Z' });
     const content = readFileSync(join(root, 'sport.boject.json'), 'utf8');
     expect(content.endsWith('\n')).toBe(true);
     expect(content).toContain('  "version": 1');
   });
 
-  it('successive rebuilds differ only by exportedAt', () => {
+  it('successive rebuilds differ only by exportedAt', async () => {
     writeFileSync(join(root, 'base.boject.json'), JSON.stringify(baseBundle));
     writeFileSync(
       join(root, 'src', 'sport.overlay.json'),
@@ -235,11 +235,11 @@ describe('buildAll', () => {
         contentTypes: [],
       })
     );
-    buildAll(root);
+    await buildAll(root);
     const first = JSON.parse(
       readFileSync(join(root, 'sport.boject.json'), 'utf8')
     );
-    buildAll(root);
+    await buildAll(root);
     const second = JSON.parse(
       readFileSync(join(root, 'sport.boject.json'), 'utf8')
     );

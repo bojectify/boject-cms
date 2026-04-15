@@ -6,7 +6,7 @@ import { buildAll } from './build';
 
 const DEFAULT_ROOT = resolve(process.cwd(), 'starters');
 
-function main(): void {
+async function main(): Promise<void> {
   const [, , cmd = 'build', ...rest] = process.argv;
   const rootFlag = rest.find((a) => a.startsWith('--root='));
   const root = rootFlag
@@ -14,7 +14,7 @@ function main(): void {
     : DEFAULT_ROOT;
 
   if (cmd === 'build') {
-    const results = buildAll(root);
+    const results = await buildAll(root);
     for (const r of results) {
       console.log(`built ${r.name} -> ${r.path}`);
     }
@@ -33,7 +33,7 @@ function main(): void {
         process.exit(1);
       }
     }
-    buildAll(root);
+    await buildAll(root);
     const drift: string[] = [];
     for (const name of overlayNames) {
       const path = join(root, `${name}.boject.json`);
@@ -68,4 +68,7 @@ function normalize(content: string): string {
   return JSON.stringify(parsed, null, 2) + '\n';
 }
 
-main();
+main().catch((err) => {
+  console.error(err.message ?? err);
+  process.exit(1);
+});
