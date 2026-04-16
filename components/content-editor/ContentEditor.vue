@@ -1,17 +1,13 @@
 <script setup lang="ts">
 import type { FormError } from '@nuxt/ui';
 import type { FieldConfig } from '~/types/contentEditor';
-import type { ImageFieldValue } from './ImageField.vue';
+import type { ImageFieldValue } from '../image-field/imageField.types';
+import type { ContentEditorProps } from './contentEditor.types';
+import { QA_CONTENT_EDITOR } from './contentEditor.config';
 
-const props = defineProps<{
-  title: string;
-  fields: FieldConfig[];
-  loading?: boolean;
-  saving?: boolean;
-  error?: string | null;
-  showSlug?: boolean;
-  onSave: () => void;
-}>();
+const props = withDefaults(defineProps<ContentEditorProps>(), {
+  testId: QA_CONTENT_EDITOR.COMPONENT,
+});
 
 const state = defineModel<Record<string, unknown>>('state', {
   required: true,
@@ -97,7 +93,7 @@ function onSubmit() {
 </script>
 
 <template>
-  <div class="p-6">
+  <div class="p-6 sm:p-8" :data-testid="testId">
     <div class="flex items-center justify-between mb-6">
       <h1 class="text-2xl font-bold">{{ title }}</h1>
       <UButton :loading="saving" icon="i-lucide-save" @click="form?.submit()">

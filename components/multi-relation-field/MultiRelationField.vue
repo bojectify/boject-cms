@@ -1,17 +1,11 @@
 <script setup lang="ts">
 import draggable from 'vuedraggable';
+import type { MultiRelationFieldProps } from './multiRelationField.types';
+import { QA_MULTI_RELATION_FIELD } from './multiRelationField.config';
 
-interface RelationItem {
-  contentTypeId: string;
-  entryId: string;
-  entryTitle: string;
-  contentTypeName: string;
-}
-
-const props = defineProps<{
-  label: string;
-  items: RelationItem[];
-}>();
+const props = withDefaults(defineProps<MultiRelationFieldProps>(), {
+  testId: QA_MULTI_RELATION_FIELD.COMPONENT,
+});
 
 const emit = defineEmits<{
   add: [];
@@ -35,7 +29,7 @@ const draggableItems = computed({
 </script>
 
 <template>
-  <div class="space-y-2">
+  <div class="space-y-2" :data-testid="testId">
     <span class="text-sm font-medium text-gray-700 dark:text-gray-200">
       {{ label }}
     </span>

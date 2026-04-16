@@ -1,21 +1,12 @@
 <script setup lang="ts">
-import type { ImageFieldConfig } from '~/types/contentEditor';
+import type { ImageFieldProps, ImageFieldValue } from './imageField.types';
+import { QA_IMAGE_FIELD } from './imageField.config';
 
-export interface ImageFieldValue {
-  storageKey: string;
-  mimeType: string;
-  width: number;
-  height: number;
-  fileSize: number;
-  originalName: string | null;
-  focalPointX: number;
-  focalPointY: number;
-}
+export type { ImageFieldValue };
 
-defineProps<{
-  modelValue: ImageFieldValue | null;
-  field: ImageFieldConfig;
-}>();
+const _props = withDefaults(defineProps<ImageFieldProps>(), {
+  testId: QA_IMAGE_FIELD.COMPONENT,
+});
 
 const emit = defineEmits<{
   'update:modelValue': [value: ImageFieldValue | null];
@@ -88,7 +79,7 @@ function formatBytes(bytes: number): string {
 </script>
 
 <template>
-  <div class="space-y-2">
+  <div class="space-y-2" :data-testid="testId">
     <label class="block text-sm font-medium">
       {{ field.label }}
       <span v-if="field.required" class="text-red-500">*</span>

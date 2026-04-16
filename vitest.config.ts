@@ -47,6 +47,7 @@ export default defineConfig({
             'scripts/**/*.test.ts',
             'starters/**/*.test.ts',
             'server/utils/**/*.test.ts',
+            'utils/**/*.test.ts',
           ],
           globals: true,
         },

@@ -1,28 +1,10 @@
 <script setup lang="ts">
-interface FieldData {
-  id?: string;
-  identifier: string;
-  name: string;
-  type: string;
-  required: boolean;
-  options: unknown;
-}
+import type { FieldFormData, FieldModalProps } from './fieldModal.types';
+import { QA_FIELD_MODAL } from './fieldModal.config';
 
-interface FieldFormData {
-  identifier: string;
-  name: string;
-  type: string;
-  required: boolean;
-  options: unknown;
-}
-
-const props = defineProps<{
-  open: boolean;
-  mode: 'add' | 'edit';
-  field: FieldData | null;
-  fieldTypeOptions: Array<{ label: string; value: string }>;
-  entryCount?: number;
-}>();
+const props = withDefaults(defineProps<FieldModalProps>(), {
+  testId: QA_FIELD_MODAL.COMPONENT,
+});
 
 const emit = defineEmits<{
   close: [];
@@ -101,6 +83,7 @@ const canDelete = computed(() => {
 
 <template>
   <UModal
+    :data-testid="testId"
     :open="open"
     @update:open="
       (val: boolean) => {
