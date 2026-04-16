@@ -26,8 +26,6 @@ const entryTitleFieldIdentifier = computed(() => {
   return field?.identifier ?? 'title';
 });
 
-// Map ContentTypeField definitions to FieldConfig for ContentEditor
-// Filter out SLUG fields (handled by ContentEditor's built-in slug section)
 const editorFields = computed<FieldConfig[]>(() => {
   if (!contentType.value) return [];
   return contentType.value.fields
@@ -36,11 +34,15 @@ const editorFields = computed<FieldConfig[]>(() => {
 });
 
 const {
+  isNew,
   formState,
   isSaving,
   saveError,
   status,
   hasPublishedVersion,
+  publishedAt,
+  createdAt,
+  updatedAt,
   isDirty,
   saveDraft,
   publish,
@@ -57,7 +59,13 @@ watch(
   }
 );
 
+const editorRef = useTemplateRef<{ validate: () => Promise<boolean> }>(
+  'editorRef'
+);
+
 async function handleSaveDraft() {
+  const valid = await editorRef.value?.validate();
+  if (valid === false) return;
   const newId = await saveDraft();
   if (newId) {
     await navigateTo(`/content-types/${contentTypeId}/entries/${newId}`);
@@ -65,6 +73,8 @@ async function handleSaveDraft() {
 }
 
 async function handlePublish() {
+  const valid = await editorRef.value?.validate();
+  if (valid === false) return;
   const newId = await publish();
   if (newId) {
     await navigateTo(`/content-types/${contentTypeId}/entries/${newId}`);
@@ -120,7 +130,6 @@ const resolvedMultiRelations = reactive<
   >
 >({});
 
-// Resolve references when formState changes
 watch(
   () => ({ ...formState }),
   async () => {
@@ -211,8 +220,9 @@ function openPane(
   paneOpen.value = true;
 }
 
-function handlePickerCreate(ctId: string) {
+async function handlePickerCreate(ctId: string) {
   pickerOpen.value = false;
+  await nextTick();
   openPane(ctId, null, pickerFieldKey.value);
 }
 
@@ -250,81 +260,96 @@ function handlePaneSaved(data: {
 </script>
 
 <template>
-  <div class="relative h-full overflow-hidden">
-    <div class="h-full overflow-y-auto">
-      <!-- Nav header -->
-      <div
-        class="flex items-center gap-4 px-6 py-3 border-b border-gray-200 dark:border-gray-700"
+  <div class="relative flex flex-col h-full overflow-hidden">
+    <!-- Nav header -->
+    <div
+      class="flex items-center gap-4 px-6 py-3 border-b border-gray-200 dark:border-gray-700 shrink-0"
+    >
+      <UButton
+        variant="ghost"
+        icon="i-lucide-arrow-left"
+        size="sm"
+        :to="`/content-types/${contentTypeId}/entries`"
+      />
+      <USeparator orientation="vertical" class="h-4" />
+      <NuxtLink
+        :to="`/content-types/${contentTypeId}`"
+        class="flex items-center gap-1.5 text-xs text-muted hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
       >
-        <UButton
-          variant="ghost"
-          icon="i-lucide-arrow-left"
-          size="sm"
-          :to="`/content-types/${contentTypeId}/entries`"
-        />
-        <USeparator orientation="vertical" class="h-4" />
-        <NuxtLink
-          :to="`/content-types/${contentTypeId}`"
-          class="flex items-center gap-1.5 text-xs text-muted hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+        {{ contentType?.name ?? 'Content Type' }}
+        <UIcon name="i-lucide-external-link" class="size-3" />
+      </NuxtLink>
+    </div>
+
+    <!-- Body: editor + sidebar -->
+    <div class="flex-1 flex overflow-hidden">
+      <div class="flex-1 overflow-y-auto">
+        <ContentEditor
+          ref="editorRef"
+          v-model:state="formState"
+          :title="`New ${contentType?.name ?? 'Entry'}`"
+          :fields="editorFields"
+          :loading="false"
+          :error="saveError"
+          :show-slug="hasSlugField"
         >
-          {{ contentType?.name ?? 'Content Type' }}
-          <UIcon name="i-lucide-external-link" class="size-3" />
-        </NuxtLink>
+          <template #field="{ field, value, update }">
+            <RelationField
+              v-if="field.type === 'dynamic-relation'"
+              :label="field.label"
+              :required="field.required"
+              :value="getRelationValue(value)"
+              :entry-title="resolvedRelations[field.key]?.entryTitle ?? null"
+              :content-type-name="
+                resolvedRelations[field.key]?.contentTypeName ?? null
+              "
+              @add="openPicker(field.key, getTargetContentTypeIds(field))"
+              @edit="handleRelationEdit(value, field.key)"
+              @remove="update(null)"
+            />
+            <MultiRelationField
+              v-else-if="field.type === 'dynamic-multirelation'"
+              :label="field.label"
+              :items="resolvedMultiRelations[field.key] ?? []"
+              @add="openPicker(field.key, getTargetContentTypeIds(field))"
+              @edit="
+                (idx: number) => {
+                  const refs = getMultiRelationValue(value);
+                  const ref = refs[idx];
+                  if (ref) {
+                    openPane(ref.contentTypeId, ref.entryId, field.key);
+                  }
+                }
+              "
+              @remove="
+                (idx: number) => {
+                  const refs = [...getMultiRelationValue(value)];
+                  refs.splice(idx, 1);
+                  update(refs);
+                }
+              "
+              @reorder="(items) => update(items)"
+            />
+          </template>
+        </ContentEditor>
       </div>
 
-      <ContentEditor
-        v-model:state="formState"
-        :title="`New ${contentType?.name ?? 'Entry'}`"
-        :fields="editorFields"
-        :loading="false"
-        :saving="isSaving"
-        :error="saveError"
-        :show-slug="hasSlugField"
+      <EntrySidebar
+        class="w-80 shrink-0 border-l border-gray-200 dark:border-gray-700 overflow-y-auto"
         :status="status"
-        :has-published-version="hasPublishedVersion"
         :is-dirty="isDirty"
+        :saving="isSaving"
+        :has-published-version="hasPublishedVersion"
+        :is-new="isNew"
+        :entry-id="null"
+        :content-type-name="contentType?.name ?? ''"
+        :content-type-id="contentTypeId"
+        :created-at="createdAt"
+        :updated-at="updatedAt"
+        :published-at="publishedAt"
         :on-save-draft="handleSaveDraft"
         :on-publish="handlePublish"
-      >
-        <template #field="{ field, value, update }">
-          <RelationField
-            v-if="field.type === 'dynamic-relation'"
-            :label="field.label"
-            :required="field.required"
-            :value="getRelationValue(value)"
-            :entry-title="resolvedRelations[field.key]?.entryTitle ?? null"
-            :content-type-name="
-              resolvedRelations[field.key]?.contentTypeName ?? null
-            "
-            @add="openPicker(field.key, getTargetContentTypeIds(field))"
-            @edit="handleRelationEdit(value, field.key)"
-            @remove="update(null)"
-          />
-          <MultiRelationField
-            v-else-if="field.type === 'dynamic-multirelation'"
-            :label="field.label"
-            :items="resolvedMultiRelations[field.key] ?? []"
-            @add="openPicker(field.key, getTargetContentTypeIds(field))"
-            @edit="
-              (idx: number) => {
-                const refs = getMultiRelationValue(value);
-                const ref = refs[idx];
-                if (ref) {
-                  openPane(ref.contentTypeId, ref.entryId, field.key);
-                }
-              }
-            "
-            @remove="
-              (idx: number) => {
-                const refs = [...getMultiRelationValue(value)];
-                refs.splice(idx, 1);
-                update(refs);
-              }
-            "
-            @reorder="(items) => update(items)"
-          />
-        </template>
-      </ContentEditor>
+      />
     </div>
 
     <EntryPickerModal
