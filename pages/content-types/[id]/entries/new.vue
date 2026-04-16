@@ -64,7 +64,8 @@ const editorRef = useTemplateRef<{ validate: () => Promise<boolean> }>(
 );
 
 async function handleSaveDraft() {
-  if (!(await editorRef.value?.validate())) return;
+  const valid = await editorRef.value?.validate();
+  if (valid === false) return;
   const newId = await saveDraft();
   if (newId) {
     await navigateTo(`/content-types/${contentTypeId}/entries/${newId}`);
@@ -72,7 +73,8 @@ async function handleSaveDraft() {
 }
 
 async function handlePublish() {
-  if (!(await editorRef.value?.validate())) return;
+  const valid = await editorRef.value?.validate();
+  if (valid === false) return;
   const newId = await publish();
   if (newId) {
     await navigateTo(`/content-types/${contentTypeId}/entries/${newId}`);

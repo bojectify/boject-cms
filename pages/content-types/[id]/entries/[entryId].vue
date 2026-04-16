@@ -64,11 +64,13 @@ const editorRef = useTemplateRef<{ validate: () => Promise<boolean> }>(
 );
 
 async function handleSaveDraft() {
-  if (!(await editorRef.value?.validate())) return;
+  const valid = await editorRef.value?.validate();
+  if (valid === false) return;
   await saveDraft();
 }
 async function handlePublish() {
-  if (!(await editorRef.value?.validate())) return;
+  const valid = await editorRef.value?.validate();
+  if (valid === false) return;
   await publish();
 }
 async function handleDiscardChanges() {

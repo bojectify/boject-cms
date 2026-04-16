@@ -87,13 +87,15 @@ function emitSaved(newId: string | void) {
 }
 
 async function handleSaveDraft() {
-  if (!(await editorRef.value?.validate())) return;
+  const valid = await editorRef.value?.validate();
+  if (valid === false) return;
   const newId = await saveDraft();
   emitSaved(newId);
 }
 
 async function handlePublish() {
-  if (!(await editorRef.value?.validate())) return;
+  const valid = await editorRef.value?.validate();
+  if (valid === false) return;
   const newId = await publish();
   emitSaved(newId);
 }
