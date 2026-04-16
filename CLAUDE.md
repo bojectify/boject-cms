@@ -239,7 +239,15 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder. The schema is
 - **ESLint** — Via `@nuxt/eslint` module (registered in `nuxt.config.ts`). Includes Vue, TypeScript, and Nuxt-specific rules. Config in `eslint.config.mjs`. Custom config covers `**/*.ts` files with `@typescript-eslint/parser` and `@typescript-eslint/eslint-plugin`. A separate block sets `parserOptions.parser` to `@typescript-eslint/parser` for `**/*.vue` files (the Nuxt-generated config uses `vue-eslint-parser` but doesn't configure a TypeScript sub-parser). Underscore-prefixed variables are allowed as unused (`varsIgnorePattern: '^_'`). Destructured rest siblings are also ignored (`ignoreRestSiblings: true`).
 - **Prettier** — Single quotes, trailing commas (es5), semicolons, 2-space indent, 80 char width. Config in `.prettierrc.yml`.
 - **eslint-config-prettier** — Disables ESLint rules that conflict with Prettier.
-- **Lefthook** — Pre-commit hooks run ESLint and Prettier in parallel on staged files. Config in `lefthook.yml`.
+- **Lefthook** — Pre-commit hooks run ESLint and Prettier in parallel on staged files. Pre-push hook runs the test suite. Config in `lefthook.yml`.
+
+## Git Push Workflow (Wallaby fast path)
+
+Before pushing, attempt to check Wallaby for failing tests via `wallaby_failingTests` MCP tool:
+
+1. **Wallaby unavailable** — If the MCP call fails, hangs, is rejected, or the MCP server is not connected, fall back to a normal `git push` (the full test suite runs via the pre-push hook).
+2. **No failures** — Push with `WALLABY_VERIFIED=1 git push` — this skips the `test` job in the pre-push hook (Wallaby already validated). Other pre-push jobs still run.
+3. **Failures found** — Report the failing tests to the user instead of pushing.
 
 ## Testing
 

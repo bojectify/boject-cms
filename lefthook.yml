@@ -18,3 +18,5 @@ pre-push:
   jobs:
     - name: test
       run: pnpm test
+      skip:
+        - run: test "$WALLABY_VERIFIED" = "1"
