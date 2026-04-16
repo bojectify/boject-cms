@@ -1011,6 +1011,77 @@ describe('Content Entry endpoints', async () => {
       expect(fetchedPublished.hasPublishedVersion).toBe(true);
     });
 
+    it('exposes publishedVersionPublishedAt to CMS across draft/published/changed', async () => {
+      const cookie = await getSessionCookie();
+
+      type WithMeta = EntryResponse & {
+        hasPublishedVersion?: boolean;
+        publishedVersionPublishedAt?: string | null;
+      };
+
+      // DRAFT-only: no published version yet
+      const draft = await $fetch<WithMeta>('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: testContentType.id,
+          data: { title: `PubTS Draft ${Date.now()}` },
+        },
+      });
+      expect(draft.publishedVersionPublishedAt).toBeNull();
+
+      // Publish it
+      const published = await $fetch<WithMeta>(
+        `/api/content-entries/${draft.id}`,
+        {
+          method: 'PUT',
+          headers: { cookie },
+          body: { status: 'PUBLISHED' },
+        }
+      );
+      expect(published.publishedVersionPublishedAt).not.toBeNull();
+      const originalPublishedAt = published.publishedVersionPublishedAt;
+
+      // Save a draft edit on top of published -> CHANGED — timestamp should
+      // still reflect the existing published version.
+      const changed = await $fetch<WithMeta>(
+        `/api/content-entries/${draft.id}`,
+        {
+          method: 'PUT',
+          headers: { cookie },
+          body: {
+            data: {
+              title: `PubTS Draft ${Date.now()}`,
+              summary: 'Changed content',
+            },
+          },
+        }
+      );
+      expect(changed.status).toBe('CHANGED');
+      expect(changed.publishedVersionPublishedAt).toBe(originalPublishedAt);
+    });
+
+    it('hides publishedVersionPublishedAt from API key responses', async () => {
+      const cookie = await getSessionCookie();
+
+      const entry = await $fetch<EntryResponse>('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: testContentType.id,
+          data: { title: `PubTS ApiKey ${Date.now()}` },
+          status: 'PUBLISHED',
+        },
+      });
+
+      const apiView = await $fetch<
+        EntryResponse & { publishedVersionPublishedAt?: string | null }
+      >(`/api/content-entries/${entry.id}`, {
+        headers: { authorization: `Bearer ${TEST_API_KEY}` },
+      });
+      expect(apiView.publishedVersionPublishedAt).toBeUndefined();
+    });
+
     it('draft entries are invisible to API key in list', async () => {
       const cookie = await getSessionCookie();
 

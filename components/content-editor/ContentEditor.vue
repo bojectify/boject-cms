@@ -7,9 +7,6 @@ import { QA_CONTENT_EDITOR } from './contentEditor.config';
 
 const props = withDefaults(defineProps<ContentEditorProps>(), {
   testId: QA_CONTENT_EDITOR.COMPONENT,
-  status: 'DRAFT',
-  hasPublishedVersion: false,
-  isDirty: false,
 });
 
 const state = defineModel<Record<string, unknown>>('state', {
@@ -83,99 +80,23 @@ function validate(formData: Record<string, unknown>): FormError[] {
   return errors;
 }
 
-function onSubmit() {
-  props.onSaveDraft();
+async function runValidation(): Promise<boolean> {
+  const f = form.value;
+  if (!f) return true;
+  try {
+    await f.validate({});
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-// --- Button state computeds ---
-
-const isPublished = computed(
-  () => props.status === 'PUBLISHED' && !props.isDirty
-);
-const isPublishedDirty = computed(
-  () => props.status === 'PUBLISHED' && props.isDirty
-);
-const isChanged = computed(() => props.status === 'CHANGED');
-
-const primaryLabel = computed(() => {
-  if (isChanged.value) return 'Publish Changes';
-  if (isPublished.value) return 'Published';
-  return 'Publish';
-});
-const primaryDisabled = computed(
-  () => isPublished.value || isPublishedDirty.value
-);
-
-const secondaryLabel = computed(() => {
-  if (isChanged.value) return 'Save Changes';
-  return 'Save Draft';
-});
-const secondaryVisible = computed(() => !isPublished.value);
-
-// --- Status badge ---
-
-const statusBadgeColor = computed(() => {
-  switch (props.status) {
-    case 'DRAFT':
-      return 'info' as const;
-    case 'PUBLISHED':
-      return 'success' as const;
-    case 'CHANGED':
-      return 'warning' as const;
-    case 'ARCHIVED':
-      return 'neutral' as const;
-    default:
-      return 'neutral' as const;
-  }
-});
-
-const statusBadgeLabel = computed(() => {
-  switch (props.status) {
-    case 'DRAFT':
-      return 'Draft';
-    case 'PUBLISHED':
-      return 'Published';
-    case 'CHANGED':
-      return 'Changed';
-    case 'ARCHIVED':
-      return 'Archived';
-    default:
-      return props.status ?? 'Draft';
-  }
-});
+defineExpose({ validate: runValidation });
 </script>
 
 <template>
   <div class="p-6 sm:p-8" :data-testid="testId">
-    <div class="flex items-center justify-between mb-6">
-      <h1 class="text-2xl font-bold">{{ title }}</h1>
-      <div class="flex items-center gap-2">
-        <UButton
-          v-if="isChanged && onDiscardChanges"
-          variant="ghost"
-          color="error"
-          @click="onDiscardChanges"
-        >
-          Discard Changes
-        </UButton>
-        <UButton
-          v-if="secondaryVisible"
-          variant="soft"
-          :loading="saving"
-          @click="form?.submit()"
-        >
-          {{ secondaryLabel }}
-        </UButton>
-        <UButton
-          :loading="saving && !secondaryVisible"
-          :disabled="primaryDisabled"
-          icon="i-lucide-send"
-          @click="onPublish"
-        >
-          {{ primaryLabel }}
-        </UButton>
-      </div>
-    </div>
+    <h1 class="text-2xl font-bold mb-6">{{ title }}</h1>
 
     <UAlert
       v-if="error"
@@ -195,7 +116,6 @@ const statusBadgeLabel = computed(() => {
       :validate="validate"
       :state="state"
       class="space-y-6 max-w-2xl"
-      @submit="onSubmit"
     >
       <template v-for="field in fields" :key="field.key">
         <slot
@@ -360,14 +280,6 @@ const statusBadgeLabel = computed(() => {
       </template>
 
       <slot name="after-fields" />
-
-      <USeparator label="Publishing" />
-
-      <UFormField label="Status" name="status" size="xl">
-        <UBadge :color="statusBadgeColor" size="lg">
-          {{ statusBadgeLabel }}
-        </UBadge>
-      </UFormField>
 
       <UFormField
         v-if="props.showSlug !== false"

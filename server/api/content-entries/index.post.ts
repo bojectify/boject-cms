@@ -2,7 +2,11 @@ import type { Prisma } from '#prisma';
 import { assertUuid } from '../../utils/validation';
 import { withPrismaErrors } from '../../utils/prismaErrors';
 import { enforceMutationRateLimit } from '../../utils/rateLimitEndpoint';
-import { flattenEntryWithVersion } from '../../utils/resolveVersion';
+import {
+  flattenEntryWithVersion,
+  getPublishedVersion,
+  isCmsRequest,
+} from '../../utils/resolveVersion';
 
 const VALID_STATUSES = new Set<string>([
   'DRAFT',
@@ -67,5 +71,16 @@ export default defineEventHandler(async (event) => {
   );
 
   setResponseStatus(event, 201);
-  return flattenEntryWithVersion(created, created.versions[0]!);
+
+  const isCms = isCmsRequest(event);
+  const publishedVersion = getPublishedVersion(created.versions);
+
+  return flattenEntryWithVersion(created, created.versions[0]!, {
+    ...(isCms
+      ? {
+          hasPublishedVersion: publishedVersion !== null,
+          publishedVersionPublishedAt: publishedVersion?.publishedAt ?? null,
+        }
+      : {}),
+  });
 });

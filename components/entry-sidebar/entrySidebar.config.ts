@@ -1,0 +1,11 @@
+import { testIds } from '~/utils/test-config/testConfig.utils';
+
+export const QA_ENTRY_SIDEBAR = {
+  ...testIds('ENTRY_SIDEBAR', {
+    PUBLISH_BTN: 'publish-btn',
+    SAVE_BTN: 'save-btn',
+    DISCARD_BTN: 'discard-btn',
+    STATUS_BADGE: 'status-badge',
+    COPY_ID_BTN: 'copy-id-btn',
+  }),
+};
