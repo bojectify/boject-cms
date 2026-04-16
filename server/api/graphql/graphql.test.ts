@@ -576,13 +576,14 @@ describe('GraphQL API', async () => {
         body: { identifier: 'description', name: 'Description', type: 'TEXT' },
       });
 
+      // GraphQL only serves PUBLISHED versions, so create as PUBLISHED
       const entry = await $fetch<any>('/api/content-entries', {
         method: 'POST',
         headers: { cookie },
         body: {
           contentTypeId: created.id,
           data: { title: 'Test', description: 'A description' },
-          status: 'DRAFT',
+          status: 'PUBLISHED',
         },
       });
 
@@ -696,6 +697,106 @@ describe('GraphQL API', async () => {
       }`);
       data.contentEntryList.edges.forEach((edge) => {
         expect(edge.node.status).toBe('PUBLISHED');
+      });
+    });
+  });
+
+  describe('Versioning visibility in GraphQL', () => {
+    it('draft entries are not visible in GraphQL queries', async () => {
+      const cookie = await getSessionCookie();
+
+      // Create a draft-only entry
+      const draftEntry = await $fetch<any>('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: blogTypeId,
+          data: {
+            title: `GQL Draft ${Date.now()}`,
+            slug: `gql-draft-${Date.now()}`,
+            summary: 'Should be invisible',
+          },
+          status: 'DRAFT',
+        },
+      });
+
+      // GraphQL single-item lookup should return null for draft entry
+      const { data } = await gql<{
+        blogPost: { id: string } | null;
+      }>(`{ blogPost(id: "${draftEntry.id}") { id } }`);
+      expect(data.blogPost).toBeNull();
+
+      // Clean up
+      await $fetch<unknown>(`/api/content-entries/${draftEntry.id}`, {
+        method: 'DELETE',
+        headers: { cookie },
+      });
+    });
+
+    it('after publishing a CHANGED version, GraphQL serves the updated data', async () => {
+      const cookie = await getSessionCookie();
+      const ts = Date.now();
+
+      // Create and publish an entry
+      const entry = await $fetch<any>('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: blogTypeId,
+          data: {
+            title: `GQL Version ${ts}`,
+            slug: `gql-version-${ts}`,
+            summary: 'Original published',
+          },
+          status: 'PUBLISHED',
+        },
+      });
+
+      // Verify GraphQL sees the original published version
+      const { data: before } = await gql<{
+        blogPost: { id: string; summary: string | null } | null;
+      }>(`{ blogPost(id: "${entry.id}") { id summary } }`);
+      expect(before.blogPost).not.toBeNull();
+      expect(before.blogPost!.summary).toBe('Original published');
+
+      // Save a draft edit (creates CHANGED version)
+      await $fetch(`/api/content-entries/${entry.id}`, {
+        method: 'PUT',
+        headers: { cookie },
+        body: {
+          data: {
+            title: `GQL Version ${ts}`,
+            slug: `gql-version-${ts}`,
+            summary: 'Draft changes',
+          },
+        },
+      });
+
+      // GraphQL should still see the PUBLISHED version, not the CHANGED
+      const { data: during } = await gql<{
+        blogPost: { id: string; summary: string | null } | null;
+      }>(`{ blogPost(id: "${entry.id}") { id summary } }`);
+      expect(during.blogPost).not.toBeNull();
+      expect(during.blogPost!.summary).toBe('Original published');
+
+      // Publish the CHANGED version
+      await $fetch(`/api/content-entries/${entry.id}`, {
+        method: 'PUT',
+        headers: { cookie },
+        body: { status: 'PUBLISHED' },
+      });
+
+      // GraphQL should now serve the updated content
+      const { data: after } = await gql<{
+        blogPost: { id: string; summary: string | null } | null;
+      }>(`{ blogPost(id: "${entry.id}") { id summary } }`);
+      expect(after.blogPost).not.toBeNull();
+      expect(after.blogPost!.summary).toBe('Draft changes');
+
+      // Clean up
+      await $fetch<unknown>(`/api/content-entries/${entry.id}`, {
+        method: 'DELETE',
+        headers: { cookie },
       });
     });
   });
