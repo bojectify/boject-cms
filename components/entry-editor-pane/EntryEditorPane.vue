@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import type { FieldConfig } from '~/types/contentEditor';
+import type { EntryEditorPaneProps } from './entryEditorPane.types';
+import { QA_ENTRY_EDITOR_PANE } from './entryEditorPane.config';
 
-const props = defineProps<{
-  open: boolean;
-  contentTypeId: string;
-  entryId: string | null;
-}>();
+const props = withDefaults(defineProps<EntryEditorPaneProps>(), {
+  testId: QA_ENTRY_EDITOR_PANE.COMPONENT,
+});
 
 const emit = defineEmits<{
   close: [];
@@ -129,7 +129,7 @@ async function handleSave() {
 
 <template>
   <Transition name="slide-pane">
-    <div v-if="open" class="absolute inset-0 z-30 flex">
+    <div v-if="open" class="absolute inset-0 z-30 flex" :data-testid="testId">
       <!-- Backdrop / sliver -->
       <div
         class="w-10 shrink-0 bg-gray-200/50 dark:bg-gray-900/50 backdrop-blur-sm cursor-pointer"

@@ -9,6 +9,8 @@ export default defineNuxtConfig({
     port: Number(process.env._PORT) || 4000,
   },
 
+  components: [{ path: '~/components', pathPrefix: false }],
+
   modules: ['@nuxt/ui', 'nuxt-auth-utils', '@nuxt/eslint'],
 
   css: ['~/assets/css/main.css'],

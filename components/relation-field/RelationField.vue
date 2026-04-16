@@ -1,11 +1,10 @@
 <script setup lang="ts">
-defineProps<{
-  label: string;
-  required?: boolean;
-  value: { contentTypeId: string; entryId: string } | null;
-  entryTitle: string | null;
-  contentTypeName: string | null;
-}>();
+import type { RelationFieldProps } from './relationField.types';
+import { QA_RELATION_FIELD } from './relationField.config';
+
+const _props = withDefaults(defineProps<RelationFieldProps>(), {
+  testId: QA_RELATION_FIELD.COMPONENT,
+});
 
 const emit = defineEmits<{
   add: [];
@@ -15,7 +14,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div class="space-y-2">
+  <div class="space-y-2" :data-testid="testId">
     <div class="flex items-center gap-1">
       <span class="text-sm font-medium text-gray-700 dark:text-gray-200">
         {{ label }}
