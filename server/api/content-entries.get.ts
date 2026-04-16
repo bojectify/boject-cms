@@ -61,7 +61,7 @@ export default defineEventHandler(async (event) => {
       if (!version) return null;
       return flattenEntryWithVersion(entry, version);
     })
-    .filter(Boolean);
+    .filter((item): item is NonNullable<typeof item> => item !== null);
 
   return { items, total };
 });

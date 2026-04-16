@@ -21,7 +21,7 @@ export function useContentEntryEditor(contentTypeId: string, entryId: string) {
   const formState = reactive<Record<string, unknown>>({});
   const isSaving = ref(false);
   const saveError = ref<string | null>(null);
-  const status = ref<string>('DRAFT');
+  const status = ref<'DRAFT' | 'PUBLISHED' | 'CHANGED' | 'ARCHIVED'>('DRAFT');
   const hasPublishedVersion = ref(false);
 
   // Dirty tracking via JSON snapshot comparison
@@ -50,7 +50,9 @@ export function useContentEntryEditor(contentTypeId: string, entryId: string) {
           delete formState[key];
         }
         Object.assign(formState, data);
-        status.value = (val.status as string) ?? 'DRAFT';
+        status.value =
+          (val.status as 'DRAFT' | 'PUBLISHED' | 'CHANGED' | 'ARCHIVED') ??
+          'DRAFT';
         hasPublishedVersion.value =
           (val.hasPublishedVersion as boolean) ?? false;
         takeSnapshot();

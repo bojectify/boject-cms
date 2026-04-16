@@ -78,7 +78,7 @@ export default defineEventHandler(async (event) => {
         contentTypeId: r.contentTypeId,
       };
     })
-    .filter(Boolean);
+    .filter((item): item is NonNullable<typeof item> => item !== null);
 
   return { items, total };
 });

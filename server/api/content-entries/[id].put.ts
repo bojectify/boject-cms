@@ -1,4 +1,4 @@
-import type { Prisma } from '#prisma';
+import type { Prisma, ContentEntryVersion, FieldType } from '#prisma';
 import { assertUuid } from '../../utils/validation';
 import { withPrismaErrors } from '../../utils/prismaErrors';
 import { enforceMutationRateLimit } from '../../utils/rateLimitEndpoint';
@@ -72,16 +72,22 @@ export default defineEventHandler(async (event) => {
   });
 });
 
-type EntryWithVersionsAndType = Awaited<
-  ReturnType<
-    typeof prisma.contentEntry.findUniqueOrThrow<{
-      include: {
-        versions: true;
-        contentType: { include: { fields: true } };
-      };
-    }>
-  >
->;
+type EntryWithVersionsAndType = NonNullable<
+  Awaited<ReturnType<typeof prisma.contentEntry.findUnique>>
+> & {
+  versions: ContentEntryVersion[];
+  contentType: {
+    fields: Array<{
+      id: string;
+      identifier: string;
+      name: string;
+      type: FieldType;
+      required: boolean;
+      options: unknown;
+      order: number;
+    }>;
+  };
+};
 
 /**
  * Save Draft Flow
