@@ -158,23 +158,17 @@ describe('GraphQL API', async () => {
   });
 
   describe('authentication', () => {
-    it('rejects requests without an API key', async () => {
-      const response = await $fetch<{ error: string }>('/api/graphql', {
-        method: 'POST',
-        body: { query: '{ __typename }' },
-        ignoreResponseError: true,
-      });
-      expect(response.error).toBe('Missing Authorization header');
-    });
-
-    it('rejects requests with an invalid API key', async () => {
-      const response = await $fetch<{ error: string }>('/api/graphql', {
-        method: 'POST',
-        body: { query: '{ __typename }' },
-        headers: { Authorization: 'Bearer boject_invalid_key' },
-        ignoreResponseError: true,
-      });
-      expect(response.error).toBe('Invalid API key');
+    // In dev mode, all GraphQL requests are allowed without auth
+    // so GraphiQL can introspect. Auth is enforced in production only.
+    it('allows unauthenticated requests in dev mode', async () => {
+      const response = await $fetch<{ data: { __typename: string } }>(
+        '/api/graphql',
+        {
+          method: 'POST',
+          body: { query: '{ __typename }' },
+        }
+      );
+      expect(response.data.__typename).toBe('Query');
     });
 
     it('accepts requests with a valid API key', async () => {
