@@ -63,7 +63,9 @@ The app runs at http://localhost:4000. The GraphQL playground (GraphiQL) is avai
 | `pnpm lint:fix`         | Lint and auto-fix                             |
 | `pnpm format`           | Check formatting with Prettier                |
 | `pnpm format:fix`       | Format all files                              |
-| `pnpm test:run`         | Run tests once                                |
+| `pnpm test`             | Run all tests once                            |
+| `pnpm test:integration` | Run integration tests only                    |
+| `pnpm test:unit`        | Run unit tests only                           |
 | `pnpm typecheck`        | Run TypeScript type checker                   |
 | `pnpm apikey:create`    | Create a new API key                          |
 | `pnpm apikey:list`      | List all API keys                             |
@@ -172,14 +174,17 @@ CMS pages → Nuxt server routes → Prisma → PostgreSQL
 The schema is generated from your `ContentType` rows. Each ContentType produces:
 
 - an object type with one field per `ContentTypeField` (typed by `FieldType`)
-- a Relay connection root query (plural, camelCase: e.g. a `BlogPost` type yields `blogPosts(first, after, where)`)
-- a single-item root query (singular: `blogPost(id)`)
+- a list connection query (`{camelName}List`, e.g. `blogPostList(first, after, where)`)
+- a single-item query (`{camelName}`, e.g. `blogPost(id)`)
+- a slug lookup query if the type has a SLUG field (`{camelName}BySlug`, e.g. `blogPostBySlug(slug)`)
+
+A cross-type `contentEntryList` query is also available for querying entries across all types, filterable by `status`, `contentType`, `createdAt`, and `updatedAt`.
 
 All list queries return [Relay-style cursor connections](https://relay.dev/graphql/connections.htm) with `edges`, `node`, `cursor`, and `pageInfo`, and accept `first`/`after`/`last`/`before` alongside an optional `where` filter.
 
 ```graphql
 {
-  blogPosts(first: 10, where: { status: { equals: PUBLISHED } }) {
+  blogPostList(first: 10, where: { status: { equals: PUBLISHED } }) {
     edges {
       node {
         id
@@ -198,13 +203,13 @@ All list queries return [Relay-style cursor connections](https://relay.dev/graph
 
 ### Filter Operations
 
-| Type          | Operations                                            |
-| ------------- | ----------------------------------------------------- |
-| String        | `contains`, `equals`, `startsWith`, `endsWith`, `not` |
-| Int           | `equals`, `gt`, `gte`, `lt`, `lte`, `not`             |
-| Boolean       | `equals`, `not`                                       |
-| DateTime      | `equals`, `gt`, `gte`, `lt`, `lte`, `not`             |
-| ContentStatus | `equals`, `not`                                       |
+| Type          | Operations                         |
+| ------------- | ---------------------------------- |
+| String        | `equals`, `contains`               |
+| Float         | `equals`, `gt`, `gte`, `lt`, `lte` |
+| Boolean       | `equals`                           |
+| DateTime      | `equals`, `gt`, `gte`, `lt`, `lte` |
+| ContentStatus | `equals`                           |
 
 ### Custom Scalars
 
@@ -213,7 +218,7 @@ All list queries return [Relay-style cursor connections](https://relay.dev/graph
 
 ### Authentication
 
-All `POST /api/graphql` requests require an `Authorization: Bearer boject_...` header with a valid API key. Manage keys via:
+In production, all `/api/graphql` requests require an `Authorization: Bearer boject_...` header with a valid API key. In development, all requests are unauthenticated so the GraphiQL playground can introspect and query freely. Manage keys via:
 
 ```bash
 pnpm apikey:create "My integration"   # prints the raw key once
@@ -246,24 +251,31 @@ pnpx prisma migrate deploy    # Apply migrations (non-interactive / CI)
 
 ## Testing
 
-Integration tests using Vitest + `@nuxt/test-utils`. Tests start a Nuxt dev server and run against the seeded database.
+Two Vitest projects: **integration** (server API + middleware, starts a Nuxt dev server, requires seeded database) and **unit** (scripts, starters, server utils, no database needed).
 
 ```bash
-pnpm test:run                # Single run (CI)
-pnpm test:watch              # Watch mode
+pnpm test                    # Run all tests once
+pnpm test:integration        # Integration tests only
+pnpm test:unit               # Unit tests only
 ```
 
-- **GraphQL** — dynamic-type list queries, single-item lookups, where filtering, Relay cursor pagination, API key authentication.
+**Integration tests:**
+
+- **GraphQL** — dynamic-type list queries, single-item lookups, where filtering, Relay cursor pagination, dev-mode unauthenticated access.
 - **Content** — `/api/content` contentType-identifier filter, status filter, combined filters, invalid-value handling.
 - **Auth** — login validation, credential checking, session handling, middleware behaviour.
 - **Files** — primitive upload (auth, mime/size validation, successful upload), transform endpoint (resize, format conversion, public access, rate limiting).
 - **Content types** — CRUD, field management (add/update/delete/reorder), identifier validation, uniqueness constraints.
 - **Content entries** — CRUD, data validation against field definitions, slug uniqueness, status transitions, `entryTitle` populate + uniqueness, IMAGE field end-to-end.
 - **CSRF** — origin/referer enforcement and Bearer-key bypass.
+
+**Unit tests:**
+
 - **Content bundle** — shape validation, portable reference walkers, export, import, fixture regression, export → import round-trip.
 - **Starters** — shape regression + overlay-drift check against committed outputs.
+- **Server utils** — Prisma error translation, entry data validation, input validation helpers.
 
-**Requirement:** Docker PostgreSQL must be running with seeded data.
+**Requirement:** Docker PostgreSQL must be running (integration tests auto-reset and seed the `boject_test` database via `vitest.globalSetup.ts`).
 
 ## Linting & Formatting
 

@@ -1,17 +1,12 @@
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui';
 import { useContentTable } from '~/composables/useContentTable';
+import type { ContentTableProps } from './contentTable.types';
+import { QA_CONTENT_TABLE } from './contentTable.config';
 
-const props = defineProps<{
-  title: string;
-  data: Record<string, unknown>[];
-  loading?: boolean;
-  columns?: TableColumn<Record<string, unknown>>[];
-  page?: number;
-  total?: number;
-  itemsPerPage?: number;
-  rowLink?: (_row: Record<string, unknown>) => string;
-}>();
+const props = withDefaults(defineProps<ContentTableProps>(), {
+  testId: QA_CONTENT_TABLE.COMPONENT,
+});
 
 const emit = defineEmits<{
   'update:page': [value: number];
@@ -36,7 +31,7 @@ const allColumns = computed<TableColumn<Record<string, unknown>>[]>(() => [
 </script>
 
 <template>
-  <div class="p-6">
+  <div class="p-6" :data-testid="testId">
     <div class="flex items-center justify-between mb-4">
       <h1 class="text-2xl font-bold">{{ title }}</h1>
       <slot name="actions" />

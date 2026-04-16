@@ -9,10 +9,12 @@ import Link from '@tiptap/extension-link';
 import Image from '@tiptap/extension-image';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
 import { common, createLowlight } from 'lowlight';
+import type { RichTextEditorProps } from './richTextEditor.types';
+import { QA_RICH_TEXT_EDITOR } from './richTextEditor.config';
 
-const props = defineProps<{
-  modelValue: unknown;
-}>();
+const props = withDefaults(defineProps<RichTextEditorProps>(), {
+  testId: QA_RICH_TEXT_EDITOR.COMPONENT,
+});
 
 const emit = defineEmits<{
   'update:modelValue': [value: unknown];
@@ -63,7 +65,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="border rounded-lg overflow-hidden">
+  <div class="border rounded-lg overflow-hidden" :data-testid="testId">
     <div
       v-if="editor"
       class="flex flex-wrap gap-1 p-2 border-b bg-gray-50 dark:bg-gray-900"

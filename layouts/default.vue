@@ -65,7 +65,11 @@ const userMenuItems = computed<DropdownMenuItem[][]>(() => [
       <UNavigationMenu :items="dynamicNavItems" orientation="vertical" />
     </UDashboardSidebar>
 
-    <UDashboardPanel>
+    <UDashboardPanel
+      :ui="{
+        body: 'flex flex-col gap-4 sm:gap-6 flex-1 overflow-y-auto p-0 sm:p-0',
+      }"
+    >
       <template #header>
         <UDashboardNavbar>
           <template #leading>

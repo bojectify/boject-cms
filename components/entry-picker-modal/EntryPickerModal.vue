@@ -1,8 +1,10 @@
 <script setup lang="ts">
-const props = defineProps<{
-  open: boolean;
-  targetContentTypeIds: string[];
-}>();
+import type { EntryPickerModalProps } from './entryPickerModal.types';
+import { QA_ENTRY_PICKER_MODAL } from './entryPickerModal.config';
+
+const props = withDefaults(defineProps<EntryPickerModalProps>(), {
+  testId: QA_ENTRY_PICKER_MODAL.COMPONENT,
+});
 
 const emit = defineEmits<{
   select: [
@@ -120,6 +122,7 @@ function handleCreate(contentTypeId: string) {
 
 <template>
   <UModal
+    :data-testid="testId"
     :open="open"
     @update:open="
       (val: boolean) => {
