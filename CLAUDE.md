@@ -18,14 +18,15 @@ pnpm preview                  # Preview production build locally
 pnpm db:up                    # Start local PostgreSQL container (alias for docker compose up -d)
 pnpm prisma:generate          # Regenerate Prisma client + Pothos types (required after schema changes)
 pnpm prisma:migrate           # Run database migrations
-pnpm prisma:seed              # Seed database with admin user + test API key (static-model seed was removed)
+pnpm prisma:seed              # Seed database with admin user + test API key
 pnpm prisma:seed:test         # Seed the `boject_test` database (hardcoded URL — mirrors prisma:studio:test)
 pnpm lint                     # Lint with ESLint
 pnpm lint:fix                 # Lint and auto-fix
 pnpm format                   # Check formatting with Prettier
 pnpm format:fix               # Format all files with Prettier
-pnpm test:watch               # Run tests in watch mode
-pnpm test:run                 # Run tests once (CI)
+pnpm test                     # Run all tests once (alias: pnpm test:run)
+pnpm test:integration         # Run integration tests only (server/api + server/middleware)
+pnpm test:unit                # Run unit tests only (scripts, starters, server/utils)
 pnpm typecheck                # Run TypeScript type checker (nuxi typecheck)
 pnpm apikey:create <name>     # Create a new API key (prints raw key once)
 pnpm apikey:list              # List all API keys (prefix, name, status, last used)
@@ -62,7 +63,7 @@ Note: `prisma migrate dev` requires an interactive terminal. When running from a
 - **EntryEditorPane component** — `components/EntryEditorPane.vue` sliding full-screen pane for creating or editing a related entry. Contentful-inspired stacked pane pattern with parent page sliver visible on the left. Uses `ContentEditor` and `useContentEntryEditor` internally. CSS transition slide-in from right. Emits: `close`, `saved`.
 - **useRelationResolver composable** — `composables/useRelationResolver.ts` resolves `{ contentTypeId, entryId }` relation references into display data (entry title, content type name). Uses `useRequestFetch()` so server-side calls forward cookies. Caches results to avoid re-fetching.
 - **Path aliases** — `nuxt.config.ts` defines `#prisma` → `generated/prisma/client` and `#generated` → `generated/`. These are resolved by both Nuxt (app + Nitro server) and TypeScript (via auto-generated `.nuxt/tsconfig.json`). Use `import type { Prisma } from '#prisma'` instead of relative paths. Standalone scripts (`scripts/`, `prisma/seed.ts`) that run via `tsx` outside Nuxt still use relative paths.
-- **REST API filtering** — The surviving endpoints `/api/content-entries` and `/api/content` support filters on `contentTypeId` / `contentType` (identifier), `status`, `page`, `perPage`. Status values are validated against a `VALID_STATUSES` set; invalid values are silently ignored (no filter applied). `/api/content` returns `{ items: [{ id, entryTitle, status, contentType, contentTypeId, createdAt, updatedAt }], total }` where `contentType` is the ContentType display name.
+- **REST API filtering** — `/api/content-entries` and `/api/content` support filters on `contentTypeId` / `contentType` (identifier), `status`, `page`, `perPage`. Status values are validated against a `VALID_STATUSES` set; invalid values are silently ignored (no filter applied). `/api/content` returns `{ items: [{ id, entryTitle, status, contentType, contentTypeId, createdAt, updatedAt }], total }` where `contentType` is the ContentType display name.
 - **CSRF protection** — `server/middleware/csrf.ts` rejects non-GET/HEAD `/api/*` requests whose `Origin`/`Referer` does not match the request `Host`, unless the request carries a `Bearer` API key (API keys are ambient-credential-free). Session cookie is `SameSite=Strict, HttpOnly, Secure` (secure only in production) via `runtimeConfig.session.cookie` in `nuxt.config.ts`. A production boot-time check throws if `NUXT_SESSION_PASSWORD` is unset.
 - **Mutation rate limiting** — `server/utils/rateLimitEndpoint.ts` applies a per-IP, per-endpoint sliding window (30 req/60s) to mutating content-type and content-entry endpoints via `enforceMutationRateLimit(event, '<id>')`. Uses the existing `rateLimit()` sliding-window helper.
 - **Shared validation** — `server/utils/validation.ts` exports `isUuid`, `assertUuid`, `assertNonNegativeInt`, `assertStringLength`, `toPascalCase`, `toCamelCase`, `assertIdentifier` (PascalCase), and `assertFieldIdentifier` (camelCase) for consistent 400 errors on bad input.
@@ -113,12 +114,12 @@ The sole content modelling layer — all content types and entries are user-defi
 
 Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder. The schema is built entirely from `ContentType` rows at startup — there are no hand-written model types.
 
-- **Authentication** — All `POST /api/graphql` requests require an `Authorization: Bearer boject_...` header with a valid API key. Keys are SHA-256 hashed and stored in the `ApiKey` database table. `GET` requests in development are unauthenticated (GraphiQL playground access). Key validation is handled by `server/utils/validateApiKey.ts` (auto-imported). Revoked keys (non-null `revokedAt`) are rejected. `lastUsedAt` is updated fire-and-forget on each valid request. Keys are managed via `scripts/manage-api-keys.ts` CLI (create/list/revoke). Integration tests use a deterministic test key seeded by `prisma/seed.ts`.
-- **Endpoint** — `POST /api/graphql` for queries/mutations. `GET /api/graphql` serves GraphiQL playground in development.
-- **Schema builder** — `server/graphql/builder.ts` exports the singleton `SchemaBuilder` with PrismaPlugin, PrismaUtilsPlugin, and RelayPlugin. Includes a custom `JSON` scalar for RICHTEXT fields (ProseMirror JSON).
-- **Dynamic type registration** — `server/graphql/dynamicTypes.ts` defines `registerDynamicTypes(builder, contentTypes)`, which walks each `ContentType` + `ContentTypeField` row and emits a Pothos object type, Relay connection query, and single-item lookup. `server/graphql/types/` contains only `contentStatus.ts` (the shared `ContentStatus` GraphQL enum).
-- **Relay cursor pagination** — All generated list queries use `t.prismaConnection()` with `cursor: 'id'`. Responses use standard Relay connection shape (`edges { node { ... } cursor } pageInfo { hasNextPage endCursor ... }`). Clients can paginate with `first`/`after`/`last`/`before` args.
-- **Where filtering** — Handled by `server/graphql/jsonbFilters.ts`, which defines Prisma-style where inputs for each dynamic ContentType. Scalar filters (string, int, boolean, datetime) are declared on the builder; dynamic-field filters are generated per ContentType based on its `ContentTypeField` definitions.
+- **Authentication** — In production, all `/api/graphql` requests require an `Authorization: Bearer boject_...` header with a valid API key. In development, all requests are unauthenticated so GraphiQL can introspect and query freely. Keys are SHA-256 hashed and stored in the `ApiKey` database table. Key validation is handled by `server/utils/validateApiKey.ts` (auto-imported). Revoked keys (non-null `revokedAt`) are rejected. `lastUsedAt` is updated fire-and-forget on each valid request. Keys are managed via `scripts/manage-api-keys.ts` CLI (create/list/revoke). Integration tests use a deterministic test key seeded by `prisma/seed.ts`.
+- **Endpoint** — `POST /api/graphql` for queries/mutations. `GET /api/graphql` serves the GraphiQL playground in development.
+- **Schema builder** — `server/graphql/builder.ts` exports a `createBuilder()` factory with PrismaPlugin, PrismaUtilsPlugin, and RelayPlugin. Includes custom `JSON` and `DateTime` scalars.
+- **Dynamic type registration** — `server/graphql/dynamicTypes.ts` defines `registerDynamicTypes(builder, contentTypes, ContentStatusEnum)`, which walks each `ContentType` + `ContentTypeField` row and emits a Pothos object type implementing a shared `ContentEntry` interface, per-type `Where` filter input, list connection query (`{camelName}List`), single-item lookup (`{camelName}`), and optional slug lookup (`{camelName}BySlug`). Also registers a cross-type `contentEntryList` connection query. `server/graphql/types/` contains only `contentStatus.ts` (the shared `ContentStatus` GraphQL enum).
+- **Relay offset pagination** — All generated list queries use `resolveOffsetConnection` with raw SQL via `prisma.$queryRaw`. Responses use standard Relay connection shape (`edges { node { ... } cursor } pageInfo { hasNextPage endCursor ... }`). Clients can paginate with `first`/`after`/`last`/`before` args.
+- **Where filtering** — Handled by `server/graphql/jsonbFilters.ts`, which defines Prisma-style where inputs for each dynamic ContentType. Scalar filters (string `equals`/`contains`, float `equals`/`gt`/`gte`/`lt`/`lte`, boolean `equals`, datetime `equals`/`gt`/`gte`/`lt`/`lte`, contentStatus `equals`) are declared on the builder; dynamic-field filters are generated per ContentType based on its `ContentTypeField` definitions.
 - **Schema assembly** — `server/graphql/buildSchema.ts` loads `ContentType` rows, registers dynamic types, and returns a `GraphQLSchema`. `server/graphql/schema.ts` caches the built schema; `invalidateSchema()` is called after every ContentType mutation to force a rebuild on the next request.
 - **Generated types** — `generated/pothos-types.ts` is produced by `prisma generate` alongside the Prisma client. Gitignored, never edit manually.
 - **DateTime scalar** — Registered in the builder. Serialises as ISO-8601 strings, parses string input to `Date`.
@@ -195,7 +196,8 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder. The schema is
 - `docker-compose.yml` — Local PostgreSQL 17 container
 - `eslint.config.mjs` — ESLint flat config (extends Nuxt-generated config, loads `@typescript-eslint` plugin)
 - `lefthook.yml` — Pre-commit (lint, format, typecheck) and pre-push (test) hook configuration
-- `vitest.config.ts` — Vitest configuration (fileParallelism disabled to prevent port conflicts)
+- `vitest.config.ts` — Vitest configuration (two projects: integration + unit; fileParallelism disabled)
+- `vitest.globalSetup.ts` — Resets and seeds the `boject_test` database before integration tests run
 - `pages/content-types/index.vue` — Content type listing page
 - `pages/content-types/new.vue` — Content type creation with field builder
 - `pages/content-types/[id].vue` — Content type edit with field management
@@ -241,13 +243,13 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder. The schema is
 
 ## Testing
 
-- **Vitest** — Test runner, configured via `vitest.config.ts` using `@nuxt/test-utils/config`. `fileParallelism: false` prevents port conflicts between test files that each start a Nuxt dev server.
+- **Vitest** — Test runner, configured via `vitest.config.ts` with plain `defineConfig` (not `@nuxt/test-utils/config` due to Nuxt 4.3 incompatibility). Two test projects: `integration` (server/api + server/middleware tests, with `globalSetup` for DB reset/seed) and `unit` (scripts, starters, server/utils tests, no DB needed). `fileParallelism: false` prevents port conflicts between test files.
 - **@nuxt/test-utils** — Starts a Nuxt dev server for integration tests. Tests must use `setup({ dev: true })` (production mode masks GraphQL errors).
 - **Test location** — Colocated with source files (e.g. `server/api/graphql/graphql.test.ts`).
-- **Test API key** — All REST and GraphQL tests authenticate with a deterministic test key (`boject_test_key_for_integration_tests_only`) seeded via `prisma/seed.ts`.
-- **GraphQL tests** — Integration tests covering dynamic-type list queries, single-item lookups, where filtering, Relay cursor pagination, and API key authentication.
-- **Content tests** — Integration tests for `/api/content` covering `contentType` identifier filter, `status` filter, combined filters, and invalid value handling (dynamic entries only).
-- **Auth tests** — Integration tests covering login validation, credential checking, session handling, and middleware behaviour against the surviving endpoints.
+- **Test API key** — All REST and GraphQL integration tests authenticate with a deterministic test key (`boject_test_key_for_integration_tests_only`) seeded via `prisma/seed.ts`.
+- **GraphQL tests** — Integration tests covering dynamic-type list queries, single-item lookups, where filtering, Relay cursor pagination, and dev-mode unauthenticated access.
+- **Content tests** — Integration tests for `/api/content` covering `contentType` identifier filter, `status` filter, combined filters, and invalid value handling.
+- **Auth tests** — Integration tests covering login validation, credential checking, session handling, and middleware behaviour.
 - **File tests** — Integration tests covering primitive upload (auth, mime/size validation, successful upload returning `{ storageKey, ... }`), transform endpoint (resize, format conversion, public access, rate limiting).
 - **Content type tests** — Integration tests covering content type CRUD, field management (add, update, delete, reorder), identifier validation (PascalCase for types, camelCase for fields), uniqueness constraints, and ENTRY_TITLE/SLUG field rules.
 - **Content entry tests** — Integration tests covering entry CRUD, data validation (required fields, type checking, select choices), slug uniqueness, status transitions, `entryTitle` populate + uniqueness, and IMAGE field end-to-end coverage.
