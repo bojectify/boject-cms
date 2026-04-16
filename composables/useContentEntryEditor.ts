@@ -23,6 +23,9 @@ export function useContentEntryEditor(contentTypeId: string, entryId: string) {
   const saveError = ref<string | null>(null);
   const status = ref<'DRAFT' | 'PUBLISHED' | 'CHANGED' | 'ARCHIVED'>('DRAFT');
   const hasPublishedVersion = ref(false);
+  const publishedAt = ref<string | null>(null);
+  const createdAt = ref<string | null>(null);
+  const updatedAt = ref<string | null>(null);
 
   // Dirty tracking via JSON snapshot comparison
   const snapshot = ref<string>('{}');
@@ -55,6 +58,10 @@ export function useContentEntryEditor(contentTypeId: string, entryId: string) {
           'DRAFT';
         hasPublishedVersion.value =
           (val.hasPublishedVersion as boolean) ?? false;
+        publishedAt.value =
+          (val.publishedVersionPublishedAt as string | null) ?? null;
+        createdAt.value = (val.createdAt as string | null) ?? null;
+        updatedAt.value = (val.updatedAt as string | null) ?? null;
         takeSnapshot();
       }
     },
@@ -177,6 +184,9 @@ export function useContentEntryEditor(contentTypeId: string, entryId: string) {
     saveError,
     status,
     hasPublishedVersion,
+    publishedAt,
+    createdAt,
+    updatedAt,
     isDirty,
     saveDraft,
     publish,

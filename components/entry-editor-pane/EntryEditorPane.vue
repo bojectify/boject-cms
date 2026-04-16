@@ -47,12 +47,16 @@ const editorFields = computed<FieldConfig[]>(() => {
 // Entry editor composable
 const effectiveEntryId = computed(() => props.entryId ?? 'new');
 const {
+  isNew,
   formState,
   loadingStatus,
   isSaving,
   saveError,
   status,
   hasPublishedVersion,
+  publishedAt,
+  createdAt,
+  updatedAt,
   isDirty,
   saveDraft,
   publish,
@@ -65,6 +69,10 @@ const pageTitle = computed(() => {
   if (typeof titleVal === 'string' && titleVal) return titleVal;
   return contentType.value?.name ?? 'Entry';
 });
+
+const editorRef = useTemplateRef<{ validate: () => Promise<boolean> }>(
+  'editorRef'
+);
 
 function emitSaved(newId: string | void) {
   const entryId = newId ?? props.entryId;
@@ -79,11 +87,13 @@ function emitSaved(newId: string | void) {
 }
 
 async function handleSaveDraft() {
+  if (!(await editorRef.value?.validate())) return;
   const newId = await saveDraft();
   emitSaved(newId);
 }
 
 async function handlePublish() {
+  if (!(await editorRef.value?.validate())) return;
   const newId = await publish();
   emitSaved(newId);
 }
@@ -128,19 +138,32 @@ async function handleDiscardChanges() {
           <span class="text-sm font-semibold">{{ pageTitle }}</span>
           <div class="flex-1" />
         </div>
-        <!-- Body -->
-        <div class="flex-1 overflow-y-auto">
-          <ContentEditor
-            v-model:state="formState"
-            :title="pageTitle"
-            :fields="editorFields"
-            :loading="loadingStatus === 'pending'"
-            :saving="isSaving"
-            :error="saveError"
-            :show-slug="hasSlugField"
+        <!-- Body: editor + sidebar -->
+        <div class="flex-1 flex overflow-hidden">
+          <div class="flex-1 overflow-y-auto">
+            <ContentEditor
+              ref="editorRef"
+              v-model:state="formState"
+              :title="pageTitle"
+              :fields="editorFields"
+              :loading="loadingStatus === 'pending'"
+              :error="saveError"
+              :show-slug="hasSlugField"
+            />
+          </div>
+          <EntrySidebar
+            class="w-80 shrink-0 border-l border-gray-200 dark:border-gray-700 overflow-y-auto"
             :status="status"
-            :has-published-version="hasPublishedVersion"
             :is-dirty="isDirty"
+            :saving="isSaving"
+            :has-published-version="hasPublishedVersion"
+            :is-new="isNew"
+            :entry-id="props.entryId ?? null"
+            :content-type-name="contentType?.name ?? ''"
+            :content-type-id="contentTypeId"
+            :created-at="createdAt"
+            :updated-at="updatedAt"
+            :published-at="publishedAt"
             :on-save-draft="handleSaveDraft"
             :on-publish="handlePublish"
             :on-discard-changes="handleDiscardChanges"

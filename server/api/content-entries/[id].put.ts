@@ -64,10 +64,15 @@ export default defineEventHandler(async (event) => {
     });
   }
 
+  const publishedVersion = getPublishedVersion(updated.versions);
+
   return flattenEntryWithVersion(updated, version, {
     contentType: updated.contentType,
     ...(isCms
-      ? { hasPublishedVersion: getPublishedVersion(updated.versions) !== null }
+      ? {
+          hasPublishedVersion: publishedVersion !== null,
+          publishedVersionPublishedAt: publishedVersion?.publishedAt ?? null,
+        }
       : {}),
   });
 });
