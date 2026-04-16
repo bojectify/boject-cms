@@ -20,10 +20,3 @@ enum ContentStatus {
   CHANGED
   ARCHIVED
 }
-
-enum ScoreType {
-  TRY
-  CONVERSION
-  PENALTY
-  DROP_GOAL
-}

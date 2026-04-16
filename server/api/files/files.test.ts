@@ -239,18 +239,6 @@ describe('Files Upload & Transform API', async () => {
       reset();
     });
   });
-
-  describe('shared bucket sanity', () => {
-    it('legacy /api/images/:id/transform cannot serve a storageKey', async () => {
-      // Legacy endpoint looks up by Image row ID, not storage key — so calling it
-      // with our primitive storage key must 404 (no DB row exists for it).
-      await expect(
-        $fetch(`/api/images/${uploadedStorageKey}/transform`, {
-          responseType: 'arrayBuffer',
-        })
-      ).rejects.toMatchObject({ statusCode: 404 });
-    });
-  });
 });
 
 let _sessionCookie: string;

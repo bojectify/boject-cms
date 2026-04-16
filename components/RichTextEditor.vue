@@ -9,7 +9,6 @@ import Link from '@tiptap/extension-link';
 import Image from '@tiptap/extension-image';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
 import { common, createLowlight } from 'lowlight';
-import { CmsEmbed } from '~/extensions/cmsEmbed';
 
 const props = defineProps<{
   modelValue: unknown;
@@ -20,8 +19,6 @@ const emit = defineEmits<{
 }>();
 
 const lowlight = createLowlight(common);
-
-const showEmbedModal = ref(false);
 
 const editor = useEditor({
   extensions: [
@@ -35,7 +32,6 @@ const editor = useEditor({
     Link.configure({ openOnClick: false }),
     Image,
     CodeBlockLowlight.configure({ lowlight }),
-    CmsEmbed,
   ],
   content: props.modelValue as Record<string, unknown> | null,
   onUpdate: ({ editor: e }) => {
@@ -54,17 +50,6 @@ watch(
     }
   }
 );
-
-function insertEmbed(embedType: string, embedId: string) {
-  editor.value
-    ?.chain()
-    .focus()
-    .insertContent({
-      type: 'cmsEmbed',
-      attrs: { embedType, embedId },
-    })
-    .run();
-}
 
 function promptLink() {
   if (!editor.value) return;
@@ -170,23 +155,11 @@ onBeforeUnmount(() => {
         icon="i-lucide-link"
         @click="promptLink"
       />
-      <UButton
-        variant="ghost"
-        size="xs"
-        icon="i-lucide-box"
-        @click="showEmbedModal = true"
-      />
     </div>
 
     <EditorContent
       :editor="editor"
       class="prose dark:prose-invert max-w-none p-4 min-h-[200px]"
-    />
-
-    <CmsEmbedModal
-      :open="showEmbedModal"
-      @close="showEmbedModal = false"
-      @select="insertEmbed"
     />
   </div>
 </template>

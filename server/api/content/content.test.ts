@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { setup, $fetch } from '@nuxt/test-utils/e2e';
+import { describe, it, expect, beforeAll } from 'vitest';
+import { setup, $fetch, fetch } from '@nuxt/test-utils/e2e';
+import { TEST_USERNAME, TEST_PASSWORD } from '../../test/credentials';
 
 const TEST_API_KEY = 'boject_test_key_for_integration_tests_only';
 
@@ -10,9 +11,49 @@ type ContentItem = {
   createdAt: string;
   updatedAt: string;
   contentType: string;
+  contentTypeId: string;
 };
 
 type ContentResponse = { items: ContentItem[]; total: number };
+
+type ContentTypeResponse = {
+  id: string;
+  name: string;
+  identifier: string;
+  fields: Array<{
+    id: string;
+    identifier: string;
+    name: string;
+    type: string;
+    required: boolean;
+    order: number;
+    options: unknown;
+  }>;
+};
+
+type EntryResponse = {
+  id: string;
+  contentTypeId: string;
+  entryTitle: string;
+  status: string;
+};
+
+let _sessionCookie: string | null = null;
+
+async function getSessionCookie(): Promise<string> {
+  if (_sessionCookie) return _sessionCookie;
+  const response = await fetch('/api/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({
+      email: TEST_USERNAME,
+      password: TEST_PASSWORD,
+    }),
+    headers: { 'Content-Type': 'application/json' },
+  });
+  const cookies = response.headers.getSetCookie();
+  _sessionCookie = cookies.join('; ');
+  return _sessionCookie;
+}
 
 function getContent(params: Record<string, string | number> = {}) {
   const search = new URLSearchParams();
@@ -25,94 +66,160 @@ function getContent(params: Record<string, string | number> = {}) {
   });
 }
 
-// Minimum seeded PUBLISHED count: Team=4, Club=3, Competition=2, Season=1, Fixture=3, Player=5, Image=1, Author=2, Tag=3, Article=2
-const MIN_SEEDED_PUBLISHED = 26;
+let blogPostType: ContentTypeResponse;
+let secondType: ContentTypeResponse;
 
 describe('Content API filters', async () => {
   await setup({ dev: true });
 
+  beforeAll(async () => {
+    const cookie = await getSessionCookie();
+
+    // Create a dynamic "BlogPost" content type with a mix of statuses
+    blogPostType = await $fetch<ContentTypeResponse>('/api/content-types', {
+      method: 'POST',
+      headers: { cookie },
+      body: {
+        name: `Content Filter Blog Post ${Date.now()}`,
+        fields: [
+          {
+            identifier: 'title',
+            name: 'Title',
+            type: 'ENTRY_TITLE',
+            required: true,
+          },
+          { identifier: 'slug', name: 'Slug', type: 'SLUG' },
+        ],
+      },
+    });
+
+    // Create a second content type so contentType filtering can be verified
+    secondType = await $fetch<ContentTypeResponse>('/api/content-types', {
+      method: 'POST',
+      headers: { cookie },
+      body: {
+        name: `Content Filter News ${Date.now()}`,
+        fields: [
+          {
+            identifier: 'title',
+            name: 'Title',
+            type: 'ENTRY_TITLE',
+            required: true,
+          },
+        ],
+      },
+    });
+
+    // Seed entries for the blog post type: 2 PUBLISHED, 1 DRAFT
+    await $fetch<EntryResponse>('/api/content-entries', {
+      method: 'POST',
+      headers: { cookie },
+      body: {
+        contentTypeId: blogPostType.id,
+        data: { title: `Published Blog 1 ${Date.now()}` },
+        status: 'PUBLISHED',
+      },
+    });
+    await $fetch<EntryResponse>('/api/content-entries', {
+      method: 'POST',
+      headers: { cookie },
+      body: {
+        contentTypeId: blogPostType.id,
+        data: { title: `Published Blog 2 ${Date.now()}` },
+        status: 'PUBLISHED',
+      },
+    });
+    await $fetch<EntryResponse>('/api/content-entries', {
+      method: 'POST',
+      headers: { cookie },
+      body: {
+        contentTypeId: blogPostType.id,
+        data: { title: `Draft Blog ${Date.now()}` },
+        status: 'DRAFT',
+      },
+    });
+
+    // Seed entries for the second content type
+    await $fetch<EntryResponse>('/api/content-entries', {
+      method: 'POST',
+      headers: { cookie },
+      body: {
+        contentTypeId: secondType.id,
+        data: { title: `Published News ${Date.now()}` },
+        status: 'PUBLISHED',
+      },
+    });
+  });
+
   // ── Default listing ───────────────────────────────────────────
+
+  const UUID_RE =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
   it('returns all content items', async () => {
     const { items, total } = await getContent({ perPage: 50 });
-    expect(total).toBeGreaterThanOrEqual(MIN_SEEDED_PUBLISHED);
-    expect(items.length).toBeGreaterThanOrEqual(MIN_SEEDED_PUBLISHED);
+    expect(total).toBeGreaterThanOrEqual(4);
+    expect(items.length).toBeGreaterThanOrEqual(4);
     expect(items[0]).toHaveProperty('contentType');
+    expect(items[0]).toHaveProperty('contentTypeId');
     expect(items[0]).toHaveProperty('entryTitle');
     expect(items[0]).toHaveProperty('status');
+    expect(typeof items[0]!.contentType).toBe('string');
+    expect(typeof items[0]!.contentTypeId).toBe('string');
+    expect(items[0]!.contentTypeId).toMatch(UUID_RE);
+  });
+
+  it('paginates results', async () => {
+    const { items } = await getContent({ page: 1, perPage: 2 });
+    expect(items.length).toBeLessThanOrEqual(2);
   });
 
   // ── contentType filter ────────────────────────────────────────
 
   describe('contentType filter', () => {
-    it('filters by contentType=Team', async () => {
-      const { items, total } = await getContent({ contentType: 'Team' });
-      expect(total).toBeGreaterThanOrEqual(4);
-      expect(items.length).toBeGreaterThanOrEqual(4);
-      expect(items.every((i) => i.contentType === 'Team')).toBe(true);
-    });
-
-    it('filters by contentType=Club', async () => {
-      const { items, total } = await getContent({ contentType: 'Club' });
-      expect(total).toBeGreaterThanOrEqual(3);
-      expect(items.length).toBeGreaterThanOrEqual(3);
-      expect(items.every((i) => i.contentType === 'Club')).toBe(true);
-    });
-
-    it('filters by contentType=Player', async () => {
-      const { items, total } = await getContent({ contentType: 'Player' });
-      expect(total).toBeGreaterThanOrEqual(5);
-      expect(items.length).toBeGreaterThanOrEqual(5);
-      expect(items.every((i) => i.contentType === 'Player')).toBe(true);
-    });
-
-    it('filters by contentType=Image', async () => {
-      const { items, total } = await getContent({ contentType: 'Image' });
-      expect(total).toBeGreaterThanOrEqual(1);
-      expect(items.length).toBeGreaterThanOrEqual(1);
-    });
-
-    it('ignores invalid contentType', async () => {
-      const { total } = await getContent({
-        contentType: 'NonExistent',
+    it('filters by dynamic identifier', async () => {
+      const { items, total } = await getContent({
+        contentType: blogPostType.identifier,
         perPage: 50,
       });
-      expect(total).toBeGreaterThanOrEqual(MIN_SEEDED_PUBLISHED);
-    });
-
-    it('filters by contentType=Author', async () => {
-      const { items, total } = await getContent({ contentType: 'Author' });
-      expect(total).toBeGreaterThanOrEqual(2);
-      expect(items.every((i) => i.contentType === 'Author')).toBe(true);
-    });
-
-    it('filters by contentType=Tag', async () => {
-      const { items, total } = await getContent({ contentType: 'Tag' });
       expect(total).toBeGreaterThanOrEqual(3);
-      expect(items.every((i) => i.contentType === 'Tag')).toBe(true);
+      expect(items.length).toBeGreaterThanOrEqual(3);
+      expect(items.every((i) => i.contentType === blogPostType.name)).toBe(
+        true
+      );
     });
 
-    it('filters by contentType=Article', async () => {
-      const { items, total } = await getContent({ contentType: 'Article' });
-      expect(total).toBeGreaterThanOrEqual(3);
-      expect(items.every((i) => i.contentType === 'Article')).toBe(true);
+    it('returns empty for unknown contentType identifier', async () => {
+      const { items, total } = await getContent({
+        contentType: 'DoesNotExist',
+        perPage: 50,
+      });
+      expect(total).toBe(0);
+      expect(items).toEqual([]);
     });
   });
 
   // ── status filter ─────────────────────────────────────────────
 
   describe('status filter', () => {
-    it('filters by status=PUBLISHED', async () => {
+    it('filters by status=PUBLISHED and all items have a string contentType', async () => {
       const { items, total } = await getContent({
         status: 'PUBLISHED',
-        perPage: 50,
+        perPage: 100,
       });
-      expect(total).toBeGreaterThanOrEqual(MIN_SEEDED_PUBLISHED);
+      expect(total).toBeGreaterThanOrEqual(3);
       expect(items.every((i) => i.status === 'PUBLISHED')).toBe(true);
+      expect(items.every((i) => typeof i.contentType === 'string')).toBe(true);
+      expect(
+        items.every(
+          (i) =>
+            typeof i.contentTypeId === 'string' && UUID_RE.test(i.contentTypeId)
+        )
+      ).toBe(true);
     });
 
     it('filters by status=DRAFT', async () => {
-      const { items } = await getContent({ status: 'DRAFT' });
+      const { items } = await getContent({ status: 'DRAFT', perPage: 100 });
       expect(items.every((i) => i.status === 'DRAFT')).toBe(true);
     });
 
@@ -121,7 +228,7 @@ describe('Content API filters', async () => {
         status: 'INVALID',
         perPage: 50,
       });
-      expect(total).toBeGreaterThanOrEqual(MIN_SEEDED_PUBLISHED);
+      expect(total).toBeGreaterThanOrEqual(4);
     });
   });
 
@@ -130,35 +237,27 @@ describe('Content API filters', async () => {
   describe('combined filters', () => {
     it('filters by contentType and status together', async () => {
       const { items, total } = await getContent({
-        contentType: 'Team',
+        contentType: blogPostType.identifier,
         status: 'PUBLISHED',
       });
-      expect(total).toBeGreaterThanOrEqual(4);
+      expect(total).toBeGreaterThanOrEqual(2);
       expect(
-        items.every((i) => i.contentType === 'Team' && i.status === 'PUBLISHED')
+        items.every(
+          (i) => i.contentType === blogPostType.name && i.status === 'PUBLISHED'
+        )
       ).toBe(true);
     });
 
-    it('contentType=Team + status=DRAFT', async () => {
+    it('contentType + status=DRAFT', async () => {
       const { items } = await getContent({
-        contentType: 'Team',
+        contentType: blogPostType.identifier,
         status: 'DRAFT',
       });
       expect(
-        items.every((i) => i.contentType === 'Team' && i.status === 'DRAFT')
+        items.every(
+          (i) => i.contentType === blogPostType.name && i.status === 'DRAFT'
+        )
       ).toBe(true);
     });
-  });
-
-  it('filters by contentType=Link', async () => {
-    const { items, total } = await getContent({ contentType: 'Link' });
-    expect(total).toBeGreaterThanOrEqual(1);
-    expect(items.every((i) => i.contentType === 'Link')).toBe(true);
-  });
-
-  it('filters by contentType=Navigation', async () => {
-    const { items, total } = await getContent({ contentType: 'Navigation' });
-    expect(total).toBeGreaterThanOrEqual(1);
-    expect(items.every((i) => i.contentType === 'Navigation')).toBe(true);
   });
 });
