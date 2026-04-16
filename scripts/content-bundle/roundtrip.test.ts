@@ -33,10 +33,15 @@ async function seed() {
   const categoryEntry = await prisma.contentEntry.create({
     data: {
       contentTypeId: category.id,
-      data: { name: 'News' },
       entryTitle: 'News',
       slug: 'news',
-      status: 'PUBLISHED',
+      versions: {
+        create: {
+          data: { name: 'News' },
+          entryTitle: 'News',
+          status: 'PUBLISHED',
+        },
+      },
     },
   });
   const post = await prisma.contentType.create({
@@ -67,13 +72,21 @@ async function seed() {
   await prisma.contentEntry.create({
     data: {
       contentTypeId: post.id,
-      data: {
-        title: 'Welcome',
-        category: { contentTypeId: category.id, entryId: categoryEntry.id },
-      },
       entryTitle: 'Welcome',
       slug: 'welcome',
-      status: 'DRAFT',
+      versions: {
+        create: {
+          data: {
+            title: 'Welcome',
+            category: {
+              contentTypeId: category.id,
+              entryId: categoryEntry.id,
+            },
+          },
+          entryTitle: 'Welcome',
+          status: 'DRAFT',
+        },
+      },
     },
   });
 }
@@ -100,11 +113,12 @@ describe('export → import round-trip', () => {
     });
     const welcome = await prisma.contentEntry.findFirst({
       where: { contentTypeId: post!.id, slug: 'welcome' },
+      include: { versions: true },
     });
     const news = await prisma.contentEntry.findFirst({
       where: { contentTypeId: category!.id, slug: 'news' },
     });
-    const data = welcome!.data as Record<string, unknown>;
+    const data = welcome!.versions[0]!.data as Record<string, unknown>;
     expect(data.category).toEqual({
       contentTypeId: category!.id,
       entryId: news!.id,

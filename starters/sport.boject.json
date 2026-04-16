@@ -1,6 +1,6 @@
 {
-  "version": 1,
-  "exportedAt": "2026-04-15T13:58:00.704Z",
+  "version": 2,
+  "exportedAt": "2026-04-16T18:50:18.743Z",
   "portable": true,
   "contentTypes": [
     {
@@ -783,15 +783,19 @@
       "contentTypeIdentifier": "SiteSettings",
       "entryTitle": "Site Settings",
       "slug": null,
-      "status": "PUBLISHED",
-      "publishedAt": null,
-      "data": {
-        "name": "Site Settings",
-        "siteName": "My Site",
-        "logo": null,
-        "defaultOgImage": null,
-        "footerCopy": "© {{year}} My Site. All rights reserved."
-      }
+      "versions": [
+        {
+          "status": "PUBLISHED",
+          "data": {
+            "name": "Site Settings",
+            "siteName": "My Site",
+            "logo": null,
+            "defaultOgImage": null,
+            "footerCopy": "© {{year}} My Site. All rights reserved."
+          },
+          "publishedAt": null
+        }
+      ]
     }
   ]
 }
