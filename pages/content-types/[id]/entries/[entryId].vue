@@ -36,8 +36,18 @@ const editorFields = computed<FieldConfig[]>(() => {
     .map((f) => mapFieldToConfig(f));
 });
 
-const { formState, loadingStatus, isSaving, saveError, save } =
-  useContentEntryEditor(contentTypeId, entryId);
+const {
+  formState,
+  loadingStatus,
+  isSaving,
+  saveError,
+  status,
+  hasPublishedVersion,
+  isDirty,
+  saveDraft,
+  publish,
+  discardChanges,
+} = useContentEntryEditor(contentTypeId, entryId);
 
 const pageTitle = computed(() => {
   const titleVal = formState[entryTitleFieldIdentifier.value];
@@ -45,9 +55,33 @@ const pageTitle = computed(() => {
   return contentType.value?.name ?? 'Entry';
 });
 
-async function handleSave() {
-  await save();
+async function handleSaveDraft() {
+  await saveDraft();
 }
+async function handlePublish() {
+  await publish();
+}
+async function handleDiscardChanges() {
+  await discardChanges();
+}
+
+// Dirty detection: warn before browser navigation (tab close / address bar)
+if (import.meta.client) {
+  const beforeUnloadHandler = (e: BeforeUnloadEvent) => {
+    if (isDirty.value) e.preventDefault();
+  };
+  onMounted(() => window.addEventListener('beforeunload', beforeUnloadHandler));
+  onBeforeUnmount(() =>
+    window.removeEventListener('beforeunload', beforeUnloadHandler)
+  );
+}
+
+// Dirty detection: warn before in-app route navigation
+onBeforeRouteLeave(() => {
+  if (isDirty.value) {
+    return window.confirm('You have unsaved changes. Leave anyway?');
+  }
+});
 
 // Template helpers to avoid `as` casts in templates
 type RelationRef = {
@@ -258,7 +292,12 @@ function handlePaneSaved(data: {
         :saving="isSaving"
         :error="saveError"
         :show-slug="hasSlugField"
-        :on-save="handleSave"
+        :status="status"
+        :has-published-version="hasPublishedVersion"
+        :is-dirty="isDirty"
+        :on-save-draft="handleSaveDraft"
+        :on-publish="handlePublish"
+        :on-discard-changes="handleDiscardChanges"
       >
         <template #field="{ field, value, update }">
           <RelationField

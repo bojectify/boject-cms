@@ -35,8 +35,17 @@ const editorFields = computed<FieldConfig[]>(() => {
     .map((f) => mapFieldToConfig(f));
 });
 
-const { formState, isSaving, saveError, save, generateSlug } =
-  useContentEntryEditor(contentTypeId, 'new');
+const {
+  formState,
+  isSaving,
+  saveError,
+  status,
+  hasPublishedVersion,
+  isDirty,
+  saveDraft,
+  publish,
+  generateSlug,
+} = useContentEntryEditor(contentTypeId, 'new');
 
 // Auto-generate slug from ENTRY_TITLE field
 watch(
@@ -48,8 +57,15 @@ watch(
   }
 );
 
-async function handleSave() {
-  const newId = await save();
+async function handleSaveDraft() {
+  const newId = await saveDraft();
+  if (newId) {
+    await navigateTo(`/content-types/${contentTypeId}/entries/${newId}`);
+  }
+}
+
+async function handlePublish() {
+  const newId = await publish();
   if (newId) {
     await navigateTo(`/content-types/${contentTypeId}/entries/${newId}`);
   }
@@ -264,7 +280,11 @@ function handlePaneSaved(data: {
         :saving="isSaving"
         :error="saveError"
         :show-slug="hasSlugField"
-        :on-save="handleSave"
+        :status="status"
+        :has-published-version="hasPublishedVersion"
+        :is-dirty="isDirty"
+        :on-save-draft="handleSaveDraft"
+        :on-publish="handlePublish"
       >
         <template #field="{ field, value, update }">
           <RelationField

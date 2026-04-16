@@ -41,70 +41,23 @@ const editorFields = computed<FieldConfig[]>(() => {
   if (!contentType.value) return [];
   return contentType.value.fields
     .filter((f) => f.type !== 'SLUG')
-    .map((f) => {
-      switch (f.type) {
-        case 'ENTRY_TITLE':
-        case 'TEXT':
-          return {
-            type: 'text' as const,
-            key: f.identifier,
-            label: f.name,
-            required: f.required,
-          };
-        case 'TEXTAREA':
-          return {
-            type: 'textarea' as const,
-            key: f.identifier,
-            label: f.name,
-            required: f.required,
-          };
-        case 'NUMBER':
-          return {
-            type: 'number' as const,
-            key: f.identifier,
-            label: f.name,
-            required: f.required,
-          };
-        case 'BOOLEAN':
-          return { type: 'boolean' as const, key: f.identifier, label: f.name };
-        case 'DATETIME':
-          return {
-            type: 'datetime' as const,
-            key: f.identifier,
-            label: f.name,
-            required: f.required,
-          };
-        case 'SELECT': {
-          const opts = f.options as { choices?: string[] } | null;
-          return {
-            type: 'select' as const,
-            key: f.identifier,
-            label: f.name,
-            required: f.required,
-            options: (opts?.choices ?? []).map((c) => ({ label: c, value: c })),
-          };
-        }
-        case 'RICHTEXT':
-          return {
-            type: 'richtext' as const,
-            key: f.identifier,
-            label: f.name,
-          };
-        default:
-          return {
-            type: 'text' as const,
-            key: f.identifier,
-            label: f.name,
-            required: f.required,
-          };
-      }
-    });
+    .map((f) => mapFieldToConfig(f));
 });
 
 // Entry editor composable
 const effectiveEntryId = computed(() => props.entryId ?? 'new');
-const { formState, loadingStatus, isSaving, saveError, save } =
-  useContentEntryEditor(props.contentTypeId, effectiveEntryId.value);
+const {
+  formState,
+  loadingStatus,
+  isSaving,
+  saveError,
+  status,
+  hasPublishedVersion,
+  isDirty,
+  saveDraft,
+  publish,
+  discardChanges,
+} = useContentEntryEditor(props.contentTypeId, effectiveEntryId.value);
 
 const pageTitle = computed(() => {
   if (!props.entryId) return `New ${contentType.value?.name ?? 'Entry'}`;
@@ -113,8 +66,7 @@ const pageTitle = computed(() => {
   return contentType.value?.name ?? 'Entry';
 });
 
-async function handleSave() {
-  const newId = await save();
+function emitSaved(newId: string | void) {
   const entryId = newId ?? props.entryId;
   if (entryId) {
     const titleVal = formState[entryTitleFieldIdentifier.value];
@@ -124,6 +76,20 @@ async function handleSave() {
       entryTitle: typeof titleVal === 'string' ? titleVal : 'Untitled',
     });
   }
+}
+
+async function handleSaveDraft() {
+  const newId = await saveDraft();
+  emitSaved(newId);
+}
+
+async function handlePublish() {
+  const newId = await publish();
+  emitSaved(newId);
+}
+
+async function handleDiscardChanges() {
+  await discardChanges();
 }
 </script>
 
@@ -172,7 +138,12 @@ async function handleSave() {
             :saving="isSaving"
             :error="saveError"
             :show-slug="hasSlugField"
-            :on-save="handleSave"
+            :status="status"
+            :has-published-version="hasPublishedVersion"
+            :is-dirty="isDirty"
+            :on-save-draft="handleSaveDraft"
+            :on-publish="handlePublish"
+            :on-discard-changes="handleDiscardChanges"
           />
         </div>
       </div>
