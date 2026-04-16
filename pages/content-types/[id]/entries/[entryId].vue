@@ -233,8 +233,9 @@ function openPane(
   paneOpen.value = true;
 }
 
-function handlePickerCreate(contentTypeId: string) {
+async function handlePickerCreate(contentTypeId: string) {
   pickerOpen.value = false;
+  await nextTick();
   openPane(contentTypeId, null, pickerFieldKey.value);
 }
 
