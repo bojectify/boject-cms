@@ -1,8 +1,16 @@
+import {
+  isCmsRequest,
+  getVersionForContext,
+  getPublishedVersion,
+  flattenEntryWithVersion,
+} from '../../utils/resolveVersion';
+
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id');
   const entry = await prisma.contentEntry.findUnique({
     where: { id },
     include: {
+      versions: true,
       contentType: {
         include: { fields: { orderBy: { order: 'asc' } } },
       },
@@ -14,5 +22,20 @@ export default defineEventHandler(async (event) => {
       statusMessage: 'Content entry not found',
     });
   }
-  return entry;
+
+  const isCms = isCmsRequest(event);
+  const version = getVersionForContext(entry.versions, isCms);
+  if (!version) {
+    throw createError({
+      statusCode: 404,
+      statusMessage: 'No visible version for this entry',
+    });
+  }
+
+  return flattenEntryWithVersion(entry, version, {
+    contentType: entry.contentType,
+    ...(isCms
+      ? { hasPublishedVersion: getPublishedVersion(entry.versions) !== null }
+      : {}),
+  });
 });

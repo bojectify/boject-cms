@@ -163,11 +163,12 @@ describe('importBundle', () => {
     });
     const blogPost = await prisma.contentEntry.findFirst({
       where: { contentTypeId: blog!.id, slug: 'hello' },
+      include: { versions: true },
     });
     const newsCategory = await prisma.contentEntry.findFirst({
       where: { contentTypeId: category!.id, slug: 'news' },
     });
-    const data = blogPost!.data as Record<string, unknown>;
+    const data = blogPost!.versions[0]!.data as Record<string, unknown>;
     expect(data.category).toEqual({
       contentTypeId: category!.id,
       entryId: newsCategory!.id,

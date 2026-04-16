@@ -39,6 +39,39 @@ interface ContentEntryShape {
   updatedAt: Date;
 }
 
+/**
+ * Build a ContentEntryShape from a ContentEntry envelope + its published
+ * ContentEntryVersion. The envelope owns id/contentTypeId/slug while the
+ * version owns data/status/publishedAt/timestamps.
+ */
+function flattenToShape(
+  entry: {
+    id: string;
+    contentTypeId: string;
+    slug: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+  },
+  version: {
+    data: unknown;
+    status: string;
+    publishedAt: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+  }
+): ContentEntryShape {
+  return {
+    id: entry.id,
+    contentTypeId: entry.contentTypeId,
+    data: version.data,
+    slug: entry.slug,
+    status: version.status as ContentEntryShape['status'],
+    publishedAt: version.publishedAt,
+    createdAt: version.createdAt,
+    updatedAt: version.updatedAt,
+  };
+}
+
 type ScalarTypeName = 'String' | 'Float' | 'Boolean' | 'DateTime' | 'JSON';
 
 const FIELD_TYPE_TO_SCALAR: Record<string, ScalarTypeName | undefined> = {
@@ -197,9 +230,12 @@ export function registerDynamicTypes(
               entryId?: string;
             } | null;
             if (!ref?.entryId) return null;
-            return prisma.contentEntry.findUnique({
+            const related = await prisma.contentEntry.findUnique({
               where: { id: ref.entryId },
+              include: { versions: { where: { status: 'PUBLISHED' } } },
             });
+            if (!related || related.versions.length === 0) return null;
+            return flattenToShape(related, related.versions[0]!);
           };
 
           if (targetIds.length === 1) {
@@ -301,11 +337,23 @@ export function registerDynamicTypes(
                   if (entryIds.length === 0) return [];
                   const entries = await prisma.contentEntry.findMany({
                     where: { id: { in: entryIds } },
+                    include: {
+                      versions: { where: { status: 'PUBLISHED' } },
+                    },
                   });
-                  const byId = new Map(entries.map((e) => [e.id, e]));
+                  const byId = new Map(
+                    entries
+                      .filter((e) => e.versions.length > 0)
+                      .map((e) => [
+                        e.id,
+                        flattenToShape(e, e.versions[0]!),
+                      ])
+                  );
                   return entryIds
                     .map((id) => byId.get(id))
-                    .filter((e): e is NonNullable<typeof e> => Boolean(e));
+                    .filter(
+                      (e): e is NonNullable<typeof e> => Boolean(e)
+                    );
                 }
               ),
           }) as never;
@@ -341,9 +389,12 @@ export function registerDynamicTypes(
         nullable: true,
         args: { id: t.arg.id({ required: true }) },
         resolve: async (_root, args) => {
-          return prisma.contentEntry.findFirst({
+          const entry = await prisma.contentEntry.findFirst({
             where: { id: String(args.id), contentTypeId: ct.id },
+            include: { versions: { where: { status: 'PUBLISHED' } } },
           });
+          if (!entry || entry.versions.length === 0) return null;
+          return flattenToShape(entry, entry.versions[0]!);
         },
       })
     );
@@ -356,9 +407,12 @@ export function registerDynamicTypes(
           nullable: true,
           args: { slug: t.arg.string({ required: true }) },
           resolve: async (_root, args) => {
-            return prisma.contentEntry.findFirst({
+            const entry = await prisma.contentEntry.findFirst({
               where: { contentTypeId: ct.id, slug: args.slug },
+              include: { versions: { where: { status: 'PUBLISHED' } } },
             });
+            if (!entry || entry.versions.length === 0) return null;
+            return flattenToShape(entry, entry.versions[0]!);
           },
         })
       );
@@ -387,14 +441,16 @@ export function registerDynamicTypes(
           } | null;
 
           if (whereArgs?.status?.equals) {
-            conditions.push(Prisma.sql`"status" = ${whereArgs.status.equals}`);
+            conditions.push(
+              Prisma.sql`v."status" = ${whereArgs.status.equals}`
+            );
           }
           if (whereArgs?.contentType?.equals) {
             const ct = contentTypes.find(
               (c) => c.identifier === whereArgs.contentType!.equals
             );
             if (ct) {
-              conditions.push(Prisma.sql`"contentTypeId" = ${ct.id}`);
+              conditions.push(Prisma.sql`e."contentTypeId" = ${ct.id}`);
             } else {
               return [];
             }
@@ -411,7 +467,7 @@ export function registerDynamicTypes(
               .map((c) => c.id);
             if (matchingIds.length === 0) return [];
             conditions.push(
-              Prisma.sql`"contentTypeId" IN (${Prisma.join(matchingIds)})`
+              Prisma.sql`e."contentTypeId" IN (${Prisma.join(matchingIds)})`
             );
           }
 
@@ -420,7 +476,8 @@ export function registerDynamicTypes(
               const dateConditions = buildDateConditions(
                 sysField,
                 whereArgs[sysField] as Record<string, unknown>,
-                false
+                false,
+                'v'
               );
               conditions.push(...dateConditions.map((c) => c.sql));
             }
@@ -432,9 +489,12 @@ export function registerDynamicTypes(
               : Prisma.sql`1=1`;
 
           return (await prisma.$queryRaw`
-            SELECT * FROM "ContentEntry"
-            WHERE ${whereClause}
-            ORDER BY "createdAt" DESC
+            SELECT e."id", e."contentTypeId", v."data", e."slug",
+                   v."status", v."publishedAt", v."createdAt", v."updatedAt"
+            FROM "ContentEntry" e
+            JOIN "ContentEntryVersion" v ON v."entryId" = e."id"
+            WHERE v."status" = 'PUBLISHED' AND ${whereClause}
+            ORDER BY v."createdAt" DESC
             LIMIT ${limit} OFFSET ${offset}
           `) as unknown[];
         }) as never,

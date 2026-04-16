@@ -40,7 +40,7 @@ describe('exportBundle', () => {
       portable: false,
     });
 
-    expect(bundle.version).toBe(1);
+    expect(bundle.version).toBe(2);
     expect(bundle.portable).toBe(false);
     expect(bundle.contentTypes).toHaveLength(1);
     expect(bundle.contentTypes![0]?.id).toBe(ct.id);
@@ -94,11 +94,16 @@ describe('exportBundle', () => {
     await prisma.contentEntry.create({
       data: {
         contentTypeId: ct.id,
-        data: { title: 'Hello' },
         entryTitle: 'Hello',
         slug: 'hello',
-        status: 'PUBLISHED',
-        publishedAt: new Date('2026-04-01T00:00:00.000Z'),
+        versions: {
+          create: {
+            data: { title: 'Hello' },
+            entryTitle: 'Hello',
+            status: 'PUBLISHED',
+            publishedAt: new Date('2026-04-01T00:00:00.000Z'),
+          },
+        },
       },
     });
 
@@ -108,6 +113,9 @@ describe('exportBundle', () => {
     expect(bundle.entries![0]).toMatchObject({
       entryTitle: 'Hello',
       slug: 'hello',
+    });
+    expect(bundle.entries![0]?.versions).toHaveLength(1);
+    expect(bundle.entries![0]?.versions![0]).toMatchObject({
       status: 'PUBLISHED',
       publishedAt: '2026-04-01T00:00:00.000Z',
     });
@@ -132,10 +140,15 @@ describe('exportBundle', () => {
     const categoryEntry = await prisma.contentEntry.create({
       data: {
         contentTypeId: category.id,
-        data: { name: 'News' },
         entryTitle: 'News',
         slug: 'news',
-        status: 'PUBLISHED',
+        versions: {
+          create: {
+            data: { name: 'News' },
+            entryTitle: 'News',
+            status: 'PUBLISHED',
+          },
+        },
       },
     });
     const blog = await prisma.contentType.create({
@@ -166,13 +179,21 @@ describe('exportBundle', () => {
     await prisma.contentEntry.create({
       data: {
         contentTypeId: blog.id,
-        data: {
-          title: 'Hello',
-          category: { contentTypeId: category.id, entryId: categoryEntry.id },
-        },
         entryTitle: 'Hello',
         slug: 'hello',
-        status: 'DRAFT',
+        versions: {
+          create: {
+            data: {
+              title: 'Hello',
+              category: {
+                contentTypeId: category.id,
+                entryId: categoryEntry.id,
+              },
+            },
+            entryTitle: 'Hello',
+            status: 'DRAFT',
+          },
+        },
       },
     });
 
@@ -181,7 +202,7 @@ describe('exportBundle', () => {
     const blogEntry = bundle.entries!.find(
       (e) => e.contentTypeIdentifier === 'BlogPost'
     )!;
-    expect(blogEntry.data.category).toEqual({
+    expect(blogEntry.versions![0]!.data.category).toEqual({
       contentTypeIdentifier: 'Category',
       entryKey: 'news',
     });

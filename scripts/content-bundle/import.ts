@@ -1,5 +1,5 @@
-import type { PrismaClient, FieldType } from '#prisma';
-import type { Bundle, BundleMode, ImportResult } from './types';
+import type { PrismaClient, FieldType, Prisma } from '#prisma';
+import type { Bundle, BundleEntry, BundleMode, ImportResult } from './types';
 import { validateBundle } from './validate';
 import { decodeDataRefs } from './portable';
 
@@ -109,8 +109,7 @@ export async function importBundle(
                   type: f.type,
                   required: f.required,
                   order: f.order,
-                  options: (opts ??
-                    undefined) as import('#prisma').Prisma.InputJsonValue,
+                  options: (opts ?? undefined) as Prisma.InputJsonValue,
                 };
               }),
             },
@@ -166,7 +165,7 @@ export async function importBundle(
             options: {
               ...pending.otherOptions,
               targetContentTypeIds: resolved,
-            } as import('#prisma').Prisma.InputJsonValue,
+            } as Prisma.InputJsonValue,
           },
         });
       }
@@ -197,34 +196,58 @@ export async function importBundle(
       }
 
       const pendingEntries: Array<{
-        newId: string;
-        bundleEntry: (typeof bundle.entries)[number];
+        entryId: string;
+        versionIds: string[];
+        bundleEntry: BundleEntry;
+        /** The raw data arrays (one per version) before portable resolution */
+        rawDataArrays: Record<string, unknown>[];
       }> = [];
 
       for (const e of bundle.entries) {
         const typeId = identifierToTypeId.get(e.contentTypeIdentifier)!;
         const fieldTypes = fieldTypesByTypeId.get(typeId) ?? {};
+        const isV2 = Array.isArray(e.versions);
 
-        // Pass 1 data: in portable mode strip relation fields (resolved in pass 2).
-        // We trust the bundle shape — validateBundle already ran. Relation refs
-        // are resolved via in-memory maps in pass 2, so extra type checks here
-        // add nothing.
-        const pass1Data = bundle.portable
-          ? stripRelationFields(e.data, fieldTypes)
-          : (e.data as Record<string, unknown>);
+        // Normalise versions: V1 entries have flat status/data, V2 entries
+        // have a versions array.
+        const versionSpecs = isV2
+          ? e.versions!.map((v) => ({
+              data: v.data,
+              status: v.status,
+              publishedAt: v.publishedAt,
+            }))
+          : [
+              {
+                data: e.data!,
+                status: e.status!,
+                publishedAt: e.publishedAt ?? null,
+              },
+            ];
+
+        const pass1Datas = versionSpecs.map((v) =>
+          bundle.portable
+            ? stripRelationFields(v.data, fieldTypes)
+            : (v.data as Record<string, unknown>)
+        );
 
         const created = await tx.contentEntry.create({
           data: {
             id: bundle.portable ? undefined : (e.id ?? undefined),
             contentTypeId: typeId,
-            data: pass1Data as import('#prisma').Prisma.InputJsonValue,
             entryTitle: e.entryTitle,
             slug: e.slug,
-            status: e.status,
-            publishedAt: e.publishedAt ? new Date(e.publishedAt) : null,
-            createdBy: author ?? null,
-            updatedBy: author ?? null,
+            versions: {
+              create: versionSpecs.map((v, i) => ({
+                data: pass1Datas[i] as Prisma.InputJsonValue,
+                entryTitle: e.entryTitle,
+                status: v.status,
+                publishedAt: v.publishedAt ? new Date(v.publishedAt) : null,
+                createdBy: author ?? null,
+                updatedBy: author ?? null,
+              })),
+            },
           },
+          include: { versions: true },
         });
 
         entriesCreated++;
@@ -236,27 +259,38 @@ export async function importBundle(
         if (e.slug) map.set(e.slug, created.id);
         map.set(e.entryTitle, created.id);
 
-        pendingEntries.push({ newId: created.id, bundleEntry: e });
+        pendingEntries.push({
+          entryId: created.id,
+          versionIds: created.versions.map((v) => v.id),
+          bundleEntry: e,
+          rawDataArrays: versionSpecs.map((v) => v.data),
+        });
       }
 
       if (bundle.portable) {
-        for (const { newId, bundleEntry } of pendingEntries) {
+        for (const {
+          versionIds,
+          bundleEntry,
+          rawDataArrays,
+        } of pendingEntries) {
           const typeId = identifierToTypeId.get(
             bundleEntry.contentTypeIdentifier
           )!;
           const fieldTypes = fieldTypesByTypeId.get(typeId) ?? {};
-          const resolvedData = decodeDataRefs(
-            bundleEntry.data,
-            fieldTypes,
-            identifierToTypeId,
-            typeIdentifierToKeyToEntry
-          );
-          await tx.contentEntry.update({
-            where: { id: newId },
-            data: {
-              data: resolvedData as import('#prisma').Prisma.InputJsonValue,
-            },
-          });
+          for (let i = 0; i < versionIds.length; i++) {
+            const resolvedData = decodeDataRefs(
+              rawDataArrays[i]!,
+              fieldTypes,
+              identifierToTypeId,
+              typeIdentifierToKeyToEntry
+            );
+            await tx.contentEntryVersion.update({
+              where: { id: versionIds[i] },
+              data: {
+                data: resolvedData as Prisma.InputJsonValue,
+              },
+            });
+          }
         }
       }
     }

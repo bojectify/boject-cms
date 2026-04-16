@@ -1,7 +1,7 @@
 import type { H3Event } from 'h3';
 import { rateLimit } from './rateLimit';
 
-const MUTATION_MAX = 30;
+const MUTATION_MAX = 50;
 const MUTATION_WINDOW_MS = 60_000;
 
 /**

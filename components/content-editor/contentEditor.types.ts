@@ -8,5 +8,10 @@ export type ContentEditorProps = BasicComponentProps & {
   saving?: boolean;
   error?: string | null;
   showSlug?: boolean;
-  onSave: () => void;
+  status?: 'DRAFT' | 'PUBLISHED' | 'CHANGED' | 'ARCHIVED';
+  hasPublishedVersion?: boolean;
+  isDirty?: boolean;
+  onSaveDraft: () => void;
+  onPublish: () => void;
+  onDiscardChanges?: () => void;
 };
