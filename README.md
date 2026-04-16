@@ -133,7 +133,7 @@ composables/
 scripts/
   content-bundle/              # CLI to export/import content bundles
   build-starters/              # CLI to build overlay-based starter bundles
-  manage-api-keys.ts           # CLI for API key create/list/revoke
+  manage-api-keys/             # CLI for API key create/list/revoke
 starters/
   base.boject.json             # v1 base starter bundle
   sport.boject.json            # built-from-overlay sport bundle

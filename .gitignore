@@ -44,8 +44,7 @@ coverage/
 .cache/
 .temp/
 
-/generated/prisma
-/generated/pothos-types.ts
+/generated
 
 # Local image storage
 storage/

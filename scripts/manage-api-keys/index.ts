@@ -1,9 +1,31 @@
 import 'dotenv/config';
 import { createHash, randomBytes } from 'node:crypto';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '../generated/prisma/client';
+import { PrismaClient } from '../../generated/prisma/client';
 
 const PREFIX = 'boject_';
+
+const HELP = `manage-api-keys — create, list, and revoke API keys
+
+Usage:
+  pnpm apikey:create <name>    Create a new API key (prints raw key once)
+  pnpm apikey:list             List all API keys (prefix, name, status, last used)
+  pnpm apikey:revoke <prefix>  Revoke an API key by its prefix
+
+Flags:
+  --help, -h   Show this help message
+
+Notes:
+  - Keys are SHA-256 hashed in the database; the raw key is only shown at
+    create time. Store it somewhere safe — it cannot be recovered later.
+  - Revocation is a soft delete (sets revokedAt). The row stays for audit.
+  - Requires DATABASE_URL in the environment (loaded via .env).
+
+Examples:
+  pnpm apikey:create "Mobile app backend"
+  pnpm apikey:list
+  pnpm apikey:revoke boject_a1b
+`;
 
 function hashApiKey(key: string): string {
   return createHash('sha256').update(key).digest('hex');
@@ -14,6 +36,10 @@ function generateApiKey() {
   const hash = hashApiKey(raw);
   const prefix = raw.slice(0, 11);
   return { raw, hash, prefix };
+}
+
+function wantsHelp(values: string[]): boolean {
+  return values.includes('--help') || values.includes('-h');
 }
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
@@ -88,11 +114,20 @@ async function revoke(prefix: string) {
 const [command, ...args] = process.argv.slice(2);
 
 async function main() {
+  if (!command || command === 'help' || wantsHelp([command ?? ''])) {
+    console.log(HELP);
+    process.exit(0);
+  }
+  if (wantsHelp(args)) {
+    console.log(HELP);
+    process.exit(0);
+  }
+
   switch (command) {
     case 'create': {
       const name = args.join(' ');
       if (!name) {
-        console.error('Usage: tsx scripts/manage-api-keys.ts create <name>');
+        console.error('Usage: pnpm apikey:create <name>');
         process.exit(1);
       }
       await create(name);
@@ -104,7 +139,7 @@ async function main() {
     case 'revoke': {
       const prefix = args[0];
       if (!prefix) {
-        console.error('Usage: tsx scripts/manage-api-keys.ts revoke <prefix>');
+        console.error('Usage: pnpm apikey:revoke <prefix>');
         process.exit(1);
       }
       await revoke(prefix);
@@ -112,7 +147,7 @@ async function main() {
     }
     default:
       console.error(
-        'Usage: tsx scripts/manage-api-keys.ts <create|list|revoke>'
+        `Unknown command "${command}". Run with --help to see usage.`
       );
       process.exit(1);
   }
