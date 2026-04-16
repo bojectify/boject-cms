@@ -35,7 +35,11 @@ export default defineEventHandler(async (event) => {
     if (typeof query.status === 'string' && VALID_STATUSES.has(query.status)) {
       where.versions = {
         some: {
-          status: query.status as 'DRAFT' | 'PUBLISHED' | 'CHANGED' | 'ARCHIVED',
+          status: query.status as
+            | 'DRAFT'
+            | 'PUBLISHED'
+            | 'CHANGED'
+            | 'ARCHIVED',
         },
       };
     }
