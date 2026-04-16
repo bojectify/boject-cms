@@ -1,6 +1,6 @@
 import type { ContentStatus, FieldType } from '#prisma';
 
-export const BUNDLE_VERSION = 1;
+export const BUNDLE_VERSION = 2;
 
 export type BundleFieldOptions = {
   choices?: string[];
@@ -27,15 +27,24 @@ export interface BundleContentType {
   fields: BundleField[];
 }
 
+export interface BundleEntryVersion {
+  status: ContentStatus;
+  data: Record<string, unknown>;
+  publishedAt: string | null;
+}
+
 export interface BundleEntry {
   id: string | null;
   contentTypeId: string | null;
   contentTypeIdentifier: string;
   entryTitle: string;
   slug: string | null;
-  status: ContentStatus;
-  publishedAt: string | null;
-  data: Record<string, unknown>;
+  // V1 flat fields (kept for backward compat on import)
+  status?: ContentStatus;
+  publishedAt?: string | null;
+  data?: Record<string, unknown>;
+  // V2 versioned
+  versions?: BundleEntryVersion[];
 }
 
 export interface Bundle {

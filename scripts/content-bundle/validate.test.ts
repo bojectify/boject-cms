@@ -21,7 +21,7 @@ const baseContentType = {
 };
 
 const validBundle: Bundle = {
-  version: 1,
+  version: 2,
   exportedAt: '2026-04-14T10:00:00.000Z',
   portable: false,
   contentTypes: [baseContentType],
@@ -33,8 +33,13 @@ describe('validateBundle', () => {
     expect(validateBundle(validBundle)).toEqual({ ok: true, errors: [] });
   });
 
+  it('accepts version 1', () => {
+    const result = validateBundle({ ...validBundle, version: 1 });
+    expect(result.ok).toBe(true);
+  });
+
   it('rejects wrong version', () => {
-    const result = validateBundle({ ...validBundle, version: 2 });
+    const result = validateBundle({ ...validBundle, version: 99 });
     expect(result.ok).toBe(false);
     expect(result.errors[0]?.path).toBe('version');
   });

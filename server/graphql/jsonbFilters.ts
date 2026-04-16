@@ -96,7 +96,8 @@ interface FieldDef {
 export function buildDateConditions(
   identifier: string,
   filter: Record<string, unknown>,
-  isJsonb: boolean
+  isJsonb: boolean,
+  tablePrefix?: string
 ): JsonbCondition[] {
   const conditions: JsonbCondition[] = [];
   const ops = ['equals', 'gt', 'gte', 'lt', 'lte'] as const;
@@ -108,6 +109,9 @@ export function buildDateConditions(
     lte: '<=',
   };
 
+  const colPrefix = tablePrefix ? `${tablePrefix}.` : '';
+  const dataRef = tablePrefix ? `${tablePrefix}."data"` : 'data';
+
   for (const op of ops) {
     if (filter[op] != null) {
       const value =
@@ -116,11 +120,11 @@ export function buildDateConditions(
           : String(filter[op]);
       if (isJsonb) {
         conditions.push({
-          sql: Prisma.sql`(data->>${Prisma.raw(`'${identifier}'`)})::timestamptz ${Prisma.raw(sqlOps[op]!)} ${value}::timestamptz`,
+          sql: Prisma.sql`(${Prisma.raw(dataRef)}->>${Prisma.raw(`'${identifier}'`)})::timestamptz ${Prisma.raw(sqlOps[op]!)} ${value}::timestamptz`,
         });
       } else {
         conditions.push({
-          sql: Prisma.sql`${Prisma.raw(`"${identifier}"`)} ${Prisma.raw(sqlOps[op]!)} ${value}::timestamptz`,
+          sql: Prisma.sql`${Prisma.raw(`${colPrefix}"${identifier}"`)} ${Prisma.raw(sqlOps[op]!)} ${value}::timestamptz`,
         });
       }
     }
@@ -151,12 +155,14 @@ export async function queryDynamicEntries(
   offset: number
 ): Promise<any[]> {
   const conditions: Prisma.Sql[] = [
-    Prisma.sql`"contentTypeId" = ${contentTypeId}`,
+    Prisma.sql`e."contentTypeId" = ${contentTypeId}`,
   ];
 
   if (whereArgs) {
     if (whereArgs.status?.equals) {
-      conditions.push(Prisma.sql`"status" = ${whereArgs.status.equals}`);
+      conditions.push(
+        Prisma.sql`v."status" = ${whereArgs.status.equals}`
+      );
     }
 
     for (const sysField of ['createdAt', 'updatedAt'] as const) {
@@ -164,7 +170,8 @@ export async function queryDynamicEntries(
         const dateConditions = buildDateConditions(
           sysField,
           whereArgs[sysField] as Record<string, unknown>,
-          false
+          false,
+          'v'
         );
         conditions.push(...dateConditions.map((c) => c.sql));
       }
@@ -184,12 +191,12 @@ export async function queryDynamicEntries(
       ) {
         if (filter.equals != null) {
           conditions.push(
-            Prisma.sql`data->>${Prisma.raw(`'${field.identifier}'`)} = ${String(filter.equals)}`
+            Prisma.sql`v."data"->>${Prisma.raw(`'${field.identifier}'`)} = ${String(filter.equals)}`
           );
         }
         if (filter.contains != null) {
           conditions.push(
-            Prisma.sql`data->>${Prisma.raw(`'${field.identifier}'`)} ILIKE ${'%' + String(filter.contains) + '%'}`
+            Prisma.sql`v."data"->>${Prisma.raw(`'${field.identifier}'`)} ILIKE ${'%' + String(filter.contains) + '%'}`
           );
         }
       } else if (field.type === 'NUMBER') {
@@ -204,21 +211,22 @@ export async function queryDynamicEntries(
         for (const op of numOps) {
           if (filter[op] != null) {
             conditions.push(
-              Prisma.sql`(data->>${Prisma.raw(`'${field.identifier}'`)})::float ${Prisma.raw(sqlOps[op]!)} ${Number(filter[op])}`
+              Prisma.sql`(v."data"->>${Prisma.raw(`'${field.identifier}'`)})::float ${Prisma.raw(sqlOps[op]!)} ${Number(filter[op])}`
             );
           }
         }
       } else if (field.type === 'BOOLEAN') {
         if (filter.equals != null) {
           conditions.push(
-            Prisma.sql`(data->>${Prisma.raw(`'${field.identifier}'`)})::boolean = ${Boolean(filter.equals)}`
+            Prisma.sql`(v."data"->>${Prisma.raw(`'${field.identifier}'`)})::boolean = ${Boolean(filter.equals)}`
           );
         }
       } else if (field.type === 'DATETIME') {
         const dateConditions = buildDateConditions(
           field.identifier,
           filter,
-          true
+          true,
+          'v'
         );
         conditions.push(...dateConditions.map((c) => c.sql));
       }
@@ -228,9 +236,12 @@ export async function queryDynamicEntries(
   const whereClause = Prisma.join(conditions, ' AND ');
 
   return prisma.$queryRaw`
-    SELECT * FROM "ContentEntry"
-    WHERE ${whereClause}
-    ORDER BY "createdAt" DESC
+    SELECT e."id", e."contentTypeId", v."data", e."slug",
+           v."status", v."publishedAt", v."createdAt", v."updatedAt"
+    FROM "ContentEntry" e
+    JOIN "ContentEntryVersion" v ON v."entryId" = e."id"
+    WHERE v."status" = 'PUBLISHED' AND ${whereClause}
+    ORDER BY v."createdAt" DESC
     LIMIT ${limit} OFFSET ${offset}
   `;
 }

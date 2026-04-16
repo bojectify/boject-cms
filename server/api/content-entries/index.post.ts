@@ -2,6 +2,7 @@ import type { Prisma } from '#prisma';
 import { assertUuid } from '../../utils/validation';
 import { withPrismaErrors } from '../../utils/prismaErrors';
 import { enforceMutationRateLimit } from '../../utils/rateLimitEndpoint';
+import { flattenEntryWithVersion } from '../../utils/resolveVersion';
 
 const VALID_STATUSES = new Set<string>([
   'DRAFT',
@@ -46,12 +47,18 @@ export default defineEventHandler(async (event) => {
       prisma.contentEntry.create({
         data: {
           contentTypeId,
-          data: validatedData as Prisma.InputJsonValue,
           entryTitle,
           slug,
-          status: status as 'DRAFT',
-          publishedAt: status === 'PUBLISHED' ? new Date() : undefined,
+          versions: {
+            create: {
+              data: validatedData as Prisma.InputJsonValue,
+              entryTitle,
+              status: status as 'DRAFT',
+              publishedAt: status === 'PUBLISHED' ? new Date() : undefined,
+            },
+          },
         },
+        include: { versions: true },
       }),
     {
       uniqueMessage:
@@ -60,5 +67,5 @@ export default defineEventHandler(async (event) => {
   );
 
   setResponseStatus(event, 201);
-  return created;
+  return flattenEntryWithVersion(created, created.versions[0]!);
 });

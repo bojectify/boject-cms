@@ -34,6 +34,7 @@ export async function exportBundle(
   const identifierByTypeId = (id: string) => typeIdToIdentifier.get(id) ?? id;
 
   const allEntries = await prisma.contentEntry.findMany({
+    include: { versions: true },
     orderBy: [{ contentTypeId: 'asc' }, { entryTitle: 'asc' }],
   });
 
@@ -114,15 +115,6 @@ export async function exportBundle(
         typeIdToIdentifier.get(entry.contentTypeId) ?? entry.contentTypeId;
       const fieldTypes =
         fieldTypesByContentTypeId.get(entry.contentTypeId) ?? {};
-      const rawData = entry.data as Record<string, unknown>;
-      const data = portable
-        ? encodeDataRefs(
-            rawData,
-            fieldTypes as Record<string, import('#prisma').FieldType>,
-            typeIdToIdentifier,
-            entryKeysByType
-          )
-        : rawData;
 
       return {
         id: portable ? null : entry.id,
@@ -130,9 +122,18 @@ export async function exportBundle(
         contentTypeIdentifier: identifier,
         entryTitle: entry.entryTitle,
         slug: entry.slug,
-        status: entry.status,
-        publishedAt: entry.publishedAt ? entry.publishedAt.toISOString() : null,
-        data,
+        versions: entry.versions.map((v) => ({
+          status: v.status,
+          data: portable
+            ? encodeDataRefs(
+                v.data as Record<string, unknown>,
+                fieldTypes as Record<string, import('#prisma').FieldType>,
+                typeIdToIdentifier,
+                entryKeysByType
+              )
+            : (v.data as Record<string, unknown>),
+          publishedAt: v.publishedAt ? v.publishedAt.toISOString() : null,
+        })),
       } satisfies BundleEntry;
     });
   }

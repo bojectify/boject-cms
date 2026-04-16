@@ -2,11 +2,11 @@ import type {
   Bundle,
   BundleContentType,
   BundleEntry,
+  BundleEntryVersion,
   BundleField,
   ValidationError,
   ValidationResult,
 } from './types';
-import { BUNDLE_VERSION } from './types';
 
 const FIELD_TYPES = new Set([
   'ENTRY_TITLE',
@@ -37,10 +37,10 @@ export function validateBundle(bundle: unknown): ValidationResult {
 
   const b = bundle as Partial<Bundle>;
 
-  if (b.version !== BUNDLE_VERSION) {
+  if (b.version !== 1 && b.version !== 2) {
     errors.push({
       path: 'version',
-      message: `expected version ${BUNDLE_VERSION}, got ${b.version}`,
+      message: `expected version 1 or 2, got ${b.version}`,
     });
   }
 
@@ -198,20 +198,73 @@ function validateEntry(
       message: 'must be a non-empty string',
     });
   }
-  if (typeof e.status !== 'string' || !STATUSES.has(e.status)) {
+
+  const hasVersions = Array.isArray(e.versions);
+  const hasData = isObject(e.data);
+
+  if (hasVersions) {
+    // V2 format
+    if (e.versions!.length === 0) {
+      errors.push({
+        path: `${path}.versions`,
+        message: 'must contain at least one version',
+      });
+    }
+    e.versions!.forEach((v, i) =>
+      validateEntryVersion(v, `${path}.versions[${i}]`, errors)
+    );
+  } else if (hasData) {
+    // V1 format
+    if (typeof e.status !== 'string' || !STATUSES.has(e.status)) {
+      errors.push({
+        path: `${path}.status`,
+        message: `must be one of ${Array.from(STATUSES).join(', ')}`,
+      });
+    }
+  } else {
     errors.push({
-      path: `${path}.status`,
-      message: `must be one of ${Array.from(STATUSES).join(', ')}`,
+      path: `${path}`,
+      message:
+        'entry must have either a versions array (V2) or a data object (V1)',
     });
-  }
-  if (!isObject(e.data)) {
-    errors.push({ path: `${path}.data`, message: 'must be an object' });
   }
 
   if (portable && e.id !== null) {
     errors.push({
       path: `${path}.id`,
       message: 'portable bundle entries must have id=null',
+    });
+  }
+}
+
+function validateEntryVersion(
+  version: unknown,
+  path: string,
+  errors: ValidationError[]
+): void {
+  if (!isObject(version)) {
+    errors.push({ path, message: 'must be an object' });
+    return;
+  }
+  const v = version as Partial<BundleEntryVersion>;
+
+  if (typeof v.status !== 'string' || !STATUSES.has(v.status)) {
+    errors.push({
+      path: `${path}.status`,
+      message: `must be one of ${Array.from(STATUSES).join(', ')}`,
+    });
+  }
+  if (!isObject(v.data)) {
+    errors.push({ path: `${path}.data`, message: 'must be an object' });
+  }
+  if (
+    v.publishedAt !== null &&
+    v.publishedAt !== undefined &&
+    typeof v.publishedAt !== 'string'
+  ) {
+    errors.push({
+      path: `${path}.publishedAt`,
+      message: 'must be a string or null',
     });
   }
 }

@@ -323,11 +323,12 @@ describe('Content Entry endpoints', async () => {
   });
 
   describe('GET /api/content-entries', () => {
-    it('lists entries with contentTypeId', async () => {
+    it('lists entries with contentTypeId (session sees all)', async () => {
+      const cookie = await getSessionCookie();
       const { items, total } = await $fetch<ListResponse>(
         `/api/content-entries?contentTypeId=${testContentType.id}`,
         {
-          headers: { Authorization: `Bearer ${TEST_API_KEY}` },
+          headers: { cookie },
         }
       );
       expect(total).toBeGreaterThanOrEqual(1);
@@ -335,6 +336,33 @@ describe('Content Entry endpoints', async () => {
       expect(items.every((i) => i.contentTypeId === testContentType.id)).toBe(
         true
       );
+    });
+
+    it('API key only sees entries with PUBLISHED versions', async () => {
+      const cookie = await getSessionCookie();
+
+      // Create a published entry to ensure at least one is visible
+      await $fetch('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: testContentType.id,
+          data: {
+            title: `API Key Visible ${Date.now()}`,
+            slug: `api-key-visible-${Date.now()}`,
+          },
+          status: 'PUBLISHED',
+        },
+      });
+
+      const { items } = await $fetch<ListResponse>(
+        `/api/content-entries?contentTypeId=${testContentType.id}`,
+        {
+          headers: { Authorization: `Bearer ${TEST_API_KEY}` },
+        }
+      );
+      expect(items.length).toBeGreaterThanOrEqual(1);
+      expect(items.every((i) => i.status === 'PUBLISHED')).toBe(true);
     });
 
     it('requires contentTypeId (400)', async () => {
@@ -354,8 +382,8 @@ describe('Content Entry endpoints', async () => {
         body: {
           contentTypeId: testContentType.id,
           data: {
-            title: 'Published Entry',
-            slug: 'published-entry',
+            title: `Published Entry ${Date.now()}`,
+            slug: `published-entry-${Date.now()}`,
           },
           status: 'PUBLISHED',
         },
@@ -364,7 +392,7 @@ describe('Content Entry endpoints', async () => {
       const { items } = await $fetch<ListResponse>(
         `/api/content-entries?contentTypeId=${testContentType.id}&status=PUBLISHED`,
         {
-          headers: { Authorization: `Bearer ${TEST_API_KEY}` },
+          headers: { cookie },
         }
       );
       expect(items.length).toBeGreaterThanOrEqual(1);
@@ -373,17 +401,18 @@ describe('Content Entry endpoints', async () => {
   });
 
   describe('GET /api/content-entries/:id', () => {
-    it('returns entry with contentType and fields', async () => {
+    it('returns entry with contentType and fields (session)', async () => {
+      const cookie = await getSessionCookie();
       const { items } = await $fetch<ListResponse>(
         `/api/content-entries?contentTypeId=${testContentType.id}`,
         {
-          headers: { Authorization: `Bearer ${TEST_API_KEY}` },
+          headers: { cookie },
         }
       );
       const entry = await $fetch<EntryResponse>(
         `/api/content-entries/${items[0]!.id}`,
         {
-          headers: { Authorization: `Bearer ${TEST_API_KEY}` },
+          headers: { cookie },
         }
       );
       expect(entry.id).toBe(items[0]!.id);
@@ -391,6 +420,46 @@ describe('Content Entry endpoints', async () => {
       expect(entry.contentType).toBeDefined();
       expect(entry.contentType!.fields).toBeDefined();
       expect(entry.contentType!.fields.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('API key returns 404 for draft-only entry', async () => {
+      const cookie = await getSessionCookie();
+      const created = await $fetch<EntryResponse>('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: testContentType.id,
+          data: { title: `Draft Only ${Date.now()}` },
+        },
+      });
+      expect(created.status).toBe('DRAFT');
+
+      const res = await fetch(`/api/content-entries/${created.id}`, {
+        headers: { Authorization: `Bearer ${TEST_API_KEY}` },
+      });
+      expect(res.status).toBe(404);
+    });
+
+    it('API key returns published entry', async () => {
+      const cookie = await getSessionCookie();
+      const created = await $fetch<EntryResponse>('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: testContentType.id,
+          data: { title: `Published For API ${Date.now()}` },
+          status: 'PUBLISHED',
+        },
+      });
+
+      const entry = await $fetch<EntryResponse>(
+        `/api/content-entries/${created.id}`,
+        {
+          headers: { Authorization: `Bearer ${TEST_API_KEY}` },
+        }
+      );
+      expect(entry.id).toBe(created.id);
+      expect(entry.status).toBe('PUBLISHED');
     });
 
     it('returns 404 for unknown id', async () => {
@@ -813,11 +882,249 @@ describe('Content Entry endpoints', async () => {
       const body = (await res.json()) as { success: boolean };
       expect(body.success).toBe(true);
 
-      // Verify it's gone
+      // Verify it's gone (use session — draft entries aren't visible to API key anyway)
       const getRes = await fetch(`/api/content-entries/${created.id}`, {
-        headers: { Authorization: `Bearer ${TEST_API_KEY}` },
+        headers: { Cookie: cookie },
       });
       expect(getRes.status).toBe(404);
+    });
+  });
+
+  describe('Versioning', () => {
+    it('save draft on a published entry creates a CHANGED version', async () => {
+      const cookie = await getSessionCookie();
+
+      // Create and publish an entry
+      const created = await $fetch<EntryResponse>('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: testContentType.id,
+          data: {
+            title: `Version Test ${Date.now()}`,
+            summary: 'Original',
+          },
+          status: 'PUBLISHED',
+        },
+      });
+      expect(created.status).toBe('PUBLISHED');
+
+      // Save a draft edit (no status: 'PUBLISHED' in body)
+      const updated = await $fetch<EntryResponse>(
+        `/api/content-entries/${created.id}`,
+        {
+          method: 'PUT',
+          headers: { cookie },
+          body: {
+            data: {
+              title: `Version Test ${Date.now()}`,
+              summary: 'Edited draft',
+            },
+          },
+        }
+      );
+
+      // CMS session sees the draft version with CHANGED status
+      expect(updated.status).toBe('CHANGED');
+      expect(updated.data.summary).toBe('Edited draft');
+    });
+
+    it('publish promotes CHANGED version to PUBLISHED', async () => {
+      const cookie = await getSessionCookie();
+      const ts = Date.now();
+
+      // Create and publish
+      const created = await $fetch<EntryResponse>('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: testContentType.id,
+          data: { title: `Promote Test ${ts}`, summary: 'Original' },
+          status: 'PUBLISHED',
+        },
+      });
+
+      // Save a draft edit to create a CHANGED version
+      await $fetch<EntryResponse>(`/api/content-entries/${created.id}`, {
+        method: 'PUT',
+        headers: { cookie },
+        body: {
+          data: { title: `Promote Test ${ts}`, summary: 'Changed content' },
+        },
+      });
+
+      // Publish the CHANGED version
+      const published = await $fetch<EntryResponse>(
+        `/api/content-entries/${created.id}`,
+        {
+          method: 'PUT',
+          headers: { cookie },
+          body: { status: 'PUBLISHED' },
+        }
+      );
+
+      expect(published.status).toBe('PUBLISHED');
+      expect(published.data.summary).toBe('Changed content');
+
+      // API key should now see the updated content
+      const apiView = await $fetch<EntryResponse>(
+        `/api/content-entries/${created.id}`,
+        {
+          headers: { Authorization: `Bearer ${TEST_API_KEY}` },
+        }
+      );
+      expect(apiView.status).toBe('PUBLISHED');
+      expect(apiView.data.summary).toBe('Changed content');
+    });
+
+    it('CMS session includes hasPublishedVersion flag', async () => {
+      const cookie = await getSessionCookie();
+
+      // DRAFT-only entry
+      const draft = await $fetch<
+        EntryResponse & { hasPublishedVersion?: boolean }
+      >('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: testContentType.id,
+          data: { title: `HasPub Flag ${Date.now()}` },
+        },
+      });
+
+      // Fetch via session — should have hasPublishedVersion in response
+      const fetched = await $fetch<
+        EntryResponse & { hasPublishedVersion?: boolean }
+      >(`/api/content-entries/${draft.id}`, { headers: { cookie } });
+      expect(fetched.hasPublishedVersion).toBe(false);
+
+      // Publish it
+      await $fetch(`/api/content-entries/${draft.id}`, {
+        method: 'PUT',
+        headers: { cookie },
+        body: { status: 'PUBLISHED' },
+      });
+
+      const fetchedPublished = await $fetch<
+        EntryResponse & { hasPublishedVersion?: boolean }
+      >(`/api/content-entries/${draft.id}`, { headers: { cookie } });
+      expect(fetchedPublished.hasPublishedVersion).toBe(true);
+    });
+
+    it('draft entries are invisible to API key in list', async () => {
+      const cookie = await getSessionCookie();
+
+      // Create a draft-only entry
+      const draftEntry = await $fetch<EntryResponse>('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: testContentType.id,
+          data: { title: `Draft Invisible ${Date.now()}` },
+        },
+      });
+
+      // API key list should not include this draft entry
+      const { items } = await $fetch<ListResponse>(
+        `/api/content-entries?contentTypeId=${testContentType.id}`,
+        {
+          headers: { Authorization: `Bearer ${TEST_API_KEY}` },
+        }
+      );
+      const found = items.find((i) => i.id === draftEntry.id);
+      expect(found).toBeUndefined();
+    });
+  });
+
+  describe('DELETE /api/content-entries/:id/draft', () => {
+    it('discards CHANGED version and returns published', async () => {
+      const cookie = await getSessionCookie();
+      const ts = Date.now();
+
+      // Create and publish
+      const created = await $fetch<EntryResponse>('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: testContentType.id,
+          data: { title: `Discard Draft ${ts}`, summary: 'Published content' },
+          status: 'PUBLISHED',
+        },
+      });
+
+      // Save a draft edit to create CHANGED version
+      await $fetch(`/api/content-entries/${created.id}`, {
+        method: 'PUT',
+        headers: { cookie },
+        body: {
+          data: {
+            title: `Discard Draft ${ts}`,
+            summary: 'Draft changes to discard',
+          },
+        },
+      });
+
+      // Verify CMS sees CHANGED
+      const changed = await $fetch<EntryResponse>(
+        `/api/content-entries/${created.id}`,
+        { headers: { cookie } }
+      );
+      expect(changed.status).toBe('CHANGED');
+
+      // Discard the draft
+      const discarded = await $fetch<EntryResponse>(
+        `/api/content-entries/${created.id}/draft`,
+        {
+          method: 'DELETE',
+          headers: { Cookie: cookie },
+        }
+      );
+
+      // Should return the published version
+      expect(discarded.status).toBe('PUBLISHED');
+      expect(discarded.data.summary).toBe('Published content');
+    });
+
+    it('returns 404 when no draft version exists', async () => {
+      const cookie = await getSessionCookie();
+
+      // Create a published-only entry (no draft)
+      const created = await $fetch<EntryResponse>('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: testContentType.id,
+          data: { title: `No Draft ${Date.now()}` },
+          status: 'PUBLISHED',
+        },
+      });
+
+      const res = await fetch(`/api/content-entries/${created.id}/draft`, {
+        method: 'DELETE',
+        headers: { Cookie: cookie },
+      });
+      expect(res.status).toBe(404);
+    });
+
+    it('returns 400 when discarding the only version', async () => {
+      const cookie = await getSessionCookie();
+
+      // Create a draft-only entry
+      const created = await $fetch<EntryResponse>('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: testContentType.id,
+          data: { title: `Only Version ${Date.now()}` },
+        },
+      });
+      expect(created.status).toBe('DRAFT');
+
+      const res = await fetch(`/api/content-entries/${created.id}/draft`, {
+        method: 'DELETE',
+        headers: { Cookie: cookie },
+      });
+      expect(res.status).toBe(400);
     });
   });
 });

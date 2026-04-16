@@ -1,4 +1,8 @@
-import { Prisma } from '#prisma';
+import type { Prisma } from '#prisma';
+import {
+  isCmsRequest,
+  getVersionForContext,
+} from '../utils/resolveVersion';
 
 const VALID_STATUSES = new Set<string>([
   'DRAFT',
@@ -13,10 +17,7 @@ export default defineEventHandler(async (event) => {
   const perPage = Math.min(100, Math.max(1, Number(query.perPage) || 15));
   const offset = (page - 1) * perPage;
 
-  const status =
-    typeof query.status === 'string' && VALID_STATUSES.has(query.status)
-      ? query.status
-      : null;
+  const isCms = isCmsRequest(event);
 
   let contentTypeId: string | null = null;
   if (typeof query.contentType === 'string' && query.contentType.length > 0) {
@@ -30,7 +31,24 @@ export default defineEventHandler(async (event) => {
 
   const where: Prisma.ContentEntryWhereInput = {};
   if (contentTypeId) where.contentTypeId = contentTypeId;
-  if (status) where.status = status as Prisma.ContentEntryWhereInput['status'];
+
+  if (isCms) {
+    // CMS: filter by status on versions if requested
+    const status =
+      typeof query.status === 'string' && VALID_STATUSES.has(query.status)
+        ? query.status
+        : null;
+    if (status) {
+      where.versions = {
+        some: {
+          status: status as 'DRAFT' | 'PUBLISHED' | 'CHANGED' | 'ARCHIVED',
+        },
+      };
+    }
+  } else {
+    // API key: only show entries with a PUBLISHED version
+    where.versions = { some: { status: 'PUBLISHED' } };
+  }
 
   const [rows, total] = await Promise.all([
     prisma.contentEntry.findMany({
@@ -38,28 +56,29 @@ export default defineEventHandler(async (event) => {
       orderBy: { updatedAt: 'desc' },
       skip: offset,
       take: perPage,
-      select: {
-        id: true,
-        entryTitle: true,
-        status: true,
-        createdAt: true,
-        updatedAt: true,
-        contentTypeId: true,
+      include: {
+        versions: true,
         contentType: { select: { name: true } },
       },
     }),
     prisma.contentEntry.count({ where }),
   ]);
 
-  const items = rows.map((r) => ({
-    id: r.id,
-    entryTitle: r.entryTitle,
-    status: r.status,
-    createdAt: r.createdAt,
-    updatedAt: r.updatedAt,
-    contentType: r.contentType.name,
-    contentTypeId: r.contentTypeId,
-  }));
+  const items = rows
+    .map((r) => {
+      const version = getVersionForContext(r.versions, isCms);
+      if (!version) return null;
+      return {
+        id: r.id,
+        entryTitle: r.entryTitle,
+        status: version.status,
+        createdAt: r.createdAt,
+        updatedAt: r.updatedAt,
+        contentType: r.contentType.name,
+        contentTypeId: r.contentTypeId,
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null);
 
   return { items, total };
 });

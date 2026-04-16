@@ -36,108 +36,18 @@ const editorFields = computed<FieldConfig[]>(() => {
     .map((f) => mapFieldToConfig(f));
 });
 
-function mapFieldToConfig(field: {
-  identifier: string;
-  name: string;
-  type: string;
-  required: boolean;
-  options: unknown;
-}): FieldConfig {
-  switch (field.type) {
-    case 'ENTRY_TITLE':
-    case 'TEXT':
-      return {
-        type: 'text',
-        key: field.identifier,
-        label: field.name,
-        required: field.required,
-      };
-    case 'TEXTAREA':
-      return {
-        type: 'textarea',
-        key: field.identifier,
-        label: field.name,
-        required: field.required,
-      };
-    case 'NUMBER':
-      return {
-        type: 'number',
-        key: field.identifier,
-        label: field.name,
-        required: field.required,
-      };
-    case 'BOOLEAN':
-      return {
-        type: 'boolean',
-        key: field.identifier,
-        label: field.name,
-      };
-    case 'DATETIME':
-      return {
-        type: 'datetime',
-        key: field.identifier,
-        label: field.name,
-        required: field.required,
-      };
-    case 'SELECT': {
-      const opts = field.options as { choices?: string[] } | null;
-      const choices = opts?.choices ?? [];
-      return {
-        type: 'select',
-        key: field.identifier,
-        label: field.name,
-        required: field.required,
-        options: choices.map((c) => ({ label: c, value: c })),
-      };
-    }
-    case 'RICHTEXT':
-      return {
-        type: 'richtext',
-        key: field.identifier,
-        label: field.name,
-      };
-    case 'RELATION': {
-      const opts = field.options as {
-        targetContentTypeIds?: string[];
-      } | null;
-      return {
-        type: 'dynamic-relation' as const,
-        key: field.identifier,
-        label: field.name,
-        required: field.required,
-        targetContentTypeIds: opts?.targetContentTypeIds ?? [],
-      };
-    }
-    case 'MULTIRELATION': {
-      const opts = field.options as {
-        targetContentTypeIds?: string[];
-      } | null;
-      return {
-        type: 'dynamic-multirelation' as const,
-        key: field.identifier,
-        label: field.name,
-        targetContentTypeIds: opts?.targetContentTypeIds ?? [],
-      };
-    }
-    case 'IMAGE':
-      return {
-        type: 'image' as const,
-        key: field.identifier,
-        label: field.name,
-        required: field.required,
-      };
-    default:
-      return {
-        type: 'text',
-        key: field.identifier,
-        label: field.name,
-        required: field.required,
-      };
-  }
-}
-
-const { formState, loadingStatus, isSaving, saveError, save } =
-  useContentEntryEditor(contentTypeId, entryId);
+const {
+  formState,
+  loadingStatus,
+  isSaving,
+  saveError,
+  status,
+  hasPublishedVersion,
+  isDirty,
+  saveDraft,
+  publish,
+  discardChanges,
+} = useContentEntryEditor(contentTypeId, entryId);
 
 const pageTitle = computed(() => {
   const titleVal = formState[entryTitleFieldIdentifier.value];
@@ -145,9 +55,33 @@ const pageTitle = computed(() => {
   return contentType.value?.name ?? 'Entry';
 });
 
-async function handleSave() {
-  await save();
+async function handleSaveDraft() {
+  await saveDraft();
 }
+async function handlePublish() {
+  await publish();
+}
+async function handleDiscardChanges() {
+  await discardChanges();
+}
+
+// Dirty detection: warn before browser navigation (tab close / address bar)
+if (import.meta.client) {
+  const beforeUnloadHandler = (e: BeforeUnloadEvent) => {
+    if (isDirty.value) e.preventDefault();
+  };
+  onMounted(() => window.addEventListener('beforeunload', beforeUnloadHandler));
+  onBeforeUnmount(() =>
+    window.removeEventListener('beforeunload', beforeUnloadHandler)
+  );
+}
+
+// Dirty detection: warn before in-app route navigation
+onBeforeRouteLeave(() => {
+  if (isDirty.value) {
+    return window.confirm('You have unsaved changes. Leave anyway?');
+  }
+});
 
 // Template helpers to avoid `as` casts in templates
 type RelationRef = {
@@ -358,7 +292,12 @@ function handlePaneSaved(data: {
         :saving="isSaving"
         :error="saveError"
         :show-slug="hasSlugField"
-        :on-save="handleSave"
+        :status="status"
+        :has-published-version="hasPublishedVersion"
+        :is-dirty="isDirty"
+        :on-save-draft="handleSaveDraft"
+        :on-publish="handlePublish"
+        :on-discard-changes="handleDiscardChanges"
       >
         <template #field="{ field, value, update }">
           <RelationField
