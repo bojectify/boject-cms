@@ -16,11 +16,15 @@ export default defineEventHandler(async (event) => {
 
   // Try session auth first
   const session = await getUserSession(event);
-  if (session.user) return;
+  if (session.user) {
+    event.context.authMethod = 'session';
+    return;
+  }
 
   // Fall back to API key auth (read-only access)
   const result = await validateApiKey(event);
   if (result.valid) {
+    event.context.authMethod = 'apikey';
     const method = getMethod(event);
     if (method !== 'GET' && method !== 'HEAD') {
       throw createError({
