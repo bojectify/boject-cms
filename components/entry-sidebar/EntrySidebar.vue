@@ -96,7 +96,7 @@ async function copyEntryId() {
 <template>
   <aside
     :data-testid="testId"
-    class="flex flex-col gap-6 p-6 w-full bg-gray-50/60 dark:bg-gray-900/40"
+    class="flex flex-col gap-6 p-6 bg-gray-50/60 dark:bg-gray-900/40"
   >
     <!-- Actions -->
     <div class="flex flex-col gap-2">
