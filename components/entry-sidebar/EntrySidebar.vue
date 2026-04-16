@@ -9,7 +9,7 @@ const props = withDefaults(defineProps<EntrySidebarProps>(), {
 const { formatDate } = useContentTable();
 const toast = useToast();
 
-const isPublished = computed(
+const isPublishedClean = computed(
   () => props.status === 'PUBLISHED' && !props.isDirty
 );
 const isPublishedDirty = computed(
@@ -18,21 +18,19 @@ const isPublishedDirty = computed(
 const isChanged = computed(() => props.status === 'CHANGED');
 
 const primaryLabel = computed(() => {
-  if (isChanged.value) return 'Publish Changes';
-  if (isPublished.value) return 'Published';
+  if (isChanged.value || isPublishedDirty.value) return 'Publish Changes';
+  if (isPublishedClean.value) return 'Published';
   return 'Publish';
 });
 
-const primaryDisabled = computed(
-  () => isPublished.value || isPublishedDirty.value || props.saving
-);
+const primaryDisabled = computed(() => isPublishedClean.value || props.saving);
 
 const secondaryLabel = computed(() => {
   if (isChanged.value) return 'Save Changes';
   return 'Save Draft';
 });
 
-const secondaryVisible = computed(() => !isPublished.value);
+const secondaryVisible = computed(() => !isPublishedClean.value);
 
 const statusBadgeColor = computed(() => {
   switch (props.status) {
