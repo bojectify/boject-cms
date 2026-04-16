@@ -344,16 +344,11 @@ export function registerDynamicTypes(
                   const byId = new Map(
                     entries
                       .filter((e) => e.versions.length > 0)
-                      .map((e) => [
-                        e.id,
-                        flattenToShape(e, e.versions[0]!),
-                      ])
+                      .map((e) => [e.id, flattenToShape(e, e.versions[0]!)])
                   );
                   return entryIds
                     .map((id) => byId.get(id))
-                    .filter(
-                      (e): e is NonNullable<typeof e> => Boolean(e)
-                    );
+                    .filter((e): e is NonNullable<typeof e> => Boolean(e));
                 }
               ),
           }) as never;

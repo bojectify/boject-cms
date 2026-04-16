@@ -160,9 +160,7 @@ export async function queryDynamicEntries(
 
   if (whereArgs) {
     if (whereArgs.status?.equals) {
-      conditions.push(
-        Prisma.sql`v."status" = ${whereArgs.status.equals}`
-      );
+      conditions.push(Prisma.sql`v."status" = ${whereArgs.status.equals}`);
     }
 
     for (const sysField of ['createdAt', 'updatedAt'] as const) {

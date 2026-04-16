@@ -1,8 +1,5 @@
 import type { Prisma } from '#prisma';
-import {
-  isCmsRequest,
-  getVersionForContext,
-} from '../utils/resolveVersion';
+import { isCmsRequest, getVersionForContext } from '../utils/resolveVersion';
 
 const VALID_STATUSES = new Set<string>([
   'DRAFT',
