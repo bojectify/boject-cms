@@ -58,3 +58,6 @@ storage/
 .claude/*.lock
 .claude/settings.local.json
 .claude/worktrees/
+
+# Git worktrees
+.worktrees/

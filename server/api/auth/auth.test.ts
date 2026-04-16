@@ -59,7 +59,7 @@ describe('Authentication', async () => {
 
   describe('server middleware', () => {
     it('rejects unauthenticated REST API requests', async () => {
-      const response = await $fetch('/api/teams', {
+      const response = await $fetch('/api/content-types', {
         ignoreResponseError: true,
       });
       expect(response).toMatchObject({
@@ -70,7 +70,7 @@ describe('Authentication', async () => {
 
     it('allows REST API requests with a valid API key', async () => {
       const response = await $fetch<{ items: unknown[]; total: number }>(
-        '/api/teams',
+        '/api/content-types',
         {
           headers: { Authorization: `Bearer ${TEST_API_KEY}` },
         }

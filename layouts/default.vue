@@ -15,19 +15,6 @@ async function logout() {
 
 const navItems: NavigationMenuItem[] = [
   { label: 'All Content', icon: 'i-lucide-layout-grid', to: '/' },
-  { label: 'Teams', icon: 'i-lucide-shield', to: '/teams' },
-  { label: 'Players', icon: 'i-lucide-users', to: '/players' },
-  { label: 'Fixtures', icon: 'i-lucide-calendar', to: '/fixtures' },
-  { label: 'Clubs', icon: 'i-lucide-landmark', to: '/clubs' },
-  { label: 'Competitions', icon: 'i-lucide-trophy', to: '/competitions' },
-  { label: 'Seasons', icon: 'i-lucide-clock', to: '/seasons' },
-  { label: 'Images', icon: 'i-lucide-image', to: '/images' },
-  { label: 'Articles', icon: 'i-lucide-newspaper', to: '/articles' },
-  { label: 'Authors', icon: 'i-lucide-pen-tool', to: '/authors' },
-  { label: 'Tags', icon: 'i-lucide-tag', to: '/tags' },
-  { label: 'Tag Groups', icon: 'i-lucide-tags', to: '/tag-groups' },
-  { label: 'Links', icon: 'i-lucide-link', to: '/links' },
-  { label: 'Navigations', icon: 'i-lucide-menu', to: '/navigations' },
 ];
 
 // Dynamic content types section
