@@ -21,6 +21,7 @@ const {
     name: string;
     type: string;
     required: boolean;
+    unique: boolean;
     order: number;
     options: unknown;
   }>;
@@ -117,6 +118,7 @@ const fieldModalField = ref<{
   name: string;
   type: string;
   required: boolean;
+  unique: boolean;
   options: unknown;
 } | null>(null);
 
@@ -132,6 +134,7 @@ function openEditFieldModal(field: {
   name: string;
   type: string;
   required: boolean;
+  unique: boolean;
   options: unknown;
 }) {
   fieldModalMode.value = 'edit';
@@ -144,6 +147,7 @@ async function handleFieldSave(data: {
   name: string;
   type: string;
   required: boolean;
+  unique: boolean;
   options: unknown;
 }) {
   try {
@@ -215,6 +219,7 @@ function fieldMenuItems(field: {
   name: string;
   type: string;
   required: boolean;
+  unique: boolean;
   options: unknown;
 }) {
   return [
