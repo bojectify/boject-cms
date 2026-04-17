@@ -371,19 +371,27 @@ function handlePaneSaved(
   const pf = route.query.pf as string | undefined;
   updateCache(data.contentTypeId, data.entryId, data.entryTitle);
 
-  // Only apply side-effect to root's formState when saving the first pane
-  // (idx=0) and pf is set. Deeper nesting is out of scope for MVP.
+  // Apply side-effect to root's formState when saving the first pane
+  // (idx=0) with ?pf set. Deeper nesting is out of scope for MVP.
   if (pf && paneIdx === 0) {
     applyFieldUpdate(pf, data);
   }
 
-  closePane(paneIdx);
-}
+  // Keep the pane open. If the pane was a `new:<ctid>` sentinel, replace
+  // it with the saved entry id so subsequent saves PUT rather than POST.
+  // Also clears ?pf from the URL since the side-effect has been applied.
+  const fullStackIdx = paneIdx + 1; // paneSegments[paneIdx] is parsedStack[paneIdx + 1]
+  const currentSegment = parsedStack.value[fullStackIdx];
+  if (!currentSegment) return;
 
-function encodePaneKey(pane: PaneSegment, idx: number): string {
-  return pane.kind === 'entry'
-    ? `${idx}:${pane.entryId}`
-    : `${idx}:new:${pane.contentTypeId}`;
+  const replacedSegment: PaneSegment =
+    currentSegment.kind === 'new'
+      ? { kind: 'entry', entryId: data.entryId }
+      : currentSegment;
+
+  const newStack = [...parsedStack.value];
+  newStack[fullStackIdx] = replacedSegment;
+  router.replace(stackHref(newStack));
 }
 </script>
 
@@ -492,7 +500,7 @@ function encodePaneKey(pane: PaneSegment, idx: number): string {
 
     <EntryEditorPane
       v-for="(pane, idx) in paneSegments"
-      :key="encodePaneKey(pane, idx)"
+      :key="`pane-${idx}`"
       :open="true"
       :content-type-id="pane.kind === 'new' ? pane.contentTypeId : undefined"
       :entry-id="pane.kind === 'entry' ? pane.entryId : null"
