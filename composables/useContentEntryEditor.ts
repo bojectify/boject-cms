@@ -39,6 +39,7 @@ export function useContentEntryEditor(
   const formState = reactive<Record<string, unknown>>({});
   const isSaving = ref(false);
   const saveError = ref<string | null>(null);
+  const fieldErrors = ref<Record<string, string>>({});
   const status = ref<'DRAFT' | 'PUBLISHED' | 'CHANGED' | 'ARCHIVED'>('DRAFT');
   const hasPublishedVersion = ref(false);
   const publishedAt = ref<string | null>(null);
@@ -89,6 +90,7 @@ export function useContentEntryEditor(
   async function saveDraft(): Promise<string | void> {
     isSaving.value = true;
     saveError.value = null;
+    fieldErrors.value = {};
     try {
       const data = { ...formState };
       if (isNew.value) {
@@ -116,6 +118,31 @@ export function useContentEntryEditor(
         });
       }
     } catch (err: unknown) {
+      const anyErr = err as {
+        statusCode?: number;
+        data?: { data?: Record<string, unknown>; [key: string]: unknown };
+        message?: string;
+      };
+      const payload = (anyErr?.data?.data ?? anyErr?.data) as
+        | { error?: string; field?: string; message?: string }
+        | undefined;
+      if (
+        anyErr?.statusCode === 409 &&
+        payload?.error === 'UNIQUE_CONFLICT' &&
+        typeof payload.field === 'string'
+      ) {
+        fieldErrors.value = {
+          ...fieldErrors.value,
+          [payload.field]: payload.message ?? 'Must be unique',
+        };
+        saveError.value = payload.message ?? 'Value must be unique';
+        toast.add({
+          title: 'Duplicate value',
+          description: payload.message ?? 'Value must be unique',
+          color: 'error',
+        });
+        return;
+      }
       const message = err instanceof Error ? err.message : 'Failed to save.';
       saveError.value = message;
       toast.add({ title: 'Error', description: message, color: 'error' });
@@ -127,6 +154,7 @@ export function useContentEntryEditor(
   async function publish(): Promise<string | void> {
     isSaving.value = true;
     saveError.value = null;
+    fieldErrors.value = {};
     try {
       const data = { ...formState };
       if (isNew.value) {
@@ -158,6 +186,31 @@ export function useContentEntryEditor(
         });
       }
     } catch (err: unknown) {
+      const anyErr = err as {
+        statusCode?: number;
+        data?: { data?: Record<string, unknown>; [key: string]: unknown };
+        message?: string;
+      };
+      const payload = (anyErr?.data?.data ?? anyErr?.data) as
+        | { error?: string; field?: string; message?: string }
+        | undefined;
+      if (
+        anyErr?.statusCode === 409 &&
+        payload?.error === 'UNIQUE_CONFLICT' &&
+        typeof payload.field === 'string'
+      ) {
+        fieldErrors.value = {
+          ...fieldErrors.value,
+          [payload.field]: payload.message ?? 'Must be unique',
+        };
+        saveError.value = payload.message ?? 'Value must be unique';
+        toast.add({
+          title: 'Duplicate value',
+          description: payload.message ?? 'Value must be unique',
+          color: 'error',
+        });
+        return;
+      }
       const message = err instanceof Error ? err.message : 'Failed to publish.';
       saveError.value = message;
       toast.add({ title: 'Error', description: message, color: 'error' });
@@ -204,6 +257,7 @@ export function useContentEntryEditor(
     loadingStatus,
     isSaving,
     saveError,
+    fieldErrors,
     status,
     hasPublishedVersion,
     publishedAt,

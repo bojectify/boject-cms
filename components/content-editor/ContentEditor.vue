@@ -70,6 +70,9 @@ function validate(formData: Record<string, unknown>): FormError[] {
       }
     }
   }
+  for (const [key, message] of Object.entries(props.fieldErrors ?? {})) {
+    errors.push({ name: key, message });
+  }
   return errors;
 }
 
