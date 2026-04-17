@@ -45,7 +45,6 @@ const editorFields = computed<FieldConfig[]>(() => {
 });
 
 // Entry editor composable
-const effectiveEntryId = computed(() => props.entryId ?? 'new');
 const {
   isNew,
   formState,
@@ -61,7 +60,10 @@ const {
   saveDraft,
   publish,
   discardChanges,
-} = useContentEntryEditor(props.contentTypeId, effectiveEntryId.value);
+} = useContentEntryEditor(
+  () => props.contentTypeId,
+  () => props.entryId ?? 'new'
+);
 
 const pageTitle = computed(() => {
   if (!props.entryId) return `New ${contentType.value?.name ?? 'Entry'}`;
