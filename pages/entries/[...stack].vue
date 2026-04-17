@@ -326,7 +326,6 @@ function handlePickerSelect(data: {
 
 async function handlePickerCreate(ctId: string) {
   const fieldKey = pickerFieldKey.value;
-  console.log('[handlePickerCreate] ctId=', ctId, 'fieldKey=', fieldKey);
   pickerOpen.value = false;
   await nextTick();
   openPane(ctId, null, fieldKey);
@@ -342,86 +341,26 @@ function openPane(
     ? { kind: 'entry', entryId: targetEntryId }
     : { kind: 'new', contentTypeId: targetContentTypeId };
   const newStack = [...parsedStack.value, newSegment];
-  const href = stackHref(newStack);
-  console.log('[openPane] href=', href, 'pf=', fieldKey);
-  router.push({ path: href, query: { pf: fieldKey } });
+  router.push({ path: stackHref(newStack), query: { pf: fieldKey } });
 }
 
 function closePane(idx: number) {
-  console.log(
-    '[closePane] idx=',
-    idx,
-    'formState before push=',
-    JSON.stringify(formState)
-  );
   // idx is 0-based within paneSegments. Keep root + first `idx` panes.
   const newStack = parsedStack.value.slice(0, idx + 1);
   router.push(stackHref(newStack));
-  setTimeout(() => {
-    console.log(
-      '[closePane +50ms] formState after push=',
-      JSON.stringify(formState)
-    );
-  }, 50);
 }
-
-// Watch formState keys for unexpected mutations
-watch(
-  () => JSON.stringify(formState),
-  (next, prev) => {
-    if (next !== prev) {
-      console.log('[formState changed]', { prev, next });
-    }
-  }
-);
 
 function applyFieldUpdate(
   fieldKey: string,
   data: { contentTypeId: string; entryId: string }
 ) {
   const field = editorFields.value.find((f) => f.key === fieldKey);
-  console.log(
-    '[applyFieldUpdate] fieldKey=',
-    fieldKey,
-    'field=',
-    field,
-    'editorFields keys=',
-    editorFields.value.map((f) => f.key)
-  );
   if (!field) return;
-  console.log(
-    '[applyFieldUpdate] formState before=',
-    JSON.stringify(formState)
-  );
   if (field.type === 'dynamic-relation') {
     formState[fieldKey] = {
       contentTypeId: data.contentTypeId,
       entryId: data.entryId,
     };
-    console.log(
-      '[applyFieldUpdate] formState after assign=',
-      JSON.stringify(formState),
-      'readback=',
-      formState[fieldKey]
-    );
-    setTimeout(() => {
-      console.log(
-        '[applyFieldUpdate +100ms] formState[fieldKey]=',
-        formState[fieldKey],
-        'full=',
-        JSON.stringify(formState)
-      );
-    }, 100);
-    setTimeout(() => {
-      console.log(
-        '[applyFieldUpdate +1000ms] formState[fieldKey]=',
-        formState[fieldKey],
-        'full=',
-        JSON.stringify(formState),
-        'resolvedRelations=',
-        JSON.stringify(resolvedRelations)
-      );
-    }, 1000);
   } else if (field.type === 'dynamic-multirelation') {
     const current =
       (formState[fieldKey] as Array<{
@@ -442,16 +381,6 @@ function handlePaneSaved(
   data: { contentTypeId: string; entryId: string; entryTitle: string }
 ) {
   const pf = route.query.pf as string | undefined;
-  console.log(
-    '[handlePaneSaved] paneIdx=',
-    paneIdx,
-    'pf=',
-    pf,
-    'data=',
-    data,
-    'route.fullPath=',
-    route.fullPath
-  );
   updateCache(data.contentTypeId, data.entryId, data.entryTitle);
 
   // Apply side-effect to root's formState when saving the first pane
