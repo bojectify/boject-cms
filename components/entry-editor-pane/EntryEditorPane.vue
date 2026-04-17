@@ -42,6 +42,7 @@ const {
   saveDraft,
   publish,
   discardChanges,
+  generateSlug,
 } = useContentEntryEditor(
   () => props.contentTypeId ?? '',
   () => props.entryId ?? 'new'
@@ -78,8 +79,9 @@ const resolvedContentTypeId = computed(
   () => contentType.value?.id ?? props.contentTypeId ?? ''
 );
 
-const hasSlugField = computed(
-  () => contentType.value?.fields.some((f) => f.type === 'SLUG') ?? false
+const slugFieldIdentifier = computed(
+  () =>
+    contentType.value?.fields.find((f) => f.type === 'SLUG')?.identifier ?? null
 );
 
 const entryTitleFieldIdentifier = computed(() => {
@@ -89,10 +91,18 @@ const entryTitleFieldIdentifier = computed(() => {
 
 const editorFields = computed<FieldConfig[]>(() => {
   if (!contentType.value) return [];
-  return contentType.value.fields
-    .filter((f) => f.type !== 'SLUG')
-    .map((f) => mapFieldToConfig(f));
+  return contentType.value.fields.map((f) => mapFieldToConfig(f));
 });
+
+watch(
+  () => formState[entryTitleFieldIdentifier.value],
+  (val) => {
+    const slugKey = slugFieldIdentifier.value;
+    if (isNew.value && typeof val === 'string' && slugKey) {
+      formState[slugKey] = generateSlug(val);
+    }
+  }
+);
 
 const pageTitle = computed(() => {
   if (!props.entryId) return `New ${contentType.value?.name ?? 'Entry'}`;
@@ -183,7 +193,6 @@ defineExpose({ isDirty });
               :fields="editorFields"
               :loading="loadingStatus === 'pending'"
               :error="saveError"
-              :show-slug="hasSlugField"
             />
           </div>
           <EntrySidebar
