@@ -377,6 +377,7 @@ function handlePaneSaved(data: {
     />
 
     <EntryEditorPane
+      :key="`${paneContentTypeId}:${paneEntryId ?? 'new'}`"
       :open="paneOpen"
       :content-type-id="paneContentTypeId"
       :entry-id="paneEntryId"
