@@ -6,6 +6,7 @@ export const QA_ENTRY_SIDEBAR = {
     SAVE_BTN: 'save-btn',
     DISCARD_BTN: 'discard-btn',
     STATUS_BADGE: 'status-badge',
+    UNSAVED_INDICATOR: 'unsaved-indicator',
     COPY_ID_BTN: 'copy-id-btn',
   }),
 };

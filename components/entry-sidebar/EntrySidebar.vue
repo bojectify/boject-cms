@@ -144,6 +144,17 @@ async function copyEntryId() {
         <span class="text-muted">Published</span>
         <span>{{ formatDate(publishedAt as string) }}</span>
       </div>
+      <div
+        v-if="isDirty"
+        class="flex items-center gap-2 text-sm"
+        :data-testid="QA_ENTRY_SIDEBAR.UNSAVED_INDICATOR"
+      >
+        <span
+          class="size-1.5 rounded-full bg-amber-500 shrink-0"
+          aria-hidden="true"
+        />
+        <span class="text-amber-700 dark:text-amber-400">Unsaved edits</span>
+      </div>
     </div>
 
     <template v-if="showInformation">
