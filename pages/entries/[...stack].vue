@@ -355,11 +355,39 @@ function applyFieldUpdate(
     editorFields.value.map((f) => f.key)
   );
   if (!field) return;
+  console.log(
+    '[applyFieldUpdate] formState before=',
+    JSON.stringify(formState)
+  );
   if (field.type === 'dynamic-relation') {
     formState[fieldKey] = {
       contentTypeId: data.contentTypeId,
       entryId: data.entryId,
     };
+    console.log(
+      '[applyFieldUpdate] formState after assign=',
+      JSON.stringify(formState),
+      'readback=',
+      formState[fieldKey]
+    );
+    setTimeout(() => {
+      console.log(
+        '[applyFieldUpdate +100ms] formState[fieldKey]=',
+        formState[fieldKey],
+        'full=',
+        JSON.stringify(formState)
+      );
+    }, 100);
+    setTimeout(() => {
+      console.log(
+        '[applyFieldUpdate +1000ms] formState[fieldKey]=',
+        formState[fieldKey],
+        'full=',
+        JSON.stringify(formState),
+        'resolvedRelations=',
+        JSON.stringify(resolvedRelations)
+      );
+    }, 1000);
   } else if (field.type === 'dynamic-multirelation') {
     const current =
       (formState[fieldKey] as Array<{
