@@ -314,6 +314,7 @@ function handlePickerSelect(data: {
 
 async function handlePickerCreate(ctId: string) {
   const fieldKey = pickerFieldKey.value;
+  console.log('[handlePickerCreate] ctId=', ctId, 'fieldKey=', fieldKey);
   pickerOpen.value = false;
   await nextTick();
   openPane(ctId, null, fieldKey);
@@ -329,7 +330,9 @@ function openPane(
     ? { kind: 'entry', entryId: targetEntryId }
     : { kind: 'new', contentTypeId: targetContentTypeId };
   const newStack = [...parsedStack.value, newSegment];
-  router.push({ path: stackHref(newStack), query: { pf: fieldKey } });
+  const href = stackHref(newStack);
+  console.log('[openPane] href=', href, 'pf=', fieldKey);
+  router.push({ path: href, query: { pf: fieldKey } });
 }
 
 function closePane(idx: number) {
@@ -343,6 +346,14 @@ function applyFieldUpdate(
   data: { contentTypeId: string; entryId: string }
 ) {
   const field = editorFields.value.find((f) => f.key === fieldKey);
+  console.log(
+    '[applyFieldUpdate] fieldKey=',
+    fieldKey,
+    'field=',
+    field,
+    'editorFields keys=',
+    editorFields.value.map((f) => f.key)
+  );
   if (!field) return;
   if (field.type === 'dynamic-relation') {
     formState[fieldKey] = {
@@ -369,6 +380,16 @@ function handlePaneSaved(
   data: { contentTypeId: string; entryId: string; entryTitle: string }
 ) {
   const pf = route.query.pf as string | undefined;
+  console.log(
+    '[handlePaneSaved] paneIdx=',
+    paneIdx,
+    'pf=',
+    pf,
+    'data=',
+    data,
+    'route.fullPath=',
+    route.fullPath
+  );
   updateCache(data.contentTypeId, data.entryId, data.entryTitle);
 
   // Apply side-effect to root's formState when saving the first pane
