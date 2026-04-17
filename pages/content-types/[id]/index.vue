@@ -121,10 +121,15 @@ const fieldModalField = ref<{
   unique: boolean;
   options: unknown;
 } | null>(null);
+const conflictAlert = ref<{
+  message: string;
+  conflicts: Array<{ value: unknown; entryIds: string[] }>;
+} | null>(null);
 
 function openAddFieldModal() {
   fieldModalMode.value = 'add';
   fieldModalField.value = null;
+  conflictAlert.value = null;
   fieldModalOpen.value = true;
 }
 
@@ -139,6 +144,7 @@ function openEditFieldModal(field: {
 }) {
   fieldModalMode.value = 'edit';
   fieldModalField.value = field;
+  conflictAlert.value = null;
   fieldModalOpen.value = true;
 }
 
@@ -150,6 +156,7 @@ async function handleFieldSave(data: {
   unique: boolean;
   options: unknown;
 }) {
+  conflictAlert.value = null;
   try {
     if (fieldModalMode.value === 'add') {
       await $fetch(`/api/content-types/${id}/fields`, {
@@ -159,6 +166,7 @@ async function handleFieldSave(data: {
           name: data.name,
           type: data.type,
           required: data.required,
+          unique: data.unique,
           ...(data.options ? { options: data.options } : {}),
         },
       });
@@ -175,6 +183,7 @@ async function handleFieldSave(data: {
           body: {
             name: data.name,
             required: data.required,
+            unique: data.unique,
             ...(data.options ? { options: data.options } : {}),
           },
         }
@@ -188,6 +197,31 @@ async function handleFieldSave(data: {
     fieldModalOpen.value = false;
     await refresh();
   } catch (err: unknown) {
+    // Read the error as-is, then probe for a h3-wrapped UNIQUE_CONFLICT data body.
+    const anyErr = err as {
+      statusCode?: number;
+      data?: { data?: Record<string, unknown>; [key: string]: unknown };
+    };
+    const payload = (anyErr?.data?.data ?? anyErr?.data) as
+      | {
+          error?: string;
+          message?: string;
+          conflicts?: Array<{ value: unknown; entryIds: string[] }>;
+        }
+      | undefined;
+    if (
+      anyErr?.statusCode === 409 &&
+      payload?.error === 'UNIQUE_CONFLICT' &&
+      Array.isArray(payload.conflicts)
+    ) {
+      conflictAlert.value = {
+        message:
+          payload.message ??
+          'Cannot mark field as unique — existing entries have duplicate values',
+        conflicts: payload.conflicts,
+      };
+      return; // Keep the modal open so the user can see the alert
+    }
     const message =
       err instanceof Error ? err.message : 'Failed to save field.';
     toast.add({ title: 'Error', description: message, color: 'error' });
@@ -364,7 +398,7 @@ async function onFieldReorder() {
                     Required
                   </UBadge>
                   <UBadge
-                    v-if="field.type === 'ENTRY_TITLE' || field.type === 'SLUG'"
+                    v-if="field.unique"
                     color="info"
                     size="sm"
                     variant="subtle"
@@ -394,6 +428,7 @@ async function onFieldReorder() {
       :field="fieldModalField"
       :field-type-options="fieldTypeOptions"
       :entry-count="contentType?._count.entries"
+      :conflict-alert="conflictAlert"
       @close="fieldModalOpen = false"
       @save="handleFieldSave"
       @delete="handleFieldDelete"
