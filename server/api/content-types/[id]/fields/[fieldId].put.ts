@@ -3,6 +3,7 @@ import { assertUuid, assertStringLength } from '../../../../utils/validation';
 import { withPrismaErrors } from '../../../../utils/prismaErrors';
 import { enforceMutationRateLimit } from '../../../../utils/rateLimitEndpoint';
 import { invalidateSchema } from '../../../../graphql/schema';
+import { resolveUniqueFlag } from '../../../../utils/validateFieldUnique';
 
 const VALID_FIELD_TYPES = new Set<string>([
   'ENTRY_TITLE',
@@ -52,6 +53,26 @@ export default defineEventHandler(async (event) => {
   }
   if ('options' in body) {
     data.options = body.options ?? undefined;
+  }
+  if ('unique' in body) {
+    if (typeof body.unique !== 'boolean') {
+      throw createError({
+        statusCode: 400,
+        statusMessage: 'unique must be a boolean',
+      });
+    }
+    if (
+      (field.type === 'ENTRY_TITLE' || field.type === 'SLUG') &&
+      body.unique === false
+    ) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: `unique cannot be disabled on ${field.type} fields`,
+      });
+    }
+    // Force implicit-unique types back to true even if body says true explicitly.
+    // Throw for user-configurable types requesting unique on a non-TEXT/NUMBER field.
+    data.unique = resolveUniqueFlag(field.type, body.unique);
   }
 
   // If updating type, block if entries exist
