@@ -336,10 +336,32 @@ function openPane(
 }
 
 function closePane(idx: number) {
+  console.log(
+    '[closePane] idx=',
+    idx,
+    'formState before push=',
+    JSON.stringify(formState)
+  );
   // idx is 0-based within paneSegments. Keep root + first `idx` panes.
   const newStack = parsedStack.value.slice(0, idx + 1);
   router.push(stackHref(newStack));
+  setTimeout(() => {
+    console.log(
+      '[closePane +50ms] formState after push=',
+      JSON.stringify(formState)
+    );
+  }, 50);
 }
+
+// Watch formState keys for unexpected mutations
+watch(
+  () => JSON.stringify(formState),
+  (next, prev) => {
+    if (next !== prev) {
+      console.log('[formState changed]', { prev, next });
+    }
+  }
+);
 
 function applyFieldUpdate(
   fieldKey: string,
