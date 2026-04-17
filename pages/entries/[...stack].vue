@@ -217,16 +217,17 @@ if (import.meta.client) {
   );
 }
 
-onBeforeRouteLeave((to, from) => {
-  // External navigation (different route): check root + all panes.
-  if (to.name !== from.name) {
-    if (isDirty.value || anyPaneDirty()) {
-      return window.confirm('You have unsaved changes. Leave anyway?');
-    }
-    return;
+// Fires when leaving the catch-all entirely (different root, external nav).
+onBeforeRouteLeave(() => {
+  if (isDirty.value || anyPaneDirty()) {
+    return window.confirm('You have unsaved changes. Leave anyway?');
   }
-  // Same-page navigation: only prompt when the stack is shrinking (a pane
-  // is being closed) and at least one closing pane has unsaved edits.
+});
+
+// Fires on same-component navigation (opening / closing panes, URL replaces
+// during save). The catch-all page is keyed by root entry, so pane-stack
+// changes land here instead of onBeforeRouteLeave.
+onBeforeRouteUpdate((to, from) => {
   const fromCount = paneCountFor(from.params.stack);
   const toCount = paneCountFor(to.params.stack);
   if (toCount < fromCount && anyPaneDirty(toCount)) {
