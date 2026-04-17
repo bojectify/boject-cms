@@ -24,10 +24,9 @@ export function useContentEntryEditor(
         `/api/content-entries/${entryIdRef.value}`
       );
       loadingStatus.value = 'success';
-    } catch (err) {
+    } catch {
       entry.value = null;
       loadingStatus.value = 'error';
-      throw err;
     }
   }
 
