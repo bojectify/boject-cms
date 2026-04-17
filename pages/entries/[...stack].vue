@@ -1,14 +1,26 @@
 <script setup lang="ts">
 import type { FieldConfig } from '~/types/contentEditor';
+import { parseStack, stackHref, type PaneSegment } from '~/utils/paneStack';
+
+// Key the page by root entry only, so opening/closing panes and
+// replacing a new:<ctid> sentinel with the saved entry id do NOT remount
+// the page (default pageKey is route.path, which changes on any stack
+// mutation — remounting wipes formState mid-flow).
+definePageMeta({
+  key: (route) => {
+    const raw = route.params.stack;
+    const arr = Array.isArray(raw) ? raw : raw ? [raw] : [];
+    return `entries:${arr[0] ?? ''}`;
+  },
+});
 
 const route = useRoute();
-const contentTypeId = route.params.id as string;
-const entryId = route.params.entryId as string;
+const router = useRouter();
 
-// Fetch content type to get field definitions
-const { data: contentType } = await useAuthedFetch<{
+type ContentTypeShape = {
   id: string;
   name: string;
+  identifier: string;
   fields: Array<{
     identifier: string;
     name: string;
@@ -16,28 +28,54 @@ const { data: contentType } = await useAuthedFetch<{
     required: boolean;
     options: unknown;
   }>;
-}>(`/api/content-types/${contentTypeId}`);
+};
 
-const hasSlugField = computed(
-  () => contentType.value?.fields.some((f) => f.type === 'SLUG') ?? false
+// ---- Stack parsing ----
+const stackSegments = computed<string[]>(() => {
+  const raw = route.params.stack;
+  return Array.isArray(raw) ? raw : raw ? [raw] : [];
+});
+
+const parsedStack = computed<PaneSegment[]>(() => {
+  try {
+    return parseStack(stackSegments.value);
+  } catch {
+    return [];
+  }
+});
+
+if (parsedStack.value.length === 0) {
+  throw createError({ statusCode: 404, statusMessage: 'Invalid entry path' });
+}
+
+// Safe non-null fallback: the createError above guarantees a non-empty
+// stack at this point, but TypeScript can't infer that across the
+// reactive boundary.
+const FALLBACK_ROOT: PaneSegment = { kind: 'new', contentTypeId: '' };
+
+const root = computed<PaneSegment>(() => parsedStack.value[0] ?? FALLBACK_ROOT);
+const paneSegments = computed<PaneSegment[]>(() => parsedStack.value.slice(1));
+
+const rootIsNew = computed(() => root.value.kind === 'new');
+const rootEntryIdForComposable = computed(() =>
+  root.value.kind === 'entry' ? root.value.entryId : 'new'
+);
+const rootContentTypeIdSentinel = computed(() =>
+  root.value.kind === 'new' ? root.value.contentTypeId : ''
 );
 
-const entryTitleFieldIdentifier = computed(() => {
-  const field = contentType.value?.fields.find((f) => f.type === 'ENTRY_TITLE');
-  return field?.identifier ?? 'title';
-});
-
-// Map ContentTypeField definitions to FieldConfig for ContentEditor
-// Filter out SLUG fields (handled by ContentEditor's built-in slug section)
-const editorFields = computed<FieldConfig[]>(() => {
-  if (!contentType.value) return [];
-  return contentType.value.fields
-    .filter((f) => f.type !== 'SLUG')
-    .map((f) => mapFieldToConfig(f));
-});
+// ---- Root editor ----
+// Declared as a function (not computed) so it can be referenced by
+// `useContentEntryEditor` before the derived content-type ref exists —
+// the getter is called lazily by the composable.
+function resolveRootContentTypeId(): string {
+  if (rootIsNew.value) return rootContentTypeIdSentinel.value;
+  return contentTypeFromEntry.value?.id ?? '';
+}
 
 const {
   isNew,
+  entry: rootEntry,
   formState,
   loadingStatus,
   isSaving,
@@ -51,13 +89,73 @@ const {
   saveDraft,
   publish,
   discardChanges,
-} = useContentEntryEditor(contentTypeId, entryId);
+  generateSlug,
+} = useContentEntryEditor(
+  () => resolveRootContentTypeId(),
+  () => rootEntryIdForComposable.value
+);
+
+// Derive content type from whichever source is active
+const contentTypeFromEntry = computed<ContentTypeShape | null>(() => {
+  const ct = (rootEntry.value as { contentType?: ContentTypeShape } | null)
+    ?.contentType;
+  return ct ?? null;
+});
+
+// For new entries, fetch /api/content-types/:id. Conditional URL: return
+// null to skip the fetch. The `as () => string` cast matches the
+// Task 2a approach — Nuxt's type signature doesn't expose the null-skip
+// behaviour but it works at runtime.
+const { data: contentTypeFromApi } = useAuthedFetch<ContentTypeShape>(
+  (() => {
+    if (!rootIsNew.value) return null;
+    if (!rootContentTypeIdSentinel.value) return null;
+    return `/api/content-types/${rootContentTypeIdSentinel.value}`;
+  }) as () => string,
+  {
+    watch: [() => rootIsNew.value, () => rootContentTypeIdSentinel.value],
+  }
+);
+
+const contentType = computed<ContentTypeShape | null>(() => {
+  if (rootIsNew.value) {
+    return (contentTypeFromApi.value as ContentTypeShape | null) ?? null;
+  }
+  return contentTypeFromEntry.value;
+});
+
+const hasSlugField = computed(
+  () => contentType.value?.fields.some((f) => f.type === 'SLUG') ?? false
+);
+
+const entryTitleFieldIdentifier = computed(() => {
+  const field = contentType.value?.fields.find((f) => f.type === 'ENTRY_TITLE');
+  return field?.identifier ?? 'title';
+});
+
+const editorFields = computed<FieldConfig[]>(() => {
+  if (!contentType.value) return [];
+  return contentType.value.fields
+    .filter((f) => f.type !== 'SLUG')
+    .map((f) => mapFieldToConfig(f));
+});
 
 const pageTitle = computed(() => {
+  if (rootIsNew.value) return `New ${contentType.value?.name ?? 'Entry'}`;
   const titleVal = formState[entryTitleFieldIdentifier.value];
   if (typeof titleVal === 'string' && titleVal) return titleVal;
   return contentType.value?.name ?? 'Entry';
 });
+
+// Auto-generate slug from ENTRY_TITLE field for new entries
+watch(
+  () => formState[entryTitleFieldIdentifier.value],
+  (val) => {
+    if (rootIsNew.value && typeof val === 'string' && hasSlugField.value) {
+      formState.slug = generateSlug(val);
+    }
+  }
+);
 
 const editorRef = useTemplateRef<{ validate: () => Promise<boolean> }>(
   'editorRef'
@@ -66,18 +164,26 @@ const editorRef = useTemplateRef<{ validate: () => Promise<boolean> }>(
 async function handleSaveDraft() {
   const valid = await editorRef.value?.validate();
   if (valid === false) return;
-  await saveDraft();
+  const newId = await saveDraft();
+  if (newId && rootIsNew.value) {
+    await router.replace(`/entries/${newId}`);
+  }
 }
+
 async function handlePublish() {
   const valid = await editorRef.value?.validate();
   if (valid === false) return;
-  await publish();
+  const newId = await publish();
+  if (newId && rootIsNew.value) {
+    await router.replace(`/entries/${newId}`);
+  }
 }
+
 async function handleDiscardChanges() {
   await discardChanges();
 }
 
-// Dirty detection: warn before browser navigation (tab close / address bar)
+// ---- Dirty guards ----
 if (import.meta.client) {
   const beforeUnloadHandler = (e: BeforeUnloadEvent) => {
     if (isDirty.value) e.preventDefault();
@@ -88,14 +194,15 @@ if (import.meta.client) {
   );
 }
 
-// Dirty detection: warn before in-app route navigation
-onBeforeRouteLeave(() => {
+onBeforeRouteLeave((to, from) => {
+  // Allow navigation within the same catch-all page (opening/closing panes)
+  if (to.name === from.name) return;
   if (isDirty.value) {
     return window.confirm('You have unsaved changes. Leave anyway?');
   }
 });
 
-// Template helpers to avoid `as` casts in templates
+// ---- Template helpers ----
 type RelationRef = {
   contentTypeId: string;
   entryId: string;
@@ -126,7 +233,7 @@ function handleRelationEdit(value: unknown, fieldKey: string) {
   }
 }
 
-// Relation field state
+// ---- Relation resolver ----
 const { resolveRef, resolveRefs, updateCache } = useRelationResolver();
 
 const resolvedRelations = reactive<
@@ -144,7 +251,6 @@ const resolvedMultiRelations = reactive<
   >
 >({});
 
-// Resolve references when formState changes
 watch(
   () => ({ ...formState }),
   async () => {
@@ -180,7 +286,7 @@ watch(
   { immediate: true }
 );
 
-// Picker modal state
+// ---- Picker modal state ----
 const pickerOpen = ref(false);
 const pickerFieldKey = ref('');
 const pickerTargetTypeIds = ref<string[]>([]);
@@ -218,43 +324,44 @@ function handlePickerSelect(data: {
   pickerOpen.value = false;
 }
 
-// Editor pane state
-const paneOpen = ref(false);
-const paneContentTypeId = ref('');
-const paneEntryId = ref<string | null>(null);
-const paneFieldKey = ref('');
+async function handlePickerCreate(ctId: string) {
+  const fieldKey = pickerFieldKey.value;
+  pickerOpen.value = false;
+  await nextTick();
+  openPane(ctId, null, fieldKey);
+}
 
+// ---- Pane navigation ----
 function openPane(
   targetContentTypeId: string,
   targetEntryId: string | null,
   fieldKey: string
 ) {
-  paneContentTypeId.value = targetContentTypeId;
-  paneEntryId.value = targetEntryId;
-  paneFieldKey.value = fieldKey;
-  paneOpen.value = true;
+  const newSegment: PaneSegment = targetEntryId
+    ? { kind: 'entry', entryId: targetEntryId }
+    : { kind: 'new', contentTypeId: targetContentTypeId };
+  const newStack = [...parsedStack.value, newSegment];
+  router.push({ path: stackHref(newStack), query: { pf: fieldKey } });
 }
 
-async function handlePickerCreate(contentTypeId: string) {
-  pickerOpen.value = false;
-  await nextTick();
-  openPane(contentTypeId, null, pickerFieldKey.value);
+function closePane(idx: number) {
+  // idx is 0-based within paneSegments. Keep root + first `idx` panes.
+  const newStack = parsedStack.value.slice(0, idx + 1);
+  router.push(stackHref(newStack));
 }
 
-function handlePaneSaved(data: {
-  contentTypeId: string;
-  entryId: string;
-  entryTitle: string;
-}) {
-  const fieldKey = paneFieldKey.value;
+function applyFieldUpdate(
+  fieldKey: string,
+  data: { contentTypeId: string; entryId: string }
+) {
   const field = editorFields.value.find((f) => f.key === fieldKey);
-  updateCache(data.contentTypeId, data.entryId, data.entryTitle);
-  if (field?.type === 'dynamic-relation') {
+  if (!field) return;
+  if (field.type === 'dynamic-relation') {
     formState[fieldKey] = {
       contentTypeId: data.contentTypeId,
       entryId: data.entryId,
     };
-  } else if (field?.type === 'dynamic-multirelation') {
+  } else if (field.type === 'dynamic-multirelation') {
     const current =
       (formState[fieldKey] as Array<{
         contentTypeId: string;
@@ -263,14 +370,40 @@ function handlePaneSaved(data: {
     if (!current.some((r) => r.entryId === data.entryId)) {
       formState[fieldKey] = [
         ...current,
-        {
-          contentTypeId: data.contentTypeId,
-          entryId: data.entryId,
-        },
+        { contentTypeId: data.contentTypeId, entryId: data.entryId },
       ];
     }
   }
-  paneOpen.value = false;
+}
+
+function handlePaneSaved(
+  paneIdx: number,
+  data: { contentTypeId: string; entryId: string; entryTitle: string }
+) {
+  const pf = route.query.pf as string | undefined;
+  updateCache(data.contentTypeId, data.entryId, data.entryTitle);
+
+  // Apply side-effect to root's formState when saving the first pane
+  // (idx=0) with ?pf set. Deeper nesting is out of scope for MVP.
+  if (pf && paneIdx === 0) {
+    applyFieldUpdate(pf, data);
+  }
+
+  // Keep the pane open. If the pane was a `new:<ctid>` sentinel, replace
+  // it with the saved entry id so subsequent saves PUT rather than POST.
+  // Also clears ?pf from the URL since the side-effect has been applied.
+  const fullStackIdx = paneIdx + 1; // paneSegments[paneIdx] is parsedStack[paneIdx + 1]
+  const currentSegment = parsedStack.value[fullStackIdx];
+  if (!currentSegment) return;
+
+  const replacedSegment: PaneSegment =
+    currentSegment.kind === 'new'
+      ? { kind: 'entry', entryId: data.entryId }
+      : currentSegment;
+
+  const newStack = [...parsedStack.value];
+  newStack[fullStackIdx] = replacedSegment;
+  router.replace(stackHref(newStack));
 }
 </script>
 
@@ -284,14 +417,15 @@ function handlePaneSaved(data: {
         variant="ghost"
         icon="i-lucide-arrow-left"
         size="sm"
-        :to="`/content-types/${contentTypeId}/entries`"
+        :to="contentType ? `/content-types/${contentType.id}/entries` : '/'"
       />
       <USeparator orientation="vertical" class="h-4" />
       <NuxtLink
-        :to="`/content-types/${contentTypeId}`"
+        v-if="contentType"
+        :to="`/content-types/${contentType.id}`"
         class="flex items-center gap-1.5 text-xs text-muted hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
       >
-        {{ contentType?.name ?? 'Content Type' }}
+        {{ contentType.name }}
         <UIcon name="i-lucide-external-link" class="size-3" />
       </NuxtLink>
     </div>
@@ -356,9 +490,9 @@ function handlePaneSaved(data: {
         :saving="isSaving"
         :has-published-version="hasPublishedVersion"
         :is-new="isNew"
-        :entry-id="isNew ? null : entryId"
+        :entry-id="root.kind === 'entry' ? root.entryId : null"
         :content-type-name="contentType?.name ?? ''"
-        :content-type-id="contentTypeId"
+        :content-type-id="contentType?.id ?? ''"
         :created-at="createdAt"
         :updated-at="updatedAt"
         :published-at="publishedAt"
@@ -377,12 +511,13 @@ function handlePaneSaved(data: {
     />
 
     <EntryEditorPane
-      :key="`${paneContentTypeId}:${paneEntryId ?? 'new'}`"
-      :open="paneOpen"
-      :content-type-id="paneContentTypeId"
-      :entry-id="paneEntryId"
-      @close="paneOpen = false"
-      @saved="handlePaneSaved"
+      v-for="(pane, idx) in paneSegments"
+      :key="`pane-${idx}`"
+      :open="true"
+      :content-type-id="pane.kind === 'new' ? pane.contentTypeId : undefined"
+      :entry-id="pane.kind === 'entry' ? pane.entryId : null"
+      @close="closePane(idx)"
+      @saved="(data) => handlePaneSaved(idx, data)"
     />
   </div>
 </template>
