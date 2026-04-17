@@ -12,8 +12,7 @@ const emit = defineEmits<{
   saved: [data: { contentTypeId: string; entryId: string; entryTitle: string }];
 }>();
 
-// Fetch content type for field definitions
-const { data: contentType } = useAuthedFetch<{
+type ContentTypeShape = {
   id: string;
   name: string;
   identifier: string;
@@ -24,9 +23,60 @@ const { data: contentType } = useAuthedFetch<{
     required: boolean;
     options: unknown;
   }>;
-}>(() => `/api/content-types/${props.contentTypeId}`, {
-  watch: [() => props.contentTypeId],
+};
+
+// Entry editor composable (fetches the entry when editing existing)
+const {
+  isNew,
+  entry,
+  formState,
+  loadingStatus,
+  isSaving,
+  saveError,
+  status,
+  hasPublishedVersion,
+  publishedAt,
+  createdAt,
+  updatedAt,
+  isDirty,
+  saveDraft,
+  publish,
+  discardChanges,
+} = useContentEntryEditor(
+  () => props.contentTypeId ?? '',
+  () => props.entryId ?? 'new'
+);
+
+// For existing entries, derive the content type from the entry response.
+// For new entries, fetch /api/content-types/:id directly.
+// Conditional URL: return null to skip the fetch (Nuxt useFetch behaviour).
+// The `as string` cast is required because Nuxt's type signature doesn't
+// expose the null-skip behaviour, but it works at runtime.
+const { data: contentTypeFromApi } = useAuthedFetch<ContentTypeShape>(
+  (() => {
+    if (props.entryId) return null;
+    if (!props.contentTypeId) return null;
+    return `/api/content-types/${props.contentTypeId}`;
+  }) as () => string,
+  {
+    watch: [() => props.contentTypeId, () => props.entryId],
+  }
+);
+
+const contentTypeFromEntry = computed<ContentTypeShape | null>(() => {
+  const ct = (entry.value as { contentType?: ContentTypeShape } | null)
+    ?.contentType;
+  return ct ?? null;
 });
+
+const contentType = computed<ContentTypeShape | null>(() => {
+  if (props.entryId) return contentTypeFromEntry.value;
+  return (contentTypeFromApi.value as ContentTypeShape | null) ?? null;
+});
+
+const resolvedContentTypeId = computed(
+  () => contentType.value?.id ?? props.contentTypeId ?? ''
+);
 
 const hasSlugField = computed(
   () => contentType.value?.fields.some((f) => f.type === 'SLUG') ?? false
@@ -44,25 +94,6 @@ const editorFields = computed<FieldConfig[]>(() => {
     .map((f) => mapFieldToConfig(f));
 });
 
-// Entry editor composable
-const effectiveEntryId = computed(() => props.entryId ?? 'new');
-const {
-  isNew,
-  formState,
-  loadingStatus,
-  isSaving,
-  saveError,
-  status,
-  hasPublishedVersion,
-  publishedAt,
-  createdAt,
-  updatedAt,
-  isDirty,
-  saveDraft,
-  publish,
-  discardChanges,
-} = useContentEntryEditor(props.contentTypeId, effectiveEntryId.value);
-
 const pageTitle = computed(() => {
   if (!props.entryId) return `New ${contentType.value?.name ?? 'Entry'}`;
   const titleVal = formState[entryTitleFieldIdentifier.value];
@@ -79,7 +110,7 @@ function emitSaved(newId: string | void) {
   if (entryId) {
     const titleVal = formState[entryTitleFieldIdentifier.value];
     emit('saved', {
-      contentTypeId: props.contentTypeId,
+      contentTypeId: resolvedContentTypeId.value,
       entryId,
       entryTitle: typeof titleVal === 'string' ? titleVal : 'Untitled',
     });
@@ -129,7 +160,7 @@ async function handleDiscardChanges() {
           />
           <USeparator orientation="vertical" class="h-4" />
           <NuxtLink
-            :to="`/content-types/${contentTypeId}`"
+            :to="`/content-types/${resolvedContentTypeId}`"
             target="_blank"
             class="flex items-center gap-1.5 text-xs text-muted hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
           >
@@ -162,7 +193,7 @@ async function handleDiscardChanges() {
             :is-new="isNew"
             :entry-id="props.entryId ?? null"
             :content-type-name="contentType?.name ?? ''"
-            :content-type-id="contentTypeId"
+            :content-type-id="resolvedContentTypeId"
             :created-at="createdAt"
             :updated-at="updatedAt"
             :published-at="publishedAt"

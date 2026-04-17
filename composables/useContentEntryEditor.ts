@@ -1,22 +1,40 @@
-import type { Ref } from 'vue';
+import type { MaybeRefOrGetter } from 'vue';
 
-export function useContentEntryEditor(contentTypeId: string, entryId: string) {
+export function useContentEntryEditor(
+  contentTypeId: MaybeRefOrGetter<string>,
+  entryId: MaybeRefOrGetter<string>
+) {
   const toast = useToast();
-  const isNew = entryId === 'new';
+  const contentTypeIdRef = computed(() => toValue(contentTypeId));
+  const entryIdRef = computed(() => toValue(entryId));
+  const isNew = computed(() => entryIdRef.value === 'new');
 
-  const {
-    data: entry,
-    status: loadingStatus,
-    refresh,
-  } = isNew
-    ? {
-        data: ref(null) as Ref<Record<string, unknown> | null>,
-        status: ref('success'),
-        refresh: async () => {},
-      }
-    : useAuthedFetch<Record<string, unknown>>(
-        `/api/content-entries/${entryId}`
+  const entry = ref<Record<string, unknown> | null>(null);
+  const loadingStatus = ref<'idle' | 'pending' | 'success' | 'error'>('idle');
+
+  async function loadEntry() {
+    if (isNew.value) {
+      entry.value = null;
+      loadingStatus.value = 'success';
+      return;
+    }
+    loadingStatus.value = 'pending';
+    try {
+      entry.value = await useRequestFetch()<Record<string, unknown>>(
+        `/api/content-entries/${entryIdRef.value}`
       );
+      loadingStatus.value = 'success';
+    } catch {
+      entry.value = null;
+      loadingStatus.value = 'error';
+    }
+  }
+
+  async function refresh() {
+    await loadEntry();
+  }
+
+  watch(entryIdRef, loadEntry, { immediate: true });
 
   const formState = reactive<Record<string, unknown>>({});
   const isSaving = ref(false);
@@ -39,12 +57,12 @@ export function useContentEntryEditor(contentTypeId: string, entryId: string) {
   });
 
   // Populate formState for new entries and take initial snapshot
-  if (isNew) {
+  if (isNew.value) {
     takeSnapshot();
   }
 
   watch(
-    () => (entry as Ref<Record<string, unknown> | null>).value,
+    entry,
     (val) => {
       if (val) {
         const data = (val.data ?? {}) as Record<string, unknown>;
@@ -73,10 +91,10 @@ export function useContentEntryEditor(contentTypeId: string, entryId: string) {
     saveError.value = null;
     try {
       const data = { ...formState };
-      if (isNew) {
+      if (isNew.value) {
         const created = await $fetch<{ id: string }>('/api/content-entries', {
           method: 'POST',
-          body: { contentTypeId, data },
+          body: { contentTypeId: contentTypeIdRef.value, data },
         });
         toast.add({
           title: 'Draft saved',
@@ -85,7 +103,7 @@ export function useContentEntryEditor(contentTypeId: string, entryId: string) {
         });
         return created.id;
       } else {
-        await $fetch(`/api/content-entries/${entryId}`, {
+        await $fetch(`/api/content-entries/${entryIdRef.value}`, {
           method: 'PUT',
           body: { data },
         });
@@ -111,10 +129,14 @@ export function useContentEntryEditor(contentTypeId: string, entryId: string) {
     saveError.value = null;
     try {
       const data = { ...formState };
-      if (isNew) {
+      if (isNew.value) {
         const created = await $fetch<{ id: string }>('/api/content-entries', {
           method: 'POST',
-          body: { contentTypeId, data, status: 'PUBLISHED' },
+          body: {
+            contentTypeId: contentTypeIdRef.value,
+            data,
+            status: 'PUBLISHED',
+          },
         });
         toast.add({
           title: 'Published',
@@ -123,7 +145,7 @@ export function useContentEntryEditor(contentTypeId: string, entryId: string) {
         });
         return created.id;
       } else {
-        await $fetch(`/api/content-entries/${entryId}`, {
+        await $fetch(`/api/content-entries/${entryIdRef.value}`, {
           method: 'PUT',
           body: { data, status: 'PUBLISHED' },
         });
@@ -148,7 +170,7 @@ export function useContentEntryEditor(contentTypeId: string, entryId: string) {
     isSaving.value = true;
     saveError.value = null;
     try {
-      await $fetch(`/api/content-entries/${entryId}/draft`, {
+      await $fetch(`/api/content-entries/${entryIdRef.value}/draft`, {
         method: 'DELETE',
       });
       await refresh();

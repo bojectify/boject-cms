@@ -21,6 +21,6 @@ const columns: TableColumn<Record<string, unknown>>[] = [
     :loading="status === 'pending'"
     :columns="columns"
     :total="data?.total ?? 0"
-    :row-link="(row) => `/content-types/${row.contentTypeId}/entries/${row.id}`"
+    :row-link="(row) => `/entries/${row.id}`"
   />
 </template>
