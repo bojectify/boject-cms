@@ -9,6 +9,7 @@ import {
 import { withPrismaErrors } from '../../utils/prismaErrors';
 import { enforceMutationRateLimit } from '../../utils/rateLimitEndpoint';
 import { invalidateSchema } from '../../graphql/schema';
+import { resolveUniqueFlag } from '../../utils/validateFieldUnique';
 
 const VALID_FIELD_TYPES = new Set<string>([
   'ENTRY_TITLE',
@@ -106,11 +107,17 @@ export default defineEventHandler(async (event) => {
     if (type === 'ENTRY_TITLE') entryTitleCount++;
     if (type === 'SLUG') slugCount++;
 
+    const uniqueFlag = resolveUniqueFlag(
+      type,
+      typeof f.unique === 'boolean' ? f.unique : undefined
+    );
+
     return {
       identifier: fieldIdentifier,
       name: fieldName,
       type,
       required: typeof f.required === 'boolean' ? f.required : false,
+      unique: uniqueFlag,
       order: idx,
       options: f.options ?? undefined,
     };

@@ -33,6 +33,7 @@ type ContentTypeResponse = {
     name: string;
     type: string;
     required: boolean;
+    unique: boolean;
     order: number;
     options: unknown;
   }>;
@@ -44,6 +45,7 @@ type FieldResponse = {
   name: string;
   type: string;
   required: boolean;
+  unique: boolean;
   order: number;
   options: unknown;
 };
@@ -170,6 +172,94 @@ describe('Content Type endpoints', async () => {
               name: 'Title',
               type: 'ENTRY_TITLE',
               required: true,
+            },
+          ],
+        }),
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('auto-sets unique=true on ENTRY_TITLE and SLUG during content type creation', async () => {
+      const cookie = await getSessionCookie();
+      const created = await $fetch<ContentTypeResponse>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: `Unique Auto ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+            { identifier: 'slug', name: 'Slug', type: 'SLUG' },
+            { identifier: 'summary', name: 'Summary', type: 'TEXT' },
+          ],
+        },
+      });
+      const titleField = created.fields.find((f) => f.type === 'ENTRY_TITLE');
+      const slugField = created.fields.find((f) => f.type === 'SLUG');
+      const textField = created.fields.find((f) => f.identifier === 'summary');
+      expect(titleField!.unique).toBe(true);
+      expect(slugField!.unique).toBe(true);
+      expect(textField!.unique).toBe(false);
+    });
+
+    it('accepts unique=true on TEXT and NUMBER fields in content type creation', async () => {
+      const cookie = await getSessionCookie();
+      const created = await $fetch<ContentTypeResponse>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: `Unique TN ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+            {
+              identifier: 'sku',
+              name: 'SKU',
+              type: 'TEXT',
+              unique: true,
+            },
+            {
+              identifier: 'serial',
+              name: 'Serial',
+              type: 'NUMBER',
+              unique: true,
+            },
+          ],
+        },
+      });
+      const textField = created.fields.find((f) => f.identifier === 'sku');
+      const numberField = created.fields.find((f) => f.identifier === 'serial');
+      expect(textField!.unique).toBe(true);
+      expect(numberField!.unique).toBe(true);
+    });
+
+    it('rejects unique=true on a BOOLEAN field during content type creation', async () => {
+      const cookie = await getSessionCookie();
+      const res = await fetch('/api/content-types', {
+        method: 'POST',
+        headers: { cookie, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: `Unique Bool ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+            {
+              identifier: 'flag',
+              name: 'Flag',
+              type: 'BOOLEAN',
+              unique: true,
             },
           ],
         }),
@@ -569,6 +659,100 @@ describe('Content Type endpoints', async () => {
           identifier: 'link',
           name: 'Link',
           type: 'RELATION',
+        }),
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('auto-sets unique=true when adding an ENTRY_TITLE or SLUG via POST /fields', async () => {
+      const cookie = await getSessionCookie();
+      const ct = await $fetch<ContentTypeResponse>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: `Auto Unique Slug ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+          ],
+        },
+      });
+
+      const field = await $fetch<FieldResponse>(
+        `/api/content-types/${ct.id}/fields`,
+        {
+          method: 'POST',
+          headers: { cookie },
+          body: { identifier: 'slug', name: 'Slug', type: 'SLUG' },
+        }
+      );
+      expect(field.unique).toBe(true);
+    });
+
+    it('accepts unique=true when adding a TEXT field via POST /fields', async () => {
+      const cookie = await getSessionCookie();
+      const ct = await $fetch<ContentTypeResponse>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: `Accept Unique Text ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+          ],
+        },
+      });
+
+      const field = await $fetch<FieldResponse>(
+        `/api/content-types/${ct.id}/fields`,
+        {
+          method: 'POST',
+          headers: { cookie },
+          body: {
+            identifier: 'sku',
+            name: 'SKU',
+            type: 'TEXT',
+            unique: true,
+          },
+        }
+      );
+      expect(field.unique).toBe(true);
+    });
+
+    it('rejects unique=true on a RICHTEXT field via POST /fields', async () => {
+      const cookie = await getSessionCookie();
+      const ct = await $fetch<ContentTypeResponse>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: `Reject Unique Richtext ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+          ],
+        },
+      });
+
+      const res = await fetch(`/api/content-types/${ct.id}/fields`, {
+        method: 'POST',
+        headers: { cookie, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          identifier: 'body',
+          name: 'Body',
+          type: 'RICHTEXT',
+          unique: true,
         }),
       });
       expect(res.status).toBe(400);
