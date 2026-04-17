@@ -56,13 +56,10 @@ const tableData = computed(() =>
     :data="tableData"
     :loading="status === 'pending'"
     :total="data?.total ?? 0"
-    :row-link="(row) => `/content-types/${contentTypeId}/entries/${row.id}`"
+    :row-link="(row) => `/entries/${row.id}`"
   >
     <template #actions>
-      <UButton
-        :to="`/content-types/${contentTypeId}/entries/new`"
-        icon="i-lucide-plus"
-      >
+      <UButton :to="`/entries/new:${contentTypeId}`" icon="i-lucide-plus">
         New Entry
       </UButton>
     </template>
