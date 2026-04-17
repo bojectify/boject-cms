@@ -197,28 +197,11 @@ async function handleFieldSave(data: {
     fieldModalOpen.value = false;
     await refresh();
   } catch (err: unknown) {
-    // Read the error as-is, then probe for a h3-wrapped UNIQUE_CONFLICT data body.
-    const anyErr = err as {
-      statusCode?: number;
-      data?: { data?: Record<string, unknown>; [key: string]: unknown };
-    };
-    const payload = (anyErr?.data?.data ?? anyErr?.data) as
-      | {
-          error?: string;
-          message?: string;
-          conflicts?: Array<{ value: unknown; entryIds: string[] }>;
-        }
-      | undefined;
-    if (
-      anyErr?.statusCode === 409 &&
-      payload?.error === 'UNIQUE_CONFLICT' &&
-      Array.isArray(payload.conflicts)
-    ) {
+    const conflict = parseUniqueConflict(err);
+    if (conflict?.kind === 'field') {
       conflictAlert.value = {
-        message:
-          payload.message ??
-          'Cannot mark field as unique — existing entries have duplicate values',
-        conflicts: payload.conflicts,
+        message: conflict.message,
+        conflicts: conflict.conflicts,
       };
       return; // Keep the modal open so the user can see the alert
     }

@@ -59,6 +59,7 @@ function fromDatetimeLocal(val: string): string {
 
 function validate(formData: Record<string, unknown>): FormError[] {
   const errors: FormError[] = [];
+  const knownKeys = new Set(props.fields.map((f) => f.key));
   for (const field of props.fields) {
     if ('required' in field && field.required) {
       const val = formData[field.key];
@@ -71,7 +72,9 @@ function validate(formData: Record<string, unknown>): FormError[] {
     }
   }
   for (const [key, message] of Object.entries(props.fieldErrors ?? {})) {
-    errors.push({ name: key, message });
+    if (knownKeys.has(key)) {
+      errors.push({ name: key, message });
+    }
   }
   return errors;
 }

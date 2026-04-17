@@ -118,27 +118,16 @@ export function useContentEntryEditor(
         });
       }
     } catch (err: unknown) {
-      const anyErr = err as {
-        statusCode?: number;
-        data?: { data?: Record<string, unknown>; [key: string]: unknown };
-        message?: string;
-      };
-      const payload = (anyErr?.data?.data ?? anyErr?.data) as
-        | { error?: string; field?: string; message?: string }
-        | undefined;
-      if (
-        anyErr?.statusCode === 409 &&
-        payload?.error === 'UNIQUE_CONFLICT' &&
-        typeof payload.field === 'string'
-      ) {
+      const conflict = parseUniqueConflict(err);
+      if (conflict?.kind === 'entry') {
         fieldErrors.value = {
           ...fieldErrors.value,
-          [payload.field]: payload.message ?? 'Must be unique',
+          [conflict.field]: conflict.message,
         };
-        saveError.value = payload.message ?? 'Value must be unique';
+        saveError.value = conflict.message;
         toast.add({
           title: 'Duplicate value',
-          description: payload.message ?? 'Value must be unique',
+          description: conflict.message,
           color: 'error',
         });
         return;
@@ -186,27 +175,16 @@ export function useContentEntryEditor(
         });
       }
     } catch (err: unknown) {
-      const anyErr = err as {
-        statusCode?: number;
-        data?: { data?: Record<string, unknown>; [key: string]: unknown };
-        message?: string;
-      };
-      const payload = (anyErr?.data?.data ?? anyErr?.data) as
-        | { error?: string; field?: string; message?: string }
-        | undefined;
-      if (
-        anyErr?.statusCode === 409 &&
-        payload?.error === 'UNIQUE_CONFLICT' &&
-        typeof payload.field === 'string'
-      ) {
+      const conflict = parseUniqueConflict(err);
+      if (conflict?.kind === 'entry') {
         fieldErrors.value = {
           ...fieldErrors.value,
-          [payload.field]: payload.message ?? 'Must be unique',
+          [conflict.field]: conflict.message,
         };
-        saveError.value = payload.message ?? 'Value must be unique';
+        saveError.value = conflict.message;
         toast.add({
           title: 'Duplicate value',
-          description: payload.message ?? 'Value must be unique',
+          description: conflict.message,
           color: 'error',
         });
         return;
