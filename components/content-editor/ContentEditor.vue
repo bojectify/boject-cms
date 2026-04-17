@@ -70,13 +70,6 @@ function validate(formData: Record<string, unknown>): FormError[] {
       }
     }
   }
-  if (
-    props.showSlug !== false &&
-    (!formData.slug ||
-      (typeof formData.slug === 'string' && !formData.slug.trim()))
-  ) {
-    errors.push({ name: 'slug', message: 'Slug is required' });
-  }
   return errors;
 }
 
@@ -280,20 +273,6 @@ defineExpose({ validate: runValidation });
       </template>
 
       <slot name="after-fields" />
-
-      <UFormField
-        v-if="props.showSlug !== false"
-        label="Slug"
-        name="slug"
-        required
-        size="xl"
-      >
-        <UInput
-          :model-value="(state.slug as string) ?? ''"
-          class="w-full"
-          @update:model-value="state.slug = $event"
-        />
-      </UFormField>
     </UForm>
   </div>
 </template>

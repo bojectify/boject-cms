@@ -6,5 +6,4 @@ export type ContentEditorProps = BasicComponentProps & {
   fields: FieldConfig[];
   loading?: boolean;
   error?: string | null;
-  showSlug?: boolean;
 };
