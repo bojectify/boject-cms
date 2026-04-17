@@ -10,6 +10,15 @@ interface FieldDef {
   unique: boolean;
 }
 
+/**
+ * Enforce `unique` on TEXT/NUMBER fields by querying every version in the
+ * content type for a matching value.
+ *
+ * NOTE: This is a best-effort runtime check, not atomic. Two concurrent POSTs
+ * can both pass the check and both insert conflicting values. The upgrade
+ * path is a PostgreSQL expression unique index managed from app code when a
+ * field is toggled; tracked as a follow-up GH issue.
+ */
 export async function assertUniqueFieldValues(
   data: Record<string, unknown>,
   fields: FieldDef[],
