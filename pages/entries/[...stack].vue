@@ -124,8 +124,9 @@ const contentType = computed<ContentTypeShape | null>(() => {
   return contentTypeFromEntry.value;
 });
 
-const hasSlugField = computed(
-  () => contentType.value?.fields.some((f) => f.type === 'SLUG') ?? false
+const slugFieldIdentifier = computed(
+  () =>
+    contentType.value?.fields.find((f) => f.type === 'SLUG')?.identifier ?? null
 );
 
 const entryTitleFieldIdentifier = computed(() => {
@@ -135,9 +136,7 @@ const entryTitleFieldIdentifier = computed(() => {
 
 const editorFields = computed<FieldConfig[]>(() => {
   if (!contentType.value) return [];
-  return contentType.value.fields
-    .filter((f) => f.type !== 'SLUG')
-    .map((f) => mapFieldToConfig(f));
+  return contentType.value.fields.map((f) => mapFieldToConfig(f));
 });
 
 const pageTitle = computed(() => {
@@ -151,8 +150,9 @@ const pageTitle = computed(() => {
 watch(
   () => formState[entryTitleFieldIdentifier.value],
   (val) => {
-    if (rootIsNew.value && typeof val === 'string' && hasSlugField.value) {
-      formState.slug = generateSlug(val);
+    const slugKey = slugFieldIdentifier.value;
+    if (rootIsNew.value && typeof val === 'string' && slugKey) {
+      formState[slugKey] = generateSlug(val);
     }
   }
 );
@@ -473,7 +473,6 @@ function handlePaneSaved(
           :fields="editorFields"
           :loading="loadingStatus === 'pending'"
           :error="saveError"
-          :show-slug="hasSlugField"
         >
           <template #field="{ field, value, update }">
             <RelationField

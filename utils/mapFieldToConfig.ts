@@ -9,6 +9,7 @@ export function mapFieldToConfig(field: {
 }): FieldConfig {
   switch (field.type) {
     case 'ENTRY_TITLE':
+    case 'SLUG':
     case 'TEXT':
       return {
         type: 'text',
