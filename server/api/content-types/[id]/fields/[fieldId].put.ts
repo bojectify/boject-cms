@@ -143,6 +143,16 @@ export default defineEventHandler(async (event) => {
   return updated;
 });
 
+/**
+ * Find entries whose latest version holds a duplicated value for the given field.
+ *
+ * This uses "latest version per entry" (DISTINCT ON + ORDER BY updatedAt DESC),
+ * not "all versions" (which is what `assertUniqueFieldValues` does at save time).
+ * Rationale: the toggle check should only block the user when enabling unique
+ * would prevent an entry from re-saving its current editor state. Archived or
+ * older-draft collisions aren't user-visible and don't belong in the confirm
+ * dialog. Save-time collisions still use the all-versions check.
+ */
 async function findDuplicateGroups(
   contentTypeId: string,
   identifier: string,
@@ -151,6 +161,10 @@ async function findDuplicateGroups(
   // For each entry, pick the most-recent version's value at `identifier`. Group
   // entries by that value and return groups with COUNT > 1. Null/empty excluded.
   if (type === 'NUMBER') {
+    // Cast to double precision (not numeric) so @prisma/adapter-pg returns a JS
+    // number rather than a string. NUMBER fields in this CMS hold ordinary
+    // user-facing values (issue numbers, prices, counts) where double-precision
+    // floats are sufficient.
     const rows = await prisma.$queryRaw<
       Array<{ value: number; entryIds: string[] }>
     >`
@@ -158,7 +172,7 @@ async function findDuplicateGroups(
       FROM (
         SELECT DISTINCT ON (cev."entryId")
           cev."entryId",
-          (cev."data" ->> ${identifier})::numeric AS value
+          (cev."data" ->> ${identifier})::double precision AS value
         FROM "ContentEntryVersion" cev
         JOIN "ContentEntry" ce ON ce."id" = cev."entryId"
         WHERE ce."contentTypeId" = ${contentTypeId}

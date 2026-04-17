@@ -1091,6 +1091,60 @@ describe('Content Type endpoints', async () => {
       expect(group.entryIds.length).toBeGreaterThanOrEqual(2);
     });
 
+    it('blocks enabling unique on a NUMBER field with existing duplicates', async () => {
+      const cookie = await getSessionCookie();
+      const ct = await $fetch<ContentTypeResponse>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: `Field Unique Num Dup Block ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+            { identifier: 'issue', name: 'Issue', type: 'NUMBER' },
+          ],
+        },
+      });
+      const fieldId = ct.fields.find((f) => f.identifier === 'issue')!.id;
+
+      await $fetch('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: ct.id,
+          data: { title: `Entry A ${Date.now()}`, issue: 7 },
+        },
+      });
+      await $fetch('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: ct.id,
+          data: { title: `Entry B ${Date.now()}`, issue: 7 },
+        },
+      });
+
+      const res = await fetch(`/api/content-types/${ct.id}/fields/${fieldId}`, {
+        method: 'PUT',
+        headers: { cookie, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ unique: true }),
+      });
+      expect(res.status).toBe(409);
+      const body = await res.json();
+      expect(body.data.error).toBe('UNIQUE_CONFLICT');
+      expect(Array.isArray(body.data.conflicts)).toBe(true);
+      const group = body.data.conflicts.find(
+        (c: { value: unknown; entryIds: string[] }) =>
+          c.value === 7 && typeof c.value === 'number'
+      );
+      expect(group).toBeDefined();
+      expect(group.entryIds.length).toBeGreaterThanOrEqual(2);
+    });
+
     it('allows enabling unique on a TEXT field when all values are distinct', async () => {
       const cookie = await getSessionCookie();
       const ct = await $fetch<ContentTypeResponse>('/api/content-types', {
