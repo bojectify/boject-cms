@@ -134,6 +134,8 @@ async function handlePublish() {
 async function handleDiscardChanges() {
   await discardChanges();
 }
+
+defineExpose({ isDirty });
 </script>
 
 <template>
