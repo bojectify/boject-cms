@@ -2,6 +2,18 @@
 import type { FieldConfig } from '~/types/contentEditor';
 import { parseStack, stackHref, type PaneSegment } from '~/utils/paneStack';
 
+// Key the page by root entry only, so opening/closing panes and
+// replacing a new:<ctid> sentinel with the saved entry id do NOT remount
+// the page (default pageKey is route.path, which changes on any stack
+// mutation — remounting wipes formState mid-flow).
+definePageMeta({
+  key: (route) => {
+    const raw = route.params.stack;
+    const arr = Array.isArray(raw) ? raw : raw ? [raw] : [];
+    return `entries:${arr[0] ?? ''}`;
+  },
+});
+
 const route = useRoute();
 const router = useRouter();
 
