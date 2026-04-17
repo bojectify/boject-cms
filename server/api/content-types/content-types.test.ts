@@ -1037,6 +1037,155 @@ describe('Content Type endpoints', async () => {
       });
       expect(res.status).toBe(400);
     });
+
+    it('blocks enabling unique on a TEXT field with existing duplicates', async () => {
+      const cookie = await getSessionCookie();
+      const ct = await $fetch<ContentTypeResponse>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: `Field Unique Dup Block ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+            { identifier: 'code', name: 'Code', type: 'TEXT' },
+          ],
+        },
+      });
+      const fieldId = ct.fields.find((f) => f.identifier === 'code')!.id;
+
+      await $fetch('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: ct.id,
+          data: { title: `Entry A ${Date.now()}`, code: 'DUP' },
+        },
+      });
+      await $fetch('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: ct.id,
+          data: { title: `Entry B ${Date.now()}`, code: 'DUP' },
+        },
+      });
+
+      const res = await fetch(`/api/content-types/${ct.id}/fields/${fieldId}`, {
+        method: 'PUT',
+        headers: { cookie, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ unique: true }),
+      });
+      expect(res.status).toBe(409);
+      const body = await res.json();
+      expect(body.data.error).toBe('UNIQUE_CONFLICT');
+      expect(Array.isArray(body.data.conflicts)).toBe(true);
+      const group = body.data.conflicts.find(
+        (c: { value: unknown; entryIds: string[] }) => c.value === 'DUP'
+      );
+      expect(group).toBeDefined();
+      expect(group.entryIds.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('allows enabling unique on a TEXT field when all values are distinct', async () => {
+      const cookie = await getSessionCookie();
+      const ct = await $fetch<ContentTypeResponse>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: `Field Unique Distinct ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+            { identifier: 'code', name: 'Code', type: 'TEXT' },
+          ],
+        },
+      });
+      const fieldId = ct.fields.find((f) => f.identifier === 'code')!.id;
+
+      await $fetch('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: ct.id,
+          data: { title: `Entry A ${Date.now()}`, code: 'ONE' },
+        },
+      });
+      await $fetch('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: ct.id,
+          data: { title: `Entry B ${Date.now()}`, code: 'TWO' },
+        },
+      });
+
+      const updated = await $fetch<FieldResponse>(
+        `/api/content-types/${ct.id}/fields/${fieldId}`,
+        {
+          method: 'PUT',
+          headers: { cookie },
+          body: { unique: true },
+        }
+      );
+      expect(updated.unique).toBe(true);
+    });
+
+    it('ignores null/empty values when detecting duplicates on toggle', async () => {
+      const cookie = await getSessionCookie();
+      const ct = await $fetch<ContentTypeResponse>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: `Field Unique Null Empty ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+            { identifier: 'code', name: 'Code', type: 'TEXT' },
+          ],
+        },
+      });
+      const fieldId = ct.fields.find((f) => f.identifier === 'code')!.id;
+
+      await $fetch('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: ct.id,
+          data: { title: `Entry Empty ${Date.now()}`, code: '' },
+        },
+      });
+      await $fetch('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: ct.id,
+          data: { title: `Entry Null ${Date.now()}`, code: null },
+        },
+      });
+
+      const updated = await $fetch<FieldResponse>(
+        `/api/content-types/${ct.id}/fields/${fieldId}`,
+        {
+          method: 'PUT',
+          headers: { cookie },
+          body: { unique: true },
+        }
+      );
+      expect(updated.unique).toBe(true);
+    });
   });
 
   describe('DELETE /api/content-types/[id]/fields/[fieldId]', () => {

@@ -72,7 +72,35 @@ export default defineEventHandler(async (event) => {
     }
     // Force implicit-unique types back to true even if body says true explicitly.
     // Throw for user-configurable types requesting unique on a non-TEXT/NUMBER field.
-    data.unique = resolveUniqueFlag(field.type, body.unique);
+    const nextUnique = resolveUniqueFlag(field.type, body.unique);
+
+    // When flipping false -> true on a TEXT/NUMBER field, block if duplicates exist.
+    if (
+      nextUnique &&
+      !field.unique &&
+      (field.type === 'TEXT' || field.type === 'NUMBER')
+    ) {
+      const conflicts = await findDuplicateGroups(
+        contentTypeId,
+        field.identifier,
+        field.type
+      );
+      if (conflicts.length > 0) {
+        throw createError({
+          statusCode: 409,
+          statusMessage:
+            'Cannot mark field as unique — existing entries have duplicate values',
+          data: {
+            error: 'UNIQUE_CONFLICT',
+            message:
+              'Cannot mark field as unique — existing entries have duplicate values',
+            conflicts,
+          },
+        });
+      }
+    }
+
+    data.unique = nextUnique;
   }
 
   // If updating type, block if entries exist
@@ -114,3 +142,53 @@ export default defineEventHandler(async (event) => {
 
   return updated;
 });
+
+async function findDuplicateGroups(
+  contentTypeId: string,
+  identifier: string,
+  type: 'TEXT' | 'NUMBER'
+): Promise<Array<{ value: unknown; entryIds: string[] }>> {
+  // For each entry, pick the most-recent version's value at `identifier`. Group
+  // entries by that value and return groups with COUNT > 1. Null/empty excluded.
+  if (type === 'NUMBER') {
+    const rows = await prisma.$queryRaw<
+      Array<{ value: number; entryIds: string[] }>
+    >`
+      SELECT v.value, array_agg(v."entryId") AS "entryIds"
+      FROM (
+        SELECT DISTINCT ON (cev."entryId")
+          cev."entryId",
+          (cev."data" ->> ${identifier})::numeric AS value
+        FROM "ContentEntryVersion" cev
+        JOIN "ContentEntry" ce ON ce."id" = cev."entryId"
+        WHERE ce."contentTypeId" = ${contentTypeId}
+          AND cev."data" ? ${identifier}
+          AND cev."data" ->> ${identifier} <> ''
+        ORDER BY cev."entryId", cev."updatedAt" DESC
+      ) v
+      GROUP BY v.value
+      HAVING COUNT(*) > 1
+    `;
+    return rows.map((r) => ({ value: r.value, entryIds: r.entryIds }));
+  }
+
+  const rows = await prisma.$queryRaw<
+    Array<{ value: string; entryIds: string[] }>
+  >`
+    SELECT v.value, array_agg(v."entryId") AS "entryIds"
+    FROM (
+      SELECT DISTINCT ON (cev."entryId")
+        cev."entryId",
+        cev."data" ->> ${identifier} AS value
+      FROM "ContentEntryVersion" cev
+      JOIN "ContentEntry" ce ON ce."id" = cev."entryId"
+      WHERE ce."contentTypeId" = ${contentTypeId}
+        AND cev."data" ? ${identifier}
+        AND cev."data" ->> ${identifier} <> ''
+      ORDER BY cev."entryId", cev."updatedAt" DESC
+    ) v
+    GROUP BY v.value
+    HAVING COUNT(*) > 1
+  `;
+  return rows.map((r) => ({ value: r.value, entryIds: r.entryIds }));
+}
