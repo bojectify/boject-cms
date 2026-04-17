@@ -358,6 +358,15 @@ async function onFieldReorder() {
                   >
                     Required
                   </UBadge>
+                  <UBadge
+                    v-if="field.type === 'ENTRY_TITLE' || field.type === 'SLUG'"
+                    color="info"
+                    size="sm"
+                    variant="subtle"
+                    class="ml-1"
+                  >
+                    Unique
+                  </UBadge>
                 </div>
                 <UDropdownMenu :items="fieldMenuItems(field)">
                   <UButton
