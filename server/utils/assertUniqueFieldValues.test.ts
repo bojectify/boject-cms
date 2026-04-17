@@ -96,7 +96,8 @@ describe('assertUniqueFieldValues', () => {
   });
 
   it('passes when the only match is the excluded entry', async () => {
-    fakePrisma.rows = [{ entryId: 'e1', value: 'ABC' }];
+    // Real SQL excludes `excludeEntryId`, so mock returns no rows.
+    fakePrisma.rows = [];
     await expect(
       assertUniqueFieldValues(
         { sku: 'ABC' },

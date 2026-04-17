@@ -31,13 +31,7 @@ export async function assertUniqueFieldValues(
       excludeEntryId
     );
 
-    // Defense-in-depth: the SQL already excludes the entry, but filter in
-    // application code too so unit-level mocks don't need to replay the SQL.
-    const conflicting = excludeEntryId
-      ? rows.filter((r) => r.entryId !== excludeEntryId)
-      : rows;
-
-    if (conflicting.length > 0) {
+    if (rows.length > 0) {
       throw createError({
         statusCode: 409,
         statusMessage: `${field.name} must be unique`,
