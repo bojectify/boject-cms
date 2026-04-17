@@ -184,9 +184,32 @@ async function handleDiscardChanges() {
 }
 
 // ---- Dirty guards ----
+const paneEls = useTemplateRef<Array<{ isDirty: boolean } | null>>('paneEls');
+
+function paneCountFor(stackParam: string | string[] | undefined): number {
+  const arr = Array.isArray(stackParam)
+    ? stackParam
+    : stackParam
+      ? [stackParam]
+      : [];
+  try {
+    return Math.max(0, parseStack(arr).length - 1);
+  } catch {
+    return 0;
+  }
+}
+
+function anyPaneDirty(fromIdx = 0): boolean {
+  const els = paneEls.value ?? [];
+  for (let i = fromIdx; i < els.length; i++) {
+    if (els[i]?.isDirty) return true;
+  }
+  return false;
+}
+
 if (import.meta.client) {
   const beforeUnloadHandler = (e: BeforeUnloadEvent) => {
-    if (isDirty.value) e.preventDefault();
+    if (isDirty.value || anyPaneDirty()) e.preventDefault();
   };
   onMounted(() => window.addEventListener('beforeunload', beforeUnloadHandler));
   onBeforeUnmount(() =>
@@ -195,10 +218,19 @@ if (import.meta.client) {
 }
 
 onBeforeRouteLeave((to, from) => {
-  // Allow navigation within the same catch-all page (opening/closing panes)
-  if (to.name === from.name) return;
-  if (isDirty.value) {
-    return window.confirm('You have unsaved changes. Leave anyway?');
+  // External navigation (different route): check root + all panes.
+  if (to.name !== from.name) {
+    if (isDirty.value || anyPaneDirty()) {
+      return window.confirm('You have unsaved changes. Leave anyway?');
+    }
+    return;
+  }
+  // Same-page navigation: only prompt when the stack is shrinking (a pane
+  // is being closed) and at least one closing pane has unsaved edits.
+  const fromCount = paneCountFor(from.params.stack);
+  const toCount = paneCountFor(to.params.stack);
+  if (toCount < fromCount && anyPaneDirty(toCount)) {
+    return window.confirm('You have unsaved changes. Close anyway?');
   }
 });
 
@@ -513,6 +545,7 @@ function handlePaneSaved(
     <EntryEditorPane
       v-for="(pane, idx) in paneSegments"
       :key="`pane-${idx}`"
+      ref="paneEls"
       :open="true"
       :content-type-id="pane.kind === 'new' ? pane.contentTypeId : undefined"
       :entry-id="pane.kind === 'entry' ? pane.entryId : null"
