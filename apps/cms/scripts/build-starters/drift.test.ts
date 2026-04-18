@@ -11,8 +11,9 @@ const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
 describe('starter outputs are up to date', () => {
   it('re-building from committed overlays produces equivalent output', async () => {
-    const projectRoot = resolve(__dirname, '..', '..');
-    const starters = join(projectRoot, 'starters');
+    // Walk up from apps/cms/scripts/build-starters/ to the repo root.
+    const repoRoot = resolve(__dirname, '..', '..', '..', '..');
+    const starters = join(repoRoot, 'starters');
     const tmp = mkdtempSync(join(tmpdir(), 'starters-drift-'));
     cpSync(starters, tmp, { recursive: true });
 
