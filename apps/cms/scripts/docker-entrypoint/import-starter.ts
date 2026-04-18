@@ -1,4 +1,4 @@
-import type { PrismaClient } from '#prisma';
+import type { PrismaClient } from '../../generated/prisma/client';
 import type { Bundle, ImportResult } from '../content-bundle/types';
 
 export interface ImportStarterInput {
@@ -62,7 +62,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     process.exit(0);
   }
 
-  const { PrismaClient } = await import('#prisma');
+  const { PrismaClient } = await import('../../generated/prisma/client');
   const { PrismaPg } = await import('@prisma/adapter-pg');
   const { importBundle } = await import('../content-bundle/import');
 

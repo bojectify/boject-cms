@@ -41,10 +41,8 @@
     "@types/pg": "^8.20.0",
     "@vitest/coverage-v8": "^4.1.1",
     "@vue/test-utils": "^2.4.6",
-    "dotenv": "^17.3.1",
     "eslint-config-prettier": "^10.1.8",
     "happy-dom": "^20.7.0",
-    "prisma": "^7.4.1",
     "vitest": "^4.0.18"
   },
   "dependencies": {
@@ -69,6 +67,7 @@
     "@tiptap/starter-kit": "^3.20.4",
     "@tiptap/vue-3": "^3.20.4",
     "dayjs": "^1.11.19",
+    "dotenv": "^17.3.1",
     "graphql": "^16.12.0",
     "graphql-yoga": "^5.18.0",
     "h3": "1.15.5",
@@ -77,6 +76,7 @@
     "nuxt": "^4.3.1",
     "nuxt-auth-utils": "^0.5.29",
     "pg": "^8.20.0",
+    "prisma": "^7.4.1",
     "sharp": "^0.34.5",
     "tailwindcss": "^4.2.0",
     "tsx": "^4.21.0",

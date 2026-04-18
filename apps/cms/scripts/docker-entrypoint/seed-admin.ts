@@ -3,7 +3,7 @@ import {
   scrypt as scryptCb,
   type ScryptOptions,
 } from 'node:crypto';
-import type { PrismaClient } from '#prisma';
+import type { PrismaClient } from '../../generated/prisma/client';
 
 export interface SeedAdminInput {
   email: string;
@@ -88,7 +88,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const firstName = process.env.BOJECT_ADMIN_FIRST_NAME ?? 'Admin';
   const lastName = process.env.BOJECT_ADMIN_LAST_NAME ?? 'User';
 
-  const { PrismaClient } = await import('#prisma');
+  const { PrismaClient } = await import('../../generated/prisma/client');
   const { PrismaPg } = await import('@prisma/adapter-pg');
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {

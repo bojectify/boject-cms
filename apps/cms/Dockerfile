@@ -55,19 +55,27 @@ WORKDIR /app
 COPY --chown=cms:cms package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY --chown=cms:cms patches ./patches
 COPY --chown=cms:cms apps/cms/package.json ./apps/cms/
+# Install prod deps (skip postinstalls — we'll trigger the engine download explicitly below)
 RUN pnpm install --frozen-lockfile --prod --filter cms --ignore-scripts
 
 # Copy build artifacts + runtime-required source
 COPY --from=build --chown=cms:cms /workspace/apps/cms/.output ./apps/cms/.output
 COPY --from=build --chown=cms:cms /workspace/apps/cms/generated ./apps/cms/generated
 COPY --from=build --chown=cms:cms /workspace/apps/cms/prisma ./apps/cms/prisma
+COPY --from=build --chown=cms:cms /workspace/apps/cms/prisma.config.ts ./apps/cms/prisma.config.ts
 COPY --from=build --chown=cms:cms /workspace/apps/cms/scripts ./apps/cms/scripts
 COPY --from=build --chown=cms:cms /workspace/apps/cms/docker ./apps/cms/docker
+
+# Trigger engine download as root (cms user can't write to /app/node_modules),
+# then hand ownership of node_modules + apps to the cms user.
+RUN cd apps/cms \
+ && pnpm prisma version \
+ && chown -R cms:cms /app/node_modules /app/apps
 
 # Storage dir + entrypoint perms
 RUN chmod +x ./apps/cms/docker/entrypoint.sh \
  && mkdir -p /app/storage/images/originals /app/storage/images/transforms \
- && chown -R cms:cms /app/storage /app/apps
+ && chown -R cms:cms /app/storage
 
 USER cms
 
@@ -78,6 +86,7 @@ EXPOSE 3000
 ENV NITRO_PORT=3000 \
     NODE_ENV=production \
     STORAGE_DRIVER=local \
-    STORAGE_LOCAL_BASE=/app/storage
+    STORAGE_LOCAL_BASE=/app/storage \
+    PATH="/app/apps/cms/node_modules/.bin:${PATH}"
 
 ENTRYPOINT ["./docker/entrypoint.sh"]
