@@ -78,8 +78,10 @@ package.json                   # root — scripts only (dev, build, release)
 
 **Dockerfile** lives at `apps/cms/Dockerfile`. Multi-stage:
 
-1. **build** — `node:22-alpine`, installs pnpm, runs `pnpm install --frozen-lockfile`, `prisma generate`, `pnpm build`.
-2. **runtime** — `node:22-alpine` (slim), copies `.output/`, `node_modules/`, `prisma/`, `starters/`, and the entrypoint script. Non-root user.
+1. **build** — `node:24-alpine`, installs pnpm, runs `pnpm install --frozen-lockfile`, `prisma generate`, `pnpm build`.
+2. **runtime** — `node:24-alpine` (slim), copies `.output/`, `node_modules/`, `prisma/`, `starters/`, and the entrypoint script. Non-root user.
+
+The plan should also add `"engines": { "node": ">=24" }` to `apps/cms/package.json` so local dev and CI enforce the same minimum.
 
 **Entrypoint script** (`apps/cms/docker/entrypoint.sh`), executed by the container on start:
 
