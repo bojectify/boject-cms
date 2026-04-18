@@ -275,3 +275,42 @@ pnpm format:fix    # Auto-fix formatting
 | `NUXT_SESSION_PASSWORD` | Session encryption key (required in prod) | Auto-generated in dev                              |
 
 Create a `.env` file in the project root. Nuxt loads it automatically in development.
+
+## Docker image
+
+The CMS ships as a self-contained Docker image that runs migrations, seeds an admin, and optionally imports a starter bundle on first boot.
+
+**Build** (from the repo root — the Docker context is the whole monorepo so pnpm can resolve the workspace):
+
+```bash
+docker build -f apps/cms/Dockerfile -t boject/cms:dev .
+```
+
+**Run** (requires a reachable Postgres):
+
+```bash
+docker run --rm -p 4000:3000 \
+  -e DATABASE_URL=postgresql://boject:boject@host.docker.internal:5432/boject \
+  -e NUXT_SESSION_PASSWORD="$(openssl rand -base64 32)" \
+  -e BOJECT_ADMIN_EMAIL=admin@local \
+  -e BOJECT_ADMIN_PASSWORD=changeme \
+  -v boject_storage:/app/storage \
+  boject/cms:dev
+```
+
+The server starts on port 3000 inside the container (mapped to 4000 above). Log in at `http://localhost:4000/login` with the credentials you set.
+
+**Import a starter bundle on first boot:**
+
+```bash
+docker run ... \
+  -e BOJECT_INITIAL_STARTER=/starters/base.boject.json \
+  -v "$(pwd)/starters:/starters:ro" \
+  boject/cms:dev
+```
+
+**Smoke test the image** end-to-end against an ephemeral postgres:
+
+```bash
+apps/cms/docker/smoke-test.sh
+```
