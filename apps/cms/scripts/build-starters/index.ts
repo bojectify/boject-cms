@@ -2,10 +2,15 @@
 // scripts/build-starters/index.ts
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { buildAll } from './build';
 import { normalize } from './normalize';
 
-const DEFAULT_ROOT = resolve(process.cwd(), 'starters');
+// Walk up from apps/cms/scripts/build-starters/ to the repo root, where
+// starters/ lives alongside apps/ and packages/.
+const __dirname = fileURLToPath(new URL('.', import.meta.url));
+const REPO_ROOT = resolve(__dirname, '..', '..', '..', '..');
+const DEFAULT_ROOT = resolve(REPO_ROOT, 'starters');
 
 async function main(): Promise<void> {
   const [, , cmd = 'build', ...rest] = process.argv;

@@ -1,10 +1,10 @@
 # Dependencies
 node_modules/
 
-# Environment variables
-.env
-.env.local
-.env.*.local
+# Environment variables (scoped to apps/cms now)
+apps/cms/.env
+apps/cms/.env.local
+apps/cms/.env.*.local
 
 # Build output
 dist/
@@ -44,14 +44,15 @@ coverage/
 .cache/
 .temp/
 
-/generated
+# Prisma + Pothos generated types
+/apps/cms/generated
 
-# Local image storage
-storage/
+# Local image storage (dev)
+apps/cms/storage/
 
 # Nuxt
-.nuxt/
-.output/
+apps/cms/.nuxt/
+apps/cms/.output/
 
 # Claude Code host-local
 .claude/*.lock
