@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "dev": "nuxt dev",
     "build": "nuxt build",
@@ -41,7 +44,6 @@
     "eslint-config-prettier": "^10.1.8",
     "happy-dom": "^20.7.0",
     "prisma": "^7.4.1",
-    "tsx": "^4.21.0",
     "vitest": "^4.0.18"
   },
   "dependencies": {
@@ -74,6 +76,7 @@
     "nuxt-auth-utils": "^0.5.29",
     "sharp": "^0.34.5",
     "tailwindcss": "^4.2.0",
+    "tsx": "^4.21.0",
     "vue": "^3.5.28",
     "vuedraggable": "^4.1.0"
   }
