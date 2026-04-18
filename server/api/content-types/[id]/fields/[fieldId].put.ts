@@ -3,6 +3,7 @@ import { assertUuid, assertStringLength } from '../../../../utils/validation';
 import { withPrismaErrors } from '../../../../utils/prismaErrors';
 import { enforceMutationRateLimit } from '../../../../utils/rateLimitEndpoint';
 import { invalidateSchema } from '../../../../graphql/schema';
+import { resolveUniqueFlag } from '../../../../utils/validateFieldUnique';
 
 const VALID_FIELD_TYPES = new Set<string>([
   'ENTRY_TITLE',
@@ -53,6 +54,54 @@ export default defineEventHandler(async (event) => {
   if ('options' in body) {
     data.options = body.options ?? undefined;
   }
+  if ('unique' in body) {
+    if (typeof body.unique !== 'boolean') {
+      throw createError({
+        statusCode: 400,
+        statusMessage: 'unique must be a boolean',
+      });
+    }
+    if (
+      (field.type === 'ENTRY_TITLE' || field.type === 'SLUG') &&
+      body.unique === false
+    ) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: `unique cannot be disabled on ${field.type} fields`,
+      });
+    }
+    // Force implicit-unique types back to true even if body says true explicitly.
+    // Throw for user-configurable types requesting unique on a non-TEXT/NUMBER field.
+    const nextUnique = resolveUniqueFlag(field.type, body.unique);
+
+    // When flipping false -> true on a TEXT/NUMBER field, block if duplicates exist.
+    if (
+      nextUnique &&
+      !field.unique &&
+      (field.type === 'TEXT' || field.type === 'NUMBER')
+    ) {
+      const conflicts = await findDuplicateGroups(
+        contentTypeId,
+        field.identifier,
+        field.type
+      );
+      if (conflicts.length > 0) {
+        throw createError({
+          statusCode: 409,
+          statusMessage:
+            'Cannot mark field as unique — existing entries have duplicate values',
+          data: {
+            error: 'UNIQUE_CONFLICT',
+            message:
+              'Cannot mark field as unique — existing entries have duplicate values',
+            conflicts,
+          },
+        });
+      }
+    }
+
+    data.unique = nextUnique;
+  }
 
   // If updating type, block if entries exist
   if ('type' in body) {
@@ -93,3 +142,67 @@ export default defineEventHandler(async (event) => {
 
   return updated;
 });
+
+/**
+ * Find entries whose latest version holds a duplicated value for the given field.
+ *
+ * This uses "latest version per entry" (DISTINCT ON + ORDER BY updatedAt DESC),
+ * not "all versions" (which is what `assertUniqueFieldValues` does at save time).
+ * Rationale: the toggle check should only block the user when enabling unique
+ * would prevent an entry from re-saving its current editor state. Archived or
+ * older-draft collisions aren't user-visible and don't belong in the confirm
+ * dialog. Save-time collisions still use the all-versions check.
+ */
+async function findDuplicateGroups(
+  contentTypeId: string,
+  identifier: string,
+  type: 'TEXT' | 'NUMBER'
+): Promise<Array<{ value: unknown; entryIds: string[] }>> {
+  // For each entry, pick the most-recent version's value at `identifier`. Group
+  // entries by that value and return groups with COUNT > 1. Null/empty excluded.
+  if (type === 'NUMBER') {
+    // Cast to double precision (not numeric) so @prisma/adapter-pg returns a JS
+    // number rather than a string. NUMBER fields in this CMS hold ordinary
+    // user-facing values (issue numbers, prices, counts) where double-precision
+    // floats are sufficient.
+    const rows = await prisma.$queryRaw<
+      Array<{ value: number; entryIds: string[] }>
+    >`
+      SELECT v.value, array_agg(v."entryId") AS "entryIds"
+      FROM (
+        SELECT DISTINCT ON (cev."entryId")
+          cev."entryId",
+          (cev."data" ->> ${identifier})::double precision AS value
+        FROM "ContentEntryVersion" cev
+        JOIN "ContentEntry" ce ON ce."id" = cev."entryId"
+        WHERE ce."contentTypeId" = ${contentTypeId}
+          AND cev."data" ? ${identifier}
+          AND cev."data" ->> ${identifier} <> ''
+        ORDER BY cev."entryId", cev."updatedAt" DESC
+      ) v
+      GROUP BY v.value
+      HAVING COUNT(*) > 1
+    `;
+    return rows.map((r) => ({ value: r.value, entryIds: r.entryIds }));
+  }
+
+  const rows = await prisma.$queryRaw<
+    Array<{ value: string; entryIds: string[] }>
+  >`
+    SELECT v.value, array_agg(v."entryId") AS "entryIds"
+    FROM (
+      SELECT DISTINCT ON (cev."entryId")
+        cev."entryId",
+        cev."data" ->> ${identifier} AS value
+      FROM "ContentEntryVersion" cev
+      JOIN "ContentEntry" ce ON ce."id" = cev."entryId"
+      WHERE ce."contentTypeId" = ${contentTypeId}
+        AND cev."data" ? ${identifier}
+        AND cev."data" ->> ${identifier} <> ''
+      ORDER BY cev."entryId", cev."updatedAt" DESC
+    ) v
+    GROUP BY v.value
+    HAVING COUNT(*) > 1
+  `;
+  return rows.map((r) => ({ value: r.value, entryIds: r.entryIds }));
+}

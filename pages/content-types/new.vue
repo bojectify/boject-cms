@@ -21,6 +21,7 @@ interface FieldDraft {
   name: string;
   type: string;
   required: boolean;
+  unique: boolean;
   options: unknown;
 }
 
@@ -50,6 +51,7 @@ const fields = ref<FieldDraft[]>([
     name: 'Title',
     type: 'ENTRY_TITLE',
     required: true,
+    unique: true,
     options: null,
   },
   {
@@ -57,6 +59,7 @@ const fields = ref<FieldDraft[]>([
     name: 'Slug',
     type: 'SLUG',
     required: false,
+    unique: true,
     options: null,
   },
 ]);
@@ -70,6 +73,7 @@ const fieldModalField = ref<{
   name: string;
   type: string;
   required: boolean;
+  unique: boolean;
   options: unknown;
 } | null>(null);
 const editingIndex = ref<number | null>(null);
@@ -90,6 +94,7 @@ function openEditFieldModal(index: number) {
     name: f.name,
     type: f.type,
     required: f.required,
+    unique: f.unique,
     options: f.options,
   };
   editingIndex.value = index;
@@ -101,6 +106,7 @@ function handleFieldSave(data: {
   name: string;
   type: string;
   required: boolean;
+  unique: boolean;
   options: unknown;
 }) {
   if (fieldModalMode.value === 'add') {
@@ -109,6 +115,7 @@ function handleFieldSave(data: {
       name: data.name,
       type: data.type,
       required: data.required,
+      unique: data.unique,
       options: data.options ?? null,
     });
     toast.add({
@@ -122,6 +129,7 @@ function handleFieldSave(data: {
       name: data.name,
       type: data.type,
       required: data.required,
+      unique: data.unique,
       options: data.options ?? null,
     };
     toast.add({

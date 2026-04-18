@@ -80,6 +80,7 @@ const {
   loadingStatus,
   isSaving,
   saveError,
+  fieldErrors,
   status,
   hasPublishedVersion,
   publishedAt,
@@ -165,6 +166,7 @@ async function handleSaveDraft() {
   const valid = await editorRef.value?.validate();
   if (valid === false) return;
   const newId = await saveDraft();
+  await editorRef.value?.validate();
   if (newId && rootIsNew.value) {
     await router.replace(`/entries/${newId}`);
   }
@@ -174,6 +176,7 @@ async function handlePublish() {
   const valid = await editorRef.value?.validate();
   if (valid === false) return;
   const newId = await publish();
+  await editorRef.value?.validate();
   if (newId && rootIsNew.value) {
     await router.replace(`/entries/${newId}`);
   }
@@ -473,6 +476,7 @@ function handlePaneSaved(
           :fields="editorFields"
           :loading="loadingStatus === 'pending'"
           :error="saveError"
+          :field-errors="fieldErrors"
         >
           <template #field="{ field, value, update }">
             <RelationField

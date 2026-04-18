@@ -21,6 +21,7 @@ const {
     name: string;
     type: string;
     required: boolean;
+    unique: boolean;
     order: number;
     options: unknown;
   }>;
@@ -117,12 +118,18 @@ const fieldModalField = ref<{
   name: string;
   type: string;
   required: boolean;
+  unique: boolean;
   options: unknown;
+} | null>(null);
+const conflictAlert = ref<{
+  message: string;
+  conflicts: Array<{ value: unknown; entryIds: string[] }>;
 } | null>(null);
 
 function openAddFieldModal() {
   fieldModalMode.value = 'add';
   fieldModalField.value = null;
+  conflictAlert.value = null;
   fieldModalOpen.value = true;
 }
 
@@ -132,10 +139,12 @@ function openEditFieldModal(field: {
   name: string;
   type: string;
   required: boolean;
+  unique: boolean;
   options: unknown;
 }) {
   fieldModalMode.value = 'edit';
   fieldModalField.value = field;
+  conflictAlert.value = null;
   fieldModalOpen.value = true;
 }
 
@@ -144,8 +153,10 @@ async function handleFieldSave(data: {
   name: string;
   type: string;
   required: boolean;
+  unique: boolean;
   options: unknown;
 }) {
+  conflictAlert.value = null;
   try {
     if (fieldModalMode.value === 'add') {
       await $fetch(`/api/content-types/${id}/fields`, {
@@ -155,6 +166,7 @@ async function handleFieldSave(data: {
           name: data.name,
           type: data.type,
           required: data.required,
+          unique: data.unique,
           ...(data.options ? { options: data.options } : {}),
         },
       });
@@ -171,6 +183,7 @@ async function handleFieldSave(data: {
           body: {
             name: data.name,
             required: data.required,
+            unique: data.unique,
             ...(data.options ? { options: data.options } : {}),
           },
         }
@@ -184,6 +197,14 @@ async function handleFieldSave(data: {
     fieldModalOpen.value = false;
     await refresh();
   } catch (err: unknown) {
+    const conflict = parseUniqueConflict(err);
+    if (conflict?.kind === 'field') {
+      conflictAlert.value = {
+        message: conflict.message,
+        conflicts: conflict.conflicts,
+      };
+      return; // Keep the modal open so the user can see the alert
+    }
     const message =
       err instanceof Error ? err.message : 'Failed to save field.';
     toast.add({ title: 'Error', description: message, color: 'error' });
@@ -215,6 +236,7 @@ function fieldMenuItems(field: {
   name: string;
   type: string;
   required: boolean;
+  unique: boolean;
   options: unknown;
 }) {
   return [
@@ -359,7 +381,7 @@ async function onFieldReorder() {
                     Required
                   </UBadge>
                   <UBadge
-                    v-if="field.type === 'ENTRY_TITLE' || field.type === 'SLUG'"
+                    v-if="field.unique"
                     color="info"
                     size="sm"
                     variant="subtle"
@@ -389,6 +411,7 @@ async function onFieldReorder() {
       :field="fieldModalField"
       :field-type-options="fieldTypeOptions"
       :entry-count="contentType?._count.entries"
+      :conflict-alert="conflictAlert"
       @close="fieldModalOpen = false"
       @save="handleFieldSave"
       @delete="handleFieldDelete"

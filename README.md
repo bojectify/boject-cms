@@ -84,7 +84,7 @@ prisma/
     base.prisma                # Generators, datasource, ContentStatus + FieldType enums
     auth.prisma                # User, ApiKey
     contentType.prisma         # ContentType, ContentTypeField
-    contentEntry.prisma        # ContentEntry
+    contentEntry.prisma        # ContentEntry, ContentEntryVersion
   seed.ts                      # Seed script (admin user + test API key)
   migrations/                  # Migration files
 app.vue                        # Root component (UApp + NuxtLayout wrapper)
@@ -115,16 +115,17 @@ server/
   middleware/
     auth.ts                    # Global server auth middleware (session or API key)
     csrf.ts                    # CSRF origin/referer enforcement
-components/
-  ContentTable.vue             # Reusable content listing table
-  ContentEditor.vue            # Generic content editing form
-  RichTextEditor.vue           # Tiptap rich text editor with toolbar
-  ImageField.vue               # IMAGE field upload/preview
-  FieldModal.vue               # Modal for adding/editing content type fields
-  RelationField.vue            # Single-relation entry card
-  MultiRelationField.vue       # Multi-relation draggable list
-  EntryPickerModal.vue         # Entry picker with type tabs + search
-  EntryEditorPane.vue          # Sliding pane for editing related entries
+components/                    # Each component lives in its own kebab-case folder
+  content-table/               # ContentTable.vue + contentTable.config.ts + contentTable.types.ts
+  content-editor/              # Generic content editing form (exposes validate())
+  entry-sidebar/               # Save/Publish/Discard + Publishing + Information
+  rich-text-editor/            # Tiptap editor with toolbar
+  image-field/                 # IMAGE field upload/preview
+  field-modal/                 # Modal for adding/editing content type fields
+  relation-field/              # Single-relation entry card
+  multi-relation-field/        # Multi-relation draggable list
+  entry-picker-modal/          # Entry picker with type tabs + search
+  entry-editor-pane/           # Sliding pane for editing related entries
 composables/
   useContentTable.ts           # Shared formatDate + statusColor helpers
   useContentEntryEditor.ts     # Entry editing lifecycle
@@ -141,10 +142,20 @@ starters/
   src/*.overlay.json           # overlay sources
 types/
   contentEditor.ts             # FieldConfig discriminated union (auto-imported)
+  basicComponentProps.ts       # Shared BasicComponentProps (testId, etc.)
+utils/
+  mapFieldToConfig.ts          # ContentTypeField -> FieldConfig mapping
+  paneStack.ts                 # Pane-stack URL encode/decode for /entries/[...stack]
+  parseUniqueConflict.ts       # Client helper parsing UNIQUE_CONFLICT 409 responses
+  test-config/                 # Shared testIds / testIdModifier helpers
 pages/
   login.vue                    # Login page
   index.vue                    # All content (paginated, sorted by updatedAt)
-  content-types/               # Content type management + entry editing
+  content-types/               # Content type list/create/edit + per-type entry listing
+  entries/[...stack].vue       # Entry create/edit (pane-stack catch-all)
+middleware/
+  auth.global.ts               # Redirects to /login when unauthenticated
+  entry-redirect.global.ts     # Rewrites legacy /content-types/:id/entries/* URLs
 storage/                       # Gitignored, local file storage (dev)
 generated/                     # Gitignored, auto-generated
   prisma/                      # Prisma client
@@ -232,15 +243,18 @@ PostgreSQL 17 runs locally via Docker Compose (port 5432, user/password/db: `boj
 
 ### Models
 
-| Model                | Description                                                                                               |
-| -------------------- | --------------------------------------------------------------------------------------------------------- |
-| **User**             | CMS admin accounts (email, scrypt-hashed password, firstName, lastName)                                   |
-| **ApiKey**           | Hashed API keys for GraphQL + REST (keyPrefix, keyHash, revokedAt, lastUsedAt)                            |
-| **ContentType**      | User-defined content type with unique name, PascalCase identifier, and ordered field definitions          |
-| **ContentTypeField** | Field definition (name, camelCase identifier, FieldType, required, order, options JSON)                   |
-| **ContentEntry**     | Instance of a ContentType. JSONB `data` validated against field definitions; includes publishing metadata |
+| Model                   | Description                                                                                                |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------- |
+| **User**                | CMS admin accounts (email, scrypt-hashed password, firstName, lastName)                                    |
+| **ApiKey**              | Hashed API keys for GraphQL + REST (keyPrefix, keyHash, revokedAt, lastUsedAt)                             |
+| **ContentType**         | User-defined content type with unique name, PascalCase identifier, and ordered field definitions           |
+| **ContentTypeField**    | Field definition (name, camelCase identifier, FieldType, required, `unique`, order, options JSON)          |
+| **ContentEntry**        | Envelope for an entry — `contentTypeId`, `slug`, `entryTitle` (synced from the active version), timestamps |
+| **ContentEntryVersion** | Versioned content body — `data` JSONB, `status`, `publishedAt`, `createdBy`, `updatedBy`                   |
 
-All models use UUID primary keys and `createdAt`/`updatedAt` timestamps. `ContentEntry` carries publishing metadata: `entryTitle` (synced from the ENTRY_TITLE field), `status` (`DRAFT`/`PUBLISHED`/`CHANGED`/`ARCHIVED`), `publishedAt`, `createdBy`, `updatedBy`.
+All models use UUID primary keys and `createdAt`/`updatedAt` timestamps. Entries use a two-table versioning model: `ContentEntry` is an identity envelope (unique `(contentTypeId, slug)` and `(contentTypeId, entryTitle)`), and `ContentEntryVersion` holds the per-version content. Each entry keeps at most one draft (`DRAFT` or `CHANGED`) and one `PUBLISHED` version at a time, enforced by a partial unique index; `ARCHIVED` versions are unlimited.
+
+User-configurable uniqueness: `ContentTypeField.unique` is auto-enabled for `ENTRY_TITLE` / `SLUG` and opt-in for `TEXT` / `NUMBER`. Enforcement is a runtime cross-version JSONB check; conflicts return `409` with `{ error: 'UNIQUE_CONFLICT', conflicts }`.
 
 ### Migrations
 

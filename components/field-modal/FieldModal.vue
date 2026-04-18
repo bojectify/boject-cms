@@ -17,6 +17,7 @@ const formIdentifier = ref('');
 const identifierTouched = ref(false);
 const formType = ref('TEXT');
 const formRequired = ref(false);
+const formUnique = ref(false);
 const formOptions = ref<unknown>(null);
 
 watch(
@@ -28,6 +29,7 @@ watch(
         formIdentifier.value = props.field.identifier;
         formType.value = props.field.type;
         formRequired.value = props.field.required;
+        formUnique.value = props.field.unique;
         formOptions.value = props.field.options ?? null;
         identifierTouched.value = true;
       } else {
@@ -35,6 +37,7 @@ watch(
         formIdentifier.value = '';
         formType.value = 'TEXT';
         formRequired.value = false;
+        formUnique.value = false;
         formOptions.value = null;
         identifierTouched.value = false;
       }
@@ -55,6 +58,18 @@ const canSave = computed(() => {
   return formName.value.trim();
 });
 
+const showUniqueToggle = computed(
+  () =>
+    formType.value === 'TEXT' ||
+    formType.value === 'NUMBER' ||
+    formType.value === 'ENTRY_TITLE' ||
+    formType.value === 'SLUG'
+);
+
+const uniqueToggleReadonly = computed(
+  () => formType.value === 'ENTRY_TITLE' || formType.value === 'SLUG'
+);
+
 function handleSave() {
   if (!canSave.value) return;
   emit('save', {
@@ -62,6 +77,7 @@ function handleSave() {
     name: formName.value.trim(),
     type: formType.value,
     required: formRequired.value,
+    unique: uniqueToggleReadonly.value ? true : formUnique.value,
     options: formOptions.value,
   });
 }
@@ -109,6 +125,33 @@ const canDelete = computed(() => {
 
     <template #body>
       <div class="space-y-4">
+        <UAlert
+          v-if="conflictAlert"
+          color="error"
+          icon="i-lucide-alert-circle"
+          :title="conflictAlert.message"
+          class="mb-2"
+        >
+          <template #description>
+            <ul class="mt-2 space-y-1 text-sm">
+              <li v-for="(c, i) in conflictAlert.conflicts" :key="i">
+                <span class="font-medium">{{ c.value }}</span>
+                <span class="text-muted"> — </span>
+                <NuxtLink
+                  v-for="(eid, j) in c.entryIds"
+                  :key="eid"
+                  :to="`/entries/${eid}`"
+                  target="_blank"
+                  class="underline mr-2"
+                >
+                  {{ eid.slice(0, 8)
+                  }}<span v-if="j < c.entryIds.length - 1">,</span>
+                </NuxtLink>
+              </li>
+            </ul>
+          </template>
+        </UAlert>
+
         <!-- Info bar (edit mode only) -->
         <div
           v-if="mode === 'edit'"
@@ -148,7 +191,7 @@ const canDelete = computed(() => {
           />
         </UFormField>
 
-        <!-- Type + Required row (add mode) -->
+        <!-- Type + Required + Unique row (add mode) -->
         <div v-if="mode === 'add'" class="grid grid-cols-2 gap-4">
           <UFormField label="Type">
             <USelect
@@ -159,13 +202,34 @@ const canDelete = computed(() => {
             />
           </UFormField>
           <UFormField label=" ">
-            <USwitch v-model="formRequired" label="Required" />
+            <div class="flex flex-col gap-2">
+              <USwitch v-model="formRequired" label="Required" />
+              <USwitch
+                v-if="showUniqueToggle"
+                :model-value="uniqueToggleReadonly ? true : formUnique"
+                :disabled="uniqueToggleReadonly"
+                label="Unique"
+                @update:model-value="formUnique = $event"
+              />
+            </div>
           </UFormField>
         </div>
 
         <!-- Required toggle (edit mode — type is read-only) -->
         <UFormField v-if="mode === 'edit'" label="Required">
           <USwitch v-model="formRequired" />
+        </UFormField>
+
+        <UFormField v-if="mode === 'edit' && showUniqueToggle" label="Unique">
+          <USwitch
+            :model-value="uniqueToggleReadonly ? true : formUnique"
+            :disabled="uniqueToggleReadonly"
+            @update:model-value="formUnique = $event"
+          />
+          <template #help>
+            Entries must have distinct values for this field. Empty values are
+            allowed.
+          </template>
         </UFormField>
 
         <!-- Type-specific options slot -->

@@ -8,6 +8,7 @@ import {
 import { withPrismaErrors } from '../../../../utils/prismaErrors';
 import { enforceMutationRateLimit } from '../../../../utils/rateLimitEndpoint';
 import { invalidateSchema } from '../../../../graphql/schema';
+import { resolveUniqueFlag } from '../../../../utils/validateFieldUnique';
 
 const VALID_FIELD_TYPES = new Set<string>([
   'ENTRY_TITLE',
@@ -110,6 +111,11 @@ export default defineEventHandler(async (event) => {
       ? Math.max(...contentType.fields.map((f) => f.order))
       : -1;
 
+  const uniqueFlag = resolveUniqueFlag(
+    type,
+    typeof body.unique === 'boolean' ? body.unique : undefined
+  );
+
   const created = await withPrismaErrors(
     () =>
       prisma.contentTypeField.create({
@@ -119,6 +125,7 @@ export default defineEventHandler(async (event) => {
           name,
           type,
           required: typeof body.required === 'boolean' ? body.required : false,
+          unique: uniqueFlag,
           order: maxOrder + 1,
           options: body.options ?? undefined,
         },

@@ -33,6 +33,7 @@ const {
   loadingStatus,
   isSaving,
   saveError,
+  fieldErrors,
   status,
   hasPublishedVersion,
   publishedAt,
@@ -131,6 +132,7 @@ async function handleSaveDraft() {
   const valid = await editorRef.value?.validate();
   if (valid === false) return;
   const newId = await saveDraft();
+  await editorRef.value?.validate();
   emitSaved(newId);
 }
 
@@ -138,6 +140,7 @@ async function handlePublish() {
   const valid = await editorRef.value?.validate();
   if (valid === false) return;
   const newId = await publish();
+  await editorRef.value?.validate();
   emitSaved(newId);
 }
 
@@ -193,6 +196,7 @@ defineExpose({ isDirty });
               :fields="editorFields"
               :loading="loadingStatus === 'pending'"
               :error="saveError"
+              :field-errors="fieldErrors"
             />
           </div>
           <EntrySidebar
