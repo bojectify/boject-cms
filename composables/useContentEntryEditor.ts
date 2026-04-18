@@ -39,6 +39,7 @@ export function useContentEntryEditor(
   const formState = reactive<Record<string, unknown>>({});
   const isSaving = ref(false);
   const saveError = ref<string | null>(null);
+  const fieldErrors = ref<Record<string, string>>({});
   const status = ref<'DRAFT' | 'PUBLISHED' | 'CHANGED' | 'ARCHIVED'>('DRAFT');
   const hasPublishedVersion = ref(false);
   const publishedAt = ref<string | null>(null);
@@ -89,6 +90,7 @@ export function useContentEntryEditor(
   async function saveDraft(): Promise<string | void> {
     isSaving.value = true;
     saveError.value = null;
+    fieldErrors.value = {};
     try {
       const data = { ...formState };
       if (isNew.value) {
@@ -116,6 +118,20 @@ export function useContentEntryEditor(
         });
       }
     } catch (err: unknown) {
+      const conflict = parseUniqueConflict(err);
+      if (conflict?.kind === 'entry') {
+        fieldErrors.value = {
+          ...fieldErrors.value,
+          [conflict.field]: conflict.message,
+        };
+        saveError.value = conflict.message;
+        toast.add({
+          title: 'Duplicate value',
+          description: conflict.message,
+          color: 'error',
+        });
+        return;
+      }
       const message = err instanceof Error ? err.message : 'Failed to save.';
       saveError.value = message;
       toast.add({ title: 'Error', description: message, color: 'error' });
@@ -127,6 +143,7 @@ export function useContentEntryEditor(
   async function publish(): Promise<string | void> {
     isSaving.value = true;
     saveError.value = null;
+    fieldErrors.value = {};
     try {
       const data = { ...formState };
       if (isNew.value) {
@@ -158,6 +175,20 @@ export function useContentEntryEditor(
         });
       }
     } catch (err: unknown) {
+      const conflict = parseUniqueConflict(err);
+      if (conflict?.kind === 'entry') {
+        fieldErrors.value = {
+          ...fieldErrors.value,
+          [conflict.field]: conflict.message,
+        };
+        saveError.value = conflict.message;
+        toast.add({
+          title: 'Duplicate value',
+          description: conflict.message,
+          color: 'error',
+        });
+        return;
+      }
       const message = err instanceof Error ? err.message : 'Failed to publish.';
       saveError.value = message;
       toast.add({ title: 'Error', description: message, color: 'error' });
@@ -204,6 +235,7 @@ export function useContentEntryEditor(
     loadingStatus,
     isSaving,
     saveError,
+    fieldErrors,
     status,
     hasPublishedVersion,
     publishedAt,

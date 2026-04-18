@@ -1198,4 +1198,216 @@ describe('Content Entry endpoints', async () => {
       expect(res.status).toBe(400);
     });
   });
+
+  describe('unique field enforcement', () => {
+    async function createUniqueContentType(
+      cookie: string,
+      suffix: string,
+      fieldType: 'TEXT' | 'NUMBER' = 'TEXT',
+      fieldIdentifier = 'sku'
+    ): Promise<ContentTypeResponse> {
+      return await $fetch<ContentTypeResponse>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: `Unique ${fieldType} ${suffix}`,
+          description: 'Content type for unique enforcement tests',
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+            {
+              identifier: fieldIdentifier,
+              name: fieldIdentifier.toUpperCase(),
+              type: fieldType,
+              unique: true,
+            },
+          ],
+        },
+      });
+    }
+
+    it('rejects creating an entry with a duplicate unique TEXT value', async () => {
+      const cookie = await getSessionCookie();
+      const ts = Date.now();
+      const ct = await createUniqueContentType(cookie, `text-${ts}`);
+
+      await $fetch('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: ct.id,
+          data: { title: `First ${ts}`, sku: 'SKU-1' },
+        },
+      });
+
+      const res = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contentTypeId: ct.id,
+          data: { title: `Second ${ts}`, sku: 'SKU-1' },
+        }),
+      });
+      expect(res.status).toBe(409);
+    });
+
+    it('rejects creating an entry with a duplicate unique NUMBER value', async () => {
+      const cookie = await getSessionCookie();
+      const ts = Date.now();
+      const ct = await createUniqueContentType(
+        cookie,
+        `number-${ts}`,
+        'NUMBER',
+        'issue'
+      );
+
+      await $fetch('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: ct.id,
+          data: { title: `First ${ts}`, issue: 7 },
+        },
+      });
+
+      const res = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contentTypeId: ct.id,
+          data: { title: `Second ${ts}`, issue: 7 },
+        }),
+      });
+      expect(res.status).toBe(409);
+    });
+
+    it('allows multiple entries with empty/null unique values', async () => {
+      const cookie = await getSessionCookie();
+      const ts = Date.now();
+      const ct = await createUniqueContentType(cookie, `empty-${ts}`);
+
+      const first = await $fetch<EntryResponse>('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: ct.id,
+          data: { title: `Empty 1 ${ts}`, sku: '' },
+        },
+      });
+      const second = await $fetch<EntryResponse>('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: ct.id,
+          data: { title: `Empty 2 ${ts}`, sku: null },
+        },
+      });
+      const third = await $fetch<EntryResponse>('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: ct.id,
+          data: { title: `Empty 3 ${ts}` },
+        },
+      });
+
+      expect(first.id).toBeTruthy();
+      expect(second.id).toBeTruthy();
+      expect(third.id).toBeTruthy();
+    });
+
+    it('allows an entry to keep its own unique value on update', async () => {
+      const cookie = await getSessionCookie();
+      const ts = Date.now();
+      const ct = await createUniqueContentType(cookie, `self-${ts}`);
+
+      const created = await $fetch<EntryResponse>('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: ct.id,
+          data: { title: `Self ${ts}`, sku: 'SKU-ABC' },
+        },
+      });
+
+      const updated = await $fetch<EntryResponse>(
+        `/api/content-entries/${created.id}`,
+        {
+          method: 'PUT',
+          headers: { cookie },
+          body: {
+            data: { title: `Self Renamed ${ts}`, sku: 'SKU-ABC' },
+          },
+        }
+      );
+      expect(updated.id).toBe(created.id);
+      expect((updated.data as Record<string, unknown>).sku).toBe('SKU-ABC');
+    });
+
+    it('blocks conflicts across all versions (draft vs draft)', async () => {
+      const cookie = await getSessionCookie();
+      const ts = Date.now();
+      const ct = await createUniqueContentType(cookie, `draft-${ts}`);
+
+      await $fetch('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: ct.id,
+          data: { title: `Draft A ${ts}`, sku: 'SKU-DRAFT' },
+          status: 'DRAFT',
+        },
+      });
+
+      const res = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contentTypeId: ct.id,
+          data: { title: `Draft B ${ts}`, sku: 'SKU-DRAFT' },
+          status: 'DRAFT',
+        }),
+      });
+      expect(res.status).toBe(409);
+    });
+
+    it('returns 409 body shape with UNIQUE_CONFLICT error and offending value', async () => {
+      const cookie = await getSessionCookie();
+      const ts = Date.now();
+      const ct = await createUniqueContentType(cookie, `shape-${ts}`);
+
+      await $fetch('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: ct.id,
+          data: { title: `Shape A ${ts}`, sku: 'SHAPE-1' },
+        },
+      });
+
+      const res = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contentTypeId: ct.id,
+          data: { title: `Shape B ${ts}`, sku: 'SHAPE-1' },
+        }),
+      });
+      expect(res.status).toBe(409);
+      const body = (await res.json()) as {
+        data?: { error?: string; field?: string; value?: unknown };
+        error?: string;
+        field?: string;
+        value?: unknown;
+      };
+      const payload = body.data ?? body;
+      expect(payload.error).toBe('UNIQUE_CONFLICT');
+      expect(payload.field).toBe('sku');
+      expect(payload.value).toBe('SHAPE-1');
+    });
+  });
 });

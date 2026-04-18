@@ -2,6 +2,7 @@ import type { Prisma, ContentEntryVersion, FieldType } from '#prisma';
 import { assertUuid } from '../../utils/validation';
 import { withPrismaErrors } from '../../utils/prismaErrors';
 import { enforceMutationRateLimit } from '../../utils/rateLimitEndpoint';
+import { assertUniqueFieldValues } from '../../utils/assertUniqueFieldValues';
 import {
   isCmsRequest,
   getDraftVersion,
@@ -35,6 +36,12 @@ export default defineEventHandler(async (event) => {
     validatedData = await validateEntryData(
       body.data as Record<string, unknown>,
       entry.contentType.fields
+    );
+    await assertUniqueFieldValues(
+      validatedData,
+      entry.contentType.fields,
+      entry.contentTypeId,
+      entry.id
     );
   }
 

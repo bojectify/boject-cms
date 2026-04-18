@@ -6,6 +6,7 @@ export interface FieldData {
   name: string;
   type: string;
   required: boolean;
+  unique: boolean;
   options: unknown;
 }
 
@@ -14,6 +15,7 @@ export interface FieldFormData {
   name: string;
   type: string;
   required: boolean;
+  unique: boolean;
   options: unknown;
 }
 
@@ -23,4 +25,8 @@ export type FieldModalProps = BasicComponentProps & {
   field: FieldData | null;
   fieldTypeOptions: Array<{ label: string; value: string }>;
   entryCount?: number;
+  conflictAlert?: {
+    message: string;
+    conflicts: Array<{ value: unknown; entryIds: string[] }>;
+  } | null;
 };

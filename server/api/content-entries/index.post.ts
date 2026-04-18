@@ -2,6 +2,7 @@ import type { Prisma } from '#prisma';
 import { assertUuid } from '../../utils/validation';
 import { withPrismaErrors } from '../../utils/prismaErrors';
 import { enforceMutationRateLimit } from '../../utils/rateLimitEndpoint';
+import { assertUniqueFieldValues } from '../../utils/assertUniqueFieldValues';
 import {
   flattenEntryWithVersion,
   getPublishedVersion,
@@ -38,6 +39,11 @@ export default defineEventHandler(async (event) => {
       : {};
 
   const validatedData = await validateEntryData(rawData, contentType.fields);
+  await assertUniqueFieldValues(
+    validatedData,
+    contentType.fields,
+    contentTypeId
+  );
   const slug = extractSlug(validatedData, contentType.fields);
   const entryTitle = extractEntryTitle(validatedData, contentType.fields);
 

@@ -33,6 +33,7 @@ type ContentTypeResponse = {
     name: string;
     type: string;
     required: boolean;
+    unique: boolean;
     order: number;
     options: unknown;
   }>;
@@ -44,6 +45,7 @@ type FieldResponse = {
   name: string;
   type: string;
   required: boolean;
+  unique: boolean;
   order: number;
   options: unknown;
 };
@@ -170,6 +172,94 @@ describe('Content Type endpoints', async () => {
               name: 'Title',
               type: 'ENTRY_TITLE',
               required: true,
+            },
+          ],
+        }),
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('auto-sets unique=true on ENTRY_TITLE and SLUG during content type creation', async () => {
+      const cookie = await getSessionCookie();
+      const created = await $fetch<ContentTypeResponse>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: `Unique Auto ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+            { identifier: 'slug', name: 'Slug', type: 'SLUG' },
+            { identifier: 'summary', name: 'Summary', type: 'TEXT' },
+          ],
+        },
+      });
+      const titleField = created.fields.find((f) => f.type === 'ENTRY_TITLE');
+      const slugField = created.fields.find((f) => f.type === 'SLUG');
+      const textField = created.fields.find((f) => f.identifier === 'summary');
+      expect(titleField!.unique).toBe(true);
+      expect(slugField!.unique).toBe(true);
+      expect(textField!.unique).toBe(false);
+    });
+
+    it('accepts unique=true on TEXT and NUMBER fields in content type creation', async () => {
+      const cookie = await getSessionCookie();
+      const created = await $fetch<ContentTypeResponse>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: `Unique TN ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+            {
+              identifier: 'sku',
+              name: 'SKU',
+              type: 'TEXT',
+              unique: true,
+            },
+            {
+              identifier: 'serial',
+              name: 'Serial',
+              type: 'NUMBER',
+              unique: true,
+            },
+          ],
+        },
+      });
+      const textField = created.fields.find((f) => f.identifier === 'sku');
+      const numberField = created.fields.find((f) => f.identifier === 'serial');
+      expect(textField!.unique).toBe(true);
+      expect(numberField!.unique).toBe(true);
+    });
+
+    it('rejects unique=true on a BOOLEAN field during content type creation', async () => {
+      const cookie = await getSessionCookie();
+      const res = await fetch('/api/content-types', {
+        method: 'POST',
+        headers: { cookie, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: `Unique Bool ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+            {
+              identifier: 'flag',
+              name: 'Flag',
+              type: 'BOOLEAN',
+              unique: true,
             },
           ],
         }),
@@ -574,6 +664,100 @@ describe('Content Type endpoints', async () => {
       expect(res.status).toBe(400);
     });
 
+    it('auto-sets unique=true when adding an ENTRY_TITLE or SLUG via POST /fields', async () => {
+      const cookie = await getSessionCookie();
+      const ct = await $fetch<ContentTypeResponse>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: `Auto Unique Slug ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+          ],
+        },
+      });
+
+      const field = await $fetch<FieldResponse>(
+        `/api/content-types/${ct.id}/fields`,
+        {
+          method: 'POST',
+          headers: { cookie },
+          body: { identifier: 'slug', name: 'Slug', type: 'SLUG' },
+        }
+      );
+      expect(field.unique).toBe(true);
+    });
+
+    it('accepts unique=true when adding a TEXT field via POST /fields', async () => {
+      const cookie = await getSessionCookie();
+      const ct = await $fetch<ContentTypeResponse>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: `Accept Unique Text ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+          ],
+        },
+      });
+
+      const field = await $fetch<FieldResponse>(
+        `/api/content-types/${ct.id}/fields`,
+        {
+          method: 'POST',
+          headers: { cookie },
+          body: {
+            identifier: 'sku',
+            name: 'SKU',
+            type: 'TEXT',
+            unique: true,
+          },
+        }
+      );
+      expect(field.unique).toBe(true);
+    });
+
+    it('rejects unique=true on a RICHTEXT field via POST /fields', async () => {
+      const cookie = await getSessionCookie();
+      const ct = await $fetch<ContentTypeResponse>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: `Reject Unique Richtext ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+          ],
+        },
+      });
+
+      const res = await fetch(`/api/content-types/${ct.id}/fields`, {
+        method: 'POST',
+        headers: { cookie, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          identifier: 'body',
+          name: 'Body',
+          type: 'RICHTEXT',
+          unique: true,
+        }),
+      });
+      expect(res.status).toBe(400);
+    });
+
     it('rejects RELATION field with non-existent targetContentTypeId', async () => {
       const cookie = await getSessionCookie();
       const ct = await $fetch<ContentTypeResponse>('/api/content-types', {
@@ -699,6 +883,362 @@ describe('Content Type endpoints', async () => {
         }
       );
       expect(res.status).toBe(404);
+    });
+
+    it('allows toggling unique=true on an empty TEXT field', async () => {
+      const cookie = await getSessionCookie();
+      const ct = await $fetch<ContentTypeResponse>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: `Field Unique Toggle On ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+            { identifier: 'sku', name: 'SKU', type: 'TEXT' },
+          ],
+        },
+      });
+      const fieldId = ct.fields[1]!.id;
+
+      const updated = await $fetch<FieldResponse>(
+        `/api/content-types/${ct.id}/fields/${fieldId}`,
+        {
+          method: 'PUT',
+          headers: { cookie },
+          body: { unique: true },
+        }
+      );
+      expect(updated.unique).toBe(true);
+    });
+
+    it('allows toggling unique=false on a user-configurable field', async () => {
+      const cookie = await getSessionCookie();
+      const ct = await $fetch<ContentTypeResponse>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: `Field Unique Toggle Off ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+            {
+              identifier: 'sku',
+              name: 'SKU',
+              type: 'TEXT',
+              unique: true,
+            },
+          ],
+        },
+      });
+      const fieldId = ct.fields[1]!.id;
+
+      const updated = await $fetch<FieldResponse>(
+        `/api/content-types/${ct.id}/fields/${fieldId}`,
+        {
+          method: 'PUT',
+          headers: { cookie },
+          body: { unique: false },
+        }
+      );
+      expect(updated.unique).toBe(false);
+    });
+
+    it('rejects setting unique=false on ENTRY_TITLE', async () => {
+      const cookie = await getSessionCookie();
+      const ct = await $fetch<ContentTypeResponse>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: `Field Unique Title Reject ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+          ],
+        },
+      });
+      const fieldId = ct.fields[0]!.id;
+
+      const res = await fetch(`/api/content-types/${ct.id}/fields/${fieldId}`, {
+        method: 'PUT',
+        headers: { cookie, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ unique: false }),
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('rejects setting unique=false on SLUG', async () => {
+      const cookie = await getSessionCookie();
+      const ct = await $fetch<ContentTypeResponse>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: `Field Unique Slug Reject ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+            { identifier: 'slug', name: 'Slug', type: 'SLUG' },
+          ],
+        },
+      });
+      const slugField = ct.fields.find((f) => f.type === 'SLUG')!;
+
+      const res = await fetch(
+        `/api/content-types/${ct.id}/fields/${slugField.id}`,
+        {
+          method: 'PUT',
+          headers: { cookie, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ unique: false }),
+        }
+      );
+      expect(res.status).toBe(400);
+    });
+
+    it('rejects setting unique=true on a BOOLEAN field', async () => {
+      const cookie = await getSessionCookie();
+      const ct = await $fetch<ContentTypeResponse>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: `Field Unique Boolean Reject ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+            { identifier: 'active', name: 'Active', type: 'BOOLEAN' },
+          ],
+        },
+      });
+      const fieldId = ct.fields[1]!.id;
+
+      const res = await fetch(`/api/content-types/${ct.id}/fields/${fieldId}`, {
+        method: 'PUT',
+        headers: { cookie, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ unique: true }),
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('blocks enabling unique on a TEXT field with existing duplicates', async () => {
+      const cookie = await getSessionCookie();
+      const ct = await $fetch<ContentTypeResponse>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: `Field Unique Dup Block ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+            { identifier: 'code', name: 'Code', type: 'TEXT' },
+          ],
+        },
+      });
+      const fieldId = ct.fields.find((f) => f.identifier === 'code')!.id;
+
+      await $fetch('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: ct.id,
+          data: { title: `Entry A ${Date.now()}`, code: 'DUP' },
+        },
+      });
+      await $fetch('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: ct.id,
+          data: { title: `Entry B ${Date.now()}`, code: 'DUP' },
+        },
+      });
+
+      const res = await fetch(`/api/content-types/${ct.id}/fields/${fieldId}`, {
+        method: 'PUT',
+        headers: { cookie, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ unique: true }),
+      });
+      expect(res.status).toBe(409);
+      const body = await res.json();
+      expect(body.data.error).toBe('UNIQUE_CONFLICT');
+      expect(Array.isArray(body.data.conflicts)).toBe(true);
+      const group = body.data.conflicts.find(
+        (c: { value: unknown; entryIds: string[] }) => c.value === 'DUP'
+      );
+      expect(group).toBeDefined();
+      expect(group.entryIds.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('blocks enabling unique on a NUMBER field with existing duplicates', async () => {
+      const cookie = await getSessionCookie();
+      const ct = await $fetch<ContentTypeResponse>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: `Field Unique Num Dup Block ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+            { identifier: 'issue', name: 'Issue', type: 'NUMBER' },
+          ],
+        },
+      });
+      const fieldId = ct.fields.find((f) => f.identifier === 'issue')!.id;
+
+      await $fetch('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: ct.id,
+          data: { title: `Entry A ${Date.now()}`, issue: 7 },
+        },
+      });
+      await $fetch('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: ct.id,
+          data: { title: `Entry B ${Date.now()}`, issue: 7 },
+        },
+      });
+
+      const res = await fetch(`/api/content-types/${ct.id}/fields/${fieldId}`, {
+        method: 'PUT',
+        headers: { cookie, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ unique: true }),
+      });
+      expect(res.status).toBe(409);
+      const body = await res.json();
+      expect(body.data.error).toBe('UNIQUE_CONFLICT');
+      expect(Array.isArray(body.data.conflicts)).toBe(true);
+      const group = body.data.conflicts.find(
+        (c: { value: unknown; entryIds: string[] }) =>
+          c.value === 7 && typeof c.value === 'number'
+      );
+      expect(group).toBeDefined();
+      expect(group.entryIds.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('allows enabling unique on a TEXT field when all values are distinct', async () => {
+      const cookie = await getSessionCookie();
+      const ct = await $fetch<ContentTypeResponse>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: `Field Unique Distinct ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+            { identifier: 'code', name: 'Code', type: 'TEXT' },
+          ],
+        },
+      });
+      const fieldId = ct.fields.find((f) => f.identifier === 'code')!.id;
+
+      await $fetch('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: ct.id,
+          data: { title: `Entry A ${Date.now()}`, code: 'ONE' },
+        },
+      });
+      await $fetch('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: ct.id,
+          data: { title: `Entry B ${Date.now()}`, code: 'TWO' },
+        },
+      });
+
+      const updated = await $fetch<FieldResponse>(
+        `/api/content-types/${ct.id}/fields/${fieldId}`,
+        {
+          method: 'PUT',
+          headers: { cookie },
+          body: { unique: true },
+        }
+      );
+      expect(updated.unique).toBe(true);
+    });
+
+    it('ignores null/empty values when detecting duplicates on toggle', async () => {
+      const cookie = await getSessionCookie();
+      const ct = await $fetch<ContentTypeResponse>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: `Field Unique Null Empty ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+            { identifier: 'code', name: 'Code', type: 'TEXT' },
+          ],
+        },
+      });
+      const fieldId = ct.fields.find((f) => f.identifier === 'code')!.id;
+
+      await $fetch('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: ct.id,
+          data: { title: `Entry Empty ${Date.now()}`, code: '' },
+        },
+      });
+      await $fetch('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: ct.id,
+          data: { title: `Entry Null ${Date.now()}`, code: null },
+        },
+      });
+
+      const updated = await $fetch<FieldResponse>(
+        `/api/content-types/${ct.id}/fields/${fieldId}`,
+        {
+          method: 'PUT',
+          headers: { cookie },
+          body: { unique: true },
+        }
+      );
+      expect(updated.unique).toBe(true);
     });
   });
 
