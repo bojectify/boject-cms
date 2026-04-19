@@ -1,0 +1,53 @@
+import { describe, expect, it } from 'vitest';
+import { renderEnvFile } from '../../src/templates/envFile.js';
+
+const baseParams = {
+  sessionPassword: 'session-password-value',
+  adminPassword: 'admin-password-value',
+};
+
+describe('renderEnvFile', () => {
+  it('includes DATABASE_URL pointed at the compose db service', () => {
+    const env = renderEnvFile({ ...baseParams, starter: 'base' });
+    expect(env).toMatch(
+      /^DATABASE_URL=postgresql:\/\/boject:boject@db:5432\/boject$/m
+    );
+  });
+
+  it('includes NUXT_SESSION_PASSWORD from parameter', () => {
+    const env = renderEnvFile({ ...baseParams, starter: 'base' });
+    expect(env).toMatch(/^NUXT_SESSION_PASSWORD=session-password-value$/m);
+  });
+
+  it('includes BOJECT_ADMIN_EMAIL=admin@local', () => {
+    const env = renderEnvFile({ ...baseParams, starter: 'base' });
+    expect(env).toMatch(/^BOJECT_ADMIN_EMAIL=admin@local$/m);
+  });
+
+  it('includes BOJECT_ADMIN_PASSWORD from parameter', () => {
+    const env = renderEnvFile({ ...baseParams, starter: 'base' });
+    expect(env).toMatch(/^BOJECT_ADMIN_PASSWORD=admin-password-value$/m);
+  });
+
+  it('includes STORAGE_DRIVER=local', () => {
+    const env = renderEnvFile({ ...baseParams, starter: 'base' });
+    expect(env).toMatch(/^STORAGE_DRIVER=local$/m);
+  });
+
+  it('includes BOJECT_INITIAL_STARTER when starter is not "none"', () => {
+    const env = renderEnvFile({ ...baseParams, starter: 'sport' });
+    expect(env).toMatch(
+      /^BOJECT_INITIAL_STARTER=\/starters\/sport\.boject\.json$/m
+    );
+  });
+
+  it('omits BOJECT_INITIAL_STARTER when starter is "none"', () => {
+    const env = renderEnvFile({ ...baseParams, starter: 'none' });
+    expect(env).not.toMatch(/BOJECT_INITIAL_STARTER/);
+  });
+
+  it('ends with a trailing newline', () => {
+    const env = renderEnvFile({ ...baseParams, starter: 'base' });
+    expect(env.endsWith('\n')).toBe(true);
+  });
+});
