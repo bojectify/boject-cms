@@ -21,10 +21,11 @@
     "lint:fix": "pnpm --filter cms lint:fix",
     "format": "prettier --check .",
     "format:fix": "prettier --write .",
-    "test": "pnpm --filter cms test",
+    "test": "pnpm -r test",
     "test:integration": "pnpm --filter cms test:integration",
     "test:unit": "pnpm --filter cms test:unit",
     "typecheck": "pnpm --filter cms typecheck",
+    "typecheck:scripts": "tsc --noEmit -p scripts/tsconfig.json",
     "prisma:generate": "pnpm --filter cms prisma:generate",
     "prisma:migrate": "pnpm --filter cms prisma:migrate",
     "prisma:seed": "pnpm --filter cms prisma:seed",
@@ -41,8 +42,10 @@
     "starters:check": "pnpm --filter cms starters:check"
   },
   "devDependencies": {
+    "@types/node": "^24.12.2",
     "lefthook": "^2.1.1",
     "prettier": "^3.8.1",
-    "tsx": "^4.21.0"
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
   }
 }

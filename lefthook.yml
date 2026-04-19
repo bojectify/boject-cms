@@ -22,6 +22,10 @@ pre-commit:
       glob: 'packages/boject-cli/**/*.ts'
       run: pnpm --filter @boject/cli typecheck
 
+    - name: typecheck-scripts
+      glob: 'scripts/**/*.ts'
+      run: pnpm typecheck:scripts
+
 pre-push:
   jobs:
     - name: test

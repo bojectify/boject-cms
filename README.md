@@ -110,7 +110,6 @@ apps/
     vitest.config.ts           # Two projects: integration + unit
     vitest.globalSetup.ts      # Resets + seeds boject_test before integration tests
     eslint.config.mjs          # Nuxt-derived flat config
-    starters.test.ts           # Validates repo-root starter bundles
     package.json               # Nuxt app deps + scripts (name: "cms")
 packages/                      # Empty; reserved for create-boject-cms + boject-cli
 starters/                      # Shared starter bundles (data, consumed by apps + future packages)

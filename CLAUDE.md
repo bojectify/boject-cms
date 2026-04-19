@@ -237,7 +237,7 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder. The schema is
 - `starters/src/sport.overlay.json` — sport overlay source (delta on top of `base`)
 - `starters/src/rugby.overlay.json` — rugby overlay source (delta on top of `sport`)
 - `starters/README.md` — starter bundle documentation + usage conventions
-- `apps/cms/starters.test.ts` — shape regression test for every bundle under `starters/`
+- `apps/cms/scripts/build-starters/starters-shape.test.ts` — shape regression test for every bundle under `starters/`
 - `apps/cms/scripts/build-starters/types.ts` — `Overlay`, `OverlayContentType`, `OverlayField` types
 - `apps/cms/scripts/build-starters/validate.ts` — overlay-specific shape validator
 - `apps/cms/scripts/build-starters/merge.ts` — pure `mergeOverlay(parent, overlay)` function implementing create/patch semantics
