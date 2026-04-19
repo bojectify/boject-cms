@@ -303,7 +303,7 @@ watch(
             contentTypeName: resolved.contentTypeName,
           };
         } else {
-          delete resolvedRelations[field.key];
+          Reflect.deleteProperty(resolvedRelations, field.key);
         }
       }
       if (field.type === 'dynamic-multirelation') {
