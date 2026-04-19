@@ -1,0 +1,41 @@
+# Build outputs
+**/.nuxt
+**/.output
+**/dist
+**/generated
+
+# Dev artifacts
+**/node_modules
+**/storage
+**/*.log
+**/coverage
+**/.nyc_output
+
+# Git / worktrees
+.git
+.worktrees
+
+# Env
+**/.env
+**/.env.local
+**/.env.*.local
+
+# IDE
+.vscode
+.idea
+**/*.swp
+
+# OS
+**/.DS_Store
+**/Thumbs.db
+
+# Tests (we don't run tests in prod images)
+**/*.test.ts
+**/*.test.tsx
+
+# Docs (root-level markdown, CLAUDE, etc. — not needed in image)
+*.md
+docs/
+
+# Plan + spec working files
+**/.claude
