@@ -2,7 +2,7 @@
 import { spawnSync } from 'node:child_process';
 
 const REGISTRY = 'http://localhost:4873';
-const IMAGE = 'localhost:5555/boject/cms:dev';
+const IMAGE = 'localhost:5555/boject/cms:0.0.1-rc.1';
 
 function main(): void {
   const args = process.argv.slice(2);
