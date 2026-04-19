@@ -4,7 +4,7 @@
 
 **Goal:** Stand up `registry:2` (Docker images) and `verdaccio` (npm packages) as local dev registries, published via `pnpm dev:registries:up`, and add `pnpm dev:publish:image` that pushes the CMS image to the local Docker registry.
 
-**Architecture:** A second compose file (`docker-compose.dev.yml`) at repo root runs both registries with named volumes for persistence. Verdaccio is configured via a committed config file (`docker/verdaccio/config.yaml`) allowing anonymous publish for `@boject/*` and `create-boject-cms`, with everything else proxied to npmjs. Three new root `package.json` scripts (`dev:registries:up`, `dev:registries:down`, `dev:publish:image`) drive the loop. README documents the one-time `insecure-registries` Docker daemon setup and the macOS port-5000 AirPlay conflict.
+**Architecture:** A second compose file (`docker-compose.dev.yml`) at repo root runs both registries with named volumes for persistence. The Docker registry is published on host port `5555` (not the conventional `5000`, which conflicts with macOS AirPlay Receiver). Verdaccio is configured via a committed config file (`docker/verdaccio/config.yaml`) allowing anonymous publish for `@boject/*` and `create-boject-cms`, with everything else proxied to npmjs. Three new root `package.json` scripts (`dev:registries:up`, `dev:registries:down`, `dev:publish:image`) drive the loop. README documents the one-time `insecure-registries` Docker daemon setup.
 
 **Tech Stack:** Docker Compose v2, `registry:2` image, `verdaccio/verdaccio` image, pnpm workspace scripts.
 
@@ -14,12 +14,12 @@
 
 ## File Structure
 
-| File                                  | Responsibility                                                                                                                                                     |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `docker-compose.dev.yml` (new)        | Defines `registry` and `verdaccio` services, named volumes (`registry-data`, `verdaccio-storage`), port bindings (5000 and 4873), bind-mount for Verdaccio config. |
-| `docker/verdaccio/config.yaml` (new)  | Verdaccio config: listen on all interfaces inside the container, anonymous publish scoped to `@boject/*` and `create-boject-cms`, proxy everything else to npmjs.  |
-| `package.json` (modify, scripts only) | Add `dev:registries:up`, `dev:registries:down`, `dev:publish:image`.                                                                                               |
-| `README.md` (modify)                  | Add "Local dev registries (maintainers)" section with one-time Docker daemon setup, macOS port note, and quick-start snippet.                                      |
+| File                                  | Responsibility                                                                                                                                                                                                             |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docker-compose.dev.yml` (new)        | Defines `registry` and `verdaccio` services, named volumes (`registry-data`, `verdaccio-storage`), port bindings (host `5555` → container `5000` for the registry, `4873` for Verdaccio), bind-mount for Verdaccio config. |
+| `docker/verdaccio/config.yaml` (new)  | Verdaccio config: listen on all interfaces inside the container, anonymous publish scoped to `@boject/*` and `create-boject-cms`, proxy everything else to npmjs.                                                          |
+| `package.json` (modify, scripts only) | Add `dev:registries:up`, `dev:registries:down`, `dev:publish:image`.                                                                                                                                                       |
+| `README.md` (modify)                  | Add "Local dev registries (maintainers)" section with one-time Docker daemon setup, macOS port note, and quick-start snippet.                                                                                              |
 
 No source code; no tests. Verification is manual per task.
 
@@ -109,7 +109,7 @@ services:
     image: registry:2
     restart: unless-stopped
     ports:
-      - '5000:5000'
+      - '5555:5000'
     volumes:
       - registry-data:/var/lib/registry
 
@@ -126,6 +126,8 @@ volumes:
   registry-data:
   verdaccio-storage:
 ```
+
+Host port `5555` maps to the registry container's internal port `5000`. We deviate from the conventional `5000:5000` because macOS Monterey+ binds host port 5000 to AirPlay Receiver; using `5555` removes per-machine setup friction.
 
 - [ ] **Step 2: Add up/down scripts to root `package.json`**
 
@@ -151,7 +153,7 @@ Expected: both containers start (look for "Started" lines, or confirm with `dock
 Then:
 
 ```bash
-curl -s http://localhost:5000/v2/
+curl -s http://localhost:5555/v2/
 curl -s http://localhost:4873/-/ping
 ```
 
@@ -161,8 +163,6 @@ Expected:
 - Verdaccio returns a JSON timestamp response (e.g. `"2026-04-19..."`), not an error.
 
 If Verdaccio returns `Connection refused`, check `docker compose -f docker-compose.dev.yml logs verdaccio` — the `listen: 0.0.0.0:4873` line in the config is required for the port to be reachable from outside the container.
-
-If the registry `curl` hangs on macOS, check System Settings → General → AirDrop & Handoff and disable AirPlay Receiver (it binds port 5000).
 
 - [ ] **Step 4: Verify persistence**
 
@@ -193,18 +193,18 @@ git commit -m "feat(c1): add dev registries compose file + up/down scripts"
 
 ```json
 {
-  "insecure-registries": ["localhost:5000"]
+  "insecure-registries": ["localhost:5555"]
 }
 ```
 
-Then restart Docker Desktop. Without this, `docker push localhost:5000/...` fails with a TLS error.
+Then restart Docker Desktop. Without this, `docker push localhost:5555/...` fails with a TLS error.
 
 - [ ] **Step 1: Add `dev:publish:image` to root `package.json`**
 
 Insert after `dev:registries:down`:
 
 ```json
-"dev:publish:image": "docker build -f apps/cms/Dockerfile -t localhost:5000/boject/cms:dev . && docker push localhost:5000/boject/cms:dev",
+"dev:publish:image": "docker build -f apps/cms/Dockerfile -t localhost:5555/boject/cms:dev . && docker push localhost:5555/boject/cms:dev",
 ```
 
 - [ ] **Step 2: Run the script**
@@ -220,19 +220,19 @@ Expected: build succeeds (reuses Plan B's Dockerfile), then `docker push` prints
 - [ ] **Step 3: Verify a round-trip pull**
 
 ```bash
-docker rmi localhost:5000/boject/cms:dev
-docker pull localhost:5000/boject/cms:dev
+docker rmi localhost:5555/boject/cms:dev
+docker pull localhost:5555/boject/cms:dev
 ```
 
-Expected: `rmi` removes the local tag, `pull` re-downloads the image from the local registry and prints `Status: Downloaded newer image for localhost:5000/boject/cms:dev`.
+Expected: `rmi` removes the local tag, `pull` re-downloads the image from the local registry and prints `Status: Downloaded newer image for localhost:5555/boject/cms:dev`.
 
 - [ ] **Step 4: Verify persistence across restart**
 
 ```bash
 pnpm dev:registries:down
 pnpm dev:registries:up
-docker rmi localhost:5000/boject/cms:dev 2>/dev/null || true
-docker pull localhost:5000/boject/cms:dev
+docker rmi localhost:5555/boject/cms:dev 2>/dev/null || true
+docker pull localhost:5555/boject/cms:dev
 ```
 
 Expected: the pull still succeeds because the registry's named volume persisted.
@@ -261,31 +261,31 @@ Insert after the existing "Docker image" section (currently the last `##` headin
 
 Maintainers who are iterating on the onboarding CLI flow (`create-boject-cms`, `boject-cli`) publish to local Docker and npm registries instead of the public ones. Two sidecar services live in `docker-compose.dev.yml`:
 
-| Service   | Port | Purpose                                 |
-| --------- | ---- | --------------------------------------- |
-| registry  | 5000 | Local Docker registry for the CMS image |
-| verdaccio | 4873 | Local npm registry for the CLI packages |
+| Service   | Host port | Purpose                                 |
+| --------- | --------- | --------------------------------------- |
+| registry  | 5555      | Local Docker registry for the CMS image |
+| verdaccio | 4873      | Local npm registry for the CLI packages |
+
+The registry uses host port `5555` instead of the conventional `5000` because macOS Monterey+ binds port 5000 to AirPlay Receiver by default.
 
 ### One-time setup
 
-Add `localhost:5000` to Docker's insecure-registries list (the local registry speaks plain HTTP). Edit `~/.docker/daemon.json`:
+Add `localhost:5555` to Docker's insecure-registries list (the local registry speaks plain HTTP). Edit `~/.docker/daemon.json`:
 
 ```json
 {
-  "insecure-registries": ["localhost:5000"]
+  "insecure-registries": ["localhost:5555"]
 }
 ```
 
 Restart Docker Desktop. This is a one-time step per machine.
-
-**macOS port 5000 note:** macOS binds port 5000 to AirPlay Receiver by default. If `curl http://localhost:5000/v2/` hangs or `docker push` fails, disable it in System Settings → General → AirDrop & Handoff → AirPlay Receiver.
 
 ### Commands
 
 ```bash
 pnpm dev:registries:up        # Start both registries in the background
 pnpm dev:registries:down      # Stop them (volumes persist)
-pnpm dev:publish:image        # Build apps/cms and push to localhost:5000/boject/cms:dev
+pnpm dev:publish:image        # Build apps/cms and push to localhost:5555/boject/cms:dev
 ```
 
 Data persists across `up`/`down` cycles via named Docker volumes. To start completely clean:
@@ -297,7 +297,7 @@ docker compose -f docker-compose.dev.yml down -v
 ### Verifying the registries are up
 
 ```bash
-curl http://localhost:5000/v2/        # → {}
+curl http://localhost:5555/v2/        # → {}
 curl http://localhost:4873/-/ping     # → JSON timestamp
 ```
 ````
@@ -318,11 +318,11 @@ Fresh shell, from a clean state:
 pnpm dev:registries:down 2>/dev/null || true
 docker volume rm boject-cms_registry-data boject-cms_verdaccio-storage 2>/dev/null || true
 pnpm dev:registries:up
-curl -s http://localhost:5000/v2/
+curl -s http://localhost:5555/v2/
 curl -s http://localhost:4873/-/ping
 pnpm dev:publish:image
-docker rmi localhost:5000/boject/cms:dev
-docker pull localhost:5000/boject/cms:dev
+docker rmi localhost:5555/boject/cms:dev
+docker pull localhost:5555/boject/cms:dev
 pnpm dev:registries:down
 ```
 
