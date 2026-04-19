@@ -1,0 +1,45 @@
+storage: /verdaccio/storage/data
+plugins: /verdaccio/plugins
+
+web:
+  enable: true
+  title: boject-cms dev registry
+
+auth:
+  htpasswd:
+    file: /verdaccio/storage/htpasswd
+    algorithm: bcrypt
+
+uplinks:
+  npmjs:
+    url: https://registry.npmjs.org/
+
+packages:
+  '@boject/*':
+    access: $all
+    publish: $anonymous
+    unpublish: $anonymous
+  'create-boject-cms':
+    access: $all
+    publish: $anonymous
+    unpublish: $anonymous
+  '@*/*':
+    access: $all
+    proxy: npmjs
+  '**':
+    access: $all
+    proxy: npmjs
+
+server:
+  keepAliveTimeout: 60
+
+middlewares:
+  audit:
+    enabled: true
+
+log:
+  type: stdout
+  format: pretty
+  level: warn
+
+listen: 0.0.0.0:4873
