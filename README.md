@@ -363,6 +363,12 @@ pnpm dev:verify /tmp/try --upgrade
 
 All dev artifacts share one version: the CMS image, `create-boject-cms`, and `@boject/cli` are all published at `0.0.1-rc.1`. Plan D will introduce coordinated version bumps.
 
+Data persists across `up`/`down` cycles via named Docker volumes. To start completely clean:
+
+```bash
+docker compose -f docker-compose.dev.yml down -v
+```
+
 ### Verifying the registries are up
 
 ```bash
