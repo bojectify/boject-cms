@@ -102,10 +102,51 @@ async function assertContentTypes(cookie: string): Promise<void> {
   }
 }
 
+async function runScaffoldedUpgrade(dir: string): Promise<void> {
+  process.stdout.write('[upgrade] publishing second image at 0.0.1-rc.2...\n');
+  const publish = spawnSync('pnpm', ['dev:publish:image:as', '0.0.1-rc.2'], {
+    stdio: 'inherit',
+  });
+  if (publish.status !== 0)
+    throw new Error('dev:publish:image:as 0.0.1-rc.2 failed');
+
+  process.stdout.write(
+    '[upgrade] running @boject/cli upgrade in scaffolded project...\n'
+  );
+  const upgrade = spawnSync('pnpm', ['dlx', '@boject/cli@latest', 'upgrade'], {
+    cwd: dir,
+    stdio: 'inherit',
+    env: {
+      ...process.env,
+      npm_config_registry: 'http://localhost:4873',
+      npm_config_prefer_online: 'true',
+    },
+  });
+  if (upgrade.status !== 0) throw new Error('boject upgrade failed');
+
+  const { readFile } = await import('node:fs/promises');
+  const { resolve: resolvePath } = await import('node:path');
+  const compose = await readFile(
+    resolvePath(dir, 'docker-compose.yml'),
+    'utf8'
+  );
+  if (!compose.includes('localhost:5555/boject/cms:0.0.1-rc.2')) {
+    throw new Error(
+      'Expected docker-compose.yml to reference 0.0.1-rc.2 after upgrade'
+    );
+  }
+
+  process.stdout.write('[upgrade] re-polling health after restart...\n');
+  await waitForHealth();
+}
+
 async function main(): Promise<void> {
-  const targetDir = process.argv[2];
+  const argv = process.argv.slice(2);
+  const targetDir = argv.find((a) => !a.startsWith('--'));
+  const doUpgrade = argv.includes('--upgrade');
+
   if (!targetDir) {
-    process.stderr.write('Usage: pnpm dev:verify <dir>\n');
+    process.stderr.write('Usage: pnpm dev:verify <dir> [--upgrade]\n');
     process.exit(1);
   }
   const dir = resolve(targetDir);
@@ -124,7 +165,16 @@ async function main(): Promise<void> {
     if (env.hasStarter) {
       await assertContentTypes(cookie);
     }
-    process.stdout.write('dev:verify: OK\n');
+    process.stdout.write('dev:verify: OK (initial boot)\n');
+
+    if (doUpgrade) {
+      await runScaffoldedUpgrade(dir);
+      const cookie2 = await login(env.adminEmail, env.adminPassword);
+      if (env.hasStarter) {
+        await assertContentTypes(cookie2);
+      }
+      process.stdout.write('dev:verify: OK (post-upgrade)\n');
+    }
   } catch (error) {
     failureMessage = error instanceof Error ? error.message : String(error);
     process.stderr.write(`dev:verify failed: ${failureMessage}\n`);

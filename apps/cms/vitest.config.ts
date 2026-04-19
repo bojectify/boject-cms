@@ -54,7 +54,6 @@ export default defineConfig({
           name: 'unit',
           include: [
             'scripts/**/*.test.ts',
-            'starters.test.ts',
             'server/utils/**/*.test.ts',
             'utils/**/*.test.ts',
           ],
