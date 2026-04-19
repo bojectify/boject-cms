@@ -10,6 +10,8 @@
     "preview": "pnpm --filter cms preview",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
+    "dev:registries:up": "docker compose -f docker-compose.dev.yml up -d",
+    "dev:registries:down": "docker compose -f docker-compose.dev.yml down",
     "lint": "pnpm --filter cms lint",
     "lint:fix": "pnpm --filter cms lint:fix",
     "format": "prettier --check .",
