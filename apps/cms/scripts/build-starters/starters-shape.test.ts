@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { validateBundle } from './scripts/content-bundle/validate';
+import { validateBundle } from '../content-bundle/validate';
 
-const here = new URL('../../starters/', import.meta.url).pathname;
+const here = new URL('../../../../starters/', import.meta.url).pathname;
 
 const bundleFiles = readdirSync(here).filter((f) => f.endsWith('.boject.json'));
 

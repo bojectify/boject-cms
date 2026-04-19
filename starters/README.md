@@ -55,7 +55,7 @@ Later tiers assume prior tiers are already imported. Apply them in order.
 
 ## Testing
 
-`starters.test.ts` runs every `*.boject.json` under this directory through `validateBundle` from `scripts/content-bundle/validate.ts`. This catches shape drift as the bundle format evolves. Run it via `pnpm test starters/starters.test.ts`.
+`apps/cms/scripts/build-starters/starters-shape.test.ts` runs every `*.boject.json` under this directory through `validateBundle` from `apps/cms/scripts/content-bundle/validate.ts`. This catches shape drift as the bundle format evolves. Run it via `pnpm --filter cms test:unit`.
 
 ## Overlay system
 

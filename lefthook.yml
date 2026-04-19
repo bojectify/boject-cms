@@ -18,6 +18,14 @@ pre-commit:
       glob: 'packages/create-boject-cms/**/*.ts'
       run: pnpm --filter create-boject-cms typecheck
 
+    - name: typecheck-cli
+      glob: 'packages/boject-cli/**/*.ts'
+      run: pnpm --filter @boject/cli typecheck
+
+    - name: typecheck-scripts
+      glob: 'scripts/**/*.ts'
+      run: pnpm typecheck:scripts
+
 pre-push:
   jobs:
     - name: test
