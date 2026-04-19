@@ -50,14 +50,16 @@ describe('GraphQL API', async () => {
 
   beforeAll(async () => {
     const cookie = await getSessionCookie();
-    const existing = await $fetch<any>('/api/content-types?perPage=200', {
+    const existing = await $fetch<{
+      items: Array<{ id: string; identifier: string }>;
+    }>('/api/content-types?perPage=200', {
       headers: { cookie },
     }).catch(() => ({ items: [] }));
     const already = existing.items?.find?.(
       (c: { identifier: string }) => c.identifier === 'BlogPost'
     );
     if (already) {
-      const entries = await $fetch<any>(
+      const entries = await $fetch<{ items: Array<{ id: string }> }>(
         `/api/content-entries?contentTypeId=${already.id}&perPage=200`,
         { headers: { cookie } }
       ).catch(() => ({ items: [] }));
@@ -73,7 +75,7 @@ describe('GraphQL API', async () => {
       }).catch(() => {});
     }
 
-    const type = await $fetch<any>('/api/content-types', {
+    const type = await $fetch<{ id: string }>('/api/content-types', {
       method: 'POST',
       headers: { cookie },
       body: {
@@ -100,7 +102,7 @@ describe('GraphQL API', async () => {
     });
     blogTypeId = type.id;
 
-    const a = await $fetch<any>('/api/content-entries', {
+    const a = await $fetch<{ id: string }>('/api/content-entries', {
       method: 'POST',
       headers: { cookie },
       body: {
@@ -118,7 +120,7 @@ describe('GraphQL API', async () => {
     });
     blogEntryIds.push(a.id);
 
-    const b = await $fetch<any>('/api/content-entries', {
+    const b = await $fetch<{ id: string }>('/api/content-entries', {
       method: 'POST',
       headers: { cookie },
       body: {
@@ -362,7 +364,7 @@ describe('GraphQL API', async () => {
     let postEntryId: string;
 
     it('sets up relation test data', async () => {
-      const tagType = await $fetch<any>('/api/content-types', {
+      const tagType = await $fetch<{ id: string }>('/api/content-types', {
         method: 'POST',
         headers: { Cookie: await getSessionCookie() },
         body: {
@@ -381,7 +383,7 @@ describe('GraphQL API', async () => {
       });
       tagTypeId = tagType.id;
 
-      const postType = await $fetch<any>('/api/content-types', {
+      const postType = await $fetch<{ id: string }>('/api/content-types', {
         method: 'POST',
         headers: { Cookie: await getSessionCookie() },
         body: {
@@ -411,7 +413,7 @@ describe('GraphQL API', async () => {
       });
       postTypeId = postType.id;
 
-      const tag1 = await $fetch<any>('/api/content-entries', {
+      const tag1 = await $fetch<{ id: string }>('/api/content-entries', {
         method: 'POST',
         headers: { Cookie: await getSessionCookie() },
         body: {
@@ -422,7 +424,7 @@ describe('GraphQL API', async () => {
       });
       tagEntryId = tag1.id;
 
-      const tag2 = await $fetch<any>('/api/content-entries', {
+      const tag2 = await $fetch<{ id: string }>('/api/content-entries', {
         method: 'POST',
         headers: { Cookie: await getSessionCookie() },
         body: {
@@ -432,7 +434,7 @@ describe('GraphQL API', async () => {
         },
       });
 
-      const post = await $fetch<any>('/api/content-entries', {
+      const post = await $fetch<{ id: string }>('/api/content-entries', {
         method: 'POST',
         headers: { Cookie: await getSessionCookie() },
         body: {
@@ -496,7 +498,7 @@ describe('GraphQL API', async () => {
         method: 'DELETE',
         headers: { Cookie: await getSessionCookie() },
       });
-      const tagEntries = await $fetch<any>(
+      const tagEntries = await $fetch<{ items: Array<{ id: string }> }>(
         `/api/content-entries?contentTypeId=${tagTypeId}`,
         {
           headers: { Cookie: await getSessionCookie() },
@@ -522,7 +524,7 @@ describe('GraphQL API', async () => {
   describe('Schema rebuild on content type changes', () => {
     it('rebuilds schema when a new content type is created', async () => {
       const cookie = await getSessionCookie();
-      const created = await $fetch<any>('/api/content-types', {
+      const created = await $fetch<{ id: string }>('/api/content-types', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -553,7 +555,7 @@ describe('GraphQL API', async () => {
 
     it('rebuilds schema when a field is added', async () => {
       const cookie = await getSessionCookie();
-      const created = await $fetch<any>('/api/content-types', {
+      const created = await $fetch<{ id: string }>('/api/content-types', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -577,7 +579,7 @@ describe('GraphQL API', async () => {
       });
 
       // GraphQL only serves PUBLISHED versions, so create as PUBLISHED
-      const entry = await $fetch<any>('/api/content-entries', {
+      const entry = await $fetch<{ id: string }>('/api/content-entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -608,7 +610,7 @@ describe('GraphQL API', async () => {
 
     it('rebuilds schema when a content type is deleted', async () => {
       const cookie = await getSessionCookie();
-      const created = await $fetch<any>('/api/content-types', {
+      const created = await $fetch<{ id: string }>('/api/content-types', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -635,7 +637,7 @@ describe('GraphQL API', async () => {
         headers: { cookie },
       });
 
-      const result = await gql<any>(
+      const result = await gql<unknown>(
         '{ deleteTestList(first: 1) { edges { node { id } } } }'
       );
       expect(result.errors).toBeDefined();
@@ -706,7 +708,7 @@ describe('GraphQL API', async () => {
       const cookie = await getSessionCookie();
 
       // Create a draft-only entry
-      const draftEntry = await $fetch<any>('/api/content-entries', {
+      const draftEntry = await $fetch<{ id: string }>('/api/content-entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -738,7 +740,7 @@ describe('GraphQL API', async () => {
       const ts = Date.now();
 
       // Create and publish an entry
-      const entry = await $fetch<any>('/api/content-entries', {
+      const entry = await $fetch<{ id: string }>('/api/content-entries', {
         method: 'POST',
         headers: { cookie },
         body: {

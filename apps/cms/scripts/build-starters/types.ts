@@ -5,7 +5,7 @@ export const OVERLAY_VERSION = 1;
 
 export type ContentTypeMode = 'create' | 'patch';
 
-export interface OverlayField extends BundleField {}
+export type OverlayField = BundleField;
 
 export interface OverlayContentType {
   identifier: string;

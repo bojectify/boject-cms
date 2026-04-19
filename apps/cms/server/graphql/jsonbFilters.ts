@@ -1,4 +1,5 @@
 import type { Builder } from './builder';
+import type { ContentEntryShape } from './dynamicTypes';
 import type { ContentStatusEnumRef } from './types/contentStatus';
 import { Prisma } from '#prisma';
 import { prisma } from '../utils/prisma';
@@ -153,7 +154,7 @@ export async function queryDynamicEntries(
   fields: FieldDef[],
   limit: number,
   offset: number
-): Promise<any[]> {
+): Promise<ContentEntryShape[]> {
   const conditions: Prisma.Sql[] = [
     Prisma.sql`e."contentTypeId" = ${contentTypeId}`,
   ];
