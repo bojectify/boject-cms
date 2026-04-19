@@ -116,7 +116,7 @@ const editorRef = useTemplateRef<{ validate: () => Promise<boolean> }>(
   'editorRef'
 );
 
-function emitSaved(newId: string | void) {
+function emitSaved(newId: string | undefined) {
   const entryId = newId ?? props.entryId;
   if (entryId) {
     const titleVal = formState[entryTitleFieldIdentifier.value];

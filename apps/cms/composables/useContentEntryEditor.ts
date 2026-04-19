@@ -69,7 +69,7 @@ export function useContentEntryEditor(
         const data = (val.data ?? {}) as Record<string, unknown>;
         // Clear existing keys then assign fresh data
         for (const key of Object.keys(formState)) {
-          delete formState[key];
+          Reflect.deleteProperty(formState, key);
         }
         Object.assign(formState, data);
         status.value =
@@ -87,7 +87,7 @@ export function useContentEntryEditor(
     { immediate: true }
   );
 
-  async function saveDraft(): Promise<string | void> {
+  async function saveDraft(): Promise<string | undefined> {
     isSaving.value = true;
     saveError.value = null;
     fieldErrors.value = {};
@@ -140,7 +140,7 @@ export function useContentEntryEditor(
     }
   }
 
-  async function publish(): Promise<string | void> {
+  async function publish(): Promise<string | undefined> {
     isSaving.value = true;
     saveError.value = null;
     fieldErrors.value = {};

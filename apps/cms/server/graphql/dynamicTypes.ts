@@ -28,7 +28,7 @@ interface ContentTypeWithFields {
 
 // Shape of a ContentEntry row as returned by Prisma. Kept loose so that
 // interface/object refs can be strongly-typed without pulling Prisma generics.
-interface ContentEntryShape {
+export interface ContentEntryShape {
   id: string;
   contentTypeId: string;
   data: unknown;
