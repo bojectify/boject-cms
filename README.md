@@ -314,3 +314,47 @@ docker run ... \
 ```bash
 apps/cms/docker/smoke-test.sh
 ```
+
+## Local dev registries (maintainers)
+
+Maintainers who are iterating on the onboarding CLI flow (`create-boject-cms`, `boject-cli`) publish to local Docker and npm registries instead of the public ones. Two sidecar services live in `docker-compose.dev.yml`:
+
+| Service   | Host port | Purpose                                 |
+| --------- | --------- | --------------------------------------- |
+| registry  | 5555      | Local Docker registry for the CMS image |
+| verdaccio | 4873      | Local npm registry for the CLI packages |
+
+The registry uses host port `5555` instead of the conventional `5000` because macOS Monterey+ binds port 5000 to AirPlay Receiver by default.
+
+### One-time setup
+
+Add `localhost:5555` to Docker's insecure-registries list (the local registry speaks plain HTTP). Open Docker Desktop → Settings → Docker Engine and merge this key into the JSON:
+
+```json
+{
+  "insecure-registries": ["localhost:5555"]
+}
+```
+
+Click **Apply & Restart**. This is a one-time step per machine.
+
+### Commands
+
+```bash
+pnpm dev:registries:up        # Start both registries in the background
+pnpm dev:registries:down      # Stop them (volumes persist)
+pnpm dev:publish:image        # Build apps/cms and push to localhost:5555/boject/cms:dev
+```
+
+Data persists across `up`/`down` cycles via named Docker volumes. To start completely clean:
+
+```bash
+docker compose -f docker-compose.dev.yml down -v
+```
+
+### Verifying the registries are up
+
+```bash
+curl http://localhost:5555/v2/        # → {}
+curl http://localhost:4873/-/ping     # → JSON timestamp
+```
