@@ -22,9 +22,6 @@ function main(): void {
   const result = spawnSync(
     'pnpm',
     [
-      '--registry',
-      REGISTRY,
-      '--prefer-online',
       'create',
       'boject-cms',
       targetDir,
@@ -34,7 +31,14 @@ function main(): void {
       starter,
       '--force',
     ],
-    { stdio: 'inherit' }
+    {
+      stdio: 'inherit',
+      env: {
+        ...process.env,
+        npm_config_registry: REGISTRY,
+        npm_config_prefer_online: 'true',
+      },
+    }
   );
 
   process.exit(result.status ?? 1);

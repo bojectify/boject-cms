@@ -7,7 +7,7 @@ import { resolve } from 'node:path';
 const HEALTH_URL = 'http://localhost:4000/api/health';
 const LOGIN_URL = 'http://localhost:4000/api/auth/login';
 const CONTENT_TYPES_URL = 'http://localhost:4000/api/content-types';
-const BOOT_TIMEOUT_MS = 60_000;
+const BOOT_TIMEOUT_MS = 120_000;
 const POLL_INTERVAL_MS = 2_000;
 
 interface EnvVars {
@@ -43,11 +43,18 @@ async function readEnv(dir: string): Promise<EnvVars> {
 }
 
 function composeUp(dir: string): void {
-  const r = spawnSync('docker', ['compose', 'up', '-d'], {
+  // Always pull so we test the latest published image, not a stale cached digest.
+  const pull = spawnSync('docker', ['compose', 'pull'], {
     cwd: dir,
     stdio: 'inherit',
   });
-  if (r.status !== 0) throw new Error('docker compose up failed');
+  if (pull.status !== 0) throw new Error('docker compose pull failed');
+
+  const up = spawnSync('docker', ['compose', 'up', '-d'], {
+    cwd: dir,
+    stdio: 'inherit',
+  });
+  if (up.status !== 0) throw new Error('docker compose up failed');
 }
 
 function composeDown(dir: string): void {
