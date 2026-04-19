@@ -4,8 +4,9 @@ export default defineEventHandler(async (event) => {
   // Only protect /api/* routes
   if (!path.startsWith('/api/')) return;
 
-  // Skip auth-related routes, GraphQL (has its own API key gate), and public image endpoints
+  // Skip auth-related routes, GraphQL (has its own API key gate), public image endpoints, and the health probe
   if (
+    path === '/api/health' ||
     path.startsWith('/api/auth/') ||
     path.startsWith('/api/_auth/') ||
     path.startsWith('/api/graphql') ||

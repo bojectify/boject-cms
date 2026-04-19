@@ -13,6 +13,9 @@
     "dev:registries:up": "docker compose -f docker-compose.dev.yml up -d",
     "dev:registries:down": "docker compose -f docker-compose.dev.yml down",
     "dev:publish:image": "docker build -f apps/cms/Dockerfile -t localhost:5555/boject/cms:dev . && docker push localhost:5555/boject/cms:dev",
+    "dev:publish": "pnpm dev:publish:image && pnpm --filter create-boject-cms build && (npm unpublish --registry http://localhost:4873 create-boject-cms@0.0.0-dev --force 2>/dev/null || true) && pnpm --filter create-boject-cms publish --no-git-checks",
+    "dev:scaffold": "tsx scripts/dev-scaffold.ts",
+    "dev:verify": "tsx scripts/dev-verify.ts",
     "lint": "pnpm --filter cms lint",
     "lint:fix": "pnpm --filter cms lint:fix",
     "format": "prettier --check .",
@@ -38,6 +41,7 @@
   },
   "devDependencies": {
     "lefthook": "^2.1.1",
-    "prettier": "^3.8.1"
+    "prettier": "^3.8.1",
+    "tsx": "^4.21.0"
   }
 }
