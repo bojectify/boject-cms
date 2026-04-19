@@ -344,7 +344,21 @@ Click **Apply & Restart**. This is a one-time step per machine.
 pnpm dev:registries:up        # Start both registries in the background
 pnpm dev:registries:down      # Stop them (volumes persist)
 pnpm dev:publish:image        # Build apps/cms and push to localhost:5555/boject/cms:dev
+pnpm dev:publish              # Push the image AND publish create-boject-cms@0.0.0-dev to verdaccio
+pnpm dev:scaffold <dir>       # Scaffold a project using the verdaccio-published scaffolder and local image
+pnpm dev:verify <dir>         # Boot the scaffolded project, assert health + admin login (+ content-type import if a starter was selected), then tear down
 ```
+
+A typical end-to-end loop:
+
+```bash
+pnpm dev:registries:up
+pnpm dev:publish
+pnpm dev:scaffold /tmp/try
+pnpm dev:verify /tmp/try
+```
+
+`dev:scaffold` accepts an optional `--starter <base|sport|rugby|none>` flag (default `base`).
 
 Data persists across `up`/`down` cycles via named Docker volumes. To start completely clean:
 
