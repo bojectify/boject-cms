@@ -10,9 +10,13 @@ pre-commit:
       exclude: 'pnpm-lock.yaml'
       run: pnpm prettier --check {staged_files}
 
-    - name: typecheck
-      glob: '*.{ts,vue}'
-      run: pnpm typecheck
+    - name: typecheck-cms
+      glob: 'apps/cms/**/*.{ts,vue}'
+      run: pnpm --filter cms typecheck
+
+    - name: typecheck-scaffolder
+      glob: 'packages/create-boject-cms/**/*.ts'
+      run: pnpm --filter create-boject-cms typecheck
 
 pre-push:
   jobs:
