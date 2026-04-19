@@ -1,0 +1,34 @@
+import { describe, expect, it } from 'vitest';
+import { renderReadme } from '../../src/templates/readme.js';
+
+describe('renderReadme', () => {
+  it('includes the docker compose up command', () => {
+    const md = renderReadme({ starter: 'base', adminEmail: 'admin@local' });
+    expect(md).toContain('docker compose up -d');
+  });
+
+  it('references the login URL (http://localhost:4000/login)', () => {
+    const md = renderReadme({ starter: 'base', adminEmail: 'admin@local' });
+    expect(md).toContain('http://localhost:4000/login');
+  });
+
+  it('mentions the admin email', () => {
+    const md = renderReadme({ starter: 'base', adminEmail: 'admin@local' });
+    expect(md).toContain('admin@local');
+  });
+
+  it('tells the user the admin password lives in .env', () => {
+    const md = renderReadme({ starter: 'base', adminEmail: 'admin@local' });
+    expect(md).toMatch(/BOJECT_ADMIN_PASSWORD.*\.env/s);
+  });
+
+  it('mentions the selected starter when one was imported', () => {
+    const md = renderReadme({ starter: 'sport', adminEmail: 'admin@local' });
+    expect(md).toContain('sport');
+  });
+
+  it('does not promise a starter import when starter is "none"', () => {
+    const md = renderReadme({ starter: 'none', adminEmail: 'admin@local' });
+    expect(md.toLowerCase()).not.toContain('starter will be imported');
+  });
+});

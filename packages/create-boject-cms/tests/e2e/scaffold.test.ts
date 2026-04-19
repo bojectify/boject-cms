@@ -1,0 +1,133 @@
+import { execFile } from 'node:child_process';
+import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+
+const run = promisify(execFile);
+const HERE = dirname(fileURLToPath(import.meta.url));
+const PACKAGE_ROOT = resolve(HERE, '..', '..');
+const CLI_PATH = join(PACKAGE_ROOT, 'dist', 'index.js');
+
+async function runCli(args: string[], opts: { env?: NodeJS.ProcessEnv } = {}) {
+  return run(process.execPath, [CLI_PATH, ...args], {
+    env: { ...process.env, ...opts.env },
+  });
+}
+
+beforeAll(async () => {
+  await run('pnpm', ['--filter', 'create-boject-cms', 'build'], {
+    cwd: resolve(PACKAGE_ROOT, '..', '..'),
+  });
+}, 60_000);
+
+let workDir: string;
+
+beforeEach(async () => {
+  workDir = await mkdtemp(join(tmpdir(), 'create-boject-cms-e2e-'));
+});
+
+afterAll(async () => {
+  // nothing global; per-test workDirs are removed below
+});
+
+describe('create-boject-cms E2E', () => {
+  it('scaffolds the full file set with --starter base', async () => {
+    const target = join(workDir, 'site');
+    const { stdout } = await runCli([target, '--starter', 'base']);
+
+    expect(stdout).toContain('Scaffolded boject-cms project');
+    expect(stdout).toContain('admin@local');
+
+    const files = await readdir(target);
+    expect(files.sort()).toEqual(
+      [
+        '.env',
+        '.gitignore',
+        'README.md',
+        'docker-compose.yml',
+        'package.json',
+        'starters',
+      ].sort()
+    );
+
+    const env = await readFile(join(target, '.env'), 'utf8');
+    // Session password: 32 bytes → 43 base64 chars + 1 '=' padding
+    expect(env).toMatch(/^NUXT_SESSION_PASSWORD=[A-Za-z0-9+/]{43}=$/m);
+    // Admin password: 16 bytes → 22 base64 chars + 2 '=' padding
+    expect(env).toMatch(/^BOJECT_ADMIN_PASSWORD=[A-Za-z0-9+/]{22}==$/m);
+
+    const starterBundle = await readFile(
+      join(target, 'starters', 'base.boject.json'),
+      'utf8'
+    );
+    const canonical = await readFile(
+      resolve(PACKAGE_ROOT, '..', '..', 'starters', 'base.boject.json'),
+      'utf8'
+    );
+    expect(starterBundle).toBe(canonical);
+
+    await rm(target, { recursive: true, force: true });
+  }, 30_000);
+
+  it('omits starters/ and BOJECT_INITIAL_STARTER when --starter none', async () => {
+    const target = join(workDir, 'site');
+    await runCli([target, '--starter', 'none']);
+
+    const files = await readdir(target);
+    expect(files).not.toContain('starters');
+
+    const env = await readFile(join(target, '.env'), 'utf8');
+    expect(env).not.toMatch(/BOJECT_INITIAL_STARTER/);
+
+    await rm(target, { recursive: true, force: true });
+  }, 30_000);
+
+  it('exits non-zero when the target is non-empty without --force', async () => {
+    const target = workDir; // the tempdir itself has at least `.` / `..`; we'll put a marker
+    await writeFile(join(target, 'marker.txt'), 'hi');
+
+    await expect(runCli([target, '--starter', 'base'])).rejects.toMatchObject({
+      code: 1,
+    });
+
+    const files = await readdir(target);
+    expect(files).toContain('marker.txt');
+    expect(files).not.toContain('.env');
+  }, 30_000);
+
+  it('succeeds into a non-empty target when --force is passed', async () => {
+    const target = workDir;
+    await writeFile(join(target, 'marker.txt'), 'hi');
+
+    const { stdout } = await runCli([target, '--starter', 'base', '--force']);
+    expect(stdout).toContain('Scaffolded');
+
+    const files = await readdir(target);
+    expect(files).toContain('.env');
+    expect(files).toContain('marker.txt');
+  }, 30_000);
+
+  it('exits 1 with usage when no target is provided', async () => {
+    await expect(runCli([])).rejects.toMatchObject({ code: 1 });
+  }, 30_000);
+
+  it('honours --image to override the default tag', async () => {
+    const target = join(workDir, 'site');
+    await runCli([
+      target,
+      '--starter',
+      'base',
+      '--image',
+      'localhost:5555/boject/cms:dev',
+    ]);
+
+    const compose = await readFile(join(target, 'docker-compose.yml'), 'utf8');
+    expect(compose).toContain('image: localhost:5555/boject/cms:dev');
+    expect(compose).not.toContain('ghcr.io/boject/cms:latest');
+
+    await rm(target, { recursive: true, force: true });
+  }, 30_000);
+});
