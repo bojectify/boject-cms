@@ -356,5 +356,7 @@ docker compose -f docker-compose.dev.yml down -v
 
 ```bash
 curl http://localhost:5555/v2/        # → {}
-curl http://localhost:4873/-/ping     # → JSON timestamp
+curl http://localhost:4873/-/ping     # → {}
 ```
+
+Both registries answer with an empty JSON object on success — that's the ping protocol in both cases.

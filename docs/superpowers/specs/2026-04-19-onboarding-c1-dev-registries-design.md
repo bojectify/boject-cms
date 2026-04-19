@@ -82,7 +82,7 @@ Both registries persist data across `up`/`down` cycles via named Docker volumes 
 Manual smoke after `pnpm dev:registries:up`:
 
 1. `curl http://localhost:5555/v2/` returns `{}` (registry is up).
-2. `curl http://localhost:4873/-/ping` returns a JSON response (Verdaccio is up).
+2. `curl http://localhost:4873/-/ping` returns `{}` (Verdaccio is up — empty JSON is the v5 ping success response).
 3. `pnpm dev:publish:image` succeeds and prints the pushed digest.
 4. `docker rmi localhost:5555/boject/cms:dev && docker pull localhost:5555/boject/cms:dev` succeeds (round-trip).
 5. `pnpm dev:registries:down && pnpm dev:registries:up` — image is still present (volume persisted).

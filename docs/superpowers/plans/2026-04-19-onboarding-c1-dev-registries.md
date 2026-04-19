@@ -160,7 +160,9 @@ curl -s http://localhost:4873/-/ping
 Expected:
 
 - Registry returns `{}` (empty object).
-- Verdaccio returns a JSON timestamp response (e.g. `"2026-04-19..."`), not an error.
+- Verdaccio returns `{}` (empty object). This is Verdaccio 5's ping response — just a healthy 200 with valid JSON, matching the npm registry ping protocol.
+
+Note: `zsh` displays the trailing `%` character after `{}` because the response has no final newline; that's shell rendering, not part of the output.
 
 If Verdaccio returns `Connection refused`, check `docker compose -f docker-compose.dev.yml logs verdaccio` — the `listen: 0.0.0.0:4873` line in the config is required for the port to be reachable from outside the container.
 
