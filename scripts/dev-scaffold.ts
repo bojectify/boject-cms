@@ -17,7 +17,7 @@ function main(): void {
   const starter =
     starterIdx >= 0 && rest[starterIdx + 1] !== undefined
       ? rest[starterIdx + 1]
-      : 'base';
+      : undefined;
 
   const result = spawnSync(
     'pnpm',
@@ -27,8 +27,7 @@ function main(): void {
       targetDir,
       '--image',
       IMAGE,
-      '--starter',
-      starter,
+      ...(starter !== undefined ? ['--starter', starter] : []),
       '--force',
     ],
     {
