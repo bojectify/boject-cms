@@ -282,6 +282,7 @@ Before pushing, attempt to check Wallaby for failing tests via `wallaby_failingT
 - **Content type tests** — Integration tests covering content type CRUD, field management (add, update, delete, reorder), identifier validation (PascalCase for types, camelCase for fields), uniqueness constraints, and ENTRY_TITLE/SLUG field rules.
 - **Content entry tests** — Integration tests covering entry CRUD, data validation (required fields, type checking, select choices), slug uniqueness, versioning workflows (draft save, publish, discard draft, CHANGED status), `entryTitle` populate + uniqueness, and IMAGE field end-to-end coverage.
 - **CSRF tests** — Integration tests covering origin/referer enforcement and the Bearer-key bypass.
+- **Storybook** — Storybook 10 via `@storybook/vue3-vite` (direct, not `@nuxtjs/storybook` — Nuxt 4 peer incompatibility). Interaction tests run as a third Vitest project (`storybook`) in browser mode via `@storybook/addon-vitest` + `@vitest/browser-playwright` on Chromium. See `apps/cms/.storybook/README.md` for the three-layer mocking conventions (MSW for network, module aliases / auto-import shim dirs for imports, decorators for provide/inject). Seed stories live at `apps/cms/components/relation-field/RelationField.stories.ts` and `apps/cms/components/multi-relation-field/MultiRelationField.stories.ts`. Run with `pnpm --filter cms test:storybook`.
 
 ## Docker image
 

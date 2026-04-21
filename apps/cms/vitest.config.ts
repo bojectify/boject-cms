@@ -1,5 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
+import { storybookTest } from '@storybook/addon-vitest/vitest-plugin';
+import { playwright } from '@vitest/browser-playwright';
 
 // Tests use a separate database so dev data is never touched.
 process.env.DATABASE_URL =
@@ -58,6 +60,22 @@ export default defineConfig({
             'utils/**/*.test.ts',
           ],
           globals: true,
+        },
+      },
+      {
+        extends: true,
+        plugins: [storybookTest({ configDir: '.storybook' })],
+        optimizeDeps: {
+          include: ['storybook/test'],
+        },
+        test: {
+          name: 'storybook',
+          browser: {
+            enabled: true,
+            headless: true,
+            provider: playwright(),
+            instances: [{ browser: 'chromium' }],
+          },
         },
       },
     ],

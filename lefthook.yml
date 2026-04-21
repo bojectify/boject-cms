@@ -32,3 +32,8 @@ pre-push:
       run: pnpm test
       skip:
         - run: test "$WALLABY_VERIFIED" = "1"
+
+    - name: storybook-test
+      run: pnpm --filter cms test:storybook
+      skip:
+        - run: test "$SKIP_STORYBOOK_TEST" = "1"
