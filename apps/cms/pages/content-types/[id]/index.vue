@@ -73,6 +73,7 @@ async function handleSave() {
       }),
     });
     await refresh();
+    await refreshNuxtData('sidebar-content-types');
     toast.add({
       title: 'Saved',
       description: 'Content type updated successfully.',
@@ -250,6 +251,43 @@ function fieldMenuItems(field: {
   ];
 }
 
+const isDeleting = ref(false);
+
+async function handleDeleteContentType() {
+  const typeName = contentType.value?.name ?? 'this content type';
+  if (!window.confirm(`Delete ${typeName}? This cannot be undone.`)) {
+    return;
+  }
+  isDeleting.value = true;
+  try {
+    const res = await fetch(`/api/content-types/${id}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => null)) as {
+        statusMessage?: string;
+        message?: string;
+      } | null;
+      throw new Error(
+        body?.statusMessage ?? body?.message ?? `Request failed (${res.status})`
+      );
+    }
+    toast.add({
+      title: 'Deleted',
+      description: `${typeName} was deleted.`,
+      color: 'success',
+    });
+    await refreshNuxtData('sidebar-content-types');
+    await navigateTo('/content-types');
+  } catch (err: unknown) {
+    const message =
+      err instanceof Error ? err.message : 'Failed to delete content type.';
+    toast.add({ title: 'Error', description: message, color: 'error' });
+  } finally {
+    isDeleting.value = false;
+  }
+}
+
 async function onFieldReorder() {
   const currentFields = contentType.value?.fields ?? [];
   const reordered = currentFields.map((field, i) => ({
@@ -402,6 +440,35 @@ async function onFieldReorder() {
             </div>
           </template>
         </draggable>
+
+        <div class="pt-8">
+          <USeparator color="error" />
+          <div class="flex items-center justify-between pt-4">
+            <div>
+              <p class="text-sm font-medium text-red-700 dark:text-red-400">
+                Delete this content type
+              </p>
+              <p class="text-xs text-muted">
+                {{
+                  (contentType?._count.entries ?? 0) > 0
+                    ? `Delete the ${contentType?._count.entries} entries first.`
+                    : 'Only content types with no entries can be deleted.'
+                }}
+              </p>
+            </div>
+            <UButton
+              size="sm"
+              variant="outline"
+              color="error"
+              icon="i-lucide-trash-2"
+              :loading="isDeleting"
+              :disabled="(contentType?._count.entries ?? 0) > 0"
+              @click="handleDeleteContentType"
+            >
+              Delete
+            </UButton>
+          </div>
+        </div>
       </div>
     </div>
 

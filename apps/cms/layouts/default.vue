@@ -20,7 +20,10 @@ const navItems: NavigationMenuItem[] = [
 // Dynamic content types section
 const { data: contentTypes } = await useFetch<{
   items: Array<{ id: string; name: string }>;
-}>('/api/content-types', { query: { perPage: 50 } });
+}>('/api/content-types', {
+  key: 'sidebar-content-types',
+  query: { perPage: 50 },
+});
 
 const dynamicNavItems = computed<NavigationMenuItem[]>(() => {
   const items: NavigationMenuItem[] = [
