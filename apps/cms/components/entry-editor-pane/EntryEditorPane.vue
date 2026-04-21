@@ -1,11 +1,20 @@
 <script setup lang="ts">
+import { inject } from 'vue';
 import type { FieldConfig } from '~/types/contentEditor';
+import { paneOrchestratorKey } from '~/composables/paneOrchestrator';
 import type { EntryEditorPaneProps } from './entryEditorPane.types';
 import { QA_ENTRY_EDITOR_PANE } from './entryEditorPane.config';
 
 const props = withDefaults(defineProps<EntryEditorPaneProps>(), {
   testId: QA_ENTRY_EDITOR_PANE.COMPONENT,
 });
+
+const orchestrator = inject(paneOrchestratorKey);
+if (!orchestrator) {
+  throw new Error(
+    'EntryEditorPane requires a paneOrchestrator provided by its ancestor.'
+  );
+}
 
 const emit = defineEmits<{
   close: [];
@@ -95,6 +104,15 @@ const editorFields = computed<FieldConfig[]>(() => {
   return contentType.value.fields.map((f) => mapFieldToConfig(f));
 });
 
+const {
+  resolvedRelations,
+  resolvedMultiRelations,
+  getRelationValue,
+  getMultiRelationValue,
+  getTargetContentTypeIds,
+  applyFieldUpdate,
+} = useRelationFieldState(formState, editorFields);
+
 watch(
   () => formState[entryTitleFieldIdentifier.value],
   (val) => {
@@ -148,7 +166,7 @@ async function handleDiscardChanges() {
   await discardChanges();
 }
 
-defineExpose({ isDirty });
+defineExpose({ isDirty, applyFieldUpdate });
 </script>
 
 <template>
@@ -197,7 +215,77 @@ defineExpose({ isDirty });
               :loading="loadingStatus === 'pending'"
               :error="saveError"
               :field-errors="fieldErrors"
-            />
+            >
+              <template #field="{ field, value, update }">
+                <RelationField
+                  v-if="field.type === 'dynamic-relation'"
+                  :label="field.label"
+                  :required="field.required"
+                  :value="getRelationValue(value)"
+                  :entry-title="
+                    resolvedRelations[field.key]?.entryTitle ?? null
+                  "
+                  :content-type-name="
+                    resolvedRelations[field.key]?.contentTypeName ?? null
+                  "
+                  @add="
+                    orchestrator.openPicker(
+                      field.key,
+                      getTargetContentTypeIds(field),
+                      props.depth
+                    )
+                  "
+                  @edit="
+                    (() => {
+                      const r = getRelationValue(value);
+                      if (r) {
+                        orchestrator.openPane(
+                          r.contentTypeId,
+                          r.entryId,
+                          field.key,
+                          props.depth
+                        );
+                      }
+                    })()
+                  "
+                  @remove="update(null)"
+                />
+                <MultiRelationField
+                  v-else-if="field.type === 'dynamic-multirelation'"
+                  :label="field.label"
+                  :items="resolvedMultiRelations[field.key] ?? []"
+                  @add="
+                    orchestrator.openPicker(
+                      field.key,
+                      getTargetContentTypeIds(field),
+                      props.depth
+                    )
+                  "
+                  @edit="
+                    (idx) => {
+                      const refs = getMultiRelationValue(value);
+                      const r = refs[idx];
+                      if (r) {
+                        orchestrator.openPane(
+                          r.contentTypeId,
+                          r.entryId,
+                          field.key,
+                          props.depth
+                        );
+                      }
+                    }
+                  "
+                  @remove="
+                    (idx) => {
+                      const refs = [...getMultiRelationValue(value)];
+                      refs.splice(idx, 1);
+                      update(refs);
+                    }
+                  "
+                  @reorder="(items) => update(items)"
+                />
+              </template>
+            </ContentEditor>
           </div>
           <EntrySidebar
             class="w-80 shrink-0 border-l border-gray-200 dark:border-gray-700 overflow-y-auto"
