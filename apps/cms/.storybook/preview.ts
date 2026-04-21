@@ -20,6 +20,17 @@ const router = createRouter({
 
 setup((app) => {
   app.use(router);
+
+  // Nuxt UI components occasionally render <NuxtLink>; in Storybook (no Nuxt
+  // runtime) alias it to <RouterLink> so Vue doesn't warn about an unresolved
+  // component.
+  app.component('NuxtLink', {
+    props: {
+      to: { type: [String, Object], required: true },
+      target: { type: String, default: undefined },
+    },
+    template: '<RouterLink :to="to" :target="target"><slot /></RouterLink>',
+  });
 });
 
 initialize({ onUnhandledRequest: 'bypass' });
