@@ -66,6 +66,9 @@ export default defineConfig({
       {
         extends: true,
         plugins: [vue(), storybookTest({ configDir: '.storybook' })],
+        optimizeDeps: {
+          include: ['storybook/test'],
+        },
         test: {
           name: 'storybook',
           browser: {
