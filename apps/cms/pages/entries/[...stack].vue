@@ -1,5 +1,10 @@
 <script setup lang="ts">
+import { provide, ref } from 'vue';
 import type { FieldConfig } from '~/types/contentEditor';
+import {
+  paneOrchestratorKey,
+  type PaneOrchestrator,
+} from '~/composables/paneOrchestrator';
 import { parseStack, stackHref, type PaneSegment } from '~/utils/paneStack';
 
 // Key the page by root entry only, so opening/closing panes and
@@ -228,7 +233,15 @@ async function handleDelete() {
 }
 
 // ---- Dirty guards ----
-const paneEls = useTemplateRef<Array<{ isDirty: boolean } | null>>('paneEls');
+const paneEls = useTemplateRef<
+  Array<{
+    isDirty: boolean;
+    applyFieldUpdate: (
+      fk: string,
+      d: { contentTypeId: string; entryId: string }
+    ) => void;
+  } | null>
+>('paneEls');
 
 function paneCountFor(stackParam: string | string[] | undefined): number {
   const arr = Array.isArray(stackParam)
@@ -291,23 +304,55 @@ const {
   updateCache,
 } = useRelationFieldState(formState, editorFields);
 
-function handleRelationEdit(value: unknown, fieldKey: string) {
-  const ref = getRelationValue(value);
-  if (ref) {
-    openPane(ref.contentTypeId, ref.entryId, fieldKey);
-  }
-}
+// Tracks which fieldKey to apply the side-effect to when the pane at a
+// given depth next saves. Keyed by target depth (root is 0).
+const pendingSideEffect = ref<Record<number, string>>({});
+
+// Track which depth currently owns the open picker.
+const pickerFromDepth = ref(0);
 
 // ---- Picker modal state ----
 const pickerOpen = ref(false);
 const pickerFieldKey = ref('');
 const pickerTargetTypeIds = ref<string[]>([]);
 
-function openPicker(fieldKey: string, targetContentTypeIds: string[]) {
-  pickerFieldKey.value = fieldKey;
-  pickerTargetTypeIds.value = targetContentTypeIds;
-  pickerOpen.value = true;
+// ---- Orchestrator ----
+function truncateDeeperSideEffects(newTopDepth: number) {
+  const next: Record<number, string> = {};
+  for (const [depth, fieldKey] of Object.entries(pendingSideEffect.value)) {
+    if (Number(depth) <= newTopDepth) next[Number(depth)] = fieldKey;
+  }
+  pendingSideEffect.value = next;
 }
+
+const orchestrator: PaneOrchestrator = {
+  openPicker(fieldKey, targetContentTypeIds, fromDepth) {
+    const newStack = parsedStack.value.slice(0, fromDepth + 1);
+    if (newStack.length !== parsedStack.value.length) {
+      router.push(stackHref(newStack));
+    }
+    truncateDeeperSideEffects(fromDepth);
+    pickerFieldKey.value = fieldKey;
+    pickerTargetTypeIds.value = targetContentTypeIds;
+    pickerFromDepth.value = fromDepth;
+    pickerOpen.value = true;
+  },
+  openPane(contentTypeId, entryId, fieldKey, fromDepth) {
+    const targetDepth = fromDepth + 1;
+    pendingSideEffect.value = {
+      ...pendingSideEffect.value,
+      [targetDepth]: fieldKey,
+    };
+    const newSegment = entryId
+      ? { kind: 'entry' as const, entryId }
+      : { kind: 'new' as const, contentTypeId };
+    const newStack = parsedStack.value.slice(0, fromDepth + 1);
+    newStack.push(newSegment);
+    router.push(stackHref(newStack));
+  },
+};
+
+provide(paneOrchestratorKey, orchestrator);
 
 function handlePickerSelect(data: {
   contentTypeId: string;
@@ -315,36 +360,39 @@ function handlePickerSelect(data: {
   entryTitle: string;
 }) {
   const fieldKey = pickerFieldKey.value;
-  rootApplyFieldUpdate(fieldKey, {
-    contentTypeId: data.contentTypeId,
-    entryId: data.entryId,
-  });
+  updateCache(data.contentTypeId, data.entryId, data.entryTitle);
+  if (pickerFromDepth.value === 0) {
+    rootApplyFieldUpdate(fieldKey, {
+      contentTypeId: data.contentTypeId,
+      entryId: data.entryId,
+    });
+  } else {
+    paneEls.value?.[pickerFromDepth.value - 1]?.applyFieldUpdate(fieldKey, {
+      contentTypeId: data.contentTypeId,
+      entryId: data.entryId,
+    });
+  }
   pickerOpen.value = false;
 }
 
-async function handlePickerCreate(ctId: string) {
+function handlePickerCreate(ctId: string) {
   const fieldKey = pickerFieldKey.value;
+  const fromDepth = pickerFromDepth.value;
   pickerOpen.value = false;
-  await nextTick();
-  openPane(ctId, null, fieldKey);
+  orchestrator.openPane(ctId, null, fieldKey, fromDepth);
+}
+
+function handleRelationEdit(value: unknown, fieldKey: string) {
+  const ref = getRelationValue(value);
+  if (ref) {
+    orchestrator.openPane(ref.contentTypeId, ref.entryId, fieldKey, 0);
+  }
 }
 
 // ---- Pane navigation ----
-function openPane(
-  targetContentTypeId: string,
-  targetEntryId: string | null,
-  fieldKey: string
-) {
-  const newSegment: PaneSegment = targetEntryId
-    ? { kind: 'entry', entryId: targetEntryId }
-    : { kind: 'new', contentTypeId: targetContentTypeId };
-  const newStack = [...parsedStack.value, newSegment];
-  router.push({ path: stackHref(newStack), query: { pf: fieldKey } });
-}
-
 function closePane(idx: number) {
-  // idx is 0-based within paneSegments. Keep root + first `idx` panes.
   const newStack = parsedStack.value.slice(0, idx + 1);
+  truncateDeeperSideEffects(idx);
   router.push(stackHref(newStack));
 }
 
@@ -352,30 +400,39 @@ function handlePaneSaved(
   paneIdx: number,
   data: { contentTypeId: string; entryId: string; entryTitle: string }
 ) {
-  const pf = route.query.pf as string | undefined;
   updateCache(data.contentTypeId, data.entryId, data.entryTitle);
 
-  // Apply side-effect to root's formState when saving the first pane
-  // (idx=0) with ?pf set. Deeper nesting is out of scope for MVP.
-  if (pf && paneIdx === 0) {
-    rootApplyFieldUpdate(pf, {
-      contentTypeId: data.contentTypeId,
-      entryId: data.entryId,
-    });
+  // Apply the pending side-effect (if any) to the parent pane at depth
+  // paneIdx (which is targetDepth - 1 relative to this save).
+  const targetDepth = paneIdx + 1;
+  const fieldKey = pendingSideEffect.value[targetDepth];
+  if (fieldKey) {
+    if (paneIdx === 0) {
+      rootApplyFieldUpdate(fieldKey, {
+        contentTypeId: data.contentTypeId,
+        entryId: data.entryId,
+      });
+    } else {
+      paneEls.value?.[paneIdx - 1]?.applyFieldUpdate(fieldKey, {
+        contentTypeId: data.contentTypeId,
+        entryId: data.entryId,
+      });
+    }
+    const next: Record<number, string> = {};
+    for (const [depth, fk] of Object.entries(pendingSideEffect.value)) {
+      if (Number(depth) !== targetDepth) next[Number(depth)] = fk;
+    }
+    pendingSideEffect.value = next;
   }
 
-  // Keep the pane open. If the pane was a `new:<ctid>` sentinel, replace
-  // it with the saved entry id so subsequent saves PUT rather than POST.
-  // Also clears ?pf from the URL since the side-effect has been applied.
-  const fullStackIdx = paneIdx + 1; // paneSegments[paneIdx] is parsedStack[paneIdx + 1]
+  // Rewrite new:<ct> sentinel to the saved entry id (unchanged).
+  const fullStackIdx = paneIdx + 1;
   const currentSegment = parsedStack.value[fullStackIdx];
   if (!currentSegment) return;
-
   const replacedSegment: PaneSegment =
     currentSegment.kind === 'new'
       ? { kind: 'entry', entryId: data.entryId }
       : currentSegment;
-
   const newStack = [...parsedStack.value];
   newStack[fullStackIdx] = replacedSegment;
   router.replace(stackHref(newStack));
@@ -427,7 +484,13 @@ function handlePaneSaved(
               :content-type-name="
                 resolvedRelations[field.key]?.contentTypeName ?? null
               "
-              @add="openPicker(field.key, getTargetContentTypeIds(field))"
+              @add="
+                orchestrator.openPicker(
+                  field.key,
+                  getTargetContentTypeIds(field),
+                  0
+                )
+              "
               @edit="handleRelationEdit(value, field.key)"
               @remove="update(null)"
             />
@@ -435,13 +498,24 @@ function handlePaneSaved(
               v-else-if="field.type === 'dynamic-multirelation'"
               :label="field.label"
               :items="resolvedMultiRelations[field.key] ?? []"
-              @add="openPicker(field.key, getTargetContentTypeIds(field))"
+              @add="
+                orchestrator.openPicker(
+                  field.key,
+                  getTargetContentTypeIds(field),
+                  0
+                )
+              "
               @edit="
                 (idx: number) => {
                   const refs = getMultiRelationValue(value);
-                  const ref = refs[idx];
-                  if (ref) {
-                    openPane(ref.contentTypeId, ref.entryId, field.key);
+                  const r = refs[idx];
+                  if (r) {
+                    orchestrator.openPane(
+                      r.contentTypeId,
+                      r.entryId,
+                      field.key,
+                      0
+                    );
                   }
                 }
               "
