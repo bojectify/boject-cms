@@ -449,7 +449,11 @@ async function onFieldReorder() {
                 Delete this content type
               </p>
               <p class="text-xs text-muted">
-                Only content types with no entries can be deleted.
+                {{
+                  (contentType?._count.entries ?? 0) > 0
+                    ? `Delete the ${contentType?._count.entries} entries first.`
+                    : 'Only content types with no entries can be deleted.'
+                }}
               </p>
             </div>
             <UButton
@@ -458,6 +462,7 @@ async function onFieldReorder() {
               color="error"
               icon="i-lucide-trash-2"
               :loading="isDeleting"
+              :disabled="(contentType?._count.entries ?? 0) > 0"
               @click="handleDeleteContentType"
             >
               Delete
