@@ -4,4 +4,5 @@ export type EntryEditorPaneProps = BasicComponentProps & {
   open: boolean;
   contentTypeId?: string;
   entryId: string | null;
+  depth: number;
 };

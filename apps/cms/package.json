@@ -53,6 +53,7 @@
     "happy-dom": "^20.7.0",
     "msw": "^2.13.4",
     "msw-storybook-addon": "^2.0.7",
+    "ofetch": "^1.5.1",
     "playwright": "^1.59.1",
     "storybook": "~10.3.5",
     "vitest": "^4.1.5",
