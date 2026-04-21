@@ -276,6 +276,7 @@ async function handleDeleteContentType() {
       description: `${typeName} was deleted.`,
       color: 'success',
     });
+    await refreshNuxtData('sidebar-content-types');
     await navigateTo('/content-types');
   } catch (err: unknown) {
     const message =
