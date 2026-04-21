@@ -73,6 +73,7 @@ async function handleSave() {
       }),
     });
     await refresh();
+    await refreshNuxtData('sidebar-content-types');
     toast.add({
       title: 'Saved',
       description: 'Content type updated successfully.',
