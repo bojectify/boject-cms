@@ -565,6 +565,7 @@ function handlePaneSaved(
       :key="`pane-${idx}`"
       ref="paneEls"
       :open="true"
+      :depth="idx + 1"
       :content-type-id="pane.kind === 'new' ? pane.contentTypeId : undefined"
       :entry-id="pane.kind === 'entry' ? pane.entryId : null"
       @close="closePane(idx)"
