@@ -280,89 +280,23 @@ onBeforeRouteUpdate((to, from) => {
   }
 });
 
-// ---- Template helpers ----
-type RelationRef = {
-  contentTypeId: string;
-  entryId: string;
-};
-
-function getRelationValue(value: unknown): RelationRef | null {
-  return (value as RelationRef | null) ?? null;
-}
-
-function getMultiRelationValue(value: unknown): RelationRef[] {
-  return (value as RelationRef[]) ?? [];
-}
-
-function getTargetContentTypeIds(field: FieldConfig): string[] {
-  if (
-    field.type === 'dynamic-relation' ||
-    field.type === 'dynamic-multirelation'
-  ) {
-    return field.targetContentTypeIds;
-  }
-  return [];
-}
+// ---- Relation field state (resolvers + applyFieldUpdate) ----
+const {
+  resolvedRelations,
+  resolvedMultiRelations,
+  getRelationValue,
+  getMultiRelationValue,
+  getTargetContentTypeIds,
+  applyFieldUpdate: rootApplyFieldUpdate,
+  updateCache,
+} = useRelationFieldState(formState, editorFields);
 
 function handleRelationEdit(value: unknown, fieldKey: string) {
-  const ref = value as RelationRef | null;
+  const ref = getRelationValue(value);
   if (ref) {
     openPane(ref.contentTypeId, ref.entryId, fieldKey);
   }
 }
-
-// ---- Relation resolver ----
-const { resolveRef, resolveRefs, updateCache } = useRelationResolver();
-
-const resolvedRelations = reactive<
-  Record<string, { entryTitle: string; contentTypeName: string }>
->({});
-const resolvedMultiRelations = reactive<
-  Record<
-    string,
-    Array<{
-      contentTypeId: string;
-      entryId: string;
-      entryTitle: string;
-      contentTypeName: string;
-    }>
-  >
->({});
-
-watch(
-  () => ({ ...formState }),
-  async () => {
-    for (const field of editorFields.value) {
-      if (field.type === 'dynamic-relation') {
-        const val = formState[field.key] as {
-          contentTypeId: string;
-          entryId: string;
-        } | null;
-        if (val?.contentTypeId && val?.entryId) {
-          const resolved = await resolveRef(val);
-          resolvedRelations[field.key] = {
-            entryTitle: resolved.entryTitle,
-            contentTypeName: resolved.contentTypeName,
-          };
-        } else {
-          Reflect.deleteProperty(resolvedRelations, field.key);
-        }
-      }
-      if (field.type === 'dynamic-multirelation') {
-        const val = formState[field.key] as Array<{
-          contentTypeId: string;
-          entryId: string;
-        }> | null;
-        if (val && val.length > 0) {
-          resolvedMultiRelations[field.key] = await resolveRefs(val);
-        } else {
-          resolvedMultiRelations[field.key] = [];
-        }
-      }
-    }
-  },
-  { immediate: true }
-);
 
 // ---- Picker modal state ----
 const pickerOpen = ref(false);
@@ -381,24 +315,10 @@ function handlePickerSelect(data: {
   entryTitle: string;
 }) {
   const fieldKey = pickerFieldKey.value;
-  const field = editorFields.value.find((f) => f.key === fieldKey);
-  if (!field) return;
-  if (field.type === 'dynamic-relation') {
-    formState[fieldKey] = {
-      contentTypeId: data.contentTypeId,
-      entryId: data.entryId,
-    };
-  } else if (field.type === 'dynamic-multirelation') {
-    const current =
-      (formState[fieldKey] as Array<{
-        contentTypeId: string;
-        entryId: string;
-      }>) ?? [];
-    formState[fieldKey] = [
-      ...current,
-      { contentTypeId: data.contentTypeId, entryId: data.entryId },
-    ];
-  }
+  rootApplyFieldUpdate(fieldKey, {
+    contentTypeId: data.contentTypeId,
+    entryId: data.entryId,
+  });
   pickerOpen.value = false;
 }
 
@@ -428,32 +348,6 @@ function closePane(idx: number) {
   router.push(stackHref(newStack));
 }
 
-function applyFieldUpdate(
-  fieldKey: string,
-  data: { contentTypeId: string; entryId: string }
-) {
-  const field = editorFields.value.find((f) => f.key === fieldKey);
-  if (!field) return;
-  if (field.type === 'dynamic-relation') {
-    formState[fieldKey] = {
-      contentTypeId: data.contentTypeId,
-      entryId: data.entryId,
-    };
-  } else if (field.type === 'dynamic-multirelation') {
-    const current =
-      (formState[fieldKey] as Array<{
-        contentTypeId: string;
-        entryId: string;
-      }>) ?? [];
-    if (!current.some((r) => r.entryId === data.entryId)) {
-      formState[fieldKey] = [
-        ...current,
-        { contentTypeId: data.contentTypeId, entryId: data.entryId },
-      ];
-    }
-  }
-}
-
 function handlePaneSaved(
   paneIdx: number,
   data: { contentTypeId: string; entryId: string; entryTitle: string }
@@ -464,7 +358,10 @@ function handlePaneSaved(
   // Apply side-effect to root's formState when saving the first pane
   // (idx=0) with ?pf set. Deeper nesting is out of scope for MVP.
   if (pf && paneIdx === 0) {
-    applyFieldUpdate(pf, data);
+    rootApplyFieldUpdate(pf, {
+      contentTypeId: data.contentTypeId,
+      entryId: data.entryId,
+    });
   }
 
   // Keep the pane open. If the pane was a `new:<ctid>` sentinel, replace
