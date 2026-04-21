@@ -24,7 +24,13 @@ const config: StorybookConfig = {
         // etc.) are NOT auto-imported here — stories that need them should
         // either import them explicitly via a module alias or mock them
         // via decorators (see apps/cms/.storybook/README.md).
-        autoImport: { imports: ['vue'] },
+        autoImport: {
+          imports: ['vue'],
+          dirs: [
+            fileURLToPath(new URL('./shims', import.meta.url)),
+            fileURLToPath(new URL('../composables', import.meta.url)),
+          ],
+        },
       })
     );
     vite.resolve ??= {};
