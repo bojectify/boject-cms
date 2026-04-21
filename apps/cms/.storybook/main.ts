@@ -32,6 +32,12 @@ const config: StorybookConfig = {
             fileURLToPath(new URL('../utils', import.meta.url)),
           ],
         },
+        // Extend Nuxt UI's bundled unplugin-vue-components so project
+        // components in ../components/ are globally auto-registered in
+        // Storybook (matching Nuxt's runtime behaviour).
+        components: {
+          dirs: [fileURLToPath(new URL('../components', import.meta.url))],
+        },
       })
     );
     vite.resolve ??= {};
