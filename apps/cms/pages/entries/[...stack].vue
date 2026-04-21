@@ -186,6 +186,47 @@ async function handleDiscardChanges() {
   await discardChanges();
 }
 
+const toast = useToast();
+const isDeleting = ref(false);
+
+async function handleDelete() {
+  if (root.value.kind !== 'entry') return;
+  const entryId = root.value.entryId;
+  const titleVal = formState[entryTitleFieldIdentifier.value];
+  const label =
+    typeof titleVal === 'string' && titleVal ? titleVal : 'this entry';
+  if (!window.confirm(`Delete ${label}? This cannot be undone.`)) return;
+
+  try {
+    const res = await fetch(`/api/content-entries/${entryId}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => null)) as {
+        statusMessage?: string;
+        message?: string;
+      } | null;
+      throw new Error(
+        body?.statusMessage ?? body?.message ?? `Request failed (${res.status})`
+      );
+    }
+    toast.add({
+      title: 'Deleted',
+      description: `${label} was deleted.`,
+      color: 'success',
+    });
+    const target = contentType.value?.id
+      ? `/content-types/${contentType.value.id}/entries`
+      : '/';
+    isDeleting.value = true;
+    await navigateTo(target);
+  } catch (err: unknown) {
+    const message =
+      err instanceof Error ? err.message : 'Failed to delete entry.';
+    toast.add({ title: 'Error', description: message, color: 'error' });
+  }
+}
+
 // ---- Dirty guards ----
 const paneEls = useTemplateRef<Array<{ isDirty: boolean } | null>>('paneEls');
 
@@ -222,6 +263,7 @@ if (import.meta.client) {
 
 // Fires when leaving the catch-all entirely (different root, external nav).
 onBeforeRouteLeave(() => {
+  if (isDeleting.value) return true;
   if (isDirty.value || anyPaneDirty()) {
     return window.confirm('You have unsaved changes. Leave anyway?');
   }
@@ -535,6 +577,7 @@ function handlePaneSaved(
         :on-save-draft="handleSaveDraft"
         :on-publish="handlePublish"
         :on-discard-changes="handleDiscardChanges"
+        :on-delete="root.kind === 'entry' ? handleDelete : undefined"
       />
     </div>
 
