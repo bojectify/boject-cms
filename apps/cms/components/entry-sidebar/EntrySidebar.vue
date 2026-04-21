@@ -216,5 +216,27 @@ async function copyEntryId() {
         Discard Changes
       </UButton>
     </template>
+
+    <template v-if="onDelete && !isNew && entryId">
+      <USeparator color="error" />
+      <div class="flex flex-col gap-2">
+        <h3
+          class="text-xs font-semibold uppercase tracking-wide text-red-700 dark:text-red-400"
+        >
+          Danger zone
+        </h3>
+        <p class="text-xs text-muted">Deleting this entry cannot be undone.</p>
+        <UButton
+          block
+          variant="outline"
+          color="error"
+          icon="i-lucide-trash-2"
+          :data-testid="QA_ENTRY_SIDEBAR.DELETE_BTN"
+          @click="onDelete"
+        >
+          Delete Entry
+        </UButton>
+      </div>
+    </template>
   </aside>
 </template>
