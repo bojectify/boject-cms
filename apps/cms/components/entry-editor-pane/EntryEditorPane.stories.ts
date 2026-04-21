@@ -179,3 +179,82 @@ export const OpensRelationAtDepth: Story = {
     expect(orch.openPane).toHaveBeenCalledWith('ct-author', 'a1', 'author', 1);
   },
 };
+
+export const EmitsSavedOnPublish: Story = {
+  render: (args) => ({
+    components: { EntryEditorPane },
+    setup() {
+      const saved = fn();
+      (window as unknown as { __saved__: ReturnType<typeof fn> }).__saved__ =
+        saved;
+      return () =>
+        h(EntryEditorPane, {
+          ...args,
+          onSaved: saved,
+        });
+    },
+  }),
+  decorators: [
+    (story) => ({
+      setup() {
+        provide(paneOrchestratorKey, { openPicker: fn(), openPane: fn() });
+        return () => h(story());
+      },
+    }),
+  ],
+  args: {
+    open: true,
+    entryId: null,
+    contentTypeId: 'ct-tag',
+    depth: 2,
+  },
+  parameters: {
+    layout: 'fullscreen',
+    msw: {
+      handlers: [
+        http.get('/api/content-types/ct-tag', () =>
+          HttpResponse.json({
+            id: 'ct-tag',
+            name: 'Tag',
+            identifier: 'Tag',
+            fields: [
+              {
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                required: true,
+                options: null,
+              },
+            ],
+          })
+        ),
+        http.post('/api/content-entries', () =>
+          HttpResponse.json({
+            id: 'new-tag-1',
+            contentTypeId: 'ct-tag',
+            status: 'DRAFT',
+            data: { title: 'TypeScript' },
+          })
+        ),
+      ],
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const screen = within(canvasElement);
+    const titleInput = await waitFor(() => screen.getByLabelText(/title/i), {
+      timeout: 3000,
+    });
+    await userEvent.type(titleInput, 'TypeScript');
+    const saveBtn = screen.getByRole('button', { name: /save draft/i });
+    await userEvent.click(saveBtn);
+
+    const saved = (window as unknown as { __saved__: ReturnType<typeof fn> })
+      .__saved__;
+    await waitFor(() => expect(saved).toHaveBeenCalled(), { timeout: 3000 });
+    expect(saved).toHaveBeenCalledWith({
+      contentTypeId: 'ct-tag',
+      entryId: 'new-tag-1',
+      entryTitle: 'TypeScript',
+    });
+  },
+};
