@@ -16,7 +16,13 @@ const config: StorybookConfig = {
     vite.plugins ??= [];
     vite.plugins.push(
       ui({
-        // Tailwind preflight is included via the runtime CSS import in preview.ts
+        // Extend Nuxt UI's bundled unplugin-auto-import with the Vue preset
+        // so components can call `ref`/`computed`/`watch` etc. without
+        // explicit imports. Project composables (useAuthedFetch, useToast,
+        // etc.) are NOT auto-imported here — stories that need them should
+        // either import them explicitly via a module alias or mock them
+        // via decorators (see apps/cms/.storybook/README.md).
+        autoImport: { imports: ['vue'] },
       })
     );
     vite.resolve ??= {};
