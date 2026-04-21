@@ -13,8 +13,10 @@ const config: StorybookConfig = {
   docs: { autodocs: 'tag' },
   async viteFinal(vite) {
     const { default: ui } = await import('@nuxt/ui/vite');
+    const { default: vue } = await import('@vitejs/plugin-vue');
     vite.plugins ??= [];
     vite.plugins.push(
+      vue(),
       ui({
         // Extend Nuxt UI's bundled unplugin-auto-import with the Vue preset
         // so components can call `ref`/`computed`/`watch` etc. without

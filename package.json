@@ -40,7 +40,9 @@
     "content:import": "pnpm --filter cms content:import",
     "content:validate": "pnpm --filter cms content:validate",
     "starters:build": "pnpm --filter cms starters:build",
-    "starters:check": "pnpm --filter cms starters:check"
+    "starters:check": "pnpm --filter cms starters:check",
+    "storybook": "pnpm --filter cms storybook",
+    "storybook:build": "pnpm --filter cms storybook:build"
   },
   "devDependencies": {
     "@types/node": "^24.12.2",

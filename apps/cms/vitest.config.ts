@@ -2,7 +2,6 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 import { storybookTest } from '@storybook/addon-vitest/vitest-plugin';
 import { playwright } from '@vitest/browser-playwright';
-import vue from '@vitejs/plugin-vue';
 
 // Tests use a separate database so dev data is never touched.
 process.env.DATABASE_URL =
@@ -65,7 +64,7 @@ export default defineConfig({
       },
       {
         extends: true,
-        plugins: [vue(), storybookTest({ configDir: '.storybook' })],
+        plugins: [storybookTest({ configDir: '.storybook' })],
         optimizeDeps: {
           include: ['storybook/test'],
         },
