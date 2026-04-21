@@ -207,6 +207,7 @@ async function handleSave() {
       color: 'success',
     });
 
+    await refreshNuxtData('sidebar-content-types');
     await navigateTo(`/content-types/${created.id}`);
   } catch (err: unknown) {
     const message =
