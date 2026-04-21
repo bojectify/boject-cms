@@ -17,4 +17,5 @@ export type EntrySidebarProps = BasicComponentProps & {
   onSaveDraft: () => void;
   onPublish: () => void;
   onDiscardChanges?: () => void;
+  onDelete?: () => void;
 };
