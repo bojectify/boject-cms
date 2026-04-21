@@ -29,6 +29,7 @@ const config: StorybookConfig = {
           dirs: [
             fileURLToPath(new URL('./shims', import.meta.url)),
             fileURLToPath(new URL('../composables', import.meta.url)),
+            fileURLToPath(new URL('../utils', import.meta.url)),
           ],
         },
       })
