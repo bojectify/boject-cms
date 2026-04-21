@@ -54,6 +54,11 @@ apps/cms/storage/
 apps/cms/.nuxt/
 apps/cms/.output/
 
+# Storybook / Nuxt UI Vite plugin generated types
+apps/cms/auto-imports.d.ts
+apps/cms/components.d.ts
+apps/cms/storybook-static/
+
 # Claude Code host-local
 .claude/*.lock
 .claude/settings.local.json
