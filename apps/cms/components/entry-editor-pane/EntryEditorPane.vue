@@ -113,6 +113,18 @@ const {
   applyFieldUpdate,
 } = useRelationFieldState(formState, editorFields);
 
+function handleRelationEdit(value: unknown, fieldKey: string) {
+  const ref = getRelationValue(value);
+  if (ref) {
+    orchestrator!.openPane(
+      ref.contentTypeId,
+      ref.entryId,
+      fieldKey,
+      props.depth
+    );
+  }
+}
+
 watch(
   () => formState[entryTitleFieldIdentifier.value],
   (val) => {
@@ -235,19 +247,7 @@ defineExpose({ isDirty, applyFieldUpdate });
                       props.depth
                     )
                   "
-                  @edit="
-                    (() => {
-                      const r = getRelationValue(value);
-                      if (r) {
-                        orchestrator.openPane(
-                          r.contentTypeId,
-                          r.entryId,
-                          field.key,
-                          props.depth
-                        );
-                      }
-                    })()
-                  "
+                  @edit="handleRelationEdit(value, field.key)"
                   @remove="update(null)"
                 />
                 <MultiRelationField
