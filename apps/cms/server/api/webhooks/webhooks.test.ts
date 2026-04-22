@@ -312,4 +312,71 @@ describe('Webhooks REST', async () => {
       expect(res.status).toBe(403);
     });
   });
+
+  describe('POST /api/webhooks/:id/test', () => {
+    it('enqueues a test delivery row', async () => {
+      const cookie = await getSessionCookie();
+      const created = (await (
+        await fetch('/api/webhooks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Cookie: cookie },
+          body: JSON.stringify({
+            name: 'Test-1',
+            url: 'https://example.com/x',
+            events: ['ENTRY_PUBLISHED'],
+          }),
+        })
+      ).json()) as { id: string };
+
+      const res = await fetch(`/api/webhooks/${created.id}/test`, {
+        method: 'POST',
+        headers: { Cookie: cookie },
+      });
+      expect(res.status).toBe(201);
+      const body = (await res.json()) as {
+        deliveryId: string;
+        isTest: boolean;
+      };
+      expect(body.isTest).toBe(true);
+
+      const delivery = await prisma.webhookDelivery.findUnique({
+        where: { id: body.deliveryId },
+      });
+      expect(delivery).not.toBeNull();
+      expect(delivery!.isTest).toBe(true);
+      expect(delivery!.webhookId).toBe(created.id);
+      expect(delivery!.status).toBe('PENDING');
+      const payload = delivery!.payload as {
+        event: string;
+        test?: boolean;
+        deliveryId: string;
+      };
+      expect(payload.event).toBe('ENTRY_PUBLISHED');
+      expect(payload.test).toBe(true);
+      expect(payload.deliveryId).toBe(body.deliveryId);
+    });
+
+    it('returns 404 when webhook does not exist', async () => {
+      const cookie = await getSessionCookie();
+      const res = await fetch(
+        '/api/webhooks/11111111-1111-4111-8111-111111111111/test',
+        {
+          method: 'POST',
+          headers: { Cookie: cookie },
+        }
+      );
+      expect(res.status).toBe(404);
+    });
+
+    it('rejects API-key callers', async () => {
+      const res = await fetch(
+        '/api/webhooks/11111111-1111-4111-8111-111111111111/test',
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${TEST_API_KEY}` },
+        }
+      );
+      expect(res.status).toBe(403);
+    });
+  });
 });
