@@ -90,6 +90,8 @@ type EntryWithVersionsAndType = NonNullable<
 > & {
   versions: ContentEntryVersion[];
   contentType: {
+    id: string;
+    identifier: string;
     fields: Array<{
       id: string;
       identifier: string;
@@ -245,13 +247,12 @@ async function publishFlow(
         const published = await tx.contentEntryVersion.findFirstOrThrow({
           where: { entryId: entry.id, status: 'PUBLISHED' },
         });
-        const ct = await tx.contentType.findUniqueOrThrow({
-          where: { id: entry.contentTypeId },
-          select: { id: true, identifier: true },
-        });
         await enqueueWebhookDeliveries(tx, {
           event: 'ENTRY_PUBLISHED',
-          contentType: ct,
+          contentType: {
+            id: entry.contentType.id,
+            identifier: entry.contentType.identifier,
+          },
           entry: {
             id: entry.id,
             entryTitle,

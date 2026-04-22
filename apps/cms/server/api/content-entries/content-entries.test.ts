@@ -1486,6 +1486,86 @@ describe('Content Entry endpoints', async () => {
           (d) => d.event === 'ENTRY_PUBLISHED' && d.entryId === created.id
         )
       ).toBe(true);
+
+      const match = deliveries.find(
+        (d) => d.event === 'ENTRY_PUBLISHED' && d.entryId === created.id
+      );
+      expect(match).toBeDefined();
+      expect(match!.status).toBe('PENDING');
+
+      const payload = match!.payload as {
+        event: string;
+        entry: {
+          status: string;
+          data: { title: string };
+          publishedAt: string | null;
+        };
+      };
+      expect(payload.event).toBe('ENTRY_PUBLISHED');
+      expect(payload.entry.status).toBe('PUBLISHED');
+      expect(payload.entry.data.title).toBe(created.data.title);
+      expect(payload.entry.publishedAt).not.toBeNull();
+    });
+
+    it('does not enqueue when the content-type filter excludes this entry type', async () => {
+      const cookie = await getSessionCookie();
+      const ct = await ensureBlogContentType();
+
+      // Create a second content type that the webhook will allow. Publishing a
+      // WebhookBlog entry should NOT enqueue.
+      const otherCt = await prisma.contentType.upsert({
+        where: { identifier: 'WebhookOther' },
+        update: {},
+        create: {
+          identifier: 'WebhookOther',
+          name: 'Webhook Other',
+          fields: {
+            create: [
+              {
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                order: 0,
+                required: true,
+                unique: true,
+              },
+            ],
+          },
+        },
+      });
+
+      const hook = await prisma.webhook.create({
+        data: {
+          name: `CT-filter hook ${Date.now()}`,
+          url: 'https://example.com/hook',
+          secret: 'test-secret',
+          enabled: true,
+          events: ['ENTRY_PUBLISHED'],
+          contentTypeIds: [otherCt.id],
+        },
+      });
+
+      const created = (await (
+        await fetch('/api/content-entries', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Cookie: cookie },
+          body: JSON.stringify({
+            contentTypeId: ct.id,
+            data: { title: `CT filter test ${Date.now()}` },
+          }),
+        })
+      ).json()) as { id: string; data: { title: string } };
+
+      await fetch(`/api/content-entries/${created.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify({ status: 'PUBLISHED', data: created.data }),
+      });
+
+      const deliveries = await prisma.webhookDelivery.findMany({
+        where: { webhookId: hook.id },
+      });
+      expect(deliveries.length).toBe(0);
     });
 
     it('does not enqueue when the webhook event filter excludes the event', async () => {
