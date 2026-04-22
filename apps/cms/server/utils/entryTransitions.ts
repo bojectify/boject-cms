@@ -31,7 +31,10 @@ export type TransitionPlan =
       message: string;
     };
 
-type EntryShape = Pick<ContentEntry, 'id'> & {
+type EntryShape = Pick<
+  ContentEntry,
+  'id' | 'slug' | 'createdAt' | 'updatedAt'
+> & {
   versions: Array<
     Pick<
       ContentEntryVersion,
@@ -47,11 +50,11 @@ function snapshotFromPublished(
   return {
     id: entry.id,
     entryTitle: published.entryTitle,
-    slug: null,
+    slug: entry.slug,
     status: 'PUBLISHED',
     publishedAt: published.publishedAt,
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: entry.createdAt,
+    updatedAt: entry.updatedAt,
     data: published.data,
   };
 }
@@ -63,6 +66,8 @@ export function planTransition(
   const published = getPublishedVersion(
     entry.versions as ContentEntryVersion[]
   );
+  // Two-slot invariant: at most one of DRAFT / CHANGED exists at any time.
+  // getDraftVersion prefers CHANGED > DRAFT, returning null if neither exists.
   const draft = getDraftVersion(entry.versions as ContentEntryVersion[]);
 
   switch (action) {
