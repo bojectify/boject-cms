@@ -1756,4 +1756,165 @@ describe('Content Entry endpoints', async () => {
       expect(deliveries.length).toBe(0);
     });
   });
+
+  describe('POST /api/content-entries/[id]/unpublish', () => {
+    it('demotes a PUBLISHED entry to DRAFT and enqueues ENTRY_UNPUBLISHED', async () => {
+      const cookie = await getSessionCookie();
+      const ip = '203.0.113.20';
+
+      const hook = await prisma.webhook.create({
+        data: {
+          name: `Unpub hook ${Date.now()}`,
+          url: 'https://example.com/hook',
+          secret: 'test-secret',
+          enabled: true,
+          events: ['ENTRY_UNPUBLISHED'],
+          contentTypeIds: [],
+        },
+      });
+
+      const ct = await ensureBlogContentType();
+      const created = (await (
+        await fetch('/api/content-entries', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: cookie,
+            'X-Forwarded-For': ip,
+          },
+          body: JSON.stringify({
+            contentTypeId: ct.id,
+            data: { title: `Unpub target ${Date.now()}` },
+          }),
+        })
+      ).json()) as { id: string; data: { title: string } };
+
+      await fetch(`/api/content-entries/${created.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+          'X-Forwarded-For': ip,
+        },
+        body: JSON.stringify({ status: 'PUBLISHED', data: created.data }),
+      });
+
+      const res = await fetch(`/api/content-entries/${created.id}/unpublish`, {
+        method: 'POST',
+        headers: { Cookie: cookie, 'X-Forwarded-For': ip },
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { status: string };
+      expect(body.status).toBe('DRAFT');
+
+      const deliveries = await prisma.webhookDelivery.findMany({
+        where: { webhookId: hook.id },
+      });
+      const match = deliveries.find(
+        (d) => d.event === 'ENTRY_UNPUBLISHED' && d.entryId === created.id
+      );
+      expect(match).toBeDefined();
+      const payload = match!.payload as {
+        event: string;
+        entry: { status: string; data: { title: string } };
+      };
+      expect(payload.event).toBe('ENTRY_UNPUBLISHED');
+      expect(payload.entry.status).toBe('PUBLISHED');
+      expect(payload.entry.data.title).toBe(created.data.title);
+    });
+
+    it('collapses CHANGED into DRAFT when both PUBLISHED and CHANGED exist', async () => {
+      const cookie = await getSessionCookie();
+      const ip = '203.0.113.21';
+      const ct = await ensureBlogContentType();
+      const created = (await (
+        await fetch('/api/content-entries', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: cookie,
+            'X-Forwarded-For': ip,
+          },
+          body: JSON.stringify({
+            contentTypeId: ct.id,
+            data: { title: `Unpub-C ${Date.now()}` },
+          }),
+        })
+      ).json()) as { id: string; data: { title: string } };
+
+      await fetch(`/api/content-entries/${created.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+          'X-Forwarded-For': ip,
+        },
+        body: JSON.stringify({ status: 'PUBLISHED', data: created.data }),
+      });
+      // Save a CHANGED draft with different text
+      await fetch(`/api/content-entries/${created.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+          'X-Forwarded-For': ip,
+        },
+        body: JSON.stringify({
+          data: { title: `${created.data.title} — edited` },
+        }),
+      });
+
+      const res = await fetch(`/api/content-entries/${created.id}/unpublish`, {
+        method: 'POST',
+        headers: { Cookie: cookie, 'X-Forwarded-For': ip },
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        status: string;
+        data: { title: string };
+      };
+      expect(body.status).toBe('DRAFT');
+      expect(body.data.title).toBe(`${created.data.title} — edited`);
+    });
+
+    it('returns 409 when entry has no PUBLISHED version', async () => {
+      const cookie = await getSessionCookie();
+      const ip = '203.0.113.22';
+      const ct = await ensureBlogContentType();
+      const created = (await (
+        await fetch('/api/content-entries', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: cookie,
+            'X-Forwarded-For': ip,
+          },
+          body: JSON.stringify({
+            contentTypeId: ct.id,
+            data: { title: `Unpub-fail ${Date.now()}` },
+          }),
+        })
+      ).json()) as { id: string };
+
+      const res = await fetch(`/api/content-entries/${created.id}/unpublish`, {
+        method: 'POST',
+        headers: { Cookie: cookie, 'X-Forwarded-For': ip },
+      });
+      expect(res.status).toBe(409);
+    });
+
+    it('rejects API-key callers', async () => {
+      const res = await fetch(
+        '/api/content-entries/00000000-0000-0000-0000-000000000000/unpublish',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${TEST_API_KEY}`,
+            'X-Forwarded-For': '203.0.113.23',
+          },
+        }
+      );
+      expect(res.status).toBe(403);
+    });
+  });
 });
