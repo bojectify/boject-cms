@@ -1,0 +1,47 @@
+enum WebhookEvent {
+  ENTRY_PUBLISHED
+  ENTRY_UNPUBLISHED
+  ENTRY_DELETED
+}
+
+enum DeliveryStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  DEAD_LETTERED
+}
+
+model Webhook {
+  id             String            @id @default(uuid())
+  name           String
+  url            String
+  secret         String
+  enabled        Boolean           @default(true)
+  contentTypeIds String[]
+  events         WebhookEvent[]
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  deliveries     WebhookDelivery[]
+}
+
+model WebhookDelivery {
+  id               String         @id @default(uuid())
+  webhook          Webhook        @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  webhookId        String
+  event            WebhookEvent
+  contentTypeId    String
+  entryId          String
+  payload          Json
+  status           DeliveryStatus @default(PENDING)
+  attempts         Int            @default(0)
+  nextAttemptAt    DateTime?
+  lastResponseCode Int?
+  lastResponseBody String?
+  lastError        String?
+  isTest           Boolean        @default(false)
+  createdAt        DateTime       @default(now())
+  completedAt      DateTime?
+
+  @@index([status, nextAttemptAt])
+  @@index([webhookId, createdAt])
+}
