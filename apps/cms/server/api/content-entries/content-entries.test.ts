@@ -2203,4 +2203,176 @@ describe('Content Entry endpoints', async () => {
       expect(res.status).toBe(403);
     });
   });
+
+  describe('POST /api/content-entries/[id]/republish', () => {
+    it('enqueues ENTRY_PUBLISHED without mutating the entry', async () => {
+      const cookie = await getSessionCookie();
+      const ip = '203.0.113.50';
+
+      const hook = await prisma.webhook.create({
+        data: {
+          name: `Repub hook ${Date.now()}`,
+          url: 'https://example.com/hook',
+          secret: 'test-secret',
+          enabled: true,
+          events: ['ENTRY_PUBLISHED'],
+          contentTypeIds: [],
+        },
+      });
+
+      const ct = await ensureBlogContentType();
+      const created = (await (
+        await fetch('/api/content-entries', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: cookie,
+            'X-Forwarded-For': ip,
+          },
+          body: JSON.stringify({
+            contentTypeId: ct.id,
+            data: { title: `Repub ${Date.now()}` },
+          }),
+        })
+      ).json()) as { id: string; data: { title: string } };
+      await fetch(`/api/content-entries/${created.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+          'X-Forwarded-For': ip,
+        },
+        body: JSON.stringify({ status: 'PUBLISHED', data: created.data }),
+      });
+
+      const beforeCount = await prisma.webhookDelivery.count({
+        where: {
+          webhookId: hook.id,
+          event: 'ENTRY_PUBLISHED',
+          entryId: created.id,
+        },
+      });
+
+      // Capture the published version's id before republish
+      const pubBefore = await prisma.contentEntryVersion.findFirstOrThrow({
+        where: { entryId: created.id, status: 'PUBLISHED' },
+      });
+
+      const res = await fetch(`/api/content-entries/${created.id}/republish`, {
+        method: 'POST',
+        headers: { Cookie: cookie, 'X-Forwarded-For': ip },
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { status: string };
+      expect(body.status).toBe('PUBLISHED');
+
+      // Same PUBLISHED row still exists with the same id — no mutation
+      const pubAfter = await prisma.contentEntryVersion.findFirstOrThrow({
+        where: { entryId: created.id, status: 'PUBLISHED' },
+      });
+      expect(pubAfter.id).toBe(pubBefore.id);
+      expect(pubAfter.publishedAt?.toISOString()).toBe(
+        pubBefore.publishedAt!.toISOString()
+      );
+
+      // Webhook delivery count incremented by exactly 1
+      const afterCount = await prisma.webhookDelivery.count({
+        where: {
+          webhookId: hook.id,
+          event: 'ENTRY_PUBLISHED',
+          entryId: created.id,
+        },
+      });
+      expect(afterCount).toBe(beforeCount + 1);
+    });
+
+    it('returns 409 NOT_PUBLISHED when entry has no PUBLISHED version', async () => {
+      const cookie = await getSessionCookie();
+      const ip = '203.0.113.51';
+      const ct = await ensureBlogContentType();
+      const created = (await (
+        await fetch('/api/content-entries', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: cookie,
+            'X-Forwarded-For': ip,
+          },
+          body: JSON.stringify({
+            contentTypeId: ct.id,
+            data: { title: `Repub-fail ${Date.now()}` },
+          }),
+        })
+      ).json()) as { id: string };
+
+      const res = await fetch(`/api/content-entries/${created.id}/republish`, {
+        method: 'POST',
+        headers: { Cookie: cookie, 'X-Forwarded-For': ip },
+      });
+      expect(res.status).toBe(409);
+      const body = (await res.json()) as { data?: { error?: string } };
+      expect(body.data?.error).toBe('NOT_PUBLISHED');
+    });
+
+    it('is unaffected by a CHANGED draft', async () => {
+      const cookie = await getSessionCookie();
+      const ip = '203.0.113.52';
+      const ct = await ensureBlogContentType();
+      const created = (await (
+        await fetch('/api/content-entries', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: cookie,
+            'X-Forwarded-For': ip,
+          },
+          body: JSON.stringify({
+            contentTypeId: ct.id,
+            data: { title: `Repub-CH ${Date.now()}` },
+          }),
+        })
+      ).json()) as { id: string; data: { title: string } };
+
+      await fetch(`/api/content-entries/${created.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+          'X-Forwarded-For': ip,
+        },
+        body: JSON.stringify({ status: 'PUBLISHED', data: created.data }),
+      });
+      await fetch(`/api/content-entries/${created.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+          'X-Forwarded-For': ip,
+        },
+        body: JSON.stringify({ data: { title: `${created.data.title} dr` } }),
+      });
+
+      const res = await fetch(`/api/content-entries/${created.id}/republish`, {
+        method: 'POST',
+        headers: { Cookie: cookie, 'X-Forwarded-For': ip },
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { status: string };
+      expect(body.status).toBe('PUBLISHED');
+    });
+
+    it('rejects API-key callers', async () => {
+      const res = await fetch(
+        '/api/content-entries/00000000-0000-0000-0000-000000000000/republish',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${TEST_API_KEY}`,
+            'X-Forwarded-For': '203.0.113.53',
+          },
+        }
+      );
+      expect(res.status).toBe(403);
+    });
+  });
 });
