@@ -43,9 +43,15 @@ export default defineEventHandler(async (event) => {
       if (m.kind === 'delete') {
         await tx.contentEntryVersion.delete({ where: { id: m.versionId } });
       } else {
+        const data: { status: typeof m.status; publishedAt?: Date | null } = {
+          status: m.status,
+        };
+        if ('publishedAt' in m) {
+          data.publishedAt = m.publishedAt;
+        }
         await tx.contentEntryVersion.update({
           where: { id: m.versionId },
-          data: { status: m.status, publishedAt: null },
+          data,
         });
       }
     }

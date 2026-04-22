@@ -13,6 +13,7 @@ export type VersionMutation =
       kind: 'update-status';
       versionId: string;
       status: ContentEntryVersion['status'];
+      publishedAt?: Date | null;
     }
   | { kind: 'delete'; versionId: string };
 
@@ -84,7 +85,12 @@ export function planTransition(
           kind: 'ok',
           mutations: [
             { kind: 'delete', versionId: published.id },
-            { kind: 'update-status', versionId: draft.id, status: 'DRAFT' },
+            {
+              kind: 'update-status',
+              versionId: draft.id,
+              status: 'DRAFT',
+              publishedAt: null,
+            },
           ],
           webhookEvent: 'ENTRY_UNPUBLISHED',
           snapshot: snapshotFromPublished(entry, published),
@@ -93,7 +99,12 @@ export function planTransition(
       return {
         kind: 'ok',
         mutations: [
-          { kind: 'update-status', versionId: published.id, status: 'DRAFT' },
+          {
+            kind: 'update-status',
+            versionId: published.id,
+            status: 'DRAFT',
+            publishedAt: null,
+          },
         ],
         webhookEvent: 'ENTRY_UNPUBLISHED',
         snapshot: snapshotFromPublished(entry, published),
@@ -139,7 +150,12 @@ export function planTransition(
       return {
         kind: 'ok',
         mutations: [
-          { kind: 'update-status', versionId: archived.id, status: 'DRAFT' },
+          {
+            kind: 'update-status',
+            versionId: archived.id,
+            status: 'DRAFT',
+            publishedAt: null,
+          },
         ],
         webhookEvent: null,
         snapshot: null,

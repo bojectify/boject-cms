@@ -53,7 +53,12 @@ describe('planTransition', () => {
       expect(plan.kind).toBe('ok');
       if (plan.kind !== 'ok') return;
       expect(plan.mutations).toEqual([
-        { kind: 'update-status', versionId: 'pub', status: 'DRAFT' },
+        {
+          kind: 'update-status',
+          versionId: 'pub',
+          status: 'DRAFT',
+          publishedAt: null,
+        },
       ]);
       expect(plan.webhookEvent).toBe('ENTRY_UNPUBLISHED');
       expect(plan.snapshot?.status).toBe('PUBLISHED');
@@ -76,7 +81,12 @@ describe('planTransition', () => {
       if (plan.kind !== 'ok') return;
       expect(plan.mutations).toEqual([
         { kind: 'delete', versionId: 'pub' },
-        { kind: 'update-status', versionId: 'ch', status: 'DRAFT' },
+        {
+          kind: 'update-status',
+          versionId: 'ch',
+          status: 'DRAFT',
+          publishedAt: null,
+        },
       ]);
       expect(plan.webhookEvent).toBe('ENTRY_UNPUBLISHED');
       expect(plan.snapshot?.data).toEqual({ title: 'pub' });
@@ -132,6 +142,19 @@ describe('planTransition', () => {
         message: 'Only published entries can be archived',
       });
     });
+
+    it('archive preserves publishedAt by omitting it from the mutation', () => {
+      const plan = planTransition(
+        makeEntry('e1', [v('pub', 'PUBLISHED')]),
+        'archive'
+      );
+      expect(plan.kind).toBe('ok');
+      if (plan.kind !== 'ok') return;
+      expect(plan.mutations).toHaveLength(1);
+      const m = plan.mutations[0];
+      if (!m || m.kind !== 'update-status') throw new Error('unexpected kind');
+      expect(m).not.toHaveProperty('publishedAt');
+    });
   });
 
   describe('unarchive', () => {
@@ -143,7 +166,12 @@ describe('planTransition', () => {
       expect(plan.kind).toBe('ok');
       if (plan.kind !== 'ok') return;
       expect(plan.mutations).toEqual([
-        { kind: 'update-status', versionId: 'arc', status: 'DRAFT' },
+        {
+          kind: 'update-status',
+          versionId: 'arc',
+          status: 'DRAFT',
+          publishedAt: null,
+        },
       ]);
       expect(plan.webhookEvent).toBeNull();
       expect(plan.snapshot).toBeNull();
