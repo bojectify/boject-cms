@@ -109,4 +109,60 @@ describe('Webhooks REST', async () => {
       expect(body.items.every((i) => i.secret === undefined)).toBe(true);
     });
   });
+
+  describe('PUT /api/webhooks/:id', () => {
+    it('updates fields but does not return the secret', async () => {
+      const cookie = await getSessionCookie();
+      const created = (await (
+        await fetch('/api/webhooks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Cookie: cookie },
+          body: JSON.stringify({
+            name: 'Upd-1',
+            url: 'https://example.com/x',
+            events: ['ENTRY_PUBLISHED'],
+          }),
+        })
+      ).json()) as { id: string };
+
+      const res = await fetch(`/api/webhooks/${created.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify({ enabled: false, name: 'Upd-1-renamed' }),
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as Record<string, unknown>;
+      expect(body.secret).toBeUndefined();
+      expect(body.enabled).toBe(false);
+      expect(body.name).toBe('Upd-1-renamed');
+    });
+  });
+
+  describe('DELETE /api/webhooks/:id', () => {
+    it('deletes the webhook and cascades deliveries', async () => {
+      const cookie = await getSessionCookie();
+      const created = (await (
+        await fetch('/api/webhooks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Cookie: cookie },
+          body: JSON.stringify({
+            name: 'Del-1',
+            url: 'https://example.com/x',
+            events: ['ENTRY_PUBLISHED'],
+          }),
+        })
+      ).json()) as { id: string };
+
+      const res = await fetch(`/api/webhooks/${created.id}`, {
+        method: 'DELETE',
+        headers: { Cookie: cookie },
+      });
+      expect(res.status).toBe(200);
+
+      const getRes = await fetch(`/api/webhooks/${created.id}`, {
+        headers: { Cookie: cookie },
+      });
+      expect(getRes.status).toBe(404);
+    });
+  });
 });
