@@ -29,6 +29,13 @@ describe('isPrivateHost', () => {
     ['169.254.169.254', true],
     ['203.0.113.5', false],
     ['example.com', false],
+    ['0.0.0.0', true],
+    ['169.1.1.1', false],
+    ['::ffff:127.0.0.1', true],
+    ['::ffff:10.0.0.1', true],
+    ['::ffff:8.8.8.8', false],
+    ['2130706433', true],
+    ['0x7f000001', true],
   ])('classifies %s as private=%s', (host, expected) => {
     expect(isPrivateHost(host)).toBe(expected);
   });
@@ -72,5 +79,27 @@ describe('assertWebhookUrl', () => {
   it('allows private hosts when WEBHOOK_ALLOW_PRIVATE_URLS=true', () => {
     process.env.WEBHOOK_ALLOW_PRIVATE_URLS = 'true';
     expect(() => assertWebhookUrl('http://10.0.0.1/x')).not.toThrow();
+  });
+
+  it('rejects IPv4-mapped IPv6 of a private v4', () => {
+    expect(() => assertWebhookUrl('http://[::ffff:127.0.0.1]/x')).toThrow(
+      /private/
+    );
+  });
+
+  it('rejects decimal IPv4 literal that resolves to a private address', () => {
+    expect(() => assertWebhookUrl('http://2130706433/x')).toThrow(/private/);
+  });
+
+  it('does not treat WEBHOOK_ALLOW_PRIVATE_URLS="false" as an override', () => {
+    process.env.WEBHOOK_ALLOW_PRIVATE_URLS = 'false';
+    expect(() => assertWebhookUrl('http://10.0.0.1/x')).toThrow(/private/);
+  });
+
+  it('returns the parsed URL object on success', () => {
+    const url = assertWebhookUrl('https://example.com/hook');
+    expect(url).toBeInstanceOf(URL);
+    expect(url.hostname).toBe('example.com');
+    expect(url.pathname).toBe('/hook');
   });
 });
