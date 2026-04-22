@@ -55,6 +55,18 @@ export async function runWorkerTick(deps: RunWorkerTickDeps): Promise<void> {
   }
 }
 
+/**
+ * Select PENDING deliveries ready for dispatch.
+ *
+ * The `FOR UPDATE SKIP LOCKED` clause is defensive for future multi-worker
+ * deployments, but the lock is scoped to the SELECT statement only — the
+ * subsequent UPDATE runs in a separate operation outside any transaction.
+ * In the current single-worker setup this is harmless.
+ *
+ * TODO(multi-worker): wrap this SELECT together with the per-row UPDATE
+ * in the same `prisma.$transaction` so that two workers cannot race on the
+ * same delivery row. Tracked alongside the external-queue follow-up (#87).
+ */
 async function selectPending(
   deps: RunWorkerTickDeps,
   batchSize: number
@@ -72,6 +84,14 @@ async function selectPending(
   `;
 }
 
+/**
+ * Dispatch a single delivery.
+ *
+ * Delivery semantics are **at-least-once**: if a successful POST is followed
+ * by a crash before the status UPDATE lands, the row remains PENDING and
+ * will be re-delivered on the next tick. Consumers should treat
+ * `X-Boject-Delivery-Id` as an idempotency key.
+ */
 async function dispatch(
   deps: RunWorkerTickDeps,
   row: DeliveryRow
@@ -122,7 +142,8 @@ async function dispatch(
     const text = await res.text();
     responseBody = text.slice(0, RESPONSE_BODY_MAX);
   } catch (err) {
-    transportError = (err as Error).message.slice(0, 500);
+    const msg = err instanceof Error ? err.message : String(err);
+    transportError = msg.slice(0, 500);
   } finally {
     clearTimeout(timer);
   }

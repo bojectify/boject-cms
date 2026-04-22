@@ -149,4 +149,20 @@ describe('runWorkerTick', () => {
     expect(sentHeaders['X-Boject-Signature']).toMatch(/^sha256=[0-9a-f]{64}$/);
     expect(sentBody).toBe(JSON.stringify({ hello: 'world' }));
   });
+
+  it('marks delivery FAILED when webhook no longer exists', async () => {
+    const fetchCalled = { value: false };
+    const fetchImpl = async () => {
+      fetchCalled.value = true;
+      return new Response('ok', { status: 200 });
+    };
+    // Same deliveries[], but webhooks[] is empty — findUnique will return null.
+    const prisma = makeFakePrisma(deliveries, []);
+    await runWorkerTick({ prisma, fetch: fetchImpl, now: () => new Date() });
+
+    expect(deliveries[0]!.status).toBe('FAILED');
+    expect(deliveries[0]!.lastError).toBe('Webhook no longer exists');
+    expect(deliveries[0]!.completedAt).toBeInstanceOf(Date);
+    expect(fetchCalled.value).toBe(false); // Never attempted the POST
+  });
 });

@@ -2948,11 +2948,16 @@ export function stopWorker(): void {
 }
 ```
 
-Note the subtle backoff semantics:
+Note the backoff semantics:
 
 - `attempts` in the DB row is **pre-increment** (count of prior attempts).
 - After dispatch, we have made `attempts = row.attempts + 1` attempts total.
-- When failing, the **next** attempt is `attempts + 1`, and the wait is `backoffMs(attempts + 1)`. But the unit test expects `backoffMs(attempts + 1) === backoffMs(1) === 1_000` after the first failure, which matches: after one attempt, wait 1s for attempt #2. The implementation stores `backoffMs(attempts)` — re-read: `new Date(now + backoffMs(attempts)!)`. We want `backoffMs(attempts + 1)` = the delay before the _next_ attempt. Fix the implementation to use `backoffMs(attempts + 1)` when computing `nextAttemptAt`, and guard with `if (attempts < MAX_ATTEMPTS)`.
+- When a failure occurs, the next delay is `backoffMs(attempts)` — i.e. the
+  schedule value indexed by the just-completed attempt count. After attempt 1
+  fails, wait 1s; after attempt 2 fails, wait 10s; etc.
+- After attempt 6 fails, `attempts === MAX_ATTEMPTS` and we dead-letter.
+  (The 6th schedule value `6h` is thus never applied in practice — the
+  schedule array is one slot over-specified relative to what code uses.)
 
 Replace the `else` branch of the succeeded-check with:
 
@@ -2972,7 +2977,7 @@ if (!willRetry) {
     },
   });
 } else {
-  const delay = backoffMs(attempts + 1)!;
+  const delay = backoffMs(attempts)!;
   await deps.prisma.webhookDelivery.update({
     where: { id: row.id },
     data: {
