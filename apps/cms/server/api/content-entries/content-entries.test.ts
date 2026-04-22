@@ -2095,4 +2095,94 @@ describe('Content Entry endpoints', async () => {
       expect(res.status).toBe(403);
     });
   });
+
+  describe('POST /api/content-entries/[id]/unarchive', () => {
+    it('flips ARCHIVED → DRAFT and does not enqueue a webhook delivery', async () => {
+      const cookie = await getSessionCookie();
+      const ip = '203.0.113.40';
+
+      const hook = await prisma.webhook.create({
+        data: {
+          name: `No unarchive hook ${Date.now()}`,
+          url: 'https://example.com/hook',
+          secret: 'test-secret',
+          enabled: true,
+          events: ['ENTRY_PUBLISHED', 'ENTRY_UNPUBLISHED', 'ENTRY_DELETED'],
+          contentTypeIds: [],
+        },
+      });
+
+      const ct = await ensureBlogContentType();
+      const created = (await (
+        await fetch('/api/content-entries', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: cookie,
+            'X-Forwarded-For': ip,
+          },
+          body: JSON.stringify({
+            contentTypeId: ct.id,
+            data: { title: `Unarc ${Date.now()}` },
+          }),
+        })
+      ).json()) as { id: string; data: { title: string } };
+      await fetch(`/api/content-entries/${created.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+          'X-Forwarded-For': ip,
+        },
+        body: JSON.stringify({ status: 'PUBLISHED', data: created.data }),
+      });
+      await fetch(`/api/content-entries/${created.id}/archive`, {
+        method: 'POST',
+        headers: { Cookie: cookie, 'X-Forwarded-For': ip },
+      });
+
+      const beforeCount = await prisma.webhookDelivery.count({
+        where: { webhookId: hook.id },
+      });
+
+      const res = await fetch(`/api/content-entries/${created.id}/unarchive`, {
+        method: 'POST',
+        headers: { Cookie: cookie, 'X-Forwarded-For': ip },
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { status: string };
+      expect(body.status).toBe('DRAFT');
+
+      const afterCount = await prisma.webhookDelivery.count({
+        where: { webhookId: hook.id },
+      });
+      expect(afterCount).toBe(beforeCount);
+    });
+
+    it('returns 409 when entry has no ARCHIVED version', async () => {
+      const cookie = await getSessionCookie();
+      const ip = '203.0.113.41';
+      const ct = await ensureBlogContentType();
+      const created = (await (
+        await fetch('/api/content-entries', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: cookie,
+            'X-Forwarded-For': ip,
+          },
+          body: JSON.stringify({
+            contentTypeId: ct.id,
+            data: { title: `Unarc-fail ${Date.now()}` },
+          }),
+        })
+      ).json()) as { id: string };
+
+      const res = await fetch(`/api/content-entries/${created.id}/unarchive`, {
+        method: 'POST',
+        headers: { Cookie: cookie, 'X-Forwarded-For': ip },
+      });
+      expect(res.status).toBe(409);
+    });
+  });
 });
