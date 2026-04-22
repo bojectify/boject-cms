@@ -4,7 +4,10 @@ import {
   flattenEntryWithVersion,
 } from '../../../utils/resolveVersion';
 import { enforceMutationRateLimit } from '../../../utils/rateLimitEndpoint';
-import { planTransition } from '../../../utils/entryTransitions';
+import {
+  applyTransitionMutations,
+  planTransition,
+} from '../../../utils/entryTransitions';
 import { enqueueWebhookDeliveries } from '../../../utils/webhooks';
 
 export default defineEventHandler(async (event) => {
@@ -38,22 +41,7 @@ export default defineEventHandler(async (event) => {
   }
 
   await prisma.$transaction(async (tx) => {
-    for (const m of plan.mutations) {
-      if (m.kind === 'delete') {
-        await tx.contentEntryVersion.delete({ where: { id: m.versionId } });
-      } else {
-        const data: { status: typeof m.status; publishedAt?: Date | null } = {
-          status: m.status,
-        };
-        if ('publishedAt' in m) {
-          data.publishedAt = m.publishedAt;
-        }
-        await tx.contentEntryVersion.update({
-          where: { id: m.versionId },
-          data,
-        });
-      }
-    }
+    await applyTransitionMutations(tx, plan.mutations);
     if (plan.webhookEvent && plan.snapshot) {
       await enqueueWebhookDeliveries(tx, {
         event: plan.webhookEvent,

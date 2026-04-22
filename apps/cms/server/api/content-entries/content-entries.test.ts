@@ -1901,6 +1901,8 @@ describe('Content Entry endpoints', async () => {
         headers: { Cookie: cookie, 'X-Forwarded-For': ip },
       });
       expect(res.status).toBe(409);
+      const body = (await res.json()) as { data?: { error?: string } };
+      expect(body.data?.error).toBe('WRONG_STATE');
     });
 
     it('rejects API-key callers', async () => {
@@ -2183,6 +2185,22 @@ describe('Content Entry endpoints', async () => {
         headers: { Cookie: cookie, 'X-Forwarded-For': ip },
       });
       expect(res.status).toBe(409);
+      const body = (await res.json()) as { data?: { error?: string } };
+      expect(body.data?.error).toBe('WRONG_STATE');
+    });
+
+    it('rejects API-key callers', async () => {
+      const res = await fetch(
+        '/api/content-entries/00000000-0000-0000-0000-000000000000/unarchive',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${TEST_API_KEY}`,
+            'X-Forwarded-For': '203.0.113.42',
+          },
+        }
+      );
+      expect(res.status).toBe(403);
     });
   });
 });

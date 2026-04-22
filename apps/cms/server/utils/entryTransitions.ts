@@ -1,4 +1,9 @@
-import type { ContentEntry, ContentEntryVersion, WebhookEvent } from '#prisma';
+import type {
+  ContentEntry,
+  ContentEntryVersion,
+  Prisma,
+  WebhookEvent,
+} from '#prisma';
 import type { WebhookEntrySnapshot } from './webhookPayload';
 import { getPublishedVersion, getDraftVersion } from './resolveVersion';
 
@@ -175,6 +180,35 @@ export function planTransition(
         webhookEvent: 'ENTRY_PUBLISHED',
         snapshot: snapshotFromPublished(entry, published),
       };
+    }
+  }
+}
+
+/**
+ * Execute a mutation plan against a Prisma transaction client.
+ *
+ * `update-status` mutations write `status`, and if the mutation includes
+ * `publishedAt` (including `null`), also write `publishedAt`. If the key
+ * is absent, the existing DB value is preserved.
+ */
+export async function applyTransitionMutations(
+  tx: Prisma.TransactionClient,
+  mutations: VersionMutation[]
+): Promise<void> {
+  for (const m of mutations) {
+    if (m.kind === 'delete') {
+      await tx.contentEntryVersion.delete({ where: { id: m.versionId } });
+    } else {
+      const data: { status: typeof m.status; publishedAt?: Date | null } = {
+        status: m.status,
+      };
+      if ('publishedAt' in m) {
+        data.publishedAt = m.publishedAt;
+      }
+      await tx.contentEntryVersion.update({
+        where: { id: m.versionId },
+        data,
+      });
     }
   }
 }
