@@ -261,4 +261,55 @@ describe('Webhooks REST', async () => {
       expect(res.status).toBe(403);
     });
   });
+
+  describe('POST /api/webhooks/:id/rotate', () => {
+    it('rotates the secret and returns the new one once', async () => {
+      const cookie = await getSessionCookie();
+      const created = (await (
+        await fetch('/api/webhooks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Cookie: cookie },
+          body: JSON.stringify({
+            name: 'Rot-1',
+            url: 'https://example.com/x',
+            events: ['ENTRY_PUBLISHED'],
+          }),
+        })
+      ).json()) as { id: string; secret: string };
+
+      const res = await fetch(`/api/webhooks/${created.id}/rotate`, {
+        method: 'POST',
+        headers: { Cookie: cookie },
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { secret: string };
+      expect(body.secret).not.toBe(created.secret);
+      expect(
+        Buffer.from(body.secret, 'base64').byteLength
+      ).toBeGreaterThanOrEqual(32);
+    });
+
+    it('returns 404 when webhook does not exist', async () => {
+      const cookie = await getSessionCookie();
+      const res = await fetch(
+        '/api/webhooks/11111111-1111-4111-8111-111111111111/rotate',
+        {
+          method: 'POST',
+          headers: { Cookie: cookie },
+        }
+      );
+      expect(res.status).toBe(404);
+    });
+
+    it('rejects API-key callers', async () => {
+      const res = await fetch(
+        '/api/webhooks/11111111-1111-4111-8111-111111111111/rotate',
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${TEST_API_KEY}` },
+        }
+      );
+      expect(res.status).toBe(403);
+    });
+  });
 });
