@@ -1917,4 +1917,182 @@ describe('Content Entry endpoints', async () => {
       expect(res.status).toBe(403);
     });
   });
+
+  describe('POST /api/content-entries/[id]/archive', () => {
+    it('flips PUBLISHED → ARCHIVED and enqueues ENTRY_UNPUBLISHED', async () => {
+      const cookie = await getSessionCookie();
+      const ip = '203.0.113.30';
+
+      const hook = await prisma.webhook.create({
+        data: {
+          name: `Arc hook ${Date.now()}`,
+          url: 'https://example.com/hook',
+          secret: 'test-secret',
+          enabled: true,
+          events: ['ENTRY_UNPUBLISHED'],
+          contentTypeIds: [],
+        },
+      });
+
+      const ct = await ensureBlogContentType();
+      const created = (await (
+        await fetch('/api/content-entries', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: cookie,
+            'X-Forwarded-For': ip,
+          },
+          body: JSON.stringify({
+            contentTypeId: ct.id,
+            data: { title: `Arc target ${Date.now()}` },
+          }),
+        })
+      ).json()) as { id: string; data: { title: string } };
+
+      await fetch(`/api/content-entries/${created.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+          'X-Forwarded-For': ip,
+        },
+        body: JSON.stringify({ status: 'PUBLISHED', data: created.data }),
+      });
+
+      const res = await fetch(`/api/content-entries/${created.id}/archive`, {
+        method: 'POST',
+        headers: { Cookie: cookie, 'X-Forwarded-For': ip },
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { status: string };
+      expect(body.status).toBe('ARCHIVED');
+
+      const deliveries = await prisma.webhookDelivery.findMany({
+        where: { webhookId: hook.id },
+      });
+      const match = deliveries.find(
+        (d) => d.event === 'ENTRY_UNPUBLISHED' && d.entryId === created.id
+      );
+      expect(match).toBeDefined();
+      const payload = match!.payload as {
+        event: string;
+        entry: { status: string; data: { title: string } };
+      };
+      expect(payload.event).toBe('ENTRY_UNPUBLISHED');
+      expect(payload.entry.status).toBe('PUBLISHED');
+      expect(payload.entry.data.title).toBe(created.data.title);
+    });
+
+    it('preserves publishedAt on the ARCHIVED row', async () => {
+      const cookie = await getSessionCookie();
+      const ip = '203.0.113.31';
+      const ct = await ensureBlogContentType();
+      const created = (await (
+        await fetch('/api/content-entries', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: cookie,
+            'X-Forwarded-For': ip,
+          },
+          body: JSON.stringify({
+            contentTypeId: ct.id,
+            data: { title: `Arc-preserve ${Date.now()}` },
+          }),
+        })
+      ).json()) as { id: string; data: { title: string } };
+
+      await fetch(`/api/content-entries/${created.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+          'X-Forwarded-For': ip,
+        },
+        body: JSON.stringify({ status: 'PUBLISHED', data: created.data }),
+      });
+
+      // Capture publishedAt before archive
+      const pub = await prisma.contentEntryVersion.findFirstOrThrow({
+        where: { entryId: created.id, status: 'PUBLISHED' },
+      });
+      expect(pub.publishedAt).not.toBeNull();
+
+      await fetch(`/api/content-entries/${created.id}/archive`, {
+        method: 'POST',
+        headers: { Cookie: cookie, 'X-Forwarded-For': ip },
+      });
+
+      const archived = await prisma.contentEntryVersion.findFirstOrThrow({
+        where: { entryId: created.id, status: 'ARCHIVED' },
+      });
+      expect(archived.publishedAt?.toISOString()).toBe(
+        pub.publishedAt!.toISOString()
+      );
+    });
+
+    it('returns 409 DRAFT_PRESENT when a CHANGED draft exists', async () => {
+      const cookie = await getSessionCookie();
+      const ip = '203.0.113.32';
+      const ct = await ensureBlogContentType();
+      const created = (await (
+        await fetch('/api/content-entries', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: cookie,
+            'X-Forwarded-For': ip,
+          },
+          body: JSON.stringify({
+            contentTypeId: ct.id,
+            data: { title: `Arc-C ${Date.now()}` },
+          }),
+        })
+      ).json()) as { id: string; data: { title: string } };
+
+      await fetch(`/api/content-entries/${created.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+          'X-Forwarded-For': ip,
+        },
+        body: JSON.stringify({ status: 'PUBLISHED', data: created.data }),
+      });
+      await fetch(`/api/content-entries/${created.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+          'X-Forwarded-For': ip,
+        },
+        body: JSON.stringify({
+          data: { title: `${created.data.title} draft` },
+        }),
+      });
+
+      const res = await fetch(`/api/content-entries/${created.id}/archive`, {
+        method: 'POST',
+        headers: { Cookie: cookie, 'X-Forwarded-For': ip },
+      });
+      expect(res.status).toBe(409);
+      const body = (await res.json()) as { data?: { error?: string } };
+      expect(body.data?.error).toBe('DRAFT_PRESENT');
+    });
+
+    it('rejects API-key callers', async () => {
+      const res = await fetch(
+        '/api/content-entries/00000000-0000-0000-0000-000000000000/archive',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${TEST_API_KEY}`,
+            'X-Forwarded-For': '203.0.113.33',
+          },
+        }
+      );
+      expect(res.status).toBe(403);
+    });
+  });
 });
