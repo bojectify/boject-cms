@@ -1644,4 +1644,116 @@ describe('Content Entry endpoints', async () => {
       expect(deliveries.length).toBe(0);
     });
   });
+
+  describe('Webhook ENTRY_DELETED wiring', () => {
+    it('enqueues ENTRY_DELETED when a published entry is deleted', async () => {
+      const cookie = await getSessionCookie();
+      // Use a distinct X-Forwarded-For so this test gets its own rate-limit
+      // bucket — otherwise the cumulative POST/PUT/DELETE mutations across
+      // the file can exceed the 50-per-60s cap by the time this test runs.
+      const ip = { 'X-Forwarded-For': '203.0.113.10' };
+
+      const hook = await prisma.webhook.create({
+        data: {
+          name: `Delete hook ${Date.now()}`,
+          url: 'https://example.com/hook',
+          secret: 'test-secret',
+          enabled: true,
+          events: ['ENTRY_DELETED'],
+          contentTypeIds: [],
+        },
+      });
+
+      const ct = await ensureBlogContentType();
+      const created = (await (
+        await fetch('/api/content-entries', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: cookie,
+            ...ip,
+          },
+          body: JSON.stringify({
+            contentTypeId: ct.id,
+            data: { title: `Delete target ${Date.now()}` },
+          }),
+        })
+      ).json()) as { id: string; data: { title: string } };
+
+      await fetch(`/api/content-entries/${created.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+          ...ip,
+        },
+        body: JSON.stringify({ status: 'PUBLISHED', data: created.data }),
+      });
+
+      const delRes = await fetch(`/api/content-entries/${created.id}`, {
+        method: 'DELETE',
+        headers: { Cookie: cookie, ...ip },
+      });
+      expect(delRes.status).toBe(200);
+
+      const deliveries = await prisma.webhookDelivery.findMany({
+        where: { webhookId: hook.id },
+      });
+      const match = deliveries.find(
+        (d) => d.event === 'ENTRY_DELETED' && d.entryId === created.id
+      );
+      expect(match).toBeDefined();
+      expect(match!.status).toBe('PENDING');
+
+      const payload = match!.payload as {
+        event: string;
+        entry: { status: string; data: { title: string } };
+      };
+      expect(payload.event).toBe('ENTRY_DELETED');
+      expect(payload.entry.status).toBe('PUBLISHED');
+      expect(payload.entry.data.title).toBe(created.data.title);
+    });
+
+    it('does not enqueue when deleting a draft-only entry', async () => {
+      const cookie = await getSessionCookie();
+      const ip = { 'X-Forwarded-For': '203.0.113.11' };
+
+      const hook = await prisma.webhook.create({
+        data: {
+          name: `Delete-draft hook ${Date.now()}`,
+          url: 'https://example.com/hook',
+          secret: 'test-secret',
+          enabled: true,
+          events: ['ENTRY_DELETED'],
+          contentTypeIds: [],
+        },
+      });
+
+      const ct = await ensureBlogContentType();
+      const created = (await (
+        await fetch('/api/content-entries', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: cookie,
+            ...ip,
+          },
+          body: JSON.stringify({
+            contentTypeId: ct.id,
+            data: { title: `Draft only ${Date.now()}` },
+          }),
+        })
+      ).json()) as { id: string };
+
+      await fetch(`/api/content-entries/${created.id}`, {
+        method: 'DELETE',
+        headers: { Cookie: cookie, ...ip },
+      });
+
+      const deliveries = await prisma.webhookDelivery.findMany({
+        where: { webhookId: hook.id },
+      });
+      expect(deliveries.length).toBe(0);
+    });
+  });
 });
