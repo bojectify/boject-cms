@@ -67,7 +67,7 @@ export function isPrivateHost(host: string): boolean {
 // hostname literal, so a public hostname that DNS-resolves to a private IP
 // (e.g. `localtest.me` → 127.0.0.1) bypasses this check. A full fix needs
 // DNS resolution at both validate-time AND dispatch-time. See GitHub issue
-// #TODO.
+// #103.
 export function assertWebhookUrl(input: string): URL {
   let url: URL;
   try {
