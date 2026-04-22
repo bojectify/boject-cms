@@ -3,6 +3,7 @@ import { assertUuid } from '../../utils/validation';
 import { withPrismaErrors } from '../../utils/prismaErrors';
 import { enforceMutationRateLimit } from '../../utils/rateLimitEndpoint';
 import { assertUniqueFieldValues } from '../../utils/assertUniqueFieldValues';
+import { enqueueWebhookDeliveries } from '../../utils/webhooks';
 import {
   isCmsRequest,
   getDraftVersion,
@@ -237,6 +238,30 @@ async function publishFlow(
         await tx.contentEntry.update({
           where: { id: entry.id },
           data: { slug, entryTitle },
+        });
+
+        // Re-read the canonical published version inside this transaction so
+        // the snapshot matches what consumers would see via GraphQL/REST.
+        const published = await tx.contentEntryVersion.findFirstOrThrow({
+          where: { entryId: entry.id, status: 'PUBLISHED' },
+        });
+        const ct = await tx.contentType.findUniqueOrThrow({
+          where: { id: entry.contentTypeId },
+          select: { id: true, identifier: true },
+        });
+        await enqueueWebhookDeliveries(tx, {
+          event: 'ENTRY_PUBLISHED',
+          contentType: ct,
+          entry: {
+            id: entry.id,
+            entryTitle,
+            slug,
+            status: 'PUBLISHED',
+            publishedAt: published.publishedAt,
+            createdAt: entry.createdAt,
+            updatedAt: new Date(),
+            data: published.data,
+          },
         });
       }),
     {

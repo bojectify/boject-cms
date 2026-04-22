@@ -1,7 +1,38 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { setup, $fetch, fetch } from '@nuxt/test-utils/e2e';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { PrismaClient } from '../../../generated/prisma/client';
 import { TEST_USERNAME, TEST_PASSWORD } from '../../test/credentials';
 import { resetRateLimitStore } from '../../utils/rateLimit';
+
+const prismaUrl = 'postgresql://boject:boject@localhost:5432/boject_test';
+const prismaAdapter = new PrismaPg({ connectionString: prismaUrl });
+const prisma = new PrismaClient({ adapter: prismaAdapter });
+
+async function ensureBlogContentType(): Promise<{ id: string }> {
+  const existing = await prisma.contentType.findUnique({
+    where: { identifier: 'WebhookBlog' },
+  });
+  if (existing) return existing;
+  return prisma.contentType.create({
+    data: {
+      identifier: 'WebhookBlog',
+      name: 'Webhook Blog',
+      fields: {
+        create: [
+          {
+            identifier: 'title',
+            name: 'Title',
+            type: 'ENTRY_TITLE',
+            order: 0,
+            required: true,
+            unique: true,
+          },
+        ],
+      },
+    },
+  });
+}
 
 const TEST_API_KEY = 'boject_test_key_for_integration_tests_only';
 
@@ -1408,6 +1439,129 @@ describe('Content Entry endpoints', async () => {
       expect(payload.error).toBe('UNIQUE_CONFLICT');
       expect(payload.field).toBe('sku');
       expect(payload.value).toBe('SHAPE-1');
+    });
+  });
+
+  describe('Webhook ENTRY_PUBLISHED wiring', () => {
+    it('inserts a WebhookDelivery row when a matching webhook is enabled', async () => {
+      const cookie = await getSessionCookie();
+
+      const hook = await prisma.webhook.create({
+        data: {
+          name: `Publish hook ${Date.now()}`,
+          url: 'https://example.com/hook',
+          secret: 'test-secret',
+          enabled: true,
+          events: ['ENTRY_PUBLISHED'],
+          contentTypeIds: [],
+        },
+      });
+
+      const ct = await ensureBlogContentType();
+      const createRes = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify({
+          contentTypeId: ct.id,
+          data: { title: `Hook target ${Date.now()}` },
+        }),
+      });
+      const created = (await createRes.json()) as {
+        id: string;
+        data: { title: string };
+      };
+
+      const publishRes = await fetch(`/api/content-entries/${created.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify({ status: 'PUBLISHED', data: created.data }),
+      });
+      expect(publishRes.status).toBe(200);
+
+      const deliveries = await prisma.webhookDelivery.findMany({
+        where: { webhookId: hook.id },
+      });
+      expect(
+        deliveries.some(
+          (d) => d.event === 'ENTRY_PUBLISHED' && d.entryId === created.id
+        )
+      ).toBe(true);
+    });
+
+    it('does not enqueue when the webhook event filter excludes the event', async () => {
+      const cookie = await getSessionCookie();
+
+      const hook = await prisma.webhook.create({
+        data: {
+          name: `Delete-only hook ${Date.now()}`,
+          url: 'https://example.com/hook',
+          secret: 'test-secret',
+          enabled: true,
+          events: ['ENTRY_DELETED'],
+          contentTypeIds: [],
+        },
+      });
+
+      const ct = await ensureBlogContentType();
+      const created = (await (
+        await fetch('/api/content-entries', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Cookie: cookie },
+          body: JSON.stringify({
+            contentTypeId: ct.id,
+            data: { title: `Filter test ${Date.now()}` },
+          }),
+        })
+      ).json()) as { id: string; data: { title: string } };
+
+      await fetch(`/api/content-entries/${created.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify({ status: 'PUBLISHED', data: created.data }),
+      });
+
+      const deliveries = await prisma.webhookDelivery.findMany({
+        where: { webhookId: hook.id },
+      });
+      expect(deliveries.length).toBe(0);
+    });
+
+    it('does not enqueue when the webhook is disabled', async () => {
+      const cookie = await getSessionCookie();
+
+      const hook = await prisma.webhook.create({
+        data: {
+          name: `Disabled hook ${Date.now()}`,
+          url: 'https://example.com/hook',
+          secret: 'test-secret',
+          enabled: false,
+          events: ['ENTRY_PUBLISHED'],
+          contentTypeIds: [],
+        },
+      });
+
+      const ct = await ensureBlogContentType();
+      const created = (await (
+        await fetch('/api/content-entries', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Cookie: cookie },
+          body: JSON.stringify({
+            contentTypeId: ct.id,
+            data: { title: `Disabled test ${Date.now()}` },
+          }),
+        })
+      ).json()) as { id: string; data: { title: string } };
+
+      await fetch(`/api/content-entries/${created.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify({ status: 'PUBLISHED', data: created.data }),
+      });
+
+      const deliveries = await prisma.webhookDelivery.findMany({
+        where: { webhookId: hook.id },
+      });
+      expect(deliveries.length).toBe(0);
     });
   });
 });
