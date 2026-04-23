@@ -2464,4 +2464,47 @@ describe('Content Entry endpoints', async () => {
       expect(allList.items.some((i) => i.id === live.id)).toBe(true);
     });
   });
+
+  describe('Relation picker archive exclusion', () => {
+    it('archived entries do not appear in the picker list (archiveFilter=active)', async () => {
+      const cookie = await getSessionCookie();
+      const ip = '203.0.113.61';
+      const ct = await ensureBlogContentType();
+
+      const target = (await (
+        await fetch('/api/content-entries', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: cookie,
+            'X-Forwarded-For': ip,
+          },
+          body: JSON.stringify({
+            contentTypeId: ct.id,
+            data: { title: `Picker target ${Date.now()}` },
+          }),
+        })
+      ).json()) as { id: string; data: { title: string } };
+      await fetch(`/api/content-entries/${target.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+          'X-Forwarded-For': ip,
+        },
+        body: JSON.stringify({ status: 'PUBLISHED', data: target.data }),
+      });
+      await fetch(`/api/content-entries/${target.id}/archive`, {
+        method: 'POST',
+        headers: { Cookie: cookie, 'X-Forwarded-For': ip },
+      });
+
+      const res = await fetch(
+        `/api/content-entries?contentTypeId=${ct.id}&archiveFilter=active`,
+        { headers: { Cookie: cookie, 'X-Forwarded-For': ip } }
+      );
+      const body = (await res.json()) as { items: Array<{ id: string }> };
+      expect(body.items.some((i) => i.id === target.id)).toBe(false);
+    });
+  });
 });
