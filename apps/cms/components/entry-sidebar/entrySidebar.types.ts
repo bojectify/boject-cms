@@ -1,4 +1,5 @@
 import type { BasicComponentProps } from '~/types/basicComponentProps';
+import type { EntryAction } from '~/components/entry-action-menu/entryActionMenu.types';
 
 export type EntryStatus = 'DRAFT' | 'PUBLISHED' | 'CHANGED' | 'ARCHIVED';
 
@@ -7,6 +8,7 @@ export type EntrySidebarProps = BasicComponentProps & {
   isDirty: boolean;
   saving: boolean;
   hasPublishedVersion: boolean;
+  hasArchivedVersion: boolean;
   isNew: boolean;
   entryId: string | null;
   contentTypeName: string;
@@ -18,4 +20,5 @@ export type EntrySidebarProps = BasicComponentProps & {
   onPublish: () => void;
   onDiscardChanges?: () => void;
   onDelete?: () => void;
+  onAction?: (action: EntryAction) => void | Promise<void>;
 };

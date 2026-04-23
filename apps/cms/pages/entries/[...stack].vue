@@ -6,6 +6,7 @@ import {
   type PaneOrchestrator,
 } from '~/composables/paneOrchestrator';
 import { parseStack, stackHref, type PaneSegment } from '~/utils/paneStack';
+import type { EntryAction } from '~/components/entry-action-menu/entryActionMenu.types';
 
 // Key the page by root entry only, so opening/closing panes and
 // replacing a new:<ctid> sentinel with the saved entry id do NOT remount
@@ -88,10 +89,12 @@ const {
   fieldErrors,
   status,
   hasPublishedVersion,
+  hasArchivedVersion,
   publishedAt,
   createdAt,
   updatedAt,
   isDirty,
+  refresh: refreshEntry,
   saveDraft,
   publish,
   discardChanges,
@@ -228,6 +231,68 @@ async function handleDelete() {
   } catch (err: unknown) {
     const message =
       err instanceof Error ? err.message : 'Failed to delete entry.';
+    toast.add({ title: 'Error', description: message, color: 'error' });
+  }
+}
+
+async function handleAction(action: EntryAction) {
+  if (root.value.kind !== 'entry') return;
+  if (action === 'delete') {
+    await handleDelete();
+    return;
+  }
+  const entryId = root.value.entryId;
+  const endpointByAction: Record<
+    Exclude<EntryAction, 'delete'>,
+    { path: string; successTitle: string; successBody: string }
+  > = {
+    unpublish: {
+      path: 'unpublish',
+      successTitle: 'Unpublished',
+      successBody: 'Entry is no longer published.',
+    },
+    republish: {
+      path: 'republish',
+      successTitle: 'Republished',
+      successBody: 'Entry has been republished.',
+    },
+    archive: {
+      path: 'archive',
+      successTitle: 'Archived',
+      successBody: 'Entry has been archived.',
+    },
+    unarchive: {
+      path: 'unarchive',
+      successTitle: 'Unarchived',
+      successBody: 'Entry has been unarchived.',
+    },
+  };
+  const spec = endpointByAction[action];
+  try {
+    await $fetch(`/api/content-entries/${entryId}/${spec.path}`, {
+      method: 'POST',
+    });
+    await refreshEntry();
+    toast.add({
+      title: spec.successTitle,
+      description: spec.successBody,
+      color: 'success',
+    });
+  } catch (err: unknown) {
+    const statusCode = (err as { statusCode?: number })?.statusCode;
+    const data = (err as { data?: { error?: string } })?.data;
+    if (action === 'archive' && statusCode === 409) {
+      const msg =
+        data?.error === 'DRAFT_PRESENT'
+          ? 'Discard the draft before archiving this entry.'
+          : ((err as { statusMessage?: string })?.statusMessage ??
+            'Cannot archive entry right now.');
+      toast.add({ title: 'Cannot archive', description: msg, color: 'error' });
+      return;
+    }
+    const message =
+      (err as { statusMessage?: string })?.statusMessage ??
+      (err instanceof Error ? err.message : `Failed to ${action} entry.`);
     toast.add({ title: 'Error', description: message, color: 'error' });
   }
 }
@@ -538,6 +603,7 @@ function handlePaneSaved(
         :is-dirty="isDirty"
         :saving="isSaving"
         :has-published-version="hasPublishedVersion"
+        :has-archived-version="hasArchivedVersion"
         :is-new="isNew"
         :entry-id="root.kind === 'entry' ? root.entryId : null"
         :content-type-name="contentType?.name ?? ''"
@@ -549,6 +615,7 @@ function handlePaneSaved(
         :on-publish="handlePublish"
         :on-discard-changes="handleDiscardChanges"
         :on-delete="root.kind === 'entry' ? handleDelete : undefined"
+        :on-action="root.kind === 'entry' ? handleAction : undefined"
       />
     </div>
 

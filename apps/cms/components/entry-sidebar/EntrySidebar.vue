@@ -98,16 +98,25 @@ async function copyEntryId() {
   >
     <!-- Actions -->
     <div class="flex flex-col gap-2">
-      <UButton
-        block
-        :loading="saving && !secondaryVisible"
-        :disabled="primaryDisabled"
-        icon="i-lucide-send"
-        :data-testid="QA_ENTRY_SIDEBAR.PUBLISH_BTN"
-        @click="onPublish"
-      >
-        {{ primaryLabel }}
-      </UButton>
+      <div class="flex items-start gap-2">
+        <UButton
+          block
+          class="flex-1"
+          :loading="saving && !secondaryVisible"
+          :disabled="primaryDisabled"
+          icon="i-lucide-send"
+          :data-testid="QA_ENTRY_SIDEBAR.PUBLISH_BTN"
+          @click="onPublish"
+        >
+          {{ primaryLabel }}
+        </UButton>
+        <EntryActionMenu
+          v-if="!isNew && entryId"
+          :has-published-version="hasPublishedVersion"
+          :has-archived-version="hasArchivedVersion"
+          @action="(action) => onAction?.(action)"
+        />
+      </div>
       <UButton
         v-if="secondaryVisible"
         block

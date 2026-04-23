@@ -45,6 +45,7 @@ const {
   fieldErrors,
   status,
   hasPublishedVersion,
+  hasArchivedVersion,
   publishedAt,
   createdAt,
   updatedAt,
@@ -293,6 +294,7 @@ defineExpose({ isDirty, applyFieldUpdate });
             :is-dirty="isDirty"
             :saving="isSaving"
             :has-published-version="hasPublishedVersion"
+            :has-archived-version="hasArchivedVersion"
             :is-new="isNew"
             :entry-id="props.entryId ?? null"
             :content-type-name="contentType?.name ?? ''"
