@@ -379,4 +379,116 @@ describe('Webhooks REST', async () => {
       expect(res.status).toBe(403);
     });
   });
+
+  describe('GET /api/webhooks/:id/deliveries', () => {
+    it('returns paginated deliveries for a webhook', async () => {
+      const cookie = await getSessionCookie();
+      const hook = (await (
+        await fetch('/api/webhooks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Cookie: cookie },
+          body: JSON.stringify({
+            name: 'D-1',
+            url: 'https://example.com/x',
+            events: ['ENTRY_PUBLISHED'],
+          }),
+        })
+      ).json()) as { id: string };
+
+      // Trigger a test delivery so we have something in the list.
+      await fetch(`/api/webhooks/${hook.id}/test`, {
+        method: 'POST',
+        headers: { Cookie: cookie },
+      });
+
+      const res = await fetch(`/api/webhooks/${hook.id}/deliveries`, {
+        headers: { Cookie: cookie },
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        items: Array<{ event: string; status: string; isTest: boolean }>;
+        total: number;
+      };
+      expect(body.items.length).toBeGreaterThan(0);
+      expect(body.total).toBeGreaterThan(0);
+      expect(body.items[0]!.isTest).toBe(true);
+    });
+
+    it('rejects API-key callers', async () => {
+      const res = await fetch(
+        '/api/webhooks/11111111-1111-4111-8111-111111111111/deliveries',
+        {
+          headers: { Authorization: `Bearer ${TEST_API_KEY}` },
+        }
+      );
+      expect(res.status).toBe(403);
+    });
+  });
+
+  describe('POST /api/webhooks/deliveries/:id/retry', () => {
+    it('requeues a FAILED / DEAD_LETTERED delivery as a new PENDING row', async () => {
+      const cookie = await getSessionCookie();
+      const hook = (await (
+        await fetch('/api/webhooks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Cookie: cookie },
+          body: JSON.stringify({
+            name: 'R-1',
+            url: 'https://example.com/x',
+            events: ['ENTRY_PUBLISHED'],
+          }),
+        })
+      ).json()) as { id: string };
+
+      const dead = await prisma.webhookDelivery.create({
+        data: {
+          webhookId: hook.id,
+          event: 'ENTRY_PUBLISHED',
+          contentTypeId: '00000000-0000-0000-0000-000000000000',
+          entryId: '00000000-0000-0000-0000-000000000000',
+          payload: { reused: true },
+          status: 'DEAD_LETTERED',
+          attempts: 6,
+        },
+      });
+
+      const res = await fetch(`/api/webhooks/deliveries/${dead.id}/retry`, {
+        method: 'POST',
+        headers: { Cookie: cookie },
+      });
+      expect(res.status).toBe(201);
+      const { deliveryId } = (await res.json()) as { deliveryId: string };
+      expect(deliveryId).not.toBe(dead.id);
+
+      const requeued = await prisma.webhookDelivery.findUnique({
+        where: { id: deliveryId },
+      });
+      expect(requeued?.status).toBe('PENDING');
+      expect(requeued?.attempts).toBe(0);
+      expect((requeued?.payload as { reused: boolean }).reused).toBe(true);
+    });
+
+    it('returns 404 when delivery does not exist', async () => {
+      const cookie = await getSessionCookie();
+      const res = await fetch(
+        '/api/webhooks/deliveries/11111111-1111-4111-8111-111111111111/retry',
+        {
+          method: 'POST',
+          headers: { Cookie: cookie },
+        }
+      );
+      expect(res.status).toBe(404);
+    });
+
+    it('rejects API-key callers', async () => {
+      const res = await fetch(
+        '/api/webhooks/deliveries/11111111-1111-4111-8111-111111111111/retry',
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${TEST_API_KEY}` },
+        }
+      );
+      expect(res.status).toBe(403);
+    });
+  });
 });
