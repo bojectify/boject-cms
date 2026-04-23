@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 
 interface ContentTypeOption {
   id: string;
@@ -12,6 +12,12 @@ interface CreatedWebhook {
   secret: string;
 }
 
+interface EventOption {
+  value: 'ENTRY_PUBLISHED' | 'ENTRY_UNPUBLISHED' | 'ENTRY_DELETED';
+  label: string;
+  description: string;
+}
+
 const { data: contentTypes } = await useAuthedFetch<{
   items: ContentTypeOption[];
 }>('/api/content-types');
@@ -21,7 +27,7 @@ const form = ref({
   url: '',
   enabled: true,
   contentTypeIds: [] as string[],
-  events: ['ENTRY_PUBLISHED'] as string[],
+  events: ['ENTRY_PUBLISHED'] as EventOption['value'][],
 });
 const created = ref<CreatedWebhook | null>(null);
 const error = ref<string | null>(null);
@@ -43,11 +49,52 @@ async function onSubmit() {
   }
 }
 
-const EVENTS = [
-  { value: 'ENTRY_PUBLISHED', label: 'Entry published' },
-  { value: 'ENTRY_UNPUBLISHED', label: 'Entry unpublished' },
-  { value: 'ENTRY_DELETED', label: 'Entry deleted' },
+const EVENTS: EventOption[] = [
+  {
+    value: 'ENTRY_PUBLISHED',
+    label: 'Entry published',
+    description:
+      'Fires whenever an entry is first published or a change is republished.',
+  },
+  {
+    value: 'ENTRY_DELETED',
+    label: 'Entry deleted',
+    description: 'Fires when a previously-published entry is deleted.',
+  },
+  {
+    value: 'ENTRY_UNPUBLISHED',
+    label: 'Entry unpublished',
+    description:
+      'Fires when an entry is demoted from published (via Unpublish or Archive).',
+  },
 ];
+
+function toggleEvent(value: EventOption['value']) {
+  if (form.value.events.includes(value)) {
+    form.value.events = form.value.events.filter((e) => e !== value);
+  } else {
+    form.value.events = [...form.value.events, value];
+  }
+}
+
+function contentTypeName(id: string): string {
+  return contentTypes.value?.items.find((c) => c.id === id)?.name ?? id;
+}
+
+function addContentType(id: string | null | undefined) {
+  if (!id || form.value.contentTypeIds.includes(id)) return;
+  form.value.contentTypeIds = [...form.value.contentTypeIds, id];
+}
+
+function removeContentType(id: string) {
+  form.value.contentTypeIds = form.value.contentTypeIds.filter((c) => c !== id);
+}
+
+const availableContentTypes = computed(() =>
+  (contentTypes.value?.items ?? [])
+    .filter((c) => !form.value.contentTypeIds.includes(c.id))
+    .map((c) => ({ label: c.name, value: c.id }))
+);
 </script>
 
 <template>
@@ -82,36 +129,71 @@ const EVENTS = [
         class="mb-4"
         help="Leave empty to match every content type."
       >
-        <USelectMenu
-          v-model="form.contentTypeIds"
-          multiple
-          :items="
-            (contentTypes?.items ?? []).map((c) => ({
-              label: c.name,
-              value: c.id,
-            }))
-          "
-          value-key="value"
-          placeholder="All content types"
-          class="w-full"
-        />
+        <div
+          class="flex flex-wrap items-center gap-2 min-h-[38px] px-2 py-1 border border-default rounded-md"
+        >
+          <UBadge
+            v-for="ctId in form.contentTypeIds"
+            :key="ctId"
+            color="primary"
+            variant="subtle"
+          >
+            {{ contentTypeName(ctId) }}
+            <button
+              type="button"
+              class="ml-1 opacity-60 hover:opacity-100"
+              @click="removeContentType(ctId)"
+            >
+              ×
+            </button>
+          </UBadge>
+          <USelect
+            :model-value="undefined"
+            :items="availableContentTypes"
+            value-key="value"
+            label-key="label"
+            placeholder="Add content type…"
+            class="flex-1 border-0"
+            @update:model-value="addContentType"
+          />
+        </div>
       </UFormField>
 
       <UFormField label="Events" class="mb-4">
         <div class="flex flex-col gap-2">
-          <UCheckbox
+          <button
             v-for="ev in EVENTS"
             :key="ev.value"
-            :model-value="form.events.includes(ev.value)"
-            :label="ev.label"
-            @update:model-value="
-              (v) => {
-                form.events = v
-                  ? [...form.events, ev.value]
-                  : form.events.filter((e) => e !== ev.value);
-              }
-            "
-          />
+            type="button"
+            :class="[
+              'flex items-start gap-2.5 rounded-md py-3 px-3.5 text-left transition-colors',
+              form.events.includes(ev.value)
+                ? 'border border-primary bg-primary/5'
+                : 'border border-default hover:border-neutral-300 dark:hover:border-neutral-700',
+            ]"
+            @click="toggleEvent(ev.value)"
+          >
+            <span
+              :class="[
+                'shrink-0 mt-0.5 flex items-center justify-center rounded-sm size-4',
+                form.events.includes(ev.value)
+                  ? 'bg-primary'
+                  : 'border-[1.5px] border-neutral-300 dark:border-neutral-600',
+              ]"
+            >
+              <UIcon
+                v-if="form.events.includes(ev.value)"
+                name="i-lucide-check"
+                class="size-3 text-white"
+              />
+            </span>
+            <span class="flex flex-col gap-0.5">
+              <span class="text-sm text-default font-medium">{{
+                ev.label
+              }}</span>
+              <span class="text-xs text-muted">{{ ev.description }}</span>
+            </span>
+          </button>
         </div>
       </UFormField>
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { useRoute } from 'vue-router';
 
 interface Webhook {
@@ -100,7 +100,62 @@ async function deleteWebhook() {
   navigateTo('/webhooks');
 }
 
-const EVENTS = ['ENTRY_PUBLISHED', 'ENTRY_UNPUBLISHED', 'ENTRY_DELETED'];
+interface EventOption {
+  value: 'ENTRY_PUBLISHED' | 'ENTRY_UNPUBLISHED' | 'ENTRY_DELETED';
+  label: string;
+  description: string;
+}
+
+const EVENTS: EventOption[] = [
+  {
+    value: 'ENTRY_PUBLISHED',
+    label: 'Entry published',
+    description:
+      'Fires whenever an entry is first published or a change is republished.',
+  },
+  {
+    value: 'ENTRY_DELETED',
+    label: 'Entry deleted',
+    description: 'Fires when a previously-published entry is deleted.',
+  },
+  {
+    value: 'ENTRY_UNPUBLISHED',
+    label: 'Entry unpublished',
+    description:
+      'Fires when an entry is demoted from published (via Unpublish or Archive).',
+  },
+];
+
+function toggleEvent(value: EventOption['value']) {
+  if (!data.value) return;
+  if (data.value.events.includes(value)) {
+    data.value.events = data.value.events.filter((e) => e !== value);
+  } else {
+    data.value.events = [...data.value.events, value];
+  }
+}
+
+function contentTypeName(id: string): string {
+  return contentTypes.value?.items.find((c) => c.id === id)?.name ?? id;
+}
+
+function addContentType(id: string | null | undefined) {
+  if (!id || !data.value) return;
+  if (data.value.contentTypeIds.includes(id)) return;
+  data.value.contentTypeIds = [...data.value.contentTypeIds, id];
+}
+
+function removeContentType(id: string) {
+  if (!data.value) return;
+  data.value.contentTypeIds = data.value.contentTypeIds.filter((c) => c !== id);
+}
+
+const availableContentTypes = computed(() =>
+  (contentTypes.value?.items ?? [])
+    .filter((c) => !(data.value?.contentTypeIds ?? []).includes(c.id))
+    .map((c) => ({ label: c.name, value: c.id }))
+);
+
 const statusColor = (s: string) =>
   s === 'SUCCESS'
     ? 'success'
@@ -137,34 +192,70 @@ const statusColor = (s: string) =>
         <UInput v-model="data.url" class="w-full" />
       </UFormField>
       <UFormField label="Content types" class="mb-4">
-        <USelectMenu
-          v-model="data.contentTypeIds"
-          multiple
-          :items="
-            (contentTypes?.items ?? []).map((c) => ({
-              label: c.name,
-              value: c.id,
-            }))
-          "
-          value-key="value"
-          class="w-full"
-        />
+        <div
+          class="flex flex-wrap items-center gap-2 min-h-[38px] px-2 py-1 border border-default rounded-md"
+        >
+          <UBadge
+            v-for="ctId in data.contentTypeIds"
+            :key="ctId"
+            color="primary"
+            variant="subtle"
+          >
+            {{ contentTypeName(ctId) }}
+            <button
+              type="button"
+              class="ml-1 opacity-60 hover:opacity-100"
+              @click="removeContentType(ctId)"
+            >
+              ×
+            </button>
+          </UBadge>
+          <USelect
+            :model-value="undefined"
+            :items="availableContentTypes"
+            value-key="value"
+            label-key="label"
+            placeholder="Add content type…"
+            class="flex-1 border-0"
+            @update:model-value="addContentType"
+          />
+        </div>
       </UFormField>
       <UFormField label="Events" class="mb-4">
         <div class="flex flex-col gap-2">
-          <UCheckbox
+          <button
             v-for="ev in EVENTS"
-            :key="ev"
-            :model-value="data.events.includes(ev)"
-            :label="ev"
-            @update:model-value="
-              (v) => {
-                data!.events = v
-                  ? [...data!.events, ev]
-                  : data!.events.filter((e) => e !== ev);
-              }
-            "
-          />
+            :key="ev.value"
+            type="button"
+            :class="[
+              'flex items-start gap-2.5 rounded-md py-3 px-3.5 text-left transition-colors',
+              data.events.includes(ev.value)
+                ? 'border border-primary bg-primary/5'
+                : 'border border-default hover:border-neutral-300 dark:hover:border-neutral-700',
+            ]"
+            @click="toggleEvent(ev.value)"
+          >
+            <span
+              :class="[
+                'shrink-0 mt-0.5 flex items-center justify-center rounded-sm size-4',
+                data.events.includes(ev.value)
+                  ? 'bg-primary'
+                  : 'border-[1.5px] border-neutral-300 dark:border-neutral-600',
+              ]"
+            >
+              <UIcon
+                v-if="data.events.includes(ev.value)"
+                name="i-lucide-check"
+                class="size-3 text-white"
+              />
+            </span>
+            <span class="flex flex-col gap-0.5">
+              <span class="text-sm text-default font-medium">{{
+                ev.label
+              }}</span>
+              <span class="text-xs text-muted">{{ ev.description }}</span>
+            </span>
+          </button>
         </div>
       </UFormField>
       <UFormField class="mb-6">
