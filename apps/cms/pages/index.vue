@@ -37,7 +37,7 @@ const filterOptions: Array<{ label: string; value: ArchiveFilter }> = [
     :row-link="(row) => `/entries/${row.id}`"
   >
     <template #actions>
-      <UButtonGroup>
+      <UFieldGroup>
         <UButton
           v-for="opt in filterOptions"
           :key="opt.value"
@@ -48,7 +48,7 @@ const filterOptions: Array<{ label: string; value: ArchiveFilter }> = [
         >
           {{ opt.label }}
         </UButton>
-      </UButtonGroup>
+      </UFieldGroup>
     </template>
   </ContentTable>
 </template>
