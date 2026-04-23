@@ -64,7 +64,11 @@ watch(
       const data = await $fetch<{
         items: Array<{ id: string; data: Record<string, unknown> }>;
       }>('/api/content-entries', {
-        query: { contentTypeId: typeId, perPage: 100 },
+        query: {
+          contentTypeId: typeId,
+          perPage: 100,
+          archiveFilter: 'active',
+        },
       });
 
       const typeName =

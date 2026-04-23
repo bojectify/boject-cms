@@ -1,8 +1,16 @@
 <script setup lang="ts">
+type ArchiveFilter = 'active' | 'archived' | 'all';
+
 const route = useRoute();
 const contentTypeId = route.params.id as string;
 
 const page = ref(1);
+const archiveFilter = ref<ArchiveFilter>('active');
+
+// Reset to page 1 when filter changes
+watch(archiveFilter, () => {
+  page.value = 1;
+});
 
 // Fetch the content type to get the name and ENTRY_TITLE field
 const { data: contentType } = await useAuthedFetch<{
@@ -32,8 +40,8 @@ const { data, status } = await useAuthedFetch<{
   }>;
   total: number;
 }>('/api/content-entries', {
-  query: { contentTypeId, page, perPage: 15 },
-  watch: [page],
+  query: { contentTypeId, page, perPage: 15, archiveFilter },
+  watch: [page, archiveFilter],
 });
 
 // Map entries to ContentTable format (extract entryTitle from JSONB data)
@@ -47,6 +55,12 @@ const tableData = computed(() =>
     updatedAt: item.updatedAt,
   }))
 );
+
+const filterOptions: Array<{ label: string; value: ArchiveFilter }> = [
+  { label: 'Active', value: 'active' },
+  { label: 'Archived', value: 'archived' },
+  { label: 'All', value: 'all' },
+];
 </script>
 
 <template>
@@ -59,9 +73,23 @@ const tableData = computed(() =>
     :row-link="(row) => `/entries/${row.id}`"
   >
     <template #actions>
-      <UButton :to="`/entries/new:${contentTypeId}`" icon="i-lucide-plus">
-        New Entry
-      </UButton>
+      <div class="flex items-center gap-2">
+        <UButtonGroup>
+          <UButton
+            v-for="opt in filterOptions"
+            :key="opt.value"
+            :color="archiveFilter === opt.value ? 'primary' : 'neutral'"
+            :variant="archiveFilter === opt.value ? 'solid' : 'outline'"
+            size="sm"
+            @click="archiveFilter = opt.value"
+          >
+            {{ opt.label }}
+          </UButton>
+        </UButtonGroup>
+        <UButton :to="`/entries/new:${contentTypeId}`" icon="i-lucide-plus">
+          New Entry
+        </UButton>
+      </div>
     </template>
   </ContentTable>
 </template>

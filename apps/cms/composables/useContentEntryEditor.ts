@@ -42,6 +42,7 @@ export function useContentEntryEditor(
   const fieldErrors = ref<Record<string, string>>({});
   const status = ref<'DRAFT' | 'PUBLISHED' | 'CHANGED' | 'ARCHIVED'>('DRAFT');
   const hasPublishedVersion = ref(false);
+  const hasArchivedVersion = ref(false);
   const publishedAt = ref<string | null>(null);
   const createdAt = ref<string | null>(null);
   const updatedAt = ref<string | null>(null);
@@ -77,6 +78,7 @@ export function useContentEntryEditor(
           'DRAFT';
         hasPublishedVersion.value =
           (val.hasPublishedVersion as boolean) ?? false;
+        hasArchivedVersion.value = (val.hasArchivedVersion as boolean) ?? false;
         publishedAt.value =
           (val.publishedVersionPublishedAt as string | null) ?? null;
         createdAt.value = (val.createdAt as string | null) ?? null;
@@ -238,10 +240,12 @@ export function useContentEntryEditor(
     fieldErrors,
     status,
     hasPublishedVersion,
+    hasArchivedVersion,
     publishedAt,
     createdAt,
     updatedAt,
     isDirty,
+    refresh,
     saveDraft,
     publish,
     discardChanges,
