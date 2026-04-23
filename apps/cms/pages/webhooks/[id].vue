@@ -57,6 +57,28 @@ if (pendingSecret.value) {
 }
 const saving = ref(false);
 
+type DeliveryFilter = 'all' | 'success' | 'failed' | 'dead-lettered';
+const deliveryFilter = ref<DeliveryFilter>('all');
+const deliveryFilterOptions: Array<{ value: DeliveryFilter; label: string }> = [
+  { value: 'all', label: 'All' },
+  { value: 'success', label: 'Success' },
+  { value: 'failed', label: 'Failed' },
+  { value: 'dead-lettered', label: 'Dead-lettered' },
+];
+const filteredDeliveries = computed(() => {
+  const items = deliveriesData.value?.items ?? [];
+  switch (deliveryFilter.value) {
+    case 'success':
+      return items.filter((d) => d.status === 'SUCCESS');
+    case 'failed':
+      return items.filter((d) => d.status === 'FAILED');
+    case 'dead-lettered':
+      return items.filter((d) => d.status === 'DEAD_LETTERED');
+    default:
+      return items;
+  }
+});
+
 // Live-update the delivery log while retries are in flight: poll every
 // POLL_INTERVAL_MS whenever any row is PENDING and the tab is visible. The
 // worker polls its queue every 1s, so 2.5s here gives a 2.5–3.5s perceived
@@ -245,7 +267,7 @@ const statusColor = (s: string) =>
 </script>
 
 <template>
-  <div v-if="data" class="p-6 max-w-4xl">
+  <div v-if="data" class="p-6 max-w-6xl">
     <div class="flex items-center justify-between mb-6">
       <h1 class="text-2xl font-semibold">{{ data.name }}</h1>
       <div class="flex gap-2">
@@ -337,14 +359,28 @@ const statusColor = (s: string) =>
         </div>
       </UFormField>
       <UFormField class="mb-6">
-        <UCheckbox v-model="data.enabled" label="Enabled" />
+        <USwitch v-model="data.enabled" label="Enabled" />
       </UFormField>
       <UButton type="submit" :loading="saving">Save changes</UButton>
     </UForm>
 
-    <h2 class="text-xl font-semibold mb-3">Delivery log</h2>
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-xl font-semibold">Delivery log</h2>
+      <UFieldGroup>
+        <UButton
+          v-for="opt in deliveryFilterOptions"
+          :key="opt.value"
+          :color="deliveryFilter === opt.value ? 'primary' : 'neutral'"
+          :variant="deliveryFilter === opt.value ? 'solid' : 'outline'"
+          size="sm"
+          @click="deliveryFilter = opt.value"
+        >
+          {{ opt.label }}
+        </UButton>
+      </UFieldGroup>
+    </div>
     <UTable
-      :data="deliveriesData?.items ?? []"
+      :data="filteredDeliveries"
       :columns="[
         { accessorKey: 'createdAt', header: 'When' },
         { accessorKey: 'event', header: 'Event' },
