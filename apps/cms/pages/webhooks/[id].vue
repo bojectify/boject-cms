@@ -19,6 +19,7 @@ interface Delivery {
   entryId: string;
   status: string;
   attempts: number;
+  lastRequestHeaders: Record<string, string> | null;
   lastResponseCode: number | null;
   lastResponseBody: string | null;
   lastError: string | null;
@@ -162,6 +163,12 @@ const availableContentTypes = computed(() =>
     .filter((c) => !(data.value?.contentTypeIds ?? []).includes(c.id))
     .map((c) => ({ label: c.name, value: c.id }))
 );
+
+function formatHeaders(headers: Record<string, string>): string {
+  return Object.entries(headers)
+    .map(([k, v]) => `${k}: ${v}`)
+    .join('\n');
+}
 
 const statusColor = (s: string) =>
   s === 'SUCCESS'
@@ -344,6 +351,12 @@ const statusColor = (s: string) =>
           d.lastError ?? d.lastResponseBody ?? ''
         }}</pre
       >
+      <div v-if="d.lastRequestHeaders" class="mb-3">
+        <div class="font-semibold mb-1">Request headers</div>
+        <pre class="whitespace-pre-wrap">{{
+          formatHeaders(d.lastRequestHeaders)
+        }}</pre>
+      </div>
       <div class="font-semibold mb-1">Payload</div>
       <pre>{{ JSON.stringify(d.payload, null, 2) }}</pre>
     </div>

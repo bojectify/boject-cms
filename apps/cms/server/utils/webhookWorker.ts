@@ -1,4 +1,4 @@
-import type { DeliveryStatus, WebhookEvent } from '#prisma';
+import type { DeliveryStatus, Prisma, WebhookEvent } from '#prisma';
 import { signPayload } from './signPayload';
 import { backoffMs, MAX_ATTEMPTS } from './webhookBackoff';
 
@@ -124,17 +124,19 @@ async function dispatch(
   let responseBody: string | null = null;
   let transportError: string | null = null;
 
+  const requestHeaders: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'User-Agent': 'boject-cms',
+    'X-Boject-Event': row.event,
+    'X-Boject-Delivery-Id': row.id,
+    'X-Boject-Timestamp': String(tsSeconds),
+    'X-Boject-Signature': `sha256=${signature}`,
+  };
+
   try {
     const res = await deps.fetch(webhook.url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'boject-cms',
-        'X-Boject-Event': row.event,
-        'X-Boject-Delivery-Id': row.id,
-        'X-Boject-Timestamp': String(tsSeconds),
-        'X-Boject-Signature': `sha256=${signature}`,
-      },
+      headers: requestHeaders,
       body,
       signal: controller.signal,
     });
@@ -157,6 +159,7 @@ async function dispatch(
       data: {
         status: 'SUCCESS',
         attempts,
+        lastRequestHeaders: requestHeaders as unknown as Prisma.InputJsonValue,
         lastResponseCode: responseCode,
         lastResponseBody: responseBody,
         lastError: null,
@@ -174,6 +177,7 @@ async function dispatch(
       data: {
         status: 'DEAD_LETTERED',
         attempts,
+        lastRequestHeaders: requestHeaders as unknown as Prisma.InputJsonValue,
         lastResponseCode: responseCode,
         lastResponseBody: responseBody,
         lastError: transportError,
@@ -192,6 +196,7 @@ async function dispatch(
       data: {
         status: 'PENDING',
         attempts,
+        lastRequestHeaders: requestHeaders as unknown as Prisma.InputJsonValue,
         lastResponseCode: responseCode,
         lastResponseBody: responseBody,
         lastError: transportError,

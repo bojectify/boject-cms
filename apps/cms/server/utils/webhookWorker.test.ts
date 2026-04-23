@@ -11,6 +11,7 @@ type DeliveryRow = {
   status: 'PENDING' | 'SUCCESS' | 'FAILED' | 'DEAD_LETTERED';
   attempts: number;
   nextAttemptAt: Date | null;
+  lastRequestHeaders: Record<string, string> | null;
   lastResponseCode: number | null;
   lastResponseBody: string | null;
   lastError: string | null;
@@ -58,6 +59,7 @@ const baseDelivery: DeliveryRow = {
   status: 'PENDING',
   attempts: 0,
   nextAttemptAt: new Date(0),
+  lastRequestHeaders: null,
   lastResponseCode: null,
   lastResponseBody: null,
   lastError: null,
@@ -148,6 +150,7 @@ describe('runWorkerTick', () => {
     expect(sentHeaders['X-Boject-Timestamp']).toBe('1700000000');
     expect(sentHeaders['X-Boject-Signature']).toMatch(/^sha256=[0-9a-f]{64}$/);
     expect(sentBody).toBe(JSON.stringify({ hello: 'world' }));
+    expect(deliveries[0]!.lastRequestHeaders).toEqual(sentHeaders);
   });
 
   it('marks delivery FAILED when webhook no longer exists', async () => {

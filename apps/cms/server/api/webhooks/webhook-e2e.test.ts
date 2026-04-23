@@ -170,6 +170,14 @@ describe('Webhook delivery E2E', async () => {
       expect(parsed.event).toBe('ENTRY_PUBLISHED');
       expect(parsed.entry.status).toBe('PUBLISHED');
       expect(parsed.entry.data.title).toBe(entry.data.title);
+
+      const row = await prisma.webhookDelivery.findFirstOrThrow({
+        where: { webhookId: hook.id },
+      });
+      expect(row.lastRequestHeaders).toMatchObject({
+        'Content-Type': 'application/json',
+        'X-Boject-Event': 'ENTRY_PUBLISHED',
+      });
     } finally {
       server.close();
     }

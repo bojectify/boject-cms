@@ -35,6 +35,7 @@ model WebhookDelivery {
   status           DeliveryStatus @default(PENDING)
   attempts         Int            @default(0)
   nextAttemptAt    DateTime?
+  lastRequestHeaders Json?
   lastResponseCode Int?
   lastResponseBody String?
   lastError        String?
