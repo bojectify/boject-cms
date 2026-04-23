@@ -2375,4 +2375,93 @@ describe('Content Entry endpoints', async () => {
       expect(res.status).toBe(403);
     });
   });
+
+  describe('GET /api/content-entries archiveFilter', () => {
+    it('excludes archived entries by default (archiveFilter=active)', async () => {
+      const cookie = await getSessionCookie();
+      const ip = '203.0.113.60';
+      const ct = await ensureBlogContentType();
+
+      const live = (await (
+        await fetch('/api/content-entries', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: cookie,
+            'X-Forwarded-For': ip,
+          },
+          body: JSON.stringify({
+            contentTypeId: ct.id,
+            data: { title: `Live ${Date.now()}` },
+          }),
+        })
+      ).json()) as { id: string; data: { title: string } };
+      await fetch(`/api/content-entries/${live.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+          'X-Forwarded-For': ip,
+        },
+        body: JSON.stringify({ status: 'PUBLISHED', data: live.data }),
+      });
+
+      const archived = (await (
+        await fetch('/api/content-entries', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: cookie,
+            'X-Forwarded-For': ip,
+          },
+          body: JSON.stringify({
+            contentTypeId: ct.id,
+            data: { title: `Arc ${Date.now()}` },
+          }),
+        })
+      ).json()) as { id: string; data: { title: string } };
+      await fetch(`/api/content-entries/${archived.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+          'X-Forwarded-For': ip,
+        },
+        body: JSON.stringify({ status: 'PUBLISHED', data: archived.data }),
+      });
+      await fetch(`/api/content-entries/${archived.id}/archive`, {
+        method: 'POST',
+        headers: { Cookie: cookie, 'X-Forwarded-For': ip },
+      });
+
+      const defaultList = (await (
+        await fetch(`/api/content-entries?contentTypeId=${ct.id}`, {
+          headers: { Cookie: cookie, 'X-Forwarded-For': ip },
+        })
+      ).json()) as { items: Array<{ id: string }> };
+      expect(defaultList.items.some((i) => i.id === archived.id)).toBe(false);
+      expect(defaultList.items.some((i) => i.id === live.id)).toBe(true);
+
+      const archivedList = (await (
+        await fetch(
+          `/api/content-entries?contentTypeId=${ct.id}&archiveFilter=archived`,
+          { headers: { Cookie: cookie, 'X-Forwarded-For': ip } }
+        )
+      ).json()) as { items: Array<{ id: string; status: string }> };
+      expect(archivedList.items.some((i) => i.id === archived.id)).toBe(true);
+      expect(archivedList.items.some((i) => i.id === live.id)).toBe(false);
+      expect(archivedList.items.every((i) => i.status === 'ARCHIVED')).toBe(
+        true
+      );
+
+      const allList = (await (
+        await fetch(
+          `/api/content-entries?contentTypeId=${ct.id}&archiveFilter=all`,
+          { headers: { Cookie: cookie, 'X-Forwarded-For': ip } }
+        )
+      ).json()) as { items: Array<{ id: string }> };
+      expect(allList.items.some((i) => i.id === archived.id)).toBe(true);
+      expect(allList.items.some((i) => i.id === live.id)).toBe(true);
+    });
+  });
 });
