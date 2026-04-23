@@ -491,4 +491,106 @@ describe('Webhooks REST', async () => {
       expect(res.status).toBe(403);
     });
   });
+
+  describe('POST /api/webhooks/deliveries/:id/cancel', () => {
+    it('cancels a PENDING delivery that has at least one attempt', async () => {
+      const cookie = await getSessionCookie();
+      const hook = (await (
+        await fetch('/api/webhooks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Cookie: cookie },
+          body: JSON.stringify({
+            name: `C-1 ${Date.now()}`,
+            url: 'https://example.com/x',
+            events: ['ENTRY_PUBLISHED'],
+          }),
+        })
+      ).json()) as { id: string };
+
+      const pending = await prisma.webhookDelivery.create({
+        data: {
+          webhookId: hook.id,
+          event: 'ENTRY_PUBLISHED',
+          contentTypeId: '00000000-0000-0000-0000-000000000000',
+          entryId: '00000000-0000-0000-0000-000000000000',
+          payload: { hello: 'world' },
+          status: 'PENDING',
+          attempts: 2,
+          nextAttemptAt: new Date(Date.now() + 60_000),
+          lastResponseCode: 500,
+        },
+      });
+
+      const res = await fetch(`/api/webhooks/deliveries/${pending.id}/cancel`, {
+        method: 'POST',
+        headers: { Cookie: cookie },
+      });
+      expect(res.status).toBe(200);
+
+      const cancelled = await prisma.webhookDelivery.findUniqueOrThrow({
+        where: { id: pending.id },
+      });
+      expect(cancelled.status).toBe('FAILED');
+      expect(cancelled.lastError).toBe('Cancelled by editor');
+      expect(cancelled.completedAt).toBeInstanceOf(Date);
+      expect(cancelled.nextAttemptAt).toBeNull();
+      expect(cancelled.attempts).toBe(2);
+    });
+
+    it('returns 409 when the delivery is already SUCCESS', async () => {
+      const cookie = await getSessionCookie();
+      const hook = (await (
+        await fetch('/api/webhooks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Cookie: cookie },
+          body: JSON.stringify({
+            name: `C-2 ${Date.now()}`,
+            url: 'https://example.com/x',
+            events: ['ENTRY_PUBLISHED'],
+          }),
+        })
+      ).json()) as { id: string };
+
+      const done = await prisma.webhookDelivery.create({
+        data: {
+          webhookId: hook.id,
+          event: 'ENTRY_PUBLISHED',
+          contentTypeId: '00000000-0000-0000-0000-000000000000',
+          entryId: '00000000-0000-0000-0000-000000000000',
+          payload: {},
+          status: 'SUCCESS',
+          attempts: 1,
+          completedAt: new Date(),
+        },
+      });
+
+      const res = await fetch(`/api/webhooks/deliveries/${done.id}/cancel`, {
+        method: 'POST',
+        headers: { Cookie: cookie },
+      });
+      expect(res.status).toBe(409);
+      const body = (await res.json()) as { data?: { error?: string } };
+      expect(body.data?.error).toBe('ALREADY_COMPLETED');
+    });
+
+    it('returns 404 when the delivery does not exist', async () => {
+      const cookie = await getSessionCookie();
+      const res = await fetch(
+        '/api/webhooks/deliveries/11111111-1111-4111-8111-111111111111/cancel',
+        { method: 'POST', headers: { Cookie: cookie } }
+      );
+      expect(res.status).toBe(404);
+    });
+
+    it('rejects API-key callers', async () => {
+      const res = await fetch(
+        '/api/webhooks/deliveries/11111111-1111-4111-8111-111111111111/cancel',
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${TEST_API_KEY}` },
+        }
+      );
+      expect(res.status).toBe(403);
+    });
+  });
 });
