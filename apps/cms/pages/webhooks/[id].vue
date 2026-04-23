@@ -41,7 +41,14 @@ const { data: contentTypes } = await useAuthedFetch<{
   items: Array<{ id: string; name: string }>;
 }>('/api/content-types');
 
-const rotatedSecret = ref<string | null>(null);
+const pendingSecret = useState<string | null>(
+  'webhooks:pendingSecret',
+  () => null
+);
+const rotatedSecret = ref<string | null>(pendingSecret.value);
+if (pendingSecret.value) {
+  pendingSecret.value = null;
+}
 const saving = ref(false);
 const expanded = ref<string | null>(null);
 

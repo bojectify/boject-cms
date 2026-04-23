@@ -29,7 +29,6 @@ const form = ref({
   contentTypeIds: [] as string[],
   events: ['ENTRY_PUBLISHED'] as EventOption['value'][],
 });
-const created = ref<CreatedWebhook | null>(null);
 const error = ref<string | null>(null);
 const submitting = ref(false);
 
@@ -41,7 +40,12 @@ async function onSubmit() {
       method: 'POST',
       body: form.value,
     });
-    created.value = res;
+    const pendingSecret = useState<string | null>(
+      'webhooks:pendingSecret',
+      () => null
+    );
+    pendingSecret.value = res.secret;
+    await navigateTo(`/webhooks/${res.id}`);
   } catch (err) {
     error.value = (err as { statusMessage?: string }).statusMessage ?? 'Failed';
   } finally {
@@ -101,12 +105,7 @@ const availableContentTypes = computed(() =>
   <div class="p-6 max-w-2xl">
     <h1 class="text-2xl font-semibold mb-6">New webhook</h1>
 
-    <WebhookSecretReveal v-if="created" :secret="created.secret" />
-    <div v-if="created" class="mb-6">
-      <UButton :to="`/webhooks/${created.id}`">Go to webhook</UButton>
-    </div>
-
-    <UForm v-if="!created" :state="form" @submit="onSubmit">
+    <UForm :state="form" @submit="onSubmit">
       <UFormField label="Name" name="name" class="mb-4">
         <UInput v-model="form.name" required class="w-full" />
       </UFormField>
