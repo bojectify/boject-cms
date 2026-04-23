@@ -366,7 +366,7 @@ const statusColor = (s: string) =>
 
     <div class="flex items-center justify-between mb-3">
       <h2 class="text-xl font-semibold">Delivery log</h2>
-      <UButtonGroup>
+      <UFieldGroup>
         <UButton
           v-for="opt in deliveryFilterOptions"
           :key="opt.value"
@@ -377,7 +377,7 @@ const statusColor = (s: string) =>
         >
           {{ opt.label }}
         </UButton>
-      </UButtonGroup>
+      </UFieldGroup>
     </div>
     <UTable
       :data="filteredDeliveries"

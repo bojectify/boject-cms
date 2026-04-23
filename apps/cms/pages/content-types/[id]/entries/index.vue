@@ -74,7 +74,7 @@ const filterOptions: Array<{ label: string; value: ArchiveFilter }> = [
   >
     <template #actions>
       <div class="flex items-center gap-2">
-        <UButtonGroup>
+        <UFieldGroup>
           <UButton
             v-for="opt in filterOptions"
             :key="opt.value"
@@ -85,7 +85,7 @@ const filterOptions: Array<{ label: string; value: ArchiveFilter }> = [
           >
             {{ opt.label }}
           </UButton>
-        </UButtonGroup>
+        </UFieldGroup>
         <UButton :to="`/entries/new:${contentTypeId}`" icon="i-lucide-plus">
           New Entry
         </UButton>
