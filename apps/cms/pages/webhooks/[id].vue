@@ -170,6 +170,15 @@ function formatHeaders(headers: Record<string, string>): string {
     .join('\n');
 }
 
+function formatResponseBody(body: string | null): string {
+  if (!body) return '';
+  try {
+    return JSON.stringify(JSON.parse(body), null, 2);
+  } catch {
+    return body;
+  }
+}
+
 const statusColor = (s: string) =>
   s === 'SUCCESS'
     ? 'success'
@@ -346,19 +355,24 @@ const statusColor = (s: string) =>
       class="mt-4 border rounded p-4 text-xs"
     >
       <div class="font-semibold mb-1">Response</div>
-      <pre class="mb-3"
-        >{{ d.lastResponseCode ?? 'no response' }} {{
-          d.lastError ?? d.lastResponseBody ?? ''
-        }}</pre
-      >
+      <div class="mb-3">
+        <div class="mb-1">{{ d.lastResponseCode ?? 'no response' }}</div>
+        <pre
+          v-if="d.lastError || d.lastResponseBody"
+          class="whitespace-pre-wrap wrap-anywhere"
+          >{{ d.lastError ?? formatResponseBody(d.lastResponseBody) }}</pre
+        >
+      </div>
       <div v-if="d.lastRequestHeaders" class="mb-3">
         <div class="font-semibold mb-1">Request headers</div>
-        <pre class="whitespace-pre-wrap">{{
+        <pre class="whitespace-pre-wrap wrap-anywhere">{{
           formatHeaders(d.lastRequestHeaders)
         }}</pre>
       </div>
       <div class="font-semibold mb-1">Payload</div>
-      <pre>{{ JSON.stringify(d.payload, null, 2) }}</pre>
+      <pre class="whitespace-pre-wrap wrap-anywhere">{{
+        JSON.stringify(d.payload, null, 2)
+      }}</pre>
     </div>
 
     <div class="mt-12 border-t pt-6">
