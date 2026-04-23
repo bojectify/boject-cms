@@ -39,7 +39,7 @@ Design tokens inferred from the artboards (keep consistent in the Vue implementa
 - Secret reveal banner: `border #fcd34d` on `bg #fffbeb` with warning triangle icon.
 - Danger zone: `border #fecaca` on `bg #fef2f2`; destructive button `border #dc2626` on `bg #ffffff` with `text #b91c1c`.
 
-These should map cleanly to Nuxt UI's `UBadge` colour tokens (`success` / `warning` / `error` / `neutral` / `info`), `UButton` variants, and `UCard`/`UTable` primitives. Use Tailwind utilities or `@apply` rather than inline hex values once translated into Vue. Tasks 23–27 assume these artboards as the source of truth; deviations from them should be justified in a commit message.
+These should map cleanly to Nuxt UI's `UBadge` colour tokens (`success` / `warning` / `error` / `neutral` / `info`), `UButton` variants, and `UCard`/`UTable` primitives. Use Tailwind utilities or `@apply` rather than inline hex values once translated into Vue. Tasks 24–28 assume these artboards as the source of truth; deviations from them should be justified in a commit message.
 
 **Conventions this plan assumes:**
 
@@ -4226,7 +4226,197 @@ git commit -m "test(webhooks): e2e publish/retry + lifecycle event delivery"
 
 ---
 
-### Task 22: Daily Cleanup Scheduled Task
+### Task 22: Cancel Retries Endpoint
+
+**Files:**
+
+- Create: `apps/cms/server/api/webhooks/deliveries/[id]/cancel.post.ts`
+- Modify: `apps/cms/server/api/webhooks/webhooks.test.ts`
+
+Lets the editor stop a delivery that is PENDING and has one or more failed attempts queued for retry. Transitions `PENDING → FAILED` with `lastError: 'Cancelled by editor'`, `completedAt: now`, `nextAttemptAt: null`. Returns 409 if the delivery is already in a terminal state. Near-clone of `retry.post.ts` — 4 levels deep so imports use `../../../../utils/...`.
+
+Worker race: there's a tiny window where the worker picks up the row between the user's click and the endpoint's update. We accept the race — if the worker wins, the dispatch goes through and the cancel's 409s as "already completed". Acceptable for v1; documented in the endpoint's JSDoc.
+
+- [ ] **Step 1: Add failing integration tests**
+
+Append inside the outer `describe('Webhooks REST', …)` in `apps/cms/server/api/webhooks/webhooks.test.ts`:
+
+```typescript
+describe('POST /api/webhooks/deliveries/:id/cancel', () => {
+  it('cancels a PENDING delivery that has at least one attempt', async () => {
+    const cookie = await getSessionCookie();
+    const hook = (await (
+      await fetch('/api/webhooks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify({
+          name: `C-1 ${Date.now()}`,
+          url: 'https://example.com/x',
+          events: ['ENTRY_PUBLISHED'],
+        }),
+      })
+    ).json()) as { id: string };
+
+    // Simulate a row that has failed once and is scheduled for retry.
+    const pending = await prisma.webhookDelivery.create({
+      data: {
+        webhookId: hook.id,
+        event: 'ENTRY_PUBLISHED',
+        contentTypeId: '00000000-0000-0000-0000-000000000000',
+        entryId: '00000000-0000-0000-0000-000000000000',
+        payload: { hello: 'world' },
+        status: 'PENDING',
+        attempts: 2,
+        nextAttemptAt: new Date(Date.now() + 60_000),
+        lastResponseCode: 500,
+      },
+    });
+
+    const res = await fetch(`/api/webhooks/deliveries/${pending.id}/cancel`, {
+      method: 'POST',
+      headers: { Cookie: cookie },
+    });
+    expect(res.status).toBe(200);
+
+    const cancelled = await prisma.webhookDelivery.findUniqueOrThrow({
+      where: { id: pending.id },
+    });
+    expect(cancelled.status).toBe('FAILED');
+    expect(cancelled.lastError).toBe('Cancelled by editor');
+    expect(cancelled.completedAt).toBeInstanceOf(Date);
+    expect(cancelled.nextAttemptAt).toBeNull();
+    expect(cancelled.attempts).toBe(2); // preserved
+  });
+
+  it('returns 409 when the delivery is already SUCCESS', async () => {
+    const cookie = await getSessionCookie();
+    const hook = (await (
+      await fetch('/api/webhooks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify({
+          name: `C-2 ${Date.now()}`,
+          url: 'https://example.com/x',
+          events: ['ENTRY_PUBLISHED'],
+        }),
+      })
+    ).json()) as { id: string };
+
+    const done = await prisma.webhookDelivery.create({
+      data: {
+        webhookId: hook.id,
+        event: 'ENTRY_PUBLISHED',
+        contentTypeId: '00000000-0000-0000-0000-000000000000',
+        entryId: '00000000-0000-0000-0000-000000000000',
+        payload: {},
+        status: 'SUCCESS',
+        attempts: 1,
+        completedAt: new Date(),
+      },
+    });
+
+    const res = await fetch(`/api/webhooks/deliveries/${done.id}/cancel`, {
+      method: 'POST',
+      headers: { Cookie: cookie },
+    });
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { data?: { error?: string } };
+    expect(body.data?.error).toBe('ALREADY_COMPLETED');
+  });
+
+  it('returns 404 when the delivery does not exist', async () => {
+    const cookie = await getSessionCookie();
+    const res = await fetch(
+      '/api/webhooks/deliveries/11111111-1111-4111-8111-111111111111/cancel',
+      { method: 'POST', headers: { Cookie: cookie } }
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it('rejects API-key callers', async () => {
+    const res = await fetch(
+      '/api/webhooks/deliveries/11111111-1111-4111-8111-111111111111/cancel',
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${TEST_API_KEY}` },
+      }
+    );
+    expect(res.status).toBe(403);
+  });
+});
+```
+
+Run: `pnpm --filter cms test:integration -- server/api/webhooks/webhooks.test.ts` — expect the 4 new tests to fail (endpoint missing).
+
+- [ ] **Step 2: Create `apps/cms/server/api/webhooks/deliveries/[id]/cancel.post.ts`**
+
+Note the 4-levels-deep import path (`../../../../utils/...`) — same as `retry.post.ts` which sits in the same directory.
+
+```typescript
+import { assertUuid } from '../../../../utils/validation';
+import { isCmsRequest } from '../../../../utils/resolveVersion';
+import { enforceMutationRateLimit } from '../../../../utils/rateLimitEndpoint';
+
+/**
+ * Cancel a PENDING webhook delivery. Transitions the row to FAILED with
+ * `lastError = 'Cancelled by editor'`. If the delivery is already in a
+ * terminal state (SUCCESS / FAILED / DEAD_LETTERED), returns 409
+ * ALREADY_COMPLETED.
+ *
+ * Race note: a tiny window exists where the worker dispatches the row
+ * between the user's click and this endpoint's update. If the worker
+ * wins, the dispatch goes out and the cancel 409s as ALREADY_COMPLETED.
+ * Acceptable for v1 (single-worker deployments; user sees the consistent
+ * DB state after whichever action completed first).
+ */
+export default defineEventHandler(async (event) => {
+  if (!isCmsRequest(event)) {
+    throw createError({ statusCode: 403, statusMessage: 'Forbidden' });
+  }
+  enforceMutationRateLimit(event, 'webhooks.cancel');
+  const id = assertUuid(getRouterParam(event, 'id'), 'id');
+
+  const delivery = await prisma.webhookDelivery.findUnique({ where: { id } });
+  if (!delivery) {
+    throw createError({ statusCode: 404, statusMessage: 'Delivery not found' });
+  }
+
+  if (delivery.status !== 'PENDING') {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'Delivery is already completed',
+      data: { error: 'ALREADY_COMPLETED' },
+    });
+  }
+
+  const updated = await prisma.webhookDelivery.update({
+    where: { id },
+    data: {
+      status: 'FAILED',
+      lastError: 'Cancelled by editor',
+      completedAt: new Date(),
+      nextAttemptAt: null,
+    },
+  });
+  return updated;
+});
+```
+
+- [ ] **Step 3: Run tests**
+
+Run: `pnpm --filter cms test:integration -- server/api/webhooks/webhooks.test.ts`
+Expected: all 4 new tests pass; pre-existing webhook tests still pass.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add apps/cms/server/api/webhooks/deliveries/[id]/cancel.post.ts apps/cms/server/api/webhooks/webhooks.test.ts
+git commit -m "feat(webhooks): add cancel endpoint for pending deliveries"
+```
+
+---
+
+### Task 23: Daily Cleanup Scheduled Task
 
 **Files:**
 
@@ -4426,7 +4616,7 @@ git commit -m "feat(webhooks): 30-day delivery log cleanup as Nitro scheduled ta
 
 ---
 
-### Task 23: UI — Sidebar Nav Entry
+### Task 24: UI — Sidebar Nav Entry
 
 **Files:**
 
@@ -4444,7 +4634,7 @@ Insert it immediately after the "All Content" item, keeping the `UDivider` betwe
 
 - [ ] **Step 2: Verify the link renders**
 
-Run `pnpm --filter cms dev`, visit `http://localhost:4000`, confirm a "Webhooks" sidebar link appears and routes to `/webhooks` (will 404 until Task 24).
+Run `pnpm --filter cms dev`, visit `http://localhost:4000`, confirm a "Webhooks" sidebar link appears and routes to `/webhooks` (will 404 until Task 25).
 
 - [ ] **Step 3: Commit**
 
@@ -4455,7 +4645,7 @@ git commit -m "feat(webhooks): add Webhooks sidebar nav entry"
 
 ---
 
-### Task 24: UI — List Page
+### Task 25: UI — List Page
 
 **Files:**
 
@@ -4534,7 +4724,7 @@ git commit -m "feat(webhooks): add list page"
 
 ---
 
-### Task 25: UI — Reusable Secret Reveal Panel
+### Task 26: UI — Reusable Secret Reveal Panel
 
 **Files:**
 
@@ -4622,7 +4812,7 @@ git commit -m "feat(webhooks): add reusable one-time secret reveal panel"
 
 ---
 
-### Task 26: UI — Create Page
+### Task 27: UI — Create Page
 
 **Files:**
 
@@ -4747,7 +4937,7 @@ const EVENTS = [
 
 - [ ] **Step 2: Manual verify**
 
-Create one webhook through the UI with `https://example.com/hook`, confirm the secret panel appears once, click "Go to webhook" — it 404s until Task 27 (acceptable).
+Create one webhook through the UI with `https://example.com/hook`, confirm the secret panel appears once, click "Go to webhook" — it 404s until Task 28 (acceptable).
 
 - [ ] **Step 3: Commit**
 
@@ -4758,13 +4948,13 @@ git commit -m "feat(webhooks): add create page with one-time secret reveal"
 
 ---
 
-### Task 27: UI — Detail / Edit Page with Delivery Log
+### Task 28: UI — Detail / Edit Page with Delivery Log
 
 **Files:**
 
 - Create: `apps/cms/pages/webhooks/[id].vue`
 
-This page is intentionally larger — it owns the edit form, rotate secret, send test, delivery log, and retry actions. We still keep it under ~250 lines by delegating the secret reveal to the component built in Task 25.
+This page is intentionally larger — it owns the edit form, rotate secret, send test, delivery log, and retry actions. We still keep it under ~250 lines by delegating the secret reveal to the component built in Task 26.
 
 - [ ] **Step 1: Create the page**
 
@@ -4851,6 +5041,15 @@ async function sendTest() {
 
 async function retry(deliveryId: string) {
   await $fetch(`/api/webhooks/deliveries/${deliveryId}/retry`, {
+    method: 'POST',
+  });
+  await refreshDeliveries();
+}
+
+async function cancel(deliveryId: string) {
+  if (!confirm('Cancel this pending retry? It will not be attempted again.'))
+    return;
+  await $fetch(`/api/webhooks/deliveries/${deliveryId}/cancel`, {
     method: 'POST',
   });
   await refreshDeliveries();
@@ -4978,6 +5177,16 @@ const statusColor = (s: string) =>
             @click="retry(row.original.id)"
             >Retry</UButton
           >
+          <UButton
+            v-if="
+              row.original.status === 'PENDING' && row.original.attempts > 0
+            "
+            size="xs"
+            variant="subtle"
+            color="warning"
+            @click="cancel(row.original.id)"
+            >Cancel</UButton
+          >
         </div>
       </template>
     </UTable>
@@ -5021,7 +5230,7 @@ git commit -m "feat(webhooks): add detail page with delivery log, rotate, test, 
 
 ---
 
-### Task 28: Entry Action Overflow Menu
+### Task 29: Entry Action Overflow Menu
 
 **Files:**
 
@@ -5259,7 +5468,7 @@ git commit -m "feat(lifecycle): add entry overflow action menu"
 
 ---
 
-### Task 29: List-Page Archive Filter Chip
+### Task 30: List-Page Archive Filter Chip
 
 **Files:**
 
@@ -5479,7 +5688,7 @@ git commit -m "feat(lifecycle): add archive filter chip + ARCHIVED badge styling
 
 ---
 
-### Task 30: Entry Picker Archive Filter
+### Task 31: Entry Picker Archive Filter
 
 **Files:**
 
@@ -5530,7 +5739,7 @@ describe('Relation picker archive exclusion', () => {
 - [ ] **Step 2: Run tests**
 
 Run: `pnpm --filter cms test:run -- server/api/content-entries/content-entries.test.ts`
-Expected: the new test passes already (Task 29 implemented the server-side filter).
+Expected: the new test passes already (Task 30 implemented the server-side filter).
 
 - [ ] **Step 3: Update `EntryPickerModal.vue`'s list fetch to pass `archiveFilter=active`**
 
@@ -5557,7 +5766,7 @@ git commit -m "feat(lifecycle): exclude archived entries from the relation picke
 
 ---
 
-### Task 31: CLAUDE.md Documentation
+### Task 32: CLAUDE.md Documentation
 
 **Files:**
 
@@ -5635,7 +5844,7 @@ git commit -m "docs: document webhooks + entry lifecycle architecture and endpoi
 
 ---
 
-### Task 32: Verification Pass
+### Task 33: Verification Pass
 
 - [ ] **Step 1: Full test suite**
 
