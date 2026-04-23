@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 
 interface Webhook {
@@ -52,6 +52,57 @@ if (pendingSecret.value) {
 }
 const saving = ref(false);
 const expanded = ref<string | null>(null);
+
+// Live-update the delivery log while retries are in flight: poll every
+// POLL_INTERVAL_MS whenever any row is PENDING and the tab is visible. The
+// worker polls its queue every 1s, so 2.5s here gives a 2.5–3.5s perceived
+// lag between a retry firing and the UI catching up.
+const POLL_INTERVAL_MS = 2500;
+const hasPending = computed(() =>
+  (deliveriesData.value?.items ?? []).some((d) => d.status === 'PENDING')
+);
+let pollTimer: ReturnType<typeof setInterval> | null = null;
+
+function startPolling() {
+  if (pollTimer) return;
+  pollTimer = setInterval(() => {
+    if (document.visibilityState === 'visible') {
+      refreshDeliveries();
+    }
+  }, POLL_INTERVAL_MS);
+}
+
+function stopPolling() {
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+}
+
+function onVisibilityChange() {
+  if (document.visibilityState === 'visible' && hasPending.value) {
+    refreshDeliveries();
+  }
+}
+
+onMounted(() => {
+  watch(
+    hasPending,
+    (pending) => {
+      if (pending) startPolling();
+      else stopPolling();
+    },
+    { immediate: true }
+  );
+  document.addEventListener('visibilitychange', onVisibilityChange);
+});
+
+onUnmounted(() => {
+  stopPolling();
+  if (typeof document !== 'undefined') {
+    document.removeEventListener('visibilitychange', onVisibilityChange);
+  }
+});
 
 async function save() {
   if (!data.value) return;
