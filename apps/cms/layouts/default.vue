@@ -15,6 +15,7 @@ async function logout() {
 
 const navItems: NavigationMenuItem[] = [
   { label: 'All Content', icon: 'i-lucide-layout-grid', to: '/' },
+  { label: 'Webhooks', icon: 'i-lucide-webhook', to: '/webhooks' },
 ];
 
 // Dynamic content types section

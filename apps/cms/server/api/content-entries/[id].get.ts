@@ -33,6 +33,9 @@ export default defineEventHandler(async (event) => {
   }
 
   const publishedVersion = getPublishedVersion(entry.versions);
+  const hasArchivedVersion = entry.versions.some(
+    (v) => v.status === 'ARCHIVED'
+  );
 
   return flattenEntryWithVersion(entry, version, {
     contentType: entry.contentType,
@@ -40,6 +43,7 @@ export default defineEventHandler(async (event) => {
       ? {
           hasPublishedVersion: publishedVersion !== null,
           publishedVersionPublishedAt: publishedVersion?.publishedAt ?? null,
+          hasArchivedVersion,
         }
       : {}),
   });

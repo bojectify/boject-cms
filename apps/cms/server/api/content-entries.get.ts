@@ -1,4 +1,4 @@
-import type { Prisma } from '#prisma';
+import type { Prisma, ContentEntryVersion } from '#prisma';
 import { assertUuid } from '../utils/validation';
 import {
   isCmsRequest,
@@ -12,6 +12,9 @@ const VALID_STATUSES = new Set<string>([
   'CHANGED',
   'ARCHIVED',
 ]);
+
+const VALID_ARCHIVE_FILTERS = ['active', 'archived', 'all'] as const;
+type ArchiveFilter = (typeof VALID_ARCHIVE_FILTERS)[number];
 
 export default defineEventHandler(async (event) => {
   const query = getQuery(event);
@@ -30,6 +33,12 @@ export default defineEventHandler(async (event) => {
   const isCms = isCmsRequest(event);
   const where: Prisma.ContentEntryWhereInput = { contentTypeId };
 
+  const archiveFilter: ArchiveFilter =
+    typeof query.archiveFilter === 'string' &&
+    (VALID_ARCHIVE_FILTERS as readonly string[]).includes(query.archiveFilter)
+      ? (query.archiveFilter as ArchiveFilter)
+      : 'active';
+
   if (isCms) {
     // CMS: filter by status on versions if requested
     if (typeof query.status === 'string' && VALID_STATUSES.has(query.status)) {
@@ -42,9 +51,15 @@ export default defineEventHandler(async (event) => {
             | 'ARCHIVED',
         },
       };
+    } else if (archiveFilter === 'archived') {
+      where.versions = { some: { status: 'ARCHIVED' } };
+    } else if (archiveFilter === 'active') {
+      where.versions = { none: { status: 'ARCHIVED' } };
     }
+    // 'all': leave where.versions alone
   } else {
     // API key: only return entries that have a PUBLISHED version
+    // (existing PUBLISHED filter already excludes archived)
     where.versions = { some: { status: 'PUBLISHED' } };
   }
 
@@ -61,7 +76,15 @@ export default defineEventHandler(async (event) => {
 
   const items = entries
     .map((entry) => {
-      const version = getVersionForContext(entry.versions, isCms);
+      let version: ContentEntryVersion | undefined;
+      if (isCms && archiveFilter === 'archived') {
+        version = entry.versions.find((v) => v.status === 'ARCHIVED');
+      } else {
+        version = getVersionForContext(entry.versions, isCms) ?? undefined;
+        if (!version && isCms && archiveFilter === 'all') {
+          version = entry.versions.find((v) => v.status === 'ARCHIVED');
+        }
+      }
       if (!version) return null;
       return flattenEntryWithVersion(entry, version);
     })

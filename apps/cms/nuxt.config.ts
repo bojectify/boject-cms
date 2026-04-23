@@ -156,5 +156,9 @@ export default defineNuxtConfig({
       },
     },
     storage: buildStorageConfig(),
+    experimental: { tasks: true },
+    scheduledTasks: {
+      '0 3 * * *': ['webhooks:cleanup'],
+    },
   },
 });
