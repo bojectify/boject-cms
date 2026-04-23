@@ -32,7 +32,12 @@ interface Delivery {
 const route = useRoute();
 const id = route.params.id as string;
 
-const { data, refresh } = await useAuthedFetch<Webhook>(`/api/webhooks/${id}`);
+// `deep: true` is required: Nuxt 4 defaults to a shallowRef, so nested
+// mutations like `data.value.enabled = true` or edits to `data.value.events`
+// from the form UI would not trigger re-renders.
+const { data, refresh } = await useAuthedFetch<Webhook>(`/api/webhooks/${id}`, {
+  deep: true,
+});
 const { data: deliveriesData, refresh: refreshDeliveries } =
   await useAuthedFetch<{
     items: Delivery[];
@@ -51,7 +56,6 @@ if (pendingSecret.value) {
   pendingSecret.value = null;
 }
 const saving = ref(false);
-const expanded = ref<string | null>(null);
 
 // Live-update the delivery log while retries are in flight: poll every
 // POLL_INTERVAL_MS whenever any row is PENDING and the tab is visible. The
@@ -364,14 +368,8 @@ const statusColor = (s: string) =>
       </template>
       <template #actions-cell="{ row }">
         <div class="flex gap-1">
-          <UButton
-            size="xs"
-            variant="ghost"
-            @click="
-              expanded = expanded === row.original.id ? null : row.original.id
-            "
-          >
-            {{ expanded === row.original.id ? 'Hide' : 'Show' }}
+          <UButton size="xs" variant="ghost" @click="row.toggleExpanded()">
+            {{ row.getIsExpanded() ? 'Hide' : 'Show' }}
           </UButton>
           <UButton
             v-if="
@@ -397,34 +395,35 @@ const statusColor = (s: string) =>
           </UButton>
         </div>
       </template>
+      <template #expanded="{ row }">
+        <div class="p-4 text-xs">
+          <div class="font-semibold mb-1">Response</div>
+          <div class="mb-3">
+            <div class="mb-1">
+              {{ row.original.lastResponseCode ?? 'no response' }}
+            </div>
+            <pre
+              v-if="row.original.lastError || row.original.lastResponseBody"
+              class="whitespace-pre-wrap wrap-anywhere"
+              >{{
+                row.original.lastError ??
+                formatResponseBody(row.original.lastResponseBody)
+              }}</pre
+            >
+          </div>
+          <div v-if="row.original.lastRequestHeaders" class="mb-3">
+            <div class="font-semibold mb-1">Request headers</div>
+            <pre class="whitespace-pre-wrap wrap-anywhere">{{
+              formatHeaders(row.original.lastRequestHeaders)
+            }}</pre>
+          </div>
+          <div class="font-semibold mb-1">Payload</div>
+          <pre class="whitespace-pre-wrap wrap-anywhere">{{
+            JSON.stringify(row.original.payload, null, 2)
+          }}</pre>
+        </div>
+      </template>
     </UTable>
-
-    <div
-      v-for="d in deliveriesData?.items ?? []"
-      v-show="expanded === d.id"
-      :key="d.id"
-      class="mt-4 border rounded p-4 text-xs"
-    >
-      <div class="font-semibold mb-1">Response</div>
-      <div class="mb-3">
-        <div class="mb-1">{{ d.lastResponseCode ?? 'no response' }}</div>
-        <pre
-          v-if="d.lastError || d.lastResponseBody"
-          class="whitespace-pre-wrap wrap-anywhere"
-          >{{ d.lastError ?? formatResponseBody(d.lastResponseBody) }}</pre
-        >
-      </div>
-      <div v-if="d.lastRequestHeaders" class="mb-3">
-        <div class="font-semibold mb-1">Request headers</div>
-        <pre class="whitespace-pre-wrap wrap-anywhere">{{
-          formatHeaders(d.lastRequestHeaders)
-        }}</pre>
-      </div>
-      <div class="font-semibold mb-1">Payload</div>
-      <pre class="whitespace-pre-wrap wrap-anywhere">{{
-        JSON.stringify(d.payload, null, 2)
-      }}</pre>
-    </div>
 
     <div class="mt-12 border-t pt-6">
       <h2
