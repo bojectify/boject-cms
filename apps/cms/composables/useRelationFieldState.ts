@@ -67,6 +67,39 @@ export function useRelationFieldState(
     return [];
   }
 
+  function purgeReference(ref: RelationRef): boolean {
+    let changed = false;
+    for (const field of editorFields.value) {
+      if (field.type === 'dynamic-relation') {
+        const val = formState[field.key] as RelationRef | null | undefined;
+        if (
+          val &&
+          val.contentTypeId === ref.contentTypeId &&
+          val.entryId === ref.entryId
+        ) {
+          formState[field.key] = null;
+          changed = true;
+        }
+      } else if (field.type === 'dynamic-multirelation') {
+        const val = formState[field.key] as RelationRef[] | null | undefined;
+        if (Array.isArray(val) && val.length > 0) {
+          const filtered = val.filter(
+            (r) =>
+              !(
+                r.contentTypeId === ref.contentTypeId &&
+                r.entryId === ref.entryId
+              )
+          );
+          if (filtered.length !== val.length) {
+            formState[field.key] = filtered;
+            changed = true;
+          }
+        }
+      }
+    }
+    return changed;
+  }
+
   function applyFieldUpdate(fieldKey: string, data: RelationRef) {
     const field = editorFields.value.find((f) => f.key === fieldKey);
     if (!field) return;
@@ -90,6 +123,7 @@ export function useRelationFieldState(
     getMultiRelationValue,
     getTargetContentTypeIds,
     applyFieldUpdate,
+    purgeReference,
     updateCache,
   };
 }
