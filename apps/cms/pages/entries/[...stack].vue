@@ -305,6 +305,10 @@ const paneEls = useTemplateRef<
       fk: string,
       d: { contentTypeId: string; entryId: string }
     ) => void;
+    purgeReference: (ref: {
+      contentTypeId: string;
+      entryId: string;
+    }) => boolean;
   } | null>
 >('paneEls');
 
@@ -366,6 +370,7 @@ const {
   getMultiRelationValue,
   getTargetContentTypeIds,
   applyFieldUpdate: rootApplyFieldUpdate,
+  purgeReference: rootPurgeReference,
   updateCache,
 } = useRelationFieldState(formState, editorFields);
 
@@ -459,6 +464,24 @@ function closePane(idx: number) {
   const newStack = parsedStack.value.slice(0, idx + 1);
   truncateDeeperSideEffects(idx);
   router.push(stackHref(newStack));
+}
+
+function handlePaneDeleted(
+  paneIdx: number,
+  data: { contentTypeId: string; entryId: string }
+) {
+  // Close the deleted pane (and anything stacked on top of it).
+  const newStack = parsedStack.value.slice(0, paneIdx + 1);
+  truncateDeeperSideEffects(paneIdx);
+  router.push(stackHref(newStack));
+
+  // Clear any reference to the deleted entry on the parent surface.
+  // paneIdx 0 = first pane, so its parent is the root editor.
+  if (paneIdx === 0) {
+    rootPurgeReference(data);
+  } else {
+    paneEls.value?.[paneIdx - 1]?.purgeReference(data);
+  }
 }
 
 function handlePaneSaved(
@@ -637,6 +660,7 @@ function handlePaneSaved(
       :entry-id="pane.kind === 'entry' ? pane.entryId : null"
       @close="closePane(idx)"
       @saved="(data) => handlePaneSaved(idx, data)"
+      @deleted="(data) => handlePaneDeleted(idx, data)"
     />
   </div>
 </template>
