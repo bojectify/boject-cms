@@ -2,6 +2,7 @@
 import { inject } from 'vue';
 import type { FieldConfig } from '~/types/contentEditor';
 import { paneOrchestratorKey } from '~/composables/paneOrchestrator';
+import type { EntryAction } from '~/components/entry-action-menu/entryActionMenu.types';
 import type { EntryEditorPaneProps } from './entryEditorPane.types';
 import { QA_ENTRY_EDITOR_PANE } from './entryEditorPane.config';
 
@@ -19,6 +20,7 @@ if (!orchestrator) {
 const emit = defineEmits<{
   close: [];
   saved: [data: { contentTypeId: string; entryId: string; entryTitle: string }];
+  deleted: [data: { contentTypeId: string; entryId: string }];
 }>();
 
 type ContentTypeShape = {
@@ -50,6 +52,7 @@ const {
   createdAt,
   updatedAt,
   isDirty,
+  refresh: refreshEntry,
   saveDraft,
   publish,
   discardChanges,
@@ -112,6 +115,7 @@ const {
   getMultiRelationValue,
   getTargetContentTypeIds,
   applyFieldUpdate,
+  purgeReference,
 } = useRelationFieldState(formState, editorFields);
 
 function handleRelationEdit(value: unknown, fieldKey: string) {
@@ -179,7 +183,106 @@ async function handleDiscardChanges() {
   await discardChanges();
 }
 
-defineExpose({ isDirty, applyFieldUpdate });
+const toast = useToast();
+
+async function handleDelete() {
+  if (!props.entryId) return;
+  const titleVal = formState[entryTitleFieldIdentifier.value];
+  const label =
+    typeof titleVal === 'string' && titleVal ? titleVal : 'this entry';
+  if (!window.confirm(`Delete ${label}? This cannot be undone.`)) return;
+
+  try {
+    const res = await fetch(`/api/content-entries/${props.entryId}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => null)) as {
+        statusMessage?: string;
+        message?: string;
+      } | null;
+      throw new Error(
+        body?.statusMessage ?? body?.message ?? `Request failed (${res.status})`
+      );
+    }
+    toast.add({
+      title: 'Deleted',
+      description: `${label} was deleted.`,
+      color: 'success',
+    });
+    emit('deleted', {
+      contentTypeId: resolvedContentTypeId.value,
+      entryId: props.entryId,
+    });
+  } catch (err: unknown) {
+    const message =
+      err instanceof Error ? err.message : 'Failed to delete entry.';
+    toast.add({ title: 'Error', description: message, color: 'error' });
+  }
+}
+
+async function handleAction(action: EntryAction) {
+  if (!props.entryId) return;
+  if (action === 'delete') {
+    await handleDelete();
+    return;
+  }
+  const endpointByAction: Record<
+    Exclude<EntryAction, 'delete'>,
+    { path: string; successTitle: string; successBody: string }
+  > = {
+    unpublish: {
+      path: 'unpublish',
+      successTitle: 'Unpublished',
+      successBody: 'Entry is no longer published.',
+    },
+    republish: {
+      path: 'republish',
+      successTitle: 'Republished',
+      successBody: 'Entry has been republished.',
+    },
+    archive: {
+      path: 'archive',
+      successTitle: 'Archived',
+      successBody: 'Entry has been archived.',
+    },
+    unarchive: {
+      path: 'unarchive',
+      successTitle: 'Unarchived',
+      successBody: 'Entry has been unarchived.',
+    },
+  };
+  const spec = endpointByAction[action];
+  try {
+    await $fetch(`/api/content-entries/${props.entryId}/${spec.path}`, {
+      method: 'POST',
+    });
+    await refreshEntry();
+    toast.add({
+      title: spec.successTitle,
+      description: spec.successBody,
+      color: 'success',
+    });
+  } catch (err: unknown) {
+    const statusCode = (err as { statusCode?: number })?.statusCode;
+    const data = (err as { data?: { error?: string } })?.data;
+    if (action === 'archive' && statusCode === 409) {
+      const msg =
+        data?.error === 'DRAFT_PRESENT'
+          ? 'Discard the draft before archiving this entry.'
+          : ((err as { statusMessage?: string })?.statusMessage ??
+            'Cannot archive entry right now.');
+      toast.add({ title: 'Cannot archive', description: msg, color: 'error' });
+      return;
+    }
+    const message =
+      (err as { statusMessage?: string })?.statusMessage ??
+      (err instanceof Error ? err.message : `Failed to ${action} entry.`);
+    toast.add({ title: 'Error', description: message, color: 'error' });
+  }
+}
+
+defineExpose({ isDirty, applyFieldUpdate, purgeReference });
 </script>
 
 <template>
@@ -305,6 +408,8 @@ defineExpose({ isDirty, applyFieldUpdate });
             :on-save-draft="handleSaveDraft"
             :on-publish="handlePublish"
             :on-discard-changes="handleDiscardChanges"
+            :on-delete="props.entryId ? handleDelete : undefined"
+            :on-action="props.entryId ? handleAction : undefined"
           />
         </div>
       </div>
