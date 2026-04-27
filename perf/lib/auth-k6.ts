@@ -15,8 +15,9 @@ export function apiKeyHeaders(): Record<string, string> {
   };
 }
 
-// Session auth: POST /api/auth/login, extract `Set-Cookie` and reuse it.
-// Called from scenario setup() — runs once per VU cluster.
+// Session auth: POST /api/auth/login, pull the session cookie from the
+// parsed cookie jar (k6 splits Set-Cookie for us). Called from scenario
+// setup() — runs once per VU cluster.
 export function sessionLoginCookie(): string {
   const cfg = loadK6Config();
   const res = http.post(
@@ -25,14 +26,19 @@ export function sessionLoginCookie(): string {
     { headers: { 'Content-Type': 'application/json' } }
   );
   check(res, { 'login 200': (r) => r.status === 200 });
-  const setCookie = res.headers['Set-Cookie'] ?? '';
-  const cookie = setCookie.split(';')[0] ?? '';
-  if (!cookie.startsWith('nuxt-session=')) {
-    throw new Error(`login did not return session cookie: ${setCookie}`);
+  const sessionCookies = res.cookies['nuxt-session'];
+  if (!sessionCookies?.length) {
+    throw new Error(
+      `login did not return nuxt-session cookie. Set-Cookie: ${
+        res.headers['Set-Cookie'] ?? '(none)'
+      }`
+    );
   }
-  return cookie;
+  return `nuxt-session=${sessionCookies[0]!.value}`;
 }
 
+// Origin must match the request Host so the cms's CSRF middleware
+// (apps/cms/server/middleware/csrf.ts) accepts session-cookie mutations.
 export function sessionHeaders(cookie: string): Record<string, string> {
   return {
     Cookie: cookie,
