@@ -1,5 +1,9 @@
 import type { FieldType, Prisma } from '#prisma';
-import { assertUuid, assertStringLength } from '../../../../utils/validation';
+import {
+  assertUuid,
+  assertStringLength,
+  isUuid,
+} from '../../../../utils/validation';
 import { withPrismaErrors } from '../../../../utils/prismaErrors';
 import { enforceMutationRateLimit } from '../../../../utils/rateLimitEndpoint';
 import { invalidateSchema } from '../../../../graphql/schema';
@@ -52,6 +56,29 @@ export default defineEventHandler(async (event) => {
     data.required = body.required;
   }
   if ('options' in body) {
+    if (
+      field.type === 'RICHTEXT' &&
+      body.options &&
+      typeof body.options === 'object'
+    ) {
+      const opts = body.options as { targetContentTypeIds?: unknown };
+      if (opts.targetContentTypeIds !== undefined) {
+        if (!Array.isArray(opts.targetContentTypeIds)) {
+          throw createError({
+            statusCode: 400,
+            statusMessage: 'options.targetContentTypeIds must be an array',
+          });
+        }
+        for (const targetId of opts.targetContentTypeIds) {
+          if (!isUuid(targetId)) {
+            throw createError({
+              statusCode: 400,
+              statusMessage: `Invalid UUID in targetContentTypeIds: ${targetId}`,
+            });
+          }
+        }
+      }
+    }
     data.options = body.options ?? undefined;
   }
   if ('unique' in body) {
