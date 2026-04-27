@@ -2,6 +2,7 @@ import type { Builder } from './builder';
 import type { ContentStatusEnumRef } from './types/contentStatus';
 import { resolveOffsetConnection } from '@pothos/plugin-relay';
 import { prisma } from '../utils/prisma';
+import { collectRichtextReferences } from '../utils/collectRichtextReferences';
 import {
   registerDynamicFilterInputs,
   getFilterKeyForFieldType,
@@ -83,7 +84,6 @@ const FIELD_TYPE_TO_SCALAR: Record<string, ScalarTypeName | undefined> = {
   BOOLEAN: 'Boolean',
   DATETIME: 'DateTime',
   SELECT: 'String',
-  RICHTEXT: 'JSON',
 };
 
 function toCamelCase(str: string): string {
@@ -130,6 +130,41 @@ export function registerDynamicTypes(
       resolveType: (entry) =>
         typeIdToIdentifier.get(entry.contentTypeId) ?? 'ContentEntry',
     });
+
+  interface RichTextShape {
+    json: unknown;
+  }
+
+  const RichTextRef = builder.objectRef<RichTextShape>('RichText').implement({
+    fields: (t) => ({
+      json: t.field({
+        type: 'JSON',
+        resolve: (rt) => rt.json,
+      }),
+      references: t.field({
+        type: [ContentEntryInterface],
+        nullable: false,
+        resolve: async (rt) => {
+          const refs = collectRichtextReferences(rt.json);
+          if (refs.length === 0) return [];
+          const entryIds = refs.map((r) => r.entryId);
+          const entries = await prisma.contentEntry.findMany({
+            where: { id: { in: entryIds } },
+            include: { versions: { where: { status: 'PUBLISHED' } } },
+          });
+          const byId = new Map<string, ContentEntryShape>();
+          for (const e of entries) {
+            if (e.versions.length === 0) continue;
+            if (!typeIdToIdentifier.has(e.contentTypeId)) continue;
+            byId.set(e.id, flattenToShape(e, e.versions[0]!));
+          }
+          return refs
+            .map((r) => byId.get(r.entryId))
+            .filter((e): e is ContentEntryShape => Boolean(e));
+        },
+      }),
+    }),
+  });
 
   const dynFilters = registerDynamicFilterInputs(builder, ContentStatusEnum);
 
@@ -211,6 +246,24 @@ export function registerDynamicTypes(
             // field-builder signature.
             resolve: resolver as never,
           });
+        }
+
+        // RICHTEXT fields (object type with json + references)
+        const richtextFields = ct.fields.filter((f) => f.type === 'RICHTEXT');
+        for (const field of richtextFields) {
+          fields[field.identifier] = t.field({
+            type: RichTextRef,
+            nullable: !field.required,
+            resolve: (entry: ContentEntryShape) => {
+              const data =
+                typeof entry.data === 'string'
+                  ? (JSON.parse(entry.data) as Record<string, unknown>)
+                  : (entry.data as Record<string, unknown> | null);
+              const json = data?.[field.identifier];
+              if (json == null) return null;
+              return { json };
+            },
+          }) as never;
         }
 
         // RELATION fields (single polymorphic reference)

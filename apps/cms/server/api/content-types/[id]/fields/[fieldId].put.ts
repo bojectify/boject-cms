@@ -61,19 +61,27 @@ export default defineEventHandler(async (event) => {
       body.options &&
       typeof body.options === 'object'
     ) {
-      const opts = body.options as { targetContentTypeIds?: unknown };
-      if (opts.targetContentTypeIds !== undefined) {
-        if (!Array.isArray(opts.targetContentTypeIds)) {
+      const opts = body.options as {
+        targetContentTypeIds?: unknown;
+        linkTargetContentTypeIds?: unknown;
+      };
+      for (const key of [
+        'targetContentTypeIds',
+        'linkTargetContentTypeIds',
+      ] as const) {
+        const val = opts[key];
+        if (val === undefined) continue;
+        if (!Array.isArray(val)) {
           throw createError({
             statusCode: 400,
-            statusMessage: 'options.targetContentTypeIds must be an array',
+            statusMessage: `options.${key} must be an array`,
           });
         }
-        for (const targetId of opts.targetContentTypeIds) {
-          if (!isUuid(targetId)) {
+        for (const targetId of val) {
+          if (typeof targetId !== 'string' || !isUuid(targetId)) {
             throw createError({
               statusCode: 400,
-              statusMessage: `Invalid UUID in targetContentTypeIds: ${targetId}`,
+              statusMessage: `Invalid UUID in ${key}: ${targetId}`,
             });
           }
         }

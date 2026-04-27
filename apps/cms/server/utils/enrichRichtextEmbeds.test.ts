@@ -292,4 +292,219 @@ describe('enrichEntryDataWithEmbedIdentifiers', () => {
     );
     expect(data).toEqual(snapshot);
   });
+
+  it('enriches a RICHTEXT body that contains only cmsLink marks (no embeds)', async () => {
+    const data = {
+      body: doc([
+        {
+          type: 'paragraph',
+          content: [
+            {
+              type: 'text',
+              text: 'visit',
+              marks: [
+                {
+                  type: 'cmsLink',
+                  attrs: { contentTypeId: 'ct-1', entryId: 'e-1' },
+                },
+              ],
+            },
+          ],
+        },
+      ]),
+    };
+    const loadIdentifiers = vi
+      .fn()
+      .mockResolvedValue(new Map([['ct-1', 'Page']]));
+
+    const result = await enrichEntryDataWithEmbedIdentifiers(
+      data,
+      [{ identifier: 'body', type: 'RICHTEXT' }],
+      { loadIdentifiers }
+    );
+
+    expect(loadIdentifiers).toHaveBeenCalledOnce();
+    const calledWith = loadIdentifiers.mock.calls[0]![0] as string[];
+    expect(new Set(calledWith)).toEqual(new Set(['ct-1']));
+
+    const bodyPara = (result.body as ReturnType<typeof doc>).content[0] as {
+      content: { marks: { attrs: Record<string, unknown> }[] }[];
+    };
+    expect(bodyPara.content[0]!.marks[0]!.attrs.contentTypeIdentifier).toBe(
+      'Page'
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// cmsLink mark coverage
+// ---------------------------------------------------------------------------
+
+const cmsLink = (
+  contentTypeId: string,
+  entryId: string,
+  extra?: Record<string, unknown>
+) => ({
+  type: 'cmsLink',
+  attrs: { contentTypeId, entryId, ...extra },
+});
+const externalLink = (href: string) => ({ type: 'link', attrs: { href } });
+
+describe('collectEmbedContentTypeIds — cmsLink marks', () => {
+  it('collects contentTypeId from a cmsLink mark on a text node', () => {
+    const result = collectEmbedContentTypeIds(
+      doc([
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: 'visit', marks: [cmsLink('ct-1', 'e-1')] },
+          ],
+        },
+      ])
+    );
+    expect(result).toEqual(new Set(['ct-1']));
+  });
+
+  it('ignores external link marks (type === "link")', () => {
+    const result = collectEmbedContentTypeIds(
+      doc([
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: 'visit', marks: [externalLink('https://x')] },
+          ],
+        },
+      ])
+    );
+    expect(result.size).toBe(0);
+  });
+
+  it('combines contentTypeIds from embeds and link marks', () => {
+    const result = collectEmbedContentTypeIds(
+      doc([
+        para([
+          embed('ct-1', 'e-1'),
+          { type: 'text', text: 'and', marks: [cmsLink('ct-2', 'e-2')] },
+        ]),
+      ])
+    );
+    expect(result).toEqual(new Set(['ct-1', 'ct-2']));
+  });
+});
+
+describe('enrichBodyWithContentTypeIdentifiers — cmsLink marks', () => {
+  const map = new Map([
+    ['ct-1', 'Author'],
+    ['ct-2', 'Page'],
+  ]);
+
+  it('stamps identifier on a cmsLink mark', () => {
+    const input = doc([
+      {
+        type: 'paragraph',
+        content: [
+          { type: 'text', text: 'visit', marks: [cmsLink('ct-2', 'e-1')] },
+        ],
+      },
+    ]);
+    const result = enrichBodyWithContentTypeIdentifiers(input, map) as {
+      content: {
+        content: { marks: { attrs: Record<string, unknown> }[] }[];
+      }[];
+    };
+    expect(result.content[0]!.content[0]!.marks[0]!.attrs).toEqual({
+      contentTypeId: 'ct-2',
+      entryId: 'e-1',
+      contentTypeIdentifier: 'Page',
+    });
+  });
+
+  it('leaves external link marks untouched', () => {
+    const input = doc([
+      {
+        type: 'paragraph',
+        content: [
+          { type: 'text', text: 'visit', marks: [externalLink('https://x')] },
+        ],
+      },
+    ]);
+    const result = enrichBodyWithContentTypeIdentifiers(input, map) as {
+      content: {
+        content: {
+          marks: { type: string; attrs: Record<string, unknown> }[];
+        }[];
+      }[];
+    };
+    expect(result.content[0]!.content[0]!.marks[0]).toEqual({
+      type: 'link',
+      attrs: { href: 'https://x' },
+    });
+    expect(
+      'contentTypeIdentifier' in
+        (result.content[0]!.content[0]!.marks[0]!.attrs as Record<
+          string,
+          unknown
+        >)
+    ).toBe(false);
+  });
+
+  it('does not mutate the input when stamping a cmsLink', () => {
+    const input = doc([
+      {
+        type: 'paragraph',
+        content: [
+          { type: 'text', text: 'visit', marks: [cmsLink('ct-1', 'e-1')] },
+        ],
+      },
+    ]);
+    const snapshot = JSON.parse(JSON.stringify(input));
+    enrichBodyWithContentTypeIdentifiers(input, map);
+    expect(input).toEqual(snapshot);
+  });
+
+  it('overwrites stale contentTypeIdentifier on a cmsLink mark', () => {
+    const input = doc([
+      {
+        type: 'paragraph',
+        content: [
+          {
+            type: 'text',
+            text: 'visit',
+            marks: [cmsLink('ct-1', 'e-1', { contentTypeIdentifier: 'Old' })],
+          },
+        ],
+      },
+    ]);
+    const result = enrichBodyWithContentTypeIdentifiers(input, map) as {
+      content: {
+        content: { marks: { attrs: Record<string, unknown> }[] }[];
+      }[];
+    };
+    expect(
+      result.content[0]!.content[0]!.marks[0]!.attrs.contentTypeIdentifier
+    ).toBe('Author');
+  });
+
+  it('leaves cmsLink mark attrs alone if contentTypeId is not in the map', () => {
+    const input = doc([
+      {
+        type: 'paragraph',
+        content: [
+          {
+            type: 'text',
+            text: 'visit',
+            marks: [cmsLink('ct-unknown', 'e-1')],
+          },
+        ],
+      },
+    ]);
+    const result = enrichBodyWithContentTypeIdentifiers(input, map) as {
+      content: {
+        content: { marks: { attrs: Record<string, unknown> }[] }[];
+      }[];
+    };
+    expect(
+      'contentTypeIdentifier' in result.content[0]!.content[0]!.marks[0]!.attrs
+    ).toBe(false);
+  });
 });

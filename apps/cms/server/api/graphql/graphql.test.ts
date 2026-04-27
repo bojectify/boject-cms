@@ -802,4 +802,553 @@ describe('GraphQL API', async () => {
       });
     });
   });
+
+  describe('RICHTEXT references', () => {
+    let articleTypeId: string;
+    let tagTypeId: string;
+    let tag1Id: string;
+    let tag2Id: string;
+    let articleEntryId: string;
+
+    it('sets up richtext-references test data', async () => {
+      const cookie = await getSessionCookie();
+
+      // Cleanup any prior run
+      const existing = await $fetch<{
+        items: Array<{ id: string; identifier: string }>;
+      }>('/api/content-types?perPage=200', { headers: { cookie } }).catch(
+        () => ({ items: [] })
+      );
+      for (const id of ['RtArticle', 'RtTag']) {
+        const ct = existing.items?.find?.((c) => c.identifier === id);
+        if (!ct) continue;
+        const entries = await $fetch<{ items: Array<{ id: string }> }>(
+          `/api/content-entries?contentTypeId=${ct.id}&perPage=200`,
+          { headers: { cookie } }
+        ).catch(() => ({ items: [] }));
+        for (const e of entries.items ?? []) {
+          await $fetch<unknown>(`/api/content-entries/${e.id}`, {
+            method: 'DELETE',
+            headers: { cookie },
+          }).catch(() => {});
+        }
+        await $fetch<unknown>(`/api/content-types/${ct.id}`, {
+          method: 'DELETE',
+          headers: { cookie },
+        }).catch(() => {});
+      }
+
+      // Create RtTag content type
+      const tagType = await $fetch<{ id: string }>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: 'Rt Tag',
+          identifier: 'RtTag',
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+            { identifier: 'slug', name: 'Slug', type: 'SLUG' },
+          ],
+        },
+      });
+      tagTypeId = tagType.id;
+
+      const tag1 = await $fetch<{ id: string }>('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: tagTypeId,
+          data: { title: 'News', slug: 'news' },
+          status: 'PUBLISHED',
+        },
+      });
+      tag1Id = tag1.id;
+      const tag2 = await $fetch<{ id: string }>('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: tagTypeId,
+          data: { title: 'Sport', slug: 'sport' },
+          status: 'PUBLISHED',
+        },
+      });
+      tag2Id = tag2.id;
+
+      // Create RtArticle with a RICHTEXT body that allows RtTag embeds
+      const articleType = await $fetch<{ id: string }>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: 'Rt Article',
+          identifier: 'RtArticle',
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+            {
+              identifier: 'body',
+              name: 'Body',
+              type: 'RICHTEXT',
+              options: { targetContentTypeIds: [tagTypeId] },
+            },
+          ],
+        },
+      });
+      articleTypeId = articleType.id;
+
+      const article = await $fetch<{ id: string }>('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: articleTypeId,
+          data: {
+            title: 'Hello World',
+            body: {
+              type: 'doc',
+              content: [
+                {
+                  type: 'paragraph',
+                  content: [
+                    { type: 'text', text: 'See ' },
+                    {
+                      type: 'cmsEmbed',
+                      attrs: { contentTypeId: tagTypeId, entryId: tag1Id },
+                    },
+                    { type: 'text', text: ' and ' },
+                    {
+                      type: 'cmsEmbed',
+                      attrs: { contentTypeId: tagTypeId, entryId: tag2Id },
+                    },
+                    { type: 'text', text: '.' },
+                  ],
+                },
+                {
+                  // Same tag1 referenced again — must be deduplicated
+                  type: 'paragraph',
+                  content: [
+                    {
+                      type: 'cmsEmbed',
+                      attrs: { contentTypeId: tagTypeId, entryId: tag1Id },
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+          status: 'PUBLISHED',
+        },
+      });
+      articleEntryId = article.id;
+
+      expect(tagTypeId).toBeTruthy();
+      expect(articleTypeId).toBeTruthy();
+      expect(tag1Id).toBeTruthy();
+      expect(tag2Id).toBeTruthy();
+      expect(articleEntryId).toBeTruthy();
+    });
+
+    it('returns json + deduplicated references with fragment-narrowed types', async () => {
+      const res = await gql<{
+        rtArticle: {
+          id: string;
+          body: {
+            json: { type: string };
+            references: Array<{
+              __typename: string;
+              id: string;
+              slug?: string;
+            }>;
+          };
+        };
+      }>(`
+        query {
+          rtArticle(id: "${articleEntryId}") {
+            id
+            body {
+              json
+              references {
+                __typename
+                id
+                ... on RtTag { slug }
+              }
+            }
+          }
+        }
+      `);
+
+      expect(res.errors).toBeUndefined();
+      expect(res.data.rtArticle.body.json.type).toBe('doc');
+
+      const refs = res.data.rtArticle.body.references;
+      expect(refs).toHaveLength(2);
+      const sortedSlugs = refs.map((r) => r.slug).sort();
+      expect(sortedSlugs).toEqual(['news', 'sport']);
+      for (const r of refs) {
+        expect(r.__typename).toBe('RtTag');
+      }
+    });
+
+    it('returns an empty references array for a body with no references', async () => {
+      const cookie = await getSessionCookie();
+      const created = await $fetch<{ id: string }>('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: articleTypeId,
+          data: {
+            title: 'Plain',
+            body: {
+              type: 'doc',
+              content: [
+                {
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'plain' }],
+                },
+              ],
+            },
+          },
+          status: 'PUBLISHED',
+        },
+      });
+
+      const res = await gql<{
+        rtArticle: { body: { references: unknown[] } };
+      }>(`
+        query {
+          rtArticle(id: "${created.id}") {
+            body { references { __typename id } }
+          }
+        }
+      `);
+      expect(res.errors).toBeUndefined();
+      expect(res.data.rtArticle.body.references).toEqual([]);
+
+      await $fetch<unknown>(`/api/content-entries/${created.id}`, {
+        method: 'DELETE',
+        headers: { cookie },
+      }).catch(() => {});
+    });
+
+    it('drops references whose target has no PUBLISHED version', async () => {
+      const cookie = await getSessionCookie();
+      // Create a draft-only tag
+      const draftTag = await $fetch<{ id: string }>('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: tagTypeId,
+          data: { title: 'Draft', slug: 'draft' },
+          // status defaults to DRAFT
+        },
+      });
+
+      const article = await $fetch<{ id: string }>('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: articleTypeId,
+          data: {
+            title: 'WithDraftRef',
+            body: {
+              type: 'doc',
+              content: [
+                {
+                  type: 'paragraph',
+                  content: [
+                    {
+                      type: 'cmsEmbed',
+                      attrs: {
+                        contentTypeId: tagTypeId,
+                        entryId: draftTag.id,
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+          status: 'PUBLISHED',
+        },
+      });
+
+      const res = await gql<{
+        rtArticle: { body: { references: unknown[] } };
+      }>(`
+        query {
+          rtArticle(id: "${article.id}") {
+            body { references { __typename id } }
+          }
+        }
+      `);
+      expect(res.errors).toBeUndefined();
+      expect(res.data.rtArticle.body.references).toEqual([]);
+
+      await $fetch<unknown>(`/api/content-entries/${article.id}`, {
+        method: 'DELETE',
+        headers: { cookie },
+      }).catch(() => {});
+      await $fetch<unknown>(`/api/content-entries/${draftTag.id}`, {
+        method: 'DELETE',
+        headers: { cookie },
+      }).catch(() => {});
+    });
+
+    it('combines cmsEmbed nodes and cmsLink marks in references with cross-source dedup', async () => {
+      const cookie = await getSessionCookie();
+
+      // Locate the body field id and patch its options to also allow link targets to RtTag.
+      const ct = await $fetch<{
+        fields: Array<{ id: string; identifier: string }>;
+      }>(`/api/content-types/${articleTypeId}`, { headers: { cookie } });
+      const bodyField = ct.fields.find((f) => f.identifier === 'body');
+      expect(bodyField).toBeTruthy();
+      // NOTE: this PUT permanently mutates the body field's options for the
+      // rest of this describe block (until the cleanup `it` deletes the type).
+      // Subsequent tests in this describe inherit linkTargetContentTypeIds:
+      // [tagTypeId]. If you add a test that needs the field WITHOUT a link
+      // allow-list, insert it BEFORE this `it` or reset the option here.
+      await $fetch<unknown>(
+        `/api/content-types/${articleTypeId}/fields/${bodyField!.id}`,
+        {
+          method: 'PUT',
+          headers: { cookie },
+          body: {
+            name: 'Body',
+            required: false,
+            options: {
+              targetContentTypeIds: [tagTypeId],
+              linkTargetContentTypeIds: [tagTypeId],
+            },
+          },
+        }
+      );
+
+      const article = await $fetch<{ id: string }>('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: articleTypeId,
+          data: {
+            title: 'Mixed',
+            body: {
+              type: 'doc',
+              content: [
+                {
+                  type: 'paragraph',
+                  content: [
+                    // Embed of tag1
+                    {
+                      type: 'cmsEmbed',
+                      attrs: { contentTypeId: tagTypeId, entryId: tag1Id },
+                    },
+                    { type: 'text', text: ' and ' },
+                    // Link wrapping text, also targeting tag1 — must dedup
+                    {
+                      type: 'text',
+                      text: 'see news',
+                      marks: [
+                        {
+                          type: 'cmsLink',
+                          attrs: { contentTypeId: tagTypeId, entryId: tag1Id },
+                        },
+                      ],
+                    },
+                    { type: 'text', text: ' or ' },
+                    // Link to tag2
+                    {
+                      type: 'text',
+                      text: 'sport',
+                      marks: [
+                        {
+                          type: 'cmsLink',
+                          attrs: { contentTypeId: tagTypeId, entryId: tag2Id },
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+          status: 'PUBLISHED',
+        },
+      });
+
+      const res = await gql<{
+        rtArticle: {
+          body: {
+            json: {
+              content: Array<{
+                content: Array<{
+                  marks?: Array<{
+                    type: string;
+                    attrs: Record<string, unknown>;
+                  }>;
+                }>;
+              }>;
+            };
+            references: Array<{
+              __typename: string;
+              id: string;
+              slug?: string;
+            }>;
+          };
+        };
+      }>(`
+        query {
+          rtArticle(id: "${article.id}") {
+            body {
+              json
+              references {
+                __typename
+                id
+                ... on RtTag { slug }
+              }
+            }
+          }
+        }
+      `);
+      expect(res.errors).toBeUndefined();
+
+      const refs = res.data.rtArticle.body.references;
+      expect(refs).toHaveLength(2);
+      const slugs = refs.map((r) => r.slug).sort();
+      expect(slugs).toEqual(['news', 'sport']);
+
+      // Confirm cmsLink marks in the round-tripped json carry the
+      // server-stamped contentTypeIdentifier — proves the enrich pipeline
+      // actually fired during POST and the value survives the GraphQL fetch.
+      const cmsLinkMarks: Array<{ attrs: Record<string, unknown> }> = [];
+      for (const para of res.data.rtArticle.body.json.content) {
+        for (const child of para.content) {
+          for (const mark of child.marks ?? []) {
+            if (mark.type === 'cmsLink') {
+              cmsLinkMarks.push({ attrs: mark.attrs });
+            }
+          }
+        }
+      }
+      expect(cmsLinkMarks).toHaveLength(2);
+      for (const m of cmsLinkMarks) {
+        expect(m.attrs.contentTypeIdentifier).toBe('RtTag');
+      }
+
+      // Cleanup: delete this test's article so the wildcard sweep at the end is faster
+      await $fetch<unknown>(`/api/content-entries/${article.id}`, {
+        method: 'DELETE',
+        headers: { cookie },
+      }).catch(() => {});
+    });
+
+    it('rejects entry creation with a cmsLink mark targeting a disallowed type', async () => {
+      const cookie = await getSessionCookie();
+
+      // Create a sibling content type that the body field does NOT allow as a link target.
+      const other = await $fetch<{ id: string }>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: 'Rt Other',
+          identifier: 'RtOther',
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+          ],
+        },
+      });
+
+      const otherEntry = await $fetch<{ id: string }>('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: other.id,
+          data: { title: 'Other' },
+          status: 'PUBLISHED',
+        },
+      });
+
+      const create = $fetch<unknown>('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: articleTypeId,
+          data: {
+            title: 'Disallowed',
+            body: {
+              type: 'doc',
+              content: [
+                {
+                  type: 'paragraph',
+                  content: [
+                    {
+                      type: 'text',
+                      text: 'click',
+                      marks: [
+                        {
+                          type: 'cmsLink',
+                          attrs: {
+                            contentTypeId: other.id,
+                            entryId: otherEntry.id,
+                          },
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        },
+      });
+
+      await expect(create).rejects.toMatchObject({
+        statusCode: 400,
+        statusMessage: expect.stringContaining(
+          'Entry link references a content type that is not allowed'
+        ),
+      });
+
+      // Cleanup
+      await $fetch<unknown>(`/api/content-entries/${otherEntry.id}`, {
+        method: 'DELETE',
+        headers: { cookie },
+      }).catch(() => {});
+      await $fetch<unknown>(`/api/content-types/${other.id}`, {
+        method: 'DELETE',
+        headers: { cookie },
+      }).catch(() => {});
+    });
+
+    it('cleans up richtext-references test data', async () => {
+      const cookie = await getSessionCookie();
+      for (const ctId of [articleTypeId, tagTypeId]) {
+        const entries = await $fetch<{ items: Array<{ id: string }> }>(
+          `/api/content-entries?contentTypeId=${ctId}&perPage=200`,
+          { headers: { cookie } }
+        ).catch(() => ({ items: [] }));
+        for (const e of entries.items ?? []) {
+          await $fetch<unknown>(`/api/content-entries/${e.id}`, {
+            method: 'DELETE',
+            headers: { cookie },
+          }).catch(() => {});
+        }
+        await $fetch<unknown>(`/api/content-types/${ctId}`, {
+          method: 'DELETE',
+          headers: { cookie },
+        }).catch(() => {});
+      }
+    });
+  });
 });
