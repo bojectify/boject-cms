@@ -5,8 +5,13 @@ export interface EnrichDeps {
 }
 
 /**
- * Collect the unique set of contentTypeIds referenced by `cmsEmbed` nodes
- * anywhere in a ProseMirror JSON document tree.
+ * Collect the unique set of `contentTypeId`s referenced anywhere in a
+ * ProseMirror JSON document tree by:
+ *   - `cmsEmbed` atom nodes (attrs.contentTypeId)
+ *   - `cmsLink` marks attached to text nodes (attrs.contentTypeId)
+ *
+ * Empty-string and non-string ids are skipped so they don't pollute the
+ * downstream identifier-load query.
  */
 export function collectEmbedContentTypeIds(
   body: unknown,
@@ -21,17 +26,19 @@ export function collectEmbedContentTypeIds(
   };
   if (n.type === 'cmsEmbed') {
     const attrs = (n.attrs ?? {}) as Record<string, unknown>;
-    if (typeof attrs.contentTypeId === 'string') {
+    if (typeof attrs.contentTypeId === 'string' && attrs.contentTypeId !== '') {
       out.add(attrs.contentTypeId);
     }
   }
-  if (Array.isArray(n.marks)) {
+  if (n.type === 'text' && Array.isArray(n.marks)) {
     for (const mark of n.marks) {
       if (!mark || typeof mark !== 'object') continue;
       const m = mark as { type?: unknown; attrs?: unknown };
       if (m.type === 'cmsLink') {
         const a = (m.attrs ?? {}) as Record<string, unknown>;
-        if (typeof a.contentTypeId === 'string') out.add(a.contentTypeId);
+        if (typeof a.contentTypeId === 'string' && a.contentTypeId !== '') {
+          out.add(a.contentTypeId);
+        }
       }
     }
   }
@@ -45,11 +52,13 @@ export function collectEmbedContentTypeIds(
 
 /**
  * Walk a ProseMirror JSON document and return a new document where every
- * `cmsEmbed` node's `attrs` includes `contentTypeIdentifier` sourced from
- * `identifierMap`. Nodes whose `contentTypeId` is absent from the map are
- * left untouched (defensive — the validator already enforced allow-list
- * membership). Any stale `contentTypeIdentifier` already stored on the node
- * is overwritten with the current canonical value.
+ * `cmsEmbed` node's `attrs` AND every `cmsLink` mark's `attrs` (on text
+ * nodes) include `contentTypeIdentifier` sourced from `identifierMap`.
+ * External link marks (`type === 'link'`) are left untouched — only
+ * `cmsLink` marks are stamped. Nodes/marks whose `contentTypeId` is absent
+ * from the map are left untouched (defensive — the validator already
+ * enforced allow-list membership). Any stale `contentTypeIdentifier`
+ * already stored is overwritten with the current canonical value.
  *
  * The function is purely functional — the input tree is never mutated.
  */
@@ -87,7 +96,7 @@ export function enrichBodyWithContentTypeIdentifiers(
     return result;
   }
 
-  if (Array.isArray(n.marks)) {
+  if (n.type === 'text' && Array.isArray(n.marks)) {
     const newMarks = n.marks.map((mark) => {
       if (!mark || typeof mark !== 'object') return mark;
       const m = mark as { type?: unknown; attrs?: unknown };
@@ -116,10 +125,11 @@ export function enrichBodyWithContentTypeIdentifiers(
 /**
  * Given an entry's `data` object and its field definitions, enrich every
  * RICHTEXT field's body by stamping `contentTypeIdentifier` onto each
- * `cmsEmbed` node. Returns a new `data` object; the input is not mutated.
+ * `cmsEmbed` node and each `cmsLink` mark. Returns a new `data` object;
+ * the input is not mutated.
  *
- * If there are no RICHTEXT fields or no embeds in the data, the original
- * `data` reference is returned unchanged.
+ * If there are no RICHTEXT fields or no references in the data, the
+ * original `data` reference is returned unchanged.
  */
 export async function enrichEntryDataWithEmbedIdentifiers(
   data: Record<string, unknown>,
