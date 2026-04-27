@@ -1185,6 +1185,16 @@ describe('GraphQL API', async () => {
       const res = await gql<{
         rtArticle: {
           body: {
+            json: {
+              content: Array<{
+                content: Array<{
+                  marks?: Array<{
+                    type: string;
+                    attrs: Record<string, unknown>;
+                  }>;
+                }>;
+              }>;
+            };
             references: Array<{
               __typename: string;
               id: string;
@@ -1196,6 +1206,7 @@ describe('GraphQL API', async () => {
         query {
           rtArticle(id: "${article.id}") {
             body {
+              json
               references {
                 __typename
                 id
@@ -1211,6 +1222,24 @@ describe('GraphQL API', async () => {
       expect(refs).toHaveLength(2);
       const slugs = refs.map((r) => r.slug).sort();
       expect(slugs).toEqual(['news', 'sport']);
+
+      // Confirm cmsLink marks in the round-tripped json carry the
+      // server-stamped contentTypeIdentifier — proves the enrich pipeline
+      // actually fired during POST and the value survives the GraphQL fetch.
+      const cmsLinkMarks: Array<{ attrs: Record<string, unknown> }> = [];
+      for (const para of res.data.rtArticle.body.json.content) {
+        for (const child of para.content) {
+          for (const mark of child.marks ?? []) {
+            if (mark.type === 'cmsLink') {
+              cmsLinkMarks.push({ attrs: mark.attrs });
+            }
+          }
+        }
+      }
+      expect(cmsLinkMarks).toHaveLength(2);
+      for (const m of cmsLinkMarks) {
+        expect(m.attrs.contentTypeIdentifier).toBe('RtTag');
+      }
 
       // Cleanup: delete this test's article so the wildcard sweep at the end is faster
       await $fetch<unknown>(`/api/content-entries/${article.id}`, {

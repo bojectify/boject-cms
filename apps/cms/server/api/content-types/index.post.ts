@@ -105,19 +105,27 @@ export default defineEventHandler(async (event) => {
     }
 
     if (type === 'RICHTEXT' && f.options && typeof f.options === 'object') {
-      const opts = f.options as { targetContentTypeIds?: unknown };
-      if (opts.targetContentTypeIds !== undefined) {
-        if (!Array.isArray(opts.targetContentTypeIds)) {
+      const opts = f.options as {
+        targetContentTypeIds?: unknown;
+        linkTargetContentTypeIds?: unknown;
+      };
+      for (const key of [
+        'targetContentTypeIds',
+        'linkTargetContentTypeIds',
+      ] as const) {
+        const val = opts[key];
+        if (val === undefined) continue;
+        if (!Array.isArray(val)) {
           throw createError({
             statusCode: 400,
-            statusMessage: `fields[${idx}].options.targetContentTypeIds must be an array`,
+            statusMessage: `fields[${idx}].options.${key} must be an array`,
           });
         }
-        for (const targetId of opts.targetContentTypeIds) {
-          if (!isUuid(targetId)) {
+        for (const targetId of val) {
+          if (typeof targetId !== 'string' || !isUuid(targetId)) {
             throw createError({
               statusCode: 400,
-              statusMessage: `Invalid UUID in fields[${idx}].options.targetContentTypeIds`,
+              statusMessage: `Invalid UUID in fields[${idx}].options.${key}`,
             });
           }
         }
