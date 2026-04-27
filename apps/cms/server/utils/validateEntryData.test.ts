@@ -20,6 +20,103 @@ const fullImage = {
   focalPointY: 0.7,
 };
 
+const richtextFieldNoEmbeds = {
+  identifier: 'body',
+  name: 'Body',
+  type: 'RICHTEXT' as const,
+  required: false,
+  options: null,
+};
+
+const richtextFieldWithAllowList = {
+  identifier: 'body',
+  name: 'Body',
+  type: 'RICHTEXT' as const,
+  required: false,
+  options: { targetContentTypeIds: ['allowed-ct-uuid'] },
+};
+
+const doc = (content: unknown[]) => ({ type: 'doc', content });
+const para = (content: unknown[]) => ({ type: 'paragraph', content });
+const text = (value: string) => ({ type: 'text', text: value });
+const embed = (contentTypeId: string, entryId: string) => ({
+  type: 'cmsEmbed',
+  attrs: { contentTypeId, entryId },
+});
+
+describe('validateEntryData — RICHTEXT embeds', () => {
+  it('accepts a body with no embeds when allow-list is empty', async () => {
+    const result = await validateEntryData(
+      { body: doc([para([text('hello')])]) },
+      [richtextFieldNoEmbeds]
+    );
+    expect(result.body).toEqual(doc([para([text('hello')])]));
+  });
+
+  it('rejects any embed when allow-list is empty', async () => {
+    await expect(
+      validateEntryData(
+        {
+          body: doc([para([text('hello '), embed('any-ct', 'any-entry')])]),
+        },
+        [richtextFieldNoEmbeds]
+      )
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      statusMessage: expect.stringContaining('Inline embeds are not allowed'),
+    });
+  });
+
+  it('accepts embed whose contentTypeId is in the allow-list', async () => {
+    const value = doc([
+      para([text('see '), embed('allowed-ct-uuid', 'entry-1')]),
+    ]);
+    const result = await validateEntryData({ body: value }, [
+      richtextFieldWithAllowList,
+    ]);
+    expect(result.body).toEqual(value);
+  });
+
+  it('rejects embed whose contentTypeId is not in the allow-list', async () => {
+    await expect(
+      validateEntryData(
+        { body: doc([para([embed('disallowed-ct', 'entry-1')])]) },
+        [richtextFieldWithAllowList]
+      )
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      statusMessage: expect.stringContaining('not allowed for this field'),
+    });
+  });
+
+  it('rejects a malformed embed node (missing attrs)', async () => {
+    await expect(
+      validateEntryData({ body: doc([para([{ type: 'cmsEmbed' }])]) }, [
+        richtextFieldWithAllowList,
+      ])
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      statusMessage: expect.stringContaining('Invalid inline embed'),
+    });
+  });
+
+  it('walks nested content (embed inside blockquote)', async () => {
+    await expect(
+      validateEntryData(
+        {
+          body: doc([
+            {
+              type: 'blockquote',
+              content: [para([embed('disallowed-ct', 'e1')])],
+            },
+          ]),
+        },
+        [richtextFieldWithAllowList]
+      )
+    ).rejects.toMatchObject({ statusCode: 400 });
+  });
+});
+
 describe('validateEntryData — IMAGE', () => {
   it('accepts a valid full IMAGE value', async () => {
     const result = await validateEntryData({ hero: fullImage }, [imageField]);
