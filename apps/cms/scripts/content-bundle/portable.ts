@@ -65,7 +65,7 @@ export function decodeRelationRef(
 
 function mapCmsEmbedAttrs(
   node: unknown,
-  encode: (attrs: Record<string, unknown>) => Record<string, unknown>
+  transform: (attrs: Record<string, unknown>) => Record<string, unknown>
 ): unknown {
   if (!node || typeof node !== 'object') return node;
   const n = node as { type?: unknown; attrs?: unknown; content?: unknown };
@@ -74,10 +74,10 @@ function mapCmsEmbedAttrs(
     unknown
   >;
   if (n.type === 'cmsEmbed') {
-    next.attrs = encode((n.attrs ?? {}) as Record<string, unknown>);
+    next.attrs = { ...transform((n.attrs ?? {}) as Record<string, unknown>) };
   }
   if (Array.isArray(n.content)) {
-    next.content = n.content.map((c) => mapCmsEmbedAttrs(c, encode));
+    next.content = n.content.map((c) => mapCmsEmbedAttrs(c, transform));
   }
   return next;
 }
@@ -88,6 +88,9 @@ export function encodeRichtextRefs(
   typeIdentifierToEntryKeys: Map<string, EntryKeyMap>
 ): unknown {
   return mapCmsEmbedAttrs(value, (attrs) => {
+    // Legacy / unknown-shape attrs (e.g. `embedType`/`embedId` from the old
+    // cmsEmbed implementation) pass through untouched so existing bundles
+    // remain importable.
     if (
       typeof attrs.contentTypeId !== 'string' ||
       typeof attrs.entryId !== 'string'
@@ -115,6 +118,9 @@ export function decodeRichtextRefs(
   typeIdentifierToKeyToEntry: Map<string, Map<string, string>>
 ): unknown {
   return mapCmsEmbedAttrs(value, (attrs) => {
+    // Legacy / unknown-shape attrs (e.g. `embedType`/`embedId` from the old
+    // cmsEmbed implementation) pass through untouched so existing bundles
+    // remain importable.
     if (
       typeof attrs.contentTypeIdentifier !== 'string' ||
       typeof attrs.entryKey !== 'string'
