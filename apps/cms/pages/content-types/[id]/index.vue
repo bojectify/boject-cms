@@ -38,7 +38,6 @@ const draggableFields = computed({
 });
 
 const formName = ref('');
-const formIdentifier = ref('');
 const formDescription = ref('');
 const isSaving = ref(false);
 const saveError = ref<string | null>(null);
@@ -48,7 +47,6 @@ watch(
   (val) => {
     if (val) {
       formName.value = val.name;
-      formIdentifier.value = val.identifier;
       formDescription.value = val.description ?? '';
     }
   },
@@ -68,7 +66,6 @@ async function handleSave() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         name: formName.value.trim(),
-        identifier: formIdentifier.value.trim(),
         description: formDescription.value.trim() || null,
       }),
     });
@@ -361,11 +358,14 @@ async function onFieldReorder() {
 
         <UFormField
           label="Identifier"
-          required
           size="xl"
-          hint="PascalCase, used in APIs"
+          hint="Permanent — used by GraphQL types and portable bundles"
         >
-          <UInput v-model="formIdentifier" class="w-full" />
+          <UInput
+            :model-value="contentType?.identifier ?? ''"
+            disabled
+            class="w-full"
+          />
         </UFormField>
 
         <UFormField label="Description" size="xl">
