@@ -44,7 +44,7 @@ const embed = (contentTypeId: string, entryId: string) => ({
   attrs: { contentTypeId, entryId },
 });
 
-describe('validateEntryData — RICHTEXT embeds', () => {
+describe('validateEntryData — RICHTEXT embeds (cmsEmbed nodes)', () => {
   it('accepts a body with no embeds when allow-list is empty', async () => {
     const result = await validateEntryData(
       { body: doc([para([text('hello')])]) },
@@ -250,7 +250,7 @@ describe('validateEntryData — IMAGE', () => {
   });
 });
 
-describe('RICHTEXT — cmsLink marks', () => {
+describe('validateEntryData — RICHTEXT entry links (cmsLink marks)', () => {
   const fields = (
     allowedLinks: string[]
   ): Parameters<typeof validateEntryData>[1] => [
@@ -287,16 +287,24 @@ describe('RICHTEXT — cmsLink marks', () => {
 
   it('rejects a cmsLink mark whose contentTypeId is NOT in linkTargetContentTypeIds', async () => {
     const data = { body: docWithLink('ct-other', 'e-1') };
-    await expect(validateEntryData(data, fields(['ct-page']))).rejects.toThrow(
-      /Body: Entry link references a content type that is not allowed/
-    );
+    await expect(
+      validateEntryData(data, fields(['ct-page']))
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      statusMessage: expect.stringContaining(
+        'Body: Entry link references a content type that is not allowed'
+      ),
+    });
   });
 
   it('rejects any cmsLink mark when linkTargetContentTypeIds is empty', async () => {
     const data = { body: docWithLink('ct-page', 'e-1') };
-    await expect(validateEntryData(data, fields([]))).rejects.toThrow(
-      /Body: Entry links are not allowed in this field/
-    );
+    await expect(validateEntryData(data, fields([]))).rejects.toMatchObject({
+      statusCode: 400,
+      statusMessage: expect.stringContaining(
+        'Body: Entry links are not allowed in this field'
+      ),
+    });
   });
 
   it('rejects a cmsLink mark missing required ids', async () => {
@@ -319,9 +327,14 @@ describe('RICHTEXT — cmsLink marks', () => {
         ],
       },
     };
-    await expect(validateEntryData(data, fields(['ct-page']))).rejects.toThrow(
-      /Body: Invalid entry link \(missing contentTypeId or entryId\)/
-    );
+    await expect(
+      validateEntryData(data, fields(['ct-page']))
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      statusMessage: expect.stringContaining(
+        'Body: Invalid entry link (missing contentTypeId or entryId)'
+      ),
+    });
   });
 
   it('does not reject external link marks when no link allow-list is set', async () => {
@@ -342,6 +355,63 @@ describe('RICHTEXT — cmsLink marks', () => {
         ],
       },
     };
+    const result = await validateEntryData(data, fields([]));
+    expect(result.body).toEqual(data.body);
+  });
+
+  it('accepts a cmsLink mark when the text node also carries other marks', async () => {
+    const data = {
+      body: {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'click',
+                marks: [
+                  { type: 'bold' },
+                  {
+                    type: 'cmsLink',
+                    attrs: { contentTypeId: 'ct-page', entryId: 'e-1' },
+                  },
+                  { type: 'italic' },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    };
+    const result = await validateEntryData(data, fields(['ct-page']));
+    expect(result.body).toEqual(data.body);
+  });
+
+  it('ignores a cmsLink mark attached to a non-text node', async () => {
+    // The validator only inspects marks on text nodes — pinning the
+    // design decision so a future refactor that walks marks on every
+    // node is caught.
+    const data = {
+      body: {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            marks: [
+              {
+                type: 'cmsLink',
+                attrs: { contentTypeId: 'ct-other', entryId: 'e-1' },
+              },
+            ],
+            content: [{ type: 'text', text: 'plain' }],
+          },
+        ],
+      },
+    };
+    // Pass an empty link allow-list so that, if the validator did walk
+    // non-text nodes' marks, this would throw "Entry links are not
+    // allowed in this field". It must NOT throw.
     const result = await validateEntryData(data, fields([]));
     expect(result.body).toEqual(data.body);
   });
