@@ -249,3 +249,100 @@ describe('validateEntryData — IMAGE', () => {
     expect(result.hero).not.toHaveProperty('junk');
   });
 });
+
+describe('RICHTEXT — cmsLink marks', () => {
+  const fields = (
+    allowedLinks: string[]
+  ): Parameters<typeof validateEntryData>[1] => [
+    {
+      identifier: 'body',
+      name: 'Body',
+      type: 'RICHTEXT',
+      required: false,
+      options: { linkTargetContentTypeIds: allowedLinks },
+    },
+  ];
+
+  const docWithLink = (contentTypeId: string, entryId: string) => ({
+    type: 'doc',
+    content: [
+      {
+        type: 'paragraph',
+        content: [
+          {
+            type: 'text',
+            text: 'click',
+            marks: [{ type: 'cmsLink', attrs: { contentTypeId, entryId } }],
+          },
+        ],
+      },
+    ],
+  });
+
+  it('accepts a cmsLink mark whose contentTypeId is in linkTargetContentTypeIds', async () => {
+    const data = { body: docWithLink('ct-page', 'e-1') };
+    const result = await validateEntryData(data, fields(['ct-page']));
+    expect(result.body).toEqual(data.body);
+  });
+
+  it('rejects a cmsLink mark whose contentTypeId is NOT in linkTargetContentTypeIds', async () => {
+    const data = { body: docWithLink('ct-other', 'e-1') };
+    await expect(validateEntryData(data, fields(['ct-page']))).rejects.toThrow(
+      /Body: Entry link references a content type that is not allowed/
+    );
+  });
+
+  it('rejects any cmsLink mark when linkTargetContentTypeIds is empty', async () => {
+    const data = { body: docWithLink('ct-page', 'e-1') };
+    await expect(validateEntryData(data, fields([]))).rejects.toThrow(
+      /Body: Entry links are not allowed in this field/
+    );
+  });
+
+  it('rejects a cmsLink mark missing required ids', async () => {
+    const data = {
+      body: {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'click',
+                marks: [
+                  { type: 'cmsLink', attrs: { contentTypeId: 'ct-page' } },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    };
+    await expect(validateEntryData(data, fields(['ct-page']))).rejects.toThrow(
+      /Body: Invalid entry link \(missing contentTypeId or entryId\)/
+    );
+  });
+
+  it('does not reject external link marks when no link allow-list is set', async () => {
+    const data = {
+      body: {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'click',
+                marks: [{ type: 'link', attrs: { href: 'https://x.test' } }],
+              },
+            ],
+          },
+        ],
+      },
+    };
+    const result = await validateEntryData(data, fields([]));
+    expect(result.body).toEqual(data.body);
+  });
+});

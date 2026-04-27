@@ -113,9 +113,16 @@ export async function validateEntryData(
         }
         const rtOpts = field.options as {
           targetContentTypeIds?: string[];
+          linkTargetContentTypeIds?: string[];
         } | null;
         const allowedEmbedTypes = rtOpts?.targetContentTypeIds ?? [];
-        validateRichtextEmbeds(value, allowedEmbedTypes, field.name);
+        const allowedLinkTypes = rtOpts?.linkTargetContentTypeIds ?? [];
+        validateRichtextReferences(
+          value,
+          allowedEmbedTypes,
+          allowedLinkTypes,
+          field.name
+        );
         validated[field.identifier] = value;
         break;
       }
@@ -329,18 +336,29 @@ export async function validateEntryData(
 }
 
 /**
- * Walk a ProseMirror JSON document, asserting every `cmsEmbed` node's
- * `contentTypeId` is in the allow-list. Empty allow-list means no embeds
- * are allowed at all.
+ * Walk a ProseMirror JSON document, asserting:
+ *   - every `cmsEmbed` node's `contentTypeId` is in `allowedEmbedTypes`
+ *   - every `cmsLink` mark's `contentTypeId` is in `allowedLinkTypes`
+ * Empty allow-lists mean the corresponding feature is not allowed at all.
+ * External link marks (type === 'link') are unaffected.
+ * cmsLink marks are only inspected on text nodes — matching the
+ * ProseMirror schema we accept.
  */
-function validateRichtextEmbeds(
+function validateRichtextReferences(
   doc: unknown,
-  allowedContentTypeIds: string[],
+  allowedEmbedTypes: string[],
+  allowedLinkTypes: string[],
   fieldName: string
 ): void {
   function walk(node: unknown): void {
     if (!node || typeof node !== 'object') return;
-    const n = node as { type?: unknown; attrs?: unknown; content?: unknown };
+    const n = node as {
+      type?: unknown;
+      attrs?: unknown;
+      marks?: unknown;
+      content?: unknown;
+    };
+
     if (n.type === 'cmsEmbed') {
       const attrs = (n.attrs ?? {}) as Record<string, unknown>;
       if (
@@ -352,20 +370,50 @@ function validateRichtextEmbeds(
           statusMessage: `${fieldName}: Invalid inline embed (missing contentTypeId or entryId).`,
         });
       }
-      if (allowedContentTypeIds.length === 0) {
+      if (allowedEmbedTypes.length === 0) {
         throw createError({
           statusCode: 400,
           statusMessage: `${fieldName}: Inline embeds are not allowed in this field.`,
         });
       }
-      if (!allowedContentTypeIds.includes(attrs.contentTypeId)) {
+      if (!allowedEmbedTypes.includes(attrs.contentTypeId)) {
         throw createError({
           statusCode: 400,
           statusMessage: `${fieldName}: Inline embed references a content type that is not allowed for this field.`,
         });
       }
     }
-    // Marks (e.g. bold, link) are flat on text nodes and never carry embeds; only `content` recurses.
+
+    if (n.type === 'text' && Array.isArray(n.marks)) {
+      for (const mark of n.marks) {
+        if (!mark || typeof mark !== 'object') continue;
+        const m = mark as { type?: unknown; attrs?: unknown };
+        if (m.type !== 'cmsLink') continue;
+        const a = (m.attrs ?? {}) as Record<string, unknown>;
+        if (
+          typeof a.contentTypeId !== 'string' ||
+          typeof a.entryId !== 'string'
+        ) {
+          throw createError({
+            statusCode: 400,
+            statusMessage: `${fieldName}: Invalid entry link (missing contentTypeId or entryId).`,
+          });
+        }
+        if (allowedLinkTypes.length === 0) {
+          throw createError({
+            statusCode: 400,
+            statusMessage: `${fieldName}: Entry links are not allowed in this field.`,
+          });
+        }
+        if (!allowedLinkTypes.includes(a.contentTypeId)) {
+          throw createError({
+            statusCode: 400,
+            statusMessage: `${fieldName}: Entry link references a content type that is not allowed for this field.`,
+          });
+        }
+      }
+    }
+
     if (Array.isArray(n.content)) {
       for (const child of n.content) walk(child);
     }
