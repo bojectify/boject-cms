@@ -2688,5 +2688,61 @@ describe('Content Entry endpoints', async () => {
       });
       expect(res.status).toBe(400);
     });
+
+    it('persists contentTypeIdentifier on cmsEmbed.attrs when saving', async () => {
+      const cookie = await getSessionCookie();
+      const ip = '203.0.113.52';
+      const create = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': ip,
+        },
+        body: JSON.stringify({
+          contentTypeId: hostCt.id,
+          data: {
+            title: 'HostStamped',
+            body: {
+              type: 'doc',
+              content: [
+                {
+                  type: 'paragraph',
+                  content: [
+                    {
+                      type: 'cmsEmbed',
+                      attrs: {
+                        contentTypeId: targetCt.id,
+                        entryId: targetEntryId,
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        }),
+      });
+      expect(create.status).toBe(201);
+      const created = (await create.json()) as {
+        id: string;
+        data: { body: unknown };
+      };
+
+      // Verify the persisted body carries the identifier
+      const get = await fetch(`/api/content-entries/${created.id}`, {
+        headers: { cookie, 'X-Forwarded-For': ip },
+      });
+      const fetched = (await get.json()) as {
+        data: { body: { content: unknown[] } };
+      };
+      const para = fetched.data.body.content[0] as { content: unknown[] };
+      const embed = para.content[0] as { attrs: Record<string, unknown> };
+      expect(embed.attrs).toEqual({
+        contentTypeId: targetCt.id,
+        entryId: targetEntryId,
+        contentTypeIdentifier: 'EmbedNote',
+      });
+    });
   });
 });
