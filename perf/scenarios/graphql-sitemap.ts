@@ -1,3 +1,8 @@
+// Scenario 1A — GraphQL cursor-paginated sitemap drain.
+// Each VU drains every PerfArticle once via perfArticleList; PERF_VUS
+// scales concurrent read load, NOT parallel partitioning. Requires the
+// perf DB to be pre-seeded (`pnpm perf:seed --size=N`) and the perf API
+// key present (`SEED_PERF_KEY=1 pnpm prisma:seed` once per fresh DB).
 import http, { type RefinedResponse, type ResponseType } from 'k6/http';
 import { check, fail } from 'k6';
 import { loadK6Config } from '../lib/config-k6';
