@@ -11,5 +11,10 @@
     "types": ["node"]
   },
   "include": ["lib/**/*.ts", "seed/**/*.ts", "scripts/**/*.ts"],
-  "exclude": ["scenarios/**/*.ts", "lib/auth-k6.ts", "lib/metrics-k6.ts"]
+  "exclude": [
+    "scenarios/**/*.ts",
+    "lib/auth-k6.ts",
+    "lib/metrics-k6.ts",
+    "lib/config-k6.ts"
+  ]
 }

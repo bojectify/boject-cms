@@ -8,5 +8,10 @@
     "skipLibCheck": true,
     "types": ["k6"]
   },
-  "include": ["scenarios/**/*.ts", "lib/auth-k6.ts", "lib/metrics-k6.ts"]
+  "include": [
+    "scenarios/**/*.ts",
+    "lib/auth-k6.ts",
+    "lib/metrics-k6.ts",
+    "lib/config-k6.ts"
+  ]
 }
