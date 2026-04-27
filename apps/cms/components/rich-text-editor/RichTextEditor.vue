@@ -9,11 +9,13 @@ import Link from '@tiptap/extension-link';
 import Image from '@tiptap/extension-image';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
 import { common, createLowlight } from 'lowlight';
+import { CmsEmbed } from './extensions/CmsEmbed';
 import type { RichTextEditorProps } from './richTextEditor.types';
 import { QA_RICH_TEXT_EDITOR } from './richTextEditor.config';
 
 const props = withDefaults(defineProps<RichTextEditorProps>(), {
   testId: QA_RICH_TEXT_EDITOR.COMPONENT,
+  targetContentTypeIds: () => [],
 });
 
 const emit = defineEmits<{
@@ -22,11 +24,13 @@ const emit = defineEmits<{
 
 const lowlight = createLowlight(common);
 
-const editor = useEditor({
-  extensions: [
-    StarterKit.configure({
-      codeBlock: false,
-    }),
+const embedsEnabled = computed(
+  () => (props.targetContentTypeIds?.length ?? 0) > 0
+);
+
+const extensions = computed(() => {
+  const base = [
+    StarterKit.configure({ codeBlock: false }),
     Table.configure({ resizable: true }),
     TableRow,
     TableCell,
@@ -34,7 +38,12 @@ const editor = useEditor({
     Link.configure({ openOnClick: false }),
     Image,
     CodeBlockLowlight.configure({ lowlight }),
-  ],
+  ];
+  return embedsEnabled.value ? [...base, CmsEmbed] : base;
+});
+
+const editor = useEditor({
+  extensions: extensions.value,
   content: props.modelValue as Record<string, unknown> | null,
   onUpdate: ({ editor: e }) => {
     emit('update:modelValue', e.getJSON());
@@ -57,6 +66,27 @@ function promptLink() {
   if (!editor.value) return;
   const url = window.prompt('URL');
   if (url) editor.value.chain().focus().setLink({ href: url }).run();
+}
+
+const pickerOpen = ref(false);
+function openEmbedPicker() {
+  pickerOpen.value = true;
+}
+function handleEmbedSelect(data: {
+  contentTypeId: string;
+  entryId: string;
+  entryTitle: string;
+}) {
+  if (!editor.value) return;
+  editor.value
+    .chain()
+    .focus()
+    .insertContent({
+      type: 'cmsEmbed',
+      attrs: { contentTypeId: data.contentTypeId, entryId: data.entryId },
+    })
+    .run();
+  pickerOpen.value = false;
 }
 
 onBeforeUnmount(() => {
@@ -157,11 +187,28 @@ onBeforeUnmount(() => {
         icon="i-lucide-link"
         @click="promptLink"
       />
+      <UButton
+        v-if="embedsEnabled"
+        variant="ghost"
+        size="xs"
+        icon="i-lucide-at-sign"
+        :data-testid="QA_RICH_TEXT_EDITOR.EMBED_BTN"
+        aria-label="Insert inline embed"
+        @click="openEmbedPicker"
+      />
     </div>
 
     <EditorContent
       :editor="editor"
       class="prose dark:prose-invert max-w-none p-4 min-h-[200px]"
+    />
+
+    <EntryPickerModal
+      v-if="embedsEnabled"
+      :open="pickerOpen"
+      :target-content-type-ids="targetContentTypeIds"
+      @select="handleEmbedSelect"
+      @close="pickerOpen = false"
     />
   </div>
 </template>
