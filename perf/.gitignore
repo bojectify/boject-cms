@@ -1,0 +1,4 @@
+node_modules
+*.log
+# Ignore transient sampler output; real sampler output lives under reports/
+/tmp-samples/

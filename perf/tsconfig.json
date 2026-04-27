@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "allowImportingTsExtensions": false,
+    "types": ["node"]
+  },
+  "include": ["lib/**/*.ts", "seed/**/*.ts", "scripts/**/*.ts"],
+  "exclude": ["scenarios/**/*.ts", "lib/auth-k6.ts", "lib/metrics-k6.ts"]
+}
