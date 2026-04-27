@@ -4,6 +4,7 @@ export default defineConfig({
   test: {
     include: ['lib/**/*.test.ts', 'seed/**/*.test.ts', 'scripts/**/*.test.ts'],
     exclude: ['scenarios/**', 'reports/**'],
+    passWithNoTests: true,
     pool: 'forks',
     poolOptions: { forks: { singleFork: true } },
   },
