@@ -31,7 +31,14 @@ pre-push:
     - name: test
       run: pnpm test
       skip:
-        - run: test "$WALLABY_VERIFIED" = "1"
+        # Skip only when the agent set WALLABY_VERIFIED=1 AND Wallaby is
+        # actually running in the IDE (~/.wallaby/.processes/ is non-empty
+        # while Wallaby has live runners; empty when the IDE is closed or
+        # Wallaby is stopped). Belt-and-braces against an agent setting the
+        # flag based on a stale/disconnected MCP response.
+        - run: |
+            test "$WALLABY_VERIFIED" = "1" \
+              && [ -n "$(ls -A "$HOME/.wallaby/.processes" 2>/dev/null)" ]
 
     - name: storybook-test
       run: pnpm --filter cms test:storybook
