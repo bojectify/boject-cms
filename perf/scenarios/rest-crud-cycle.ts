@@ -5,8 +5,7 @@
 // not the Bearer API key — exercises the CSRF middleware too.
 // Requires the perf DB seeded and admin@example.com / password reachable.
 import http from 'k6/http';
-import { check, group } from 'k6';
-import { SharedArray } from 'k6/data';
+import { group } from 'k6';
 import { loadK6Config } from '../lib/config-k6';
 import { sessionLoginCookie, sessionHeaders } from '../lib/auth-k6';
 import {
@@ -49,18 +48,11 @@ export function setup(): SetupData {
   const ct = body.items.find((t) => t.identifier === 'PerfArticle');
   if (!ct) {
     throw new Error(
-      'PerfArticle content type not found — run `pnpm perf:seed --size=0` first'
+      'PerfArticle content type not found — run `pnpm perf:seed --size=1` first'
     );
   }
   return { cookie, contentTypeId: ct.id };
 }
-
-// Reserved for the strict-ordering follow-up — see header comment.
-// Underscore-prefixed so unused-vars lint is satisfied while the
-// declaration documents intent for the future refinement.
-const _createdIds = new SharedArray<string>('createdIds', () => {
-  return new Array(N).fill('');
-});
 
 export default function crud(data: SetupData) {
   const cfg = loadK6Config();
@@ -121,7 +113,10 @@ export default function crud(data: SetupData) {
         { headers, tags: { phase: 'read' } }
       );
       crudReadLatency.add(res.timings.duration);
-      check(res, { '2xx read': (r) => r.status === 200 });
+      // 404 here means another VU's delete reached the same head item first.
+      // That's a normal race under load, not an unexpected error.
+      if (res.status === 404) return;
+      if (res.status < 200 || res.status >= 300) unexpectedErrors.add(1);
     });
     return;
   }
@@ -144,6 +139,9 @@ export default function crud(data: SetupData) {
     );
     crudDeleteLatency.add(res.timings.duration);
     if (res.status === 429) intentional429s.add(1);
+    // 404 here means another VU already deleted the same head item.
+    // That's a normal race under load, not an unexpected error.
+    else if (res.status === 404) return;
     else if (res.status < 200 || res.status >= 300) unexpectedErrors.add(1);
   });
 }
