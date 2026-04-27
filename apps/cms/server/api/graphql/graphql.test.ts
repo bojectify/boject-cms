@@ -947,6 +947,12 @@ describe('GraphQL API', async () => {
         },
       });
       articleEntryId = article.id;
+
+      expect(tagTypeId).toBeTruthy();
+      expect(articleTypeId).toBeTruthy();
+      expect(tag1Id).toBeTruthy();
+      expect(tag2Id).toBeTruthy();
+      expect(articleEntryId).toBeTruthy();
     });
 
     it('returns json + deduplicated references with fragment-narrowed types', async () => {
@@ -1024,6 +1030,11 @@ describe('GraphQL API', async () => {
       `);
       expect(res.errors).toBeUndefined();
       expect(res.data.rtArticle.body.references).toEqual([]);
+
+      await $fetch<unknown>(`/api/content-entries/${created.id}`, {
+        method: 'DELETE',
+        headers: { cookie },
+      }).catch(() => {});
     });
 
     it('drops references whose target has no PUBLISHED version', async () => {
@@ -1079,6 +1090,15 @@ describe('GraphQL API', async () => {
       `);
       expect(res.errors).toBeUndefined();
       expect(res.data.rtArticle.body.references).toEqual([]);
+
+      await $fetch<unknown>(`/api/content-entries/${article.id}`, {
+        method: 'DELETE',
+        headers: { cookie },
+      }).catch(() => {});
+      await $fetch<unknown>(`/api/content-entries/${draftTag.id}`, {
+        method: 'DELETE',
+        headers: { cookie },
+      }).catch(() => {});
     });
 
     it('cleans up richtext-references test data', async () => {

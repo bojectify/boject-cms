@@ -139,10 +139,11 @@ export function registerDynamicTypes(
     fields: (t) => ({
       json: t.field({
         type: 'JSON',
-        resolve: (rt) => rt.json as never,
+        resolve: (rt) => rt.json,
       }),
       references: t.field({
         type: [ContentEntryInterface],
+        nullable: false,
         resolve: async (rt) => {
           const refs = collectRichtextReferences(rt.json);
           if (refs.length === 0) return [];
