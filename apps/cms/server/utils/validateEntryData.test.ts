@@ -115,6 +115,73 @@ describe('validateEntryData — RICHTEXT embeds', () => {
       )
     ).rejects.toMatchObject({ statusCode: 400 });
   });
+
+  it('walks list items (embed inside a bulletList > listItem > paragraph)', async () => {
+    await expect(
+      validateEntryData(
+        {
+          body: doc([
+            {
+              type: 'bulletList',
+              content: [
+                {
+                  type: 'listItem',
+                  content: [para([embed('disallowed-ct', 'e1')])],
+                },
+              ],
+            },
+          ]),
+        },
+        [richtextFieldWithAllowList]
+      )
+    ).rejects.toMatchObject({ statusCode: 400 });
+  });
+
+  it('walks table cells (embed inside a table > row > cell)', async () => {
+    await expect(
+      validateEntryData(
+        {
+          body: doc([
+            {
+              type: 'table',
+              content: [
+                {
+                  type: 'tableRow',
+                  content: [
+                    {
+                      type: 'tableCell',
+                      content: [para([embed('disallowed-ct', 'e1')])],
+                    },
+                  ],
+                },
+              ],
+            },
+          ]),
+        },
+        [richtextFieldWithAllowList]
+      )
+    ).rejects.toMatchObject({ statusCode: 400 });
+  });
+
+  it('rejects when ANY embed in the document is disallowed (does not short-circuit on first valid embed)', async () => {
+    await expect(
+      validateEntryData(
+        {
+          body: doc([
+            para([
+              embed('allowed-ct-uuid', 'e1'),
+              text(' and '),
+              embed('disallowed-ct', 'e2'),
+            ]),
+          ]),
+        },
+        [richtextFieldWithAllowList]
+      )
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      statusMessage: expect.stringContaining('not allowed for this field'),
+    });
+  });
 });
 
 describe('validateEntryData — IMAGE', () => {

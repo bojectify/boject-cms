@@ -365,6 +365,7 @@ function validateRichtextEmbeds(
         });
       }
     }
+    // Marks (e.g. bold, link) are flat on text nodes and never carry embeds; only `content` recurses.
     if (Array.isArray(n.content)) {
       for (const child of n.content) walk(child);
     }
