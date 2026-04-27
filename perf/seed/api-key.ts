@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto';
 
+// KEEP IN SYNC with PERF_KEY_RAW in apps/cms/prisma/seed.ts —
+// a drift here silently 401s every k6 scenario.
 const PERF_KEY_RAW = 'boject_perf_key_for_load_tests_only';
 
 export interface EnsureOpts {
