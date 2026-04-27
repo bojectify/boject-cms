@@ -43,12 +43,12 @@
     "starters:check": "pnpm --filter cms starters:check",
     "storybook": "pnpm --filter cms storybook",
     "storybook:build": "pnpm --filter cms storybook:build",
-    "perf:seed": "pnpm --filter @boject/perf seed",
-    "perf:reset": "pnpm --filter @boject/perf reset",
-    "perf:sweep": "pnpm --filter @boject/perf sweep",
-    "perf:report": "pnpm --filter @boject/perf report",
-    "perf:followups": "pnpm --filter @boject/perf followups",
-    "perf:scenario": "pnpm --filter @boject/perf scenario"
+    "perf:seed": "pnpm --filter @boject/perf run seed",
+    "perf:reset": "pnpm --filter @boject/perf run reset",
+    "perf:sweep": "pnpm --filter @boject/perf run sweep",
+    "perf:report": "pnpm --filter @boject/perf run report",
+    "perf:followups": "pnpm --filter @boject/perf run followups",
+    "perf:scenario": "pnpm --filter @boject/perf run scenario"
   },
   "devDependencies": {
     "@types/node": "^24.12.2",

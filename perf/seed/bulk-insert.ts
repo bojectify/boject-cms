@@ -87,6 +87,11 @@ export interface SeedExecOptions {
   seed?: number;
 }
 
+// Caller contract: run `resetPerfDb` before `seedPerfData` whenever you need
+// schema agreement. We upsert content types by identifier but do NOT reconcile
+// fields if the type already exists, so a previous run with different
+// `PERF_CONTENT_TYPES` would leak its schema into k6 scenarios. Sweep flow
+// (Task 13+) always resets first; ad hoc callers must do the same.
 export async function seedPerfData(opts: SeedExecOptions): Promise<void> {
   const authorCount = opts.authorCount ?? 50;
   const seed = opts.seed ?? 1;
