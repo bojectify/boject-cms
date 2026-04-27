@@ -63,6 +63,76 @@ export function decodeRelationRef(
   return { contentTypeId, entryId };
 }
 
+function mapCmsEmbedAttrs(
+  node: unknown,
+  encode: (attrs: Record<string, unknown>) => Record<string, unknown>
+): unknown {
+  if (!node || typeof node !== 'object') return node;
+  const n = node as { type?: unknown; attrs?: unknown; content?: unknown };
+  const next: Record<string, unknown> = { ...(n as object) } as Record<
+    string,
+    unknown
+  >;
+  if (n.type === 'cmsEmbed') {
+    next.attrs = encode((n.attrs ?? {}) as Record<string, unknown>);
+  }
+  if (Array.isArray(n.content)) {
+    next.content = n.content.map((c) => mapCmsEmbedAttrs(c, encode));
+  }
+  return next;
+}
+
+export function encodeRichtextRefs(
+  value: unknown,
+  typeIdToIdentifier: Map<string, string>,
+  typeIdentifierToEntryKeys: Map<string, EntryKeyMap>
+): unknown {
+  return mapCmsEmbedAttrs(value, (attrs) => {
+    if (
+      typeof attrs.contentTypeId !== 'string' ||
+      typeof attrs.entryId !== 'string'
+    ) {
+      return attrs;
+    }
+    const ref = encodeRelationRef(
+      {
+        contentTypeId: attrs.contentTypeId,
+        entryId: attrs.entryId,
+      },
+      typeIdToIdentifier,
+      typeIdentifierToEntryKeys
+    );
+    return {
+      contentTypeIdentifier: ref.contentTypeIdentifier,
+      entryKey: ref.entryKey,
+    };
+  });
+}
+
+export function decodeRichtextRefs(
+  value: unknown,
+  identifierToTypeId: Map<string, string>,
+  typeIdentifierToKeyToEntry: Map<string, Map<string, string>>
+): unknown {
+  return mapCmsEmbedAttrs(value, (attrs) => {
+    if (
+      typeof attrs.contentTypeIdentifier !== 'string' ||
+      typeof attrs.entryKey !== 'string'
+    ) {
+      return attrs;
+    }
+    const uuid = decodeRelationRef(
+      {
+        contentTypeIdentifier: attrs.contentTypeIdentifier,
+        entryKey: attrs.entryKey,
+      },
+      identifierToTypeId,
+      typeIdentifierToKeyToEntry
+    );
+    return { contentTypeId: uuid.contentTypeId, entryId: uuid.entryId };
+  });
+}
+
 type FieldTypeMap = Record<string, FieldType>;
 
 export function encodeDataRefs(
@@ -87,6 +157,12 @@ export function encodeDataRefs(
     } else if (type === 'MULTIRELATION') {
       out[key] = (value as UuidRelationRef[]).map((ref) =>
         encodeRelationRef(ref, typeIdToIdentifier, typeIdentifierToEntryKeys)
+      );
+    } else if (type === 'RICHTEXT') {
+      out[key] = encodeRichtextRefs(
+        value,
+        typeIdToIdentifier,
+        typeIdentifierToEntryKeys
       );
     } else {
       out[key] = value;
@@ -117,6 +193,12 @@ export function decodeDataRefs(
     } else if (type === 'MULTIRELATION') {
       out[key] = (value as PortableRelationRef[]).map((ref) =>
         decodeRelationRef(ref, identifierToTypeId, typeIdentifierToKeyToEntry)
+      );
+    } else if (type === 'RICHTEXT') {
+      out[key] = decodeRichtextRefs(
+        value,
+        identifierToTypeId,
+        typeIdentifierToKeyToEntry
       );
     } else {
       out[key] = value;
