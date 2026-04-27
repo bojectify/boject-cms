@@ -10,12 +10,14 @@ import Image from '@tiptap/extension-image';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
 import { common, createLowlight } from 'lowlight';
 import { CmsEmbed } from './extensions/CmsEmbed';
+import { CmsLink } from './extensions/CmsLink';
 import type { RichTextEditorProps } from './richTextEditor.types';
 import { QA_RICH_TEXT_EDITOR } from './richTextEditor.config';
 
 const props = withDefaults(defineProps<RichTextEditorProps>(), {
   testId: QA_RICH_TEXT_EDITOR.COMPONENT,
   targetContentTypeIds: () => [],
+  linkTargetContentTypeIds: () => [],
 });
 
 const emit = defineEmits<{
@@ -26,6 +28,10 @@ const lowlight = createLowlight(common);
 
 const embedsEnabled = computed(
   () => (props.targetContentTypeIds?.length ?? 0) > 0
+);
+
+const cmsLinksEnabled = computed(
+  () => (props.linkTargetContentTypeIds?.length ?? 0) > 0
 );
 
 // Intentionally read once at editor creation; allow-list changes
@@ -41,7 +47,8 @@ const extensions = computed(() => {
     Image,
     CodeBlockLowlight.configure({ lowlight }),
   ];
-  return embedsEnabled.value ? [...base, CmsEmbed] : base;
+  const withEmbed = embedsEnabled.value ? [...base, CmsEmbed] : base;
+  return cmsLinksEnabled.value ? [...withEmbed, CmsLink] : withEmbed;
 });
 
 const editor = useEditor({
@@ -89,6 +96,30 @@ function handleEmbedSelect(data: {
     })
     .run();
   pickerOpen.value = false;
+}
+
+const linkPickerOpen = ref(false);
+function openCmsLinkPicker() {
+  if (!editor.value) return;
+  // Require a non-empty selection so we have text to wrap.
+  const { from, to } = editor.value.state.selection;
+  if (from === to) {
+    window.alert('Select some text to turn into an entry link.');
+    return;
+  }
+  linkPickerOpen.value = true;
+}
+function handleCmsLinkSelect(data: { contentTypeId: string; entryId: string }) {
+  if (!editor.value) return;
+  editor.value
+    .chain()
+    .focus()
+    .setMark('cmsLink', {
+      contentTypeId: data.contentTypeId,
+      entryId: data.entryId,
+    })
+    .run();
+  linkPickerOpen.value = false;
 }
 
 onBeforeUnmount(() => {
@@ -198,6 +229,16 @@ onBeforeUnmount(() => {
         aria-label="Insert inline embed"
         @click="openEmbedPicker"
       />
+      <UButton
+        v-if="cmsLinksEnabled"
+        variant="ghost"
+        size="xs"
+        icon="i-lucide-link-2"
+        :color="editor?.isActive('cmsLink') ? 'primary' : 'neutral'"
+        :data-testid="QA_RICH_TEXT_EDITOR.CMS_LINK_BTN"
+        aria-label="Link to entry"
+        @click="openCmsLinkPicker"
+      />
     </div>
 
     <EditorContent
@@ -211,6 +252,14 @@ onBeforeUnmount(() => {
       :target-content-type-ids="targetContentTypeIds"
       @select="handleEmbedSelect"
       @close="pickerOpen = false"
+    />
+
+    <EntryPickerModal
+      v-if="linkPickerOpen"
+      :open="linkPickerOpen"
+      :target-content-type-ids="linkTargetContentTypeIds"
+      @select="handleCmsLinkSelect"
+      @close="linkPickerOpen = false"
     />
   </div>
 </template>
