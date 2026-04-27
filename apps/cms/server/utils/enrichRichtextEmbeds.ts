@@ -13,11 +13,26 @@ export function collectEmbedContentTypeIds(
   out: Set<string> = new Set()
 ): Set<string> {
   if (!body || typeof body !== 'object') return out;
-  const n = body as { type?: unknown; attrs?: unknown; content?: unknown };
+  const n = body as {
+    type?: unknown;
+    attrs?: unknown;
+    marks?: unknown;
+    content?: unknown;
+  };
   if (n.type === 'cmsEmbed') {
     const attrs = (n.attrs ?? {}) as Record<string, unknown>;
     if (typeof attrs.contentTypeId === 'string') {
       out.add(attrs.contentTypeId);
+    }
+  }
+  if (Array.isArray(n.marks)) {
+    for (const mark of n.marks) {
+      if (!mark || typeof mark !== 'object') continue;
+      const m = mark as { type?: unknown; attrs?: unknown };
+      if (m.type === 'cmsLink') {
+        const a = (m.attrs ?? {}) as Record<string, unknown>;
+        if (typeof a.contentTypeId === 'string') out.add(a.contentTypeId);
+      }
     }
   }
   if (Array.isArray(n.content)) {
@@ -47,11 +62,11 @@ export function enrichBodyWithContentTypeIdentifiers(
   const n = body as {
     type?: unknown;
     attrs?: unknown;
+    marks?: unknown;
     content?: unknown;
     [key: string]: unknown;
   };
 
-  // Shallow-copy the node so we never mutate the input
   let result: Record<string, unknown> = { ...(n as object) } as Record<
     string,
     unknown
@@ -63,19 +78,31 @@ export function enrichBodyWithContentTypeIdentifiers(
       typeof attrs.contentTypeId === 'string'
         ? identifierMap.get(attrs.contentTypeId)
         : undefined;
-
     if (identifier !== undefined) {
       result = {
         ...result,
         attrs: { ...attrs, contentTypeIdentifier: identifier },
       };
     }
-    // If no identifier found (deleted content type), leave attrs alone —
-    // do NOT propagate into `content` since cmsEmbed is an atom node.
     return result;
   }
 
-  // Recurse into content array when present
+  if (Array.isArray(n.marks)) {
+    const newMarks = n.marks.map((mark) => {
+      if (!mark || typeof mark !== 'object') return mark;
+      const m = mark as { type?: unknown; attrs?: unknown };
+      if (m.type !== 'cmsLink') return mark;
+      const attrs = (m.attrs ?? {}) as Record<string, unknown>;
+      const identifier =
+        typeof attrs.contentTypeId === 'string'
+          ? identifierMap.get(attrs.contentTypeId)
+          : undefined;
+      if (identifier === undefined) return mark;
+      return { ...m, attrs: { ...attrs, contentTypeIdentifier: identifier } };
+    });
+    result = { ...result, marks: newMarks };
+  }
+
   if (Array.isArray(n.content)) {
     const newContent = n.content.map((child) =>
       enrichBodyWithContentTypeIdentifiers(child, identifierMap)
