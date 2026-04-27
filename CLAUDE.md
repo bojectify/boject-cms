@@ -306,9 +306,11 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder. The schema is
 
 Before pushing, attempt to check Wallaby for failing tests via `wallaby_failingTests` MCP tool:
 
-1. **Wallaby unavailable** — If the MCP call fails, hangs, is rejected, or the MCP server is not connected, fall back to a normal `git push` (the full test suite runs via the pre-push hook).
-2. **No failures** — Push with `WALLABY_VERIFIED=1 git push` — this skips the `test` job in the pre-push hook (Wallaby already validated). Other pre-push jobs still run.
+1. **Wallaby unavailable** — If the MCP call fails, hangs, is rejected, the MCP server is not connected, OR the response is `<No data available>` / empty / null (Wallaby is not running in the IDE — the MCP process is persistent and answers even when there's no live test runner to query), fall back to a normal `git push` (the full test suite runs via the pre-push hook). **Do not** set `WALLABY_VERIFIED=1` in this case.
+2. **No failures** — Only set this when Wallaby returned a structured response confirming an empty failures array. Push with `WALLABY_VERIFIED=1 git push` — this skips the `test` job in the pre-push hook (Wallaby already validated). Other pre-push jobs still run.
 3. **Failures found** — Report the failing tests to the user instead of pushing.
+
+The pre-push hook also verifies Wallaby is actually live (checks `~/.wallaby/.processes/` is non-empty) before honoring `WALLABY_VERIFIED=1` — if you set the flag while Wallaby is stopped, the hook ignores it and runs the full suite anyway.
 
 ## Testing
 
