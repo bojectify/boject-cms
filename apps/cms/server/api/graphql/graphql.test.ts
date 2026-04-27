@@ -1110,6 +1110,11 @@ describe('GraphQL API', async () => {
       }>(`/api/content-types/${articleTypeId}`, { headers: { cookie } });
       const bodyField = ct.fields.find((f) => f.identifier === 'body');
       expect(bodyField).toBeTruthy();
+      // NOTE: this PUT permanently mutates the body field's options for the
+      // rest of this describe block (until the cleanup `it` deletes the type).
+      // Subsequent tests in this describe inherit linkTargetContentTypeIds:
+      // [tagTypeId]. If you add a test that needs the field WITHOUT a link
+      // allow-list, insert it BEFORE this `it` or reset the option here.
       await $fetch<unknown>(
         `/api/content-types/${articleTypeId}/fields/${bodyField!.id}`,
         {
@@ -1281,6 +1286,9 @@ describe('GraphQL API', async () => {
 
       await expect(create).rejects.toMatchObject({
         statusCode: 400,
+        statusMessage: expect.stringContaining(
+          'Entry link references a content type that is not allowed'
+        ),
       });
 
       // Cleanup
