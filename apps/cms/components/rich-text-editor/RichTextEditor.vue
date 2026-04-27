@@ -28,6 +28,8 @@ const embedsEnabled = computed(
   () => (props.targetContentTypeIds?.length ?? 0) > 0
 );
 
+// Intentionally read once at editor creation; allow-list changes
+// mid-session would not hot-reconfigure the editor.
 const extensions = computed(() => {
   const base = [
     StarterKit.configure({ codeBlock: false }),
@@ -204,7 +206,7 @@ onBeforeUnmount(() => {
     />
 
     <EntryPickerModal
-      v-if="embedsEnabled"
+      v-if="pickerOpen"
       :open="pickerOpen"
       :target-content-type-ids="targetContentTypeIds"
       @select="handleEmbedSelect"
