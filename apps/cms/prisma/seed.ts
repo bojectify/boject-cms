@@ -70,6 +70,18 @@ async function main() {
     },
   });
 
+  if (process.env.SEED_PERF_KEY === '1') {
+    const PERF_KEY_RAW = 'boject_perf_key_for_load_tests_only';
+    const keyHash = createHash('sha256').update(PERF_KEY_RAW).digest('hex');
+    const keyPrefix = PERF_KEY_RAW.slice(0, 11);
+    await prisma.apiKey.upsert({
+      where: { keyHash },
+      update: {},
+      create: { name: '@boject/perf load test key', keyHash, keyPrefix },
+    });
+    console.log('[seed] perf load-test API key present');
+  }
+
   console.log('Seed complete (user + test API key).');
 }
 
