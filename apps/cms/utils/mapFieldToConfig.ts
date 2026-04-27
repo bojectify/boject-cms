@@ -58,12 +58,14 @@ export function mapFieldToConfig(field: {
     case 'RICHTEXT': {
       const opts = field.options as {
         targetContentTypeIds?: string[];
+        linkTargetContentTypeIds?: string[];
       } | null;
       return {
         type: 'richtext',
         key: field.identifier,
         label: field.name,
         targetContentTypeIds: opts?.targetContentTypeIds ?? [],
+        linkTargetContentTypeIds: opts?.linkTargetContentTypeIds ?? [],
       };
     }
     case 'RELATION': {

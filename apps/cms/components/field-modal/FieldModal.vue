@@ -89,6 +89,21 @@ function handleDelete() {
 }
 
 function updateOptions(val: unknown) {
+  // Merge object-shaped partial updates with the current options so
+  // multiple pickers (e.g. RICHTEXT embed + link allow-lists) can each
+  // call updateOptions({ singleKey }) without erasing the others.
+  const current = formOptions.value;
+  if (
+    val &&
+    typeof val === 'object' &&
+    !Array.isArray(val) &&
+    current &&
+    typeof current === 'object' &&
+    !Array.isArray(current)
+  ) {
+    formOptions.value = { ...current, ...val };
+    return;
+  }
   formOptions.value = val;
 }
 

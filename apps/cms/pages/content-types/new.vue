@@ -376,26 +376,43 @@ async function handleSave() {
             "
           />
         </UFormField>
-        <UFormField
-          v-else-if="type === 'RICHTEXT'"
-          label="Allowed inline embed types"
-        >
-          <ContentTypeChipPicker
-            :model-value="
-              options &&
-              typeof options === 'object' &&
-              'targetContentTypeIds' in options
-                ? (options as { targetContentTypeIds: string[] })
-                    .targetContentTypeIds
-                : []
-            "
-            :options="contentTypeOptions ?? []"
-            empty-hint="No inline embeds will be allowed in this field. Add a content type to enable inline embeds."
-            @update:model-value="
-              (val: string[]) => updateOptions({ targetContentTypeIds: val })
-            "
-          />
-        </UFormField>
+        <template v-else-if="type === 'RICHTEXT'">
+          <UFormField label="Allowed inline embed types">
+            <ContentTypeChipPicker
+              :model-value="
+                options &&
+                typeof options === 'object' &&
+                'targetContentTypeIds' in options
+                  ? (options as { targetContentTypeIds: string[] })
+                      .targetContentTypeIds
+                  : []
+              "
+              :options="contentTypeOptions ?? []"
+              empty-hint="No inline embeds will be allowed in this field. Add a content type to enable inline embeds."
+              @update:model-value="
+                (val: string[]) => updateOptions({ targetContentTypeIds: val })
+              "
+            />
+          </UFormField>
+          <UFormField label="Allowed entry-link target types">
+            <ContentTypeChipPicker
+              :model-value="
+                options &&
+                typeof options === 'object' &&
+                'linkTargetContentTypeIds' in options
+                  ? (options as { linkTargetContentTypeIds: string[] })
+                      .linkTargetContentTypeIds
+                  : []
+              "
+              :options="contentTypeOptions ?? []"
+              empty-hint="No entry links will be allowed in this field. Add a content type to enable entry links."
+              @update:model-value="
+                (val: string[]) =>
+                  updateOptions({ linkTargetContentTypeIds: val })
+              "
+            />
+          </UFormField>
+        </template>
       </template>
     </FieldModal>
   </div>

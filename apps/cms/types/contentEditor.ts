@@ -58,6 +58,7 @@ export interface RichtextFieldConfig {
   key: string;
   label: string;
   targetContentTypeIds?: string[];
+  linkTargetContentTypeIds?: string[];
 }
 
 export interface MultirelationFieldConfig {

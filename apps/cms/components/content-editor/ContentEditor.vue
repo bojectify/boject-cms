@@ -263,6 +263,9 @@ defineExpose({ validate: runValidation });
             <RichTextEditor
               :model-value="state[field.key]"
               :target-content-type-ids="field.targetContentTypeIds ?? []"
+              :link-target-content-type-ids="
+                field.linkTargetContentTypeIds ?? []
+              "
               @update:model-value="state[field.key] = $event"
             />
           </UFormField>

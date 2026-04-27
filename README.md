@@ -186,7 +186,45 @@ All list queries return [Relay-style cursor connections](https://relay.dev/graph
 ### Custom Scalars
 
 - **DateTime** — Serialises as ISO-8601 strings, parses string input to `Date`.
-- **JSON** — Pass-through scalar for RICHTEXT fields (Tiptap ProseMirror JSON).
+- **JSON** — Pass-through scalar (used for the `json` field of the `RichText` object type and for any other JSON-typed fields).
+
+### RICHTEXT fields
+
+RICHTEXT fields resolve to a shared `RichText` object type, not a raw JSON scalar:
+
+```graphql
+type RichText {
+  json: JSON!
+  references: [ContentEntry!]!
+}
+```
+
+`references` is the deduplicated set of `ContentEntry` instances the body links to via `cmsEmbed` nodes (inline embeds) and `cmsLink` marks (entry-targeted hyperlinks). Because every dynamic content type implements the shared `ContentEntry` interface, you spread per-type fragments and traverse relations directly:
+
+```graphql
+{
+  articleBySlug(slug: "hello-world") {
+    body {
+      json
+      references {
+        __typename
+        id
+        ... on Page {
+          slug
+        }
+        ... on Fixture {
+          slug
+          team {
+            slug
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+A single batched query returns the body plus everything it references — no N+1.
 
 ### Authentication
 
