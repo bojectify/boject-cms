@@ -100,15 +100,25 @@ export async function validateEntryData(
         break;
       }
 
-      case 'RICHTEXT':
-        if (typeof value !== 'object' || Array.isArray(value)) {
+      case 'RICHTEXT': {
+        if (
+          typeof value !== 'object' ||
+          value === null ||
+          Array.isArray(value)
+        ) {
           throw createError({
             statusCode: 400,
             statusMessage: `${field.name} must be a JSON object`,
           });
         }
+        const rtOpts = field.options as {
+          targetContentTypeIds?: string[];
+        } | null;
+        const allowedEmbedTypes = rtOpts?.targetContentTypeIds ?? [];
+        validateRichtextEmbeds(value, allowedEmbedTypes, field.name);
         validated[field.identifier] = value;
         break;
+      }
 
       case 'RELATION': {
         if (
@@ -316,6 +326,51 @@ export async function validateEntryData(
 
   // Strip unknown keys (only return validated field values)
   return validated;
+}
+
+/**
+ * Walk a ProseMirror JSON document, asserting every `cmsEmbed` node's
+ * `contentTypeId` is in the allow-list. Empty allow-list means no embeds
+ * are allowed at all.
+ */
+function validateRichtextEmbeds(
+  doc: unknown,
+  allowedContentTypeIds: string[],
+  fieldName: string
+): void {
+  function walk(node: unknown): void {
+    if (!node || typeof node !== 'object') return;
+    const n = node as { type?: unknown; attrs?: unknown; content?: unknown };
+    if (n.type === 'cmsEmbed') {
+      const attrs = (n.attrs ?? {}) as Record<string, unknown>;
+      if (
+        typeof attrs.contentTypeId !== 'string' ||
+        typeof attrs.entryId !== 'string'
+      ) {
+        throw createError({
+          statusCode: 400,
+          statusMessage: `${fieldName}: Invalid inline embed (missing contentTypeId or entryId).`,
+        });
+      }
+      if (allowedContentTypeIds.length === 0) {
+        throw createError({
+          statusCode: 400,
+          statusMessage: `${fieldName}: Inline embeds are not allowed in this field.`,
+        });
+      }
+      if (!allowedContentTypeIds.includes(attrs.contentTypeId)) {
+        throw createError({
+          statusCode: 400,
+          statusMessage: `${fieldName}: Inline embed references a content type that is not allowed for this field.`,
+        });
+      }
+    }
+    // Marks (e.g. bold, link) are flat on text nodes and never carry embeds; only `content` recurses.
+    if (Array.isArray(n.content)) {
+      for (const child of n.content) walk(child);
+    }
+  }
+  walk(doc);
 }
 
 /**

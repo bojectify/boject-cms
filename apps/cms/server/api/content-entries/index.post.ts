@@ -3,6 +3,7 @@ import { assertUuid } from '../../utils/validation';
 import { withPrismaErrors } from '../../utils/prismaErrors';
 import { enforceMutationRateLimit } from '../../utils/rateLimitEndpoint';
 import { assertUniqueFieldValues } from '../../utils/assertUniqueFieldValues';
+import { enrichEntryDataWithEmbedIdentifiers } from '../../utils/enrichRichtextEmbeds';
 import {
   flattenEntryWithVersion,
   getPublishedVersion,
@@ -44,8 +45,21 @@ export default defineEventHandler(async (event) => {
     contentType.fields,
     contentTypeId
   );
-  const slug = extractSlug(validatedData, contentType.fields);
-  const entryTitle = extractEntryTitle(validatedData, contentType.fields);
+  const enrichedData = await enrichEntryDataWithEmbedIdentifiers(
+    validatedData,
+    contentType.fields,
+    {
+      loadIdentifiers: async (ids) => {
+        const types = await prisma.contentType.findMany({
+          where: { id: { in: ids } },
+          select: { id: true, identifier: true },
+        });
+        return new Map(types.map((t) => [t.id, t.identifier] as const));
+      },
+    }
+  );
+  const slug = extractSlug(enrichedData, contentType.fields);
+  const entryTitle = extractEntryTitle(enrichedData, contentType.fields);
 
   let status = 'DRAFT';
   if (typeof body.status === 'string' && VALID_STATUSES.has(body.status)) {
@@ -61,7 +75,7 @@ export default defineEventHandler(async (event) => {
           slug,
           versions: {
             create: {
-              data: validatedData as Prisma.InputJsonValue,
+              data: enrichedData as Prisma.InputJsonValue,
               entryTitle,
               status: status as 'DRAFT',
               publishedAt: status === 'PUBLISHED' ? new Date() : undefined,
