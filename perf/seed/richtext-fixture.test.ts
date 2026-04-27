@@ -21,9 +21,17 @@ describe('generateRichtext', () => {
     expect(JSON.stringify(a)).not.toBe(JSON.stringify(b));
   });
 
-  it('output serialises to approximately 5KB', () => {
-    const size = JSON.stringify(generateRichtext(1)).length;
-    expect(size).toBeGreaterThan(3500);
-    expect(size).toBeLessThan(7500);
+  it('output serialises to approximately 5KB across the full seed range', () => {
+    // Sampled across seeds 1..1000: min 4198, max 5482, p50 4794.
+    // Tighter than the original 3500..7500 to catch drift without admitting
+    // the under-sized docs the loose bounds previously tolerated.
+    const sizes: number[] = [];
+    for (let i = 1; i <= 1000; i++) {
+      sizes.push(JSON.stringify(generateRichtext(i)).length);
+    }
+    const min = Math.min(...sizes);
+    const max = Math.max(...sizes);
+    expect(min).toBeGreaterThan(4000);
+    expect(max).toBeLessThan(6000);
   });
 });

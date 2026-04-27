@@ -38,7 +38,7 @@ function pickN<T>(arr: T[], n: number, rand: () => number): T[] {
 }
 
 function paragraph(rand: () => number): ProseMirrorNode {
-  const wordCount = 40 + Math.floor(rand() * 40);
+  const wordCount = 70 + Math.floor(rand() * 40);
   return {
     type: 'paragraph',
     content: [{ type: 'text', text: pickN(LOREM, wordCount, rand).join(' ') }],
