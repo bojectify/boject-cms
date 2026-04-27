@@ -12,22 +12,32 @@ const resolved = ref<{
 } | null>(null);
 const missing = ref(false);
 
+let lastAttempt = 0;
+
 async function load() {
+  const attempt = ++lastAttempt;
   const contentTypeId = props.node.attrs.contentTypeId as string | null;
   const entryId = props.node.attrs.entryId as string | null;
   if (!contentTypeId || !entryId) {
-    missing.value = true;
+    if (attempt === lastAttempt) {
+      missing.value = true;
+      resolved.value = null;
+    }
     return;
   }
   try {
     const r = await resolveRef({ contentTypeId, entryId });
+    if (attempt !== lastAttempt) return;
     resolved.value = {
       entryTitle: r.entryTitle,
       contentTypeName: r.contentTypeName,
     };
     missing.value = false;
-  } catch {
+  } catch (err) {
+    if (attempt !== lastAttempt) return;
+    console.error('Failed to resolve cmsEmbed reference', err);
     missing.value = true;
+    resolved.value = null;
   }
 }
 

@@ -853,7 +853,7 @@ Write `apps/cms/components/rich-text-editor/CmsEmbedNodeView.vue`:
 ```vue
 <script setup lang="ts">
 import { NodeViewWrapper } from '@tiptap/vue-3';
-import type { NodeViewProps } from '@tiptap/vue-3';
+import type { NodeViewProps } from '@tiptap/core';
 
 const props = defineProps<NodeViewProps>();
 

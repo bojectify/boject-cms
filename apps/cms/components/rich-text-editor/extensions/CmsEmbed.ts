@@ -27,35 +27,29 @@ export const CmsEmbed = Node.create({
 
   addAttributes() {
     return {
-      contentTypeId: { default: null },
-      entryId: { default: null },
+      contentTypeId: {
+        default: null,
+        parseHTML: (el) => el.getAttribute('data-content-type-id'),
+        renderHTML: (attrs) =>
+          attrs.contentTypeId
+            ? { 'data-content-type-id': attrs.contentTypeId as string }
+            : {},
+      },
+      entryId: {
+        default: null,
+        parseHTML: (el) => el.getAttribute('data-entry-id'),
+        renderHTML: (attrs) =>
+          attrs.entryId ? { 'data-entry-id': attrs.entryId as string } : {},
+      },
     };
   },
 
   parseHTML() {
-    return [
-      {
-        tag: 'span[data-cms-embed]',
-        getAttrs: (el) => {
-          if (!(el instanceof HTMLElement)) return false;
-          return {
-            contentTypeId: el.getAttribute('data-content-type-id'),
-            entryId: el.getAttribute('data-entry-id'),
-          };
-        },
-      },
-    ];
+    return [{ tag: 'span[data-cms-embed]' }];
   },
 
   renderHTML({ HTMLAttributes }) {
-    return [
-      'span',
-      mergeAttributes(HTMLAttributes, {
-        'data-cms-embed': '',
-        'data-content-type-id': HTMLAttributes.contentTypeId ?? '',
-        'data-entry-id': HTMLAttributes.entryId ?? '',
-      }),
-    ];
+    return ['span', mergeAttributes(HTMLAttributes, { 'data-cms-embed': '' })];
   },
 
   addCommands() {
