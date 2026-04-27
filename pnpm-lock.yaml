@@ -57,7 +57,7 @@ importers:
         version: 7.4.1
       '@prisma/client':
         specifier: ^7.4.1
-        version: 7.4.1(prisma@7.4.1(@types/react@19.2.14)(magicast@0.5.2)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3)
+        version: 7.4.1(prisma@7.4.1(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3)
       '@tiptap/core':
         specifier: ^3.20.4
         version: 3.20.4(@tiptap/pm@3.20.4)
@@ -262,6 +262,12 @@ importers:
 
   perf:
     dependencies:
+      '@prisma/adapter-pg':
+        specifier: ^7.4.1
+        version: 7.4.1
+      '@prisma/client':
+        specifier: ^7.4.1
+        version: 7.4.1(prisma@7.4.1(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3)
       chart.js:
         specifier: ^4.5.0
         version: 4.5.1
@@ -10101,14 +10107,14 @@ snapshots:
     dependencies:
       '@pothos/core': 4.12.0(graphql@16.12.0)
       '@pothos/plugin-prisma': 4.14.2(@pothos/core@4.12.0(graphql@16.12.0))(@prisma/client@7.4.1(prisma@7.4.1(@types/react@19.2.14)(magicast@0.5.2)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3))(graphql@16.12.0)(typescript@5.9.3)
-      '@prisma/client': 7.4.1(prisma@7.4.1(@types/react@19.2.14)(magicast@0.5.2)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3)
+      '@prisma/client': 7.4.1(prisma@7.4.1(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3)
       '@prisma/generator-helper': 6.19.2
       graphql: 16.12.0
 
   '@pothos/plugin-prisma@4.14.2(@pothos/core@4.12.0(graphql@16.12.0))(@prisma/client@7.4.1(prisma@7.4.1(@types/react@19.2.14)(magicast@0.5.2)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3))(graphql@16.12.0)(typescript@5.9.3)':
     dependencies:
       '@pothos/core': 4.12.0(graphql@16.12.0)
-      '@prisma/client': 7.4.1(prisma@7.4.1(@types/react@19.2.14)(magicast@0.5.2)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3)
+      '@prisma/client': 7.4.1(prisma@7.4.1(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3)
       '@prisma/generator-helper': 7.4.1
       graphql: 16.12.0
       typescript: 5.9.3
@@ -10128,7 +10134,7 @@ snapshots:
 
   '@prisma/client-runtime-utils@7.4.1': {}
 
-  '@prisma/client@7.4.1(prisma@7.4.1(@types/react@19.2.14)(magicast@0.5.2)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3)':
+  '@prisma/client@7.4.1(prisma@7.4.1(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3)':
     dependencies:
       '@prisma/client-runtime-utils': 7.4.1
     optionalDependencies:

@@ -15,6 +15,8 @@
     "followups": "tsx scripts/open-followups.ts"
   },
   "dependencies": {
+    "@prisma/adapter-pg": "^7.4.1",
+    "@prisma/client": "^7.4.1",
     "chartjs-node-canvas": "^5.0.0",
     "chart.js": "^4.5.0",
     "pg": "^8.13.1",
