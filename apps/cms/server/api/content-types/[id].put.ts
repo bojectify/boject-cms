@@ -1,9 +1,5 @@
 import type { Prisma } from '#prisma';
-import {
-  assertUuid,
-  assertStringLength,
-  assertIdentifier,
-} from '../../utils/validation';
+import { assertUuid, assertStringLength } from '../../utils/validation';
 import { withPrismaErrors } from '../../utils/prismaErrors';
 import { enforceMutationRateLimit } from '../../utils/rateLimitEndpoint';
 import { invalidateSchema } from '../../graphql/schema';
@@ -23,11 +19,16 @@ export default defineEventHandler(async (event) => {
     });
   }
 
+  if ('identifier' in body && body.identifier !== existing.identifier) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'identifier cannot be changed',
+    });
+  }
+
   const data: Prisma.ContentTypeUpdateInput = {};
   if ('name' in body)
     data.name = assertStringLength(body.name, 'name', NAME_MAX);
-  if ('identifier' in body)
-    data.identifier = assertIdentifier(body.identifier, 'identifier');
   if ('description' in body)
     data.description =
       typeof body.description === 'string' ? body.description : null;

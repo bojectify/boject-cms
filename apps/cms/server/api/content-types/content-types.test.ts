@@ -374,6 +374,71 @@ describe('Content Type endpoints', async () => {
       );
       expect(updated.description).toBe('Updated desc');
     });
+
+    it('rejects changing the identifier with 400', async () => {
+      const cookie = await getSessionCookie();
+      const created = await $fetch<ContentTypeResponse>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: `Immutable Type ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+          ],
+        },
+      });
+
+      await expect(
+        $fetch<ContentTypeResponse>(`/api/content-types/${created.id}`, {
+          method: 'PUT',
+          headers: { cookie },
+          body: { identifier: 'RenamedType' },
+        })
+      ).rejects.toMatchObject({ statusCode: 400 });
+
+      const reloaded = await $fetch<ContentTypeResponse>(
+        `/api/content-types/${created.id}`,
+        { headers: { cookie } }
+      );
+      expect(reloaded.identifier).toBe(created.identifier);
+    });
+
+    it('accepts the existing identifier as a no-op', async () => {
+      const cookie = await getSessionCookie();
+      const created = await $fetch<ContentTypeResponse>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: `Roundtrip Type ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+          ],
+        },
+      });
+
+      const updated = await $fetch<ContentTypeResponse>(
+        `/api/content-types/${created.id}`,
+        {
+          method: 'PUT',
+          headers: { cookie },
+          body: {
+            name: `Roundtrip Updated ${Date.now()}`,
+            identifier: created.identifier,
+          },
+        }
+      );
+      expect(updated.identifier).toBe(created.identifier);
+    });
   });
 
   describe('DELETE /api/content-types/[id]', () => {
