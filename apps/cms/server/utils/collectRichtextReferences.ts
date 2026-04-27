@@ -11,7 +11,10 @@ export interface RichtextReference {
  *
  * Order is document-traversal order. The pair `(ct, e)` appears at most once
  * even if it occurs multiple times across embeds and links. Pairs with
- * missing or non-string ids are silently skipped.
+ * missing, non-string, or empty-string ids are silently skipped.
+ *
+ * Recursion is capped at depth 1000; references deeper than that are silently
+ * dropped.
  */
 export function collectRichtextReferences(body: unknown): RichtextReference[] {
   const out: RichtextReference[] = [];
@@ -22,13 +25,18 @@ export function collectRichtextReferences(body: unknown): RichtextReference[] {
     const a = attrs as Record<string, unknown>;
     if (typeof a.contentTypeId !== 'string') return;
     if (typeof a.entryId !== 'string') return;
+    if (a.contentTypeId === '') return;
+    if (a.entryId === '') return;
     const key = `${a.contentTypeId}:${a.entryId}`;
     if (seen.has(key)) return;
     seen.add(key);
     out.push({ contentTypeId: a.contentTypeId, entryId: a.entryId });
   }
 
-  function walk(node: unknown): void {
+  const MAX_DEPTH = 1000;
+
+  function walk(node: unknown, depth: number): void {
+    if (depth > MAX_DEPTH) return;
     if (!node || typeof node !== 'object') return;
     const n = node as {
       type?: unknown;
@@ -41,7 +49,7 @@ export function collectRichtextReferences(body: unknown): RichtextReference[] {
       pushIfValid(n.attrs);
     }
 
-    if (Array.isArray(n.marks)) {
+    if (n.type === 'text' && Array.isArray(n.marks)) {
       for (const mark of n.marks) {
         if (!mark || typeof mark !== 'object') continue;
         const m = mark as { type?: unknown; attrs?: unknown };
@@ -52,10 +60,10 @@ export function collectRichtextReferences(body: unknown): RichtextReference[] {
     }
 
     if (Array.isArray(n.content)) {
-      for (const child of n.content) walk(child);
+      for (const child of n.content) walk(child, depth + 1);
     }
   }
 
-  walk(body);
+  walk(body, 0);
   return out;
 }
