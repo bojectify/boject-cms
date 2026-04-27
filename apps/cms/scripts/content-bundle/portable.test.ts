@@ -165,3 +165,190 @@ describe('encodeDataRefs / decodeDataRefs round-trip', () => {
     expect(decoded.body).toEqual(body);
   });
 });
+
+describe('encode/decodeDataRefs — RICHTEXT embeds', () => {
+  const fieldTypes = { body: 'RICHTEXT' as const };
+  const doc = {
+    type: 'doc',
+    content: [
+      {
+        type: 'paragraph',
+        content: [
+          { type: 'text', text: 'see ' },
+          {
+            type: 'cmsEmbed',
+            attrs: { contentTypeId: 'aaa-uuid-ct', entryId: 'post-uuid-1' },
+          },
+        ],
+      },
+    ],
+  };
+
+  it('encodes embed attrs to portable identifier/key', () => {
+    const out = encodeDataRefs(
+      { body: doc },
+      fieldTypes,
+      typeIdToIdent,
+      typeIdentToEntryKeys
+    );
+    const body = out.body as unknown as {
+      content: { content: { attrs: unknown }[] }[];
+    };
+    const embed = body.content[0]!.content[1]!;
+    expect(embed.attrs).toEqual({
+      contentTypeIdentifier: 'BlogPost',
+      entryKey: 'hello',
+    });
+  });
+
+  it('decodes portable embed attrs back to uuid form', () => {
+    const portableDoc = {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            {
+              type: 'cmsEmbed',
+              attrs: {
+                contentTypeIdentifier: 'BlogPost',
+                entryKey: 'hello',
+              },
+            },
+          ],
+        },
+      ],
+    };
+    const out = decodeDataRefs(
+      { body: portableDoc },
+      fieldTypes,
+      identToTypeId,
+      typeIdentToKeyToEntry
+    );
+    const body = out.body as unknown as {
+      content: { content: { attrs: unknown }[] }[];
+    };
+    const embed = body.content[0]!.content[0]!;
+    expect(embed.attrs).toEqual({
+      contentTypeId: 'aaa-uuid-ct',
+      entryId: 'post-uuid-1',
+    });
+  });
+
+  it('passes through RICHTEXT values with no embeds untouched', () => {
+    const plain = {
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'x' }] }],
+    };
+    const out = encodeDataRefs(
+      { body: plain },
+      fieldTypes,
+      typeIdToIdent,
+      typeIdentToEntryKeys
+    );
+    expect(out.body).toEqual(plain);
+  });
+
+  it('walks nested content (embed inside blockquote inside doc)', () => {
+    const nested = {
+      type: 'doc',
+      content: [
+        {
+          type: 'blockquote',
+          content: [
+            {
+              type: 'paragraph',
+              content: [
+                {
+                  type: 'cmsEmbed',
+                  attrs: {
+                    contentTypeId: 'aaa-uuid-ct',
+                    entryId: 'post-uuid-1',
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const out = encodeDataRefs(
+      { body: nested },
+      { body: 'RICHTEXT' as const },
+      typeIdToIdent,
+      typeIdentToEntryKeys
+    );
+    const embed = (
+      out.body as { content: { content: { content: unknown[] }[] }[] }
+    ).content[0]!.content[0]!.content[0] as { attrs: unknown };
+    expect(embed.attrs).toEqual({
+      contentTypeIdentifier: 'BlogPost',
+      entryKey: 'hello',
+    });
+  });
+
+  it('rewrites multiple embeds in the same document independently', () => {
+    const docTwo = {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            {
+              type: 'cmsEmbed',
+              attrs: { contentTypeId: 'aaa-uuid-ct', entryId: 'post-uuid-1' },
+            },
+            { type: 'text', text: ' and ' },
+            {
+              type: 'cmsEmbed',
+              attrs: { contentTypeId: 'aaa-uuid-ct', entryId: 'post-uuid-1' },
+            },
+          ],
+        },
+      ],
+    };
+    const out = encodeDataRefs(
+      { body: docTwo },
+      { body: 'RICHTEXT' as const },
+      typeIdToIdent,
+      typeIdentToEntryKeys
+    );
+    const para = (out.body as { content: { content: unknown[] }[] })
+      .content[0]!;
+    const first = para.content[0] as { attrs: unknown };
+    const second = para.content[2] as { attrs: unknown };
+    expect(first.attrs).toEqual({
+      contentTypeIdentifier: 'BlogPost',
+      entryKey: 'hello',
+    });
+    expect(second.attrs).toEqual({
+      contentTypeIdentifier: 'BlogPost',
+      entryKey: 'hello',
+    });
+  });
+
+  it('does not mutate the input document', () => {
+    const original = {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            {
+              type: 'cmsEmbed',
+              attrs: { contentTypeId: 'aaa-uuid-ct', entryId: 'post-uuid-1' },
+            },
+          ],
+        },
+      ],
+    };
+    const snapshot = JSON.parse(JSON.stringify(original));
+    encodeDataRefs(
+      { body: original },
+      { body: 'RICHTEXT' as const },
+      typeIdToIdent,
+      typeIdentToEntryKeys
+    );
+    expect(original).toEqual(snapshot);
+  });
+});

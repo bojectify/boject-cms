@@ -95,7 +95,8 @@ watch(
 
     entries.value = results;
     isLoading.value = false;
-  }
+  },
+  { immediate: true }
 );
 
 const filteredEntries = computed(() => {

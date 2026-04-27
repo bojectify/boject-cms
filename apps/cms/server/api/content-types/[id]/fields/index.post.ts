@@ -76,6 +76,38 @@ export default defineEventHandler(async (event) => {
     }
   }
 
+  if (type === 'RICHTEXT' && body.options && typeof body.options === 'object') {
+    const opts = body.options as { targetContentTypeIds?: unknown };
+    if (opts.targetContentTypeIds !== undefined) {
+      if (!Array.isArray(opts.targetContentTypeIds)) {
+        throw createError({
+          statusCode: 400,
+          statusMessage: 'options.targetContentTypeIds must be an array',
+        });
+      }
+      for (const targetId of opts.targetContentTypeIds) {
+        if (!isUuid(targetId)) {
+          throw createError({
+            statusCode: 400,
+            statusMessage: `Invalid UUID in targetContentTypeIds: ${targetId}`,
+          });
+        }
+      }
+      if (opts.targetContentTypeIds.length > 0) {
+        const existingCount = await prisma.contentType.count({
+          where: { id: { in: opts.targetContentTypeIds as string[] } },
+        });
+        if (existingCount !== opts.targetContentTypeIds.length) {
+          throw createError({
+            statusCode: 400,
+            statusMessage:
+              'One or more targetContentTypeIds do not reference existing content types',
+          });
+        }
+      }
+    }
+  }
+
   // Check content type exists and load existing fields
   const contentType = await prisma.contentType.findUnique({
     where: { id: contentTypeId },

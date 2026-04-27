@@ -2507,4 +2507,242 @@ describe('Content Entry endpoints', async () => {
       expect(body.items.some((i) => i.id === target.id)).toBe(false);
     });
   });
+
+  describe('RICHTEXT inline embeds', () => {
+    let targetCt: { id: string };
+    let otherCt: { id: string };
+    let hostCt: { id: string };
+    let targetEntryId: string;
+    let otherEntryId: string;
+
+    beforeAll(async () => {
+      targetCt = await prisma.contentType.create({
+        data: {
+          identifier: 'EmbedNote',
+          name: 'EmbedNote',
+          fields: {
+            create: [
+              {
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                order: 0,
+                required: true,
+                unique: true,
+              },
+            ],
+          },
+        },
+      });
+      otherCt = await prisma.contentType.create({
+        data: {
+          identifier: 'EmbedOther',
+          name: 'EmbedOther',
+          fields: {
+            create: [
+              {
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                order: 0,
+                required: true,
+                unique: true,
+              },
+            ],
+          },
+        },
+      });
+      hostCt = await prisma.contentType.create({
+        data: {
+          identifier: 'EmbedHost',
+          name: 'EmbedHost',
+          fields: {
+            create: [
+              {
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                order: 0,
+                required: true,
+                unique: true,
+              },
+              {
+                identifier: 'body',
+                name: 'Body',
+                type: 'RICHTEXT',
+                order: 1,
+                required: false,
+                unique: false,
+                options: { targetContentTypeIds: [targetCt.id] },
+              },
+            ],
+          },
+        },
+      });
+
+      const targetEntry = await prisma.contentEntry.create({
+        data: {
+          contentTypeId: targetCt.id,
+          entryTitle: 'EmbedTarget',
+          slug: null,
+          versions: {
+            create: {
+              status: 'DRAFT',
+              entryTitle: 'EmbedTarget',
+              data: { title: 'EmbedTarget' },
+            },
+          },
+        },
+      });
+      targetEntryId = targetEntry.id;
+
+      const otherEntry = await prisma.contentEntry.create({
+        data: {
+          contentTypeId: otherCt.id,
+          entryTitle: 'EmbedOtherEntry',
+          slug: null,
+          versions: {
+            create: {
+              status: 'DRAFT',
+              entryTitle: 'EmbedOtherEntry',
+              data: { title: 'EmbedOtherEntry' },
+            },
+          },
+        },
+      });
+      otherEntryId = otherEntry.id;
+    });
+
+    it('accepts a body with an embed whose contentTypeId is in the allow-list', async () => {
+      const cookie = await getSessionCookie();
+      // Use a distinct X-Forwarded-For so this test gets its own rate-limit
+      // bucket — the cumulative POST mutations across the file can exceed the
+      // 50-per-60s cap by the time these tests run.
+      const res = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': '203.0.113.50',
+        },
+        body: JSON.stringify({
+          contentTypeId: hostCt.id,
+          data: {
+            title: 'HostAllowed',
+            body: {
+              type: 'doc',
+              content: [
+                {
+                  type: 'paragraph',
+                  content: [
+                    { type: 'text', text: 'see ' },
+                    {
+                      type: 'cmsEmbed',
+                      attrs: {
+                        contentTypeId: targetCt.id,
+                        entryId: targetEntryId,
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        }),
+      });
+      expect(res.status).toBe(201);
+    });
+
+    it('rejects an embed whose contentTypeId is not in the allow-list', async () => {
+      const cookie = await getSessionCookie();
+      const res = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': '203.0.113.51',
+        },
+        body: JSON.stringify({
+          contentTypeId: hostCt.id,
+          data: {
+            title: 'HostDisallowed',
+            body: {
+              type: 'doc',
+              content: [
+                {
+                  type: 'paragraph',
+                  content: [
+                    {
+                      type: 'cmsEmbed',
+                      attrs: {
+                        contentTypeId: otherCt.id,
+                        entryId: otherEntryId,
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        }),
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('persists contentTypeIdentifier on cmsEmbed.attrs when saving', async () => {
+      const cookie = await getSessionCookie();
+      const ip = '203.0.113.52';
+      const create = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': ip,
+        },
+        body: JSON.stringify({
+          contentTypeId: hostCt.id,
+          data: {
+            title: 'HostStamped',
+            body: {
+              type: 'doc',
+              content: [
+                {
+                  type: 'paragraph',
+                  content: [
+                    {
+                      type: 'cmsEmbed',
+                      attrs: {
+                        contentTypeId: targetCt.id,
+                        entryId: targetEntryId,
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        }),
+      });
+      expect(create.status).toBe(201);
+      const created = (await create.json()) as {
+        id: string;
+        data: { body: unknown };
+      };
+
+      // Verify the persisted body carries the identifier
+      const get = await fetch(`/api/content-entries/${created.id}`, {
+        headers: { cookie, 'X-Forwarded-For': ip },
+      });
+      const fetched = (await get.json()) as {
+        data: { body: { content: unknown[] } };
+      };
+      const para = fetched.data.body.content[0] as { content: unknown[] };
+      const embed = para.content[0] as { attrs: Record<string, unknown> };
+      expect(embed.attrs).toEqual({
+        contentTypeId: targetCt.id,
+        entryId: targetEntryId,
+        contentTypeIdentifier: 'EmbedNote',
+      });
+    });
+  });
 });

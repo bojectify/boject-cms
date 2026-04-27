@@ -104,6 +104,26 @@ export default defineEventHandler(async (event) => {
       }
     }
 
+    if (type === 'RICHTEXT' && f.options && typeof f.options === 'object') {
+      const opts = f.options as { targetContentTypeIds?: unknown };
+      if (opts.targetContentTypeIds !== undefined) {
+        if (!Array.isArray(opts.targetContentTypeIds)) {
+          throw createError({
+            statusCode: 400,
+            statusMessage: `fields[${idx}].options.targetContentTypeIds must be an array`,
+          });
+        }
+        for (const targetId of opts.targetContentTypeIds) {
+          if (!isUuid(targetId)) {
+            throw createError({
+              statusCode: 400,
+              statusMessage: `Invalid UUID in fields[${idx}].options.targetContentTypeIds`,
+            });
+          }
+        }
+      }
+    }
+
     if (type === 'ENTRY_TITLE') entryTitleCount++;
     if (type === 'SLUG') slugCount++;
 

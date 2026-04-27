@@ -3,6 +3,7 @@ import { assertUuid } from '../../utils/validation';
 import { withPrismaErrors } from '../../utils/prismaErrors';
 import { enforceMutationRateLimit } from '../../utils/rateLimitEndpoint';
 import { assertUniqueFieldValues } from '../../utils/assertUniqueFieldValues';
+import { enrichEntryDataWithEmbedIdentifiers } from '../../utils/enrichRichtextEmbeds';
 import { enqueueWebhookDeliveries } from '../../utils/webhooks';
 import {
   isCmsRequest,
@@ -34,15 +35,28 @@ export default defineEventHandler(async (event) => {
   // Validate data if provided
   let validatedData: Record<string, unknown> | null = null;
   if (typeof body.data === 'object' && body.data !== null) {
-    validatedData = await validateEntryData(
+    const rawValidated = await validateEntryData(
       body.data as Record<string, unknown>,
       entry.contentType.fields
     );
     await assertUniqueFieldValues(
-      validatedData,
+      rawValidated,
       entry.contentType.fields,
       entry.contentTypeId,
       entry.id
+    );
+    validatedData = await enrichEntryDataWithEmbedIdentifiers(
+      rawValidated,
+      entry.contentType.fields,
+      {
+        loadIdentifiers: async (ids) => {
+          const types = await prisma.contentType.findMany({
+            where: { id: { in: ids } },
+            select: { id: true, identifier: true },
+          });
+          return new Map(types.map((t) => [t.id, t.identifier] as const));
+        },
+      }
     );
   }
 

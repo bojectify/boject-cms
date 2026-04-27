@@ -55,12 +55,17 @@ export function mapFieldToConfig(field: {
         options: choices.map((c) => ({ label: c, value: c })),
       };
     }
-    case 'RICHTEXT':
+    case 'RICHTEXT': {
+      const opts = field.options as {
+        targetContentTypeIds?: string[];
+      } | null;
       return {
         type: 'richtext',
         key: field.identifier,
         label: field.name,
+        targetContentTypeIds: opts?.targetContentTypeIds ?? [],
       };
+    }
     case 'RELATION': {
       const opts = field.options as {
         targetContentTypeIds?: string[];
