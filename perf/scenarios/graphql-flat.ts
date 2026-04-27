@@ -45,6 +45,9 @@ export const options = {
   thresholds: {
     http_req_failed: ['rate<0.05'],
     http_req_duration: ['p(99)<5000'],
+    // The `relation` shape can saturate sooner than maxVUs accommodates;
+    // fail loudly rather than silently under-counting the tail.
+    dropped_iterations: ['count<100'],
   },
   tags: { scenario: 'flat', shape: QUERY_SHAPE },
 };
@@ -52,7 +55,12 @@ export const options = {
 export default function flat() {
   const cfg = loadK6Config();
   const headers = apiKeyHeaders();
-  const query = QUERIES[QUERY_SHAPE] ?? QUERIES.bare!;
+  const query = QUERIES[QUERY_SHAPE];
+  if (!query) {
+    throw new Error(
+      `Unknown PERF_QUERY_SHAPE: ${QUERY_SHAPE}. Valid: ${Object.keys(QUERIES).join(', ')}`
+    );
+  }
 
   const res = http.post(
     `${cfg.baseUrl}/api/graphql`,
