@@ -22,7 +22,6 @@ export const CmsLink = Mark.create({
   name: 'cmsLink',
   inclusive: false,
   exitable: true,
-  excludes: '_',
 
   addAttributes() {
     return {

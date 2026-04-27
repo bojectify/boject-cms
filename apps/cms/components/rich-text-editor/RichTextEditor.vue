@@ -104,7 +104,10 @@ function openCmsLinkPicker() {
   // Require a non-empty selection so we have text to wrap.
   const { from, to } = editor.value.state.selection;
   if (from === to) {
-    window.alert('Select some text to turn into an entry link.');
+    useToast().add({
+      title: 'Select some text to turn into an entry link.',
+      color: 'warning',
+    });
     return;
   }
   linkPickerOpen.value = true;
@@ -114,7 +117,7 @@ function handleCmsLinkSelect(data: { contentTypeId: string; entryId: string }) {
   editor.value
     .chain()
     .focus()
-    .setMark('cmsLink', {
+    .setCmsLink({
       contentTypeId: data.contentTypeId,
       entryId: data.entryId,
     })
