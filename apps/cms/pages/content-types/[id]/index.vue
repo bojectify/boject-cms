@@ -509,78 +509,20 @@ async function onFieldReorder() {
           label="Target Content Types"
           required
         >
-          <div class="space-y-2">
-            <div
-              v-if="
-                options &&
-                typeof options === 'object' &&
-                'targetContentTypeIds' in options &&
-                ((options as { targetContentTypeIds: string[] })
-                  .targetContentTypeIds?.length ?? 0) > 0
-              "
-              class="flex flex-wrap gap-2"
-            >
-              <UBadge
-                v-for="targetId in (
-                  options as { targetContentTypeIds: string[] }
-                ).targetContentTypeIds"
-                :key="targetId"
-                size="md"
-                variant="subtle"
-                color="info"
-                class="cursor-pointer"
-                @click="
-                  updateOptions({
-                    targetContentTypeIds: (
-                      options as { targetContentTypeIds: string[] }
-                    ).targetContentTypeIds.filter(
-                      (id: string) => id !== targetId
-                    ),
-                  })
-                "
-              >
-                {{
-                  contentTypeOptions?.find((o) => o.value === targetId)
-                    ?.label ?? targetId
-                }}
-                <UIcon name="i-lucide-x" class="size-3 ml-1" />
-              </UBadge>
-            </div>
-            <USelect
-              :model-value="''"
-              :items="
-                (contentTypeOptions ?? []).filter(
-                  (o) =>
-                    !(
-                      options &&
-                      typeof options === 'object' &&
-                      'targetContentTypeIds' in options &&
-                      (
-                        options as { targetContentTypeIds: string[] }
-                      ).targetContentTypeIds.includes(o.value)
-                    )
-                )
-              "
-              value-key="value"
-              placeholder="Add content type..."
-              class="w-full"
-              @update:model-value="
-                (val: string) => {
-                  if (!val) return;
-                  const current =
-                    options &&
-                    typeof options === 'object' &&
-                    'targetContentTypeIds' in options
-                      ? (options as { targetContentTypeIds: string[] })
-                          .targetContentTypeIds
-                      : [];
-                  updateOptions({
-                    targetContentTypeIds: [...current, val],
-                  });
-                }
-              "
-            />
-          </div>
+          <ContentTypeChipPicker
+            :model-value="
+              options &&
+              typeof options === 'object' &&
+              'targetContentTypeIds' in options
+                ? (options as { targetContentTypeIds: string[] })
+                    .targetContentTypeIds
+                : []
+            "
+            :options="contentTypeOptions ?? []"
+            @update:model-value="
+              (val: string[]) => updateOptions({ targetContentTypeIds: val })
+            "
+          />
         </UFormField>
       </template>
     </FieldModal>
