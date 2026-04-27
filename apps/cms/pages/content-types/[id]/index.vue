@@ -524,6 +524,26 @@ async function onFieldReorder() {
             "
           />
         </UFormField>
+        <UFormField
+          v-else-if="type === 'RICHTEXT'"
+          label="Allowed inline embed types"
+        >
+          <ContentTypeChipPicker
+            :model-value="
+              options &&
+              typeof options === 'object' &&
+              'targetContentTypeIds' in options
+                ? (options as { targetContentTypeIds: string[] })
+                    .targetContentTypeIds
+                : []
+            "
+            :options="contentTypeOptions ?? []"
+            empty-hint="No inline embeds will be allowed in this field. Add a content type to enable inline embeds."
+            @update:model-value="
+              (val: string[]) => updateOptions({ targetContentTypeIds: val })
+            "
+          />
+        </UFormField>
       </template>
     </FieldModal>
   </div>
