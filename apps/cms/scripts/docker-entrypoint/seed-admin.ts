@@ -91,7 +91,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     const messages = result.failures.map(
       (id) => PASSWORD_RULES.find((r) => r.id === id)!.label
     );
-    console.error(`[seed-admin] BOJECT_ADMIN_PASSWORD: ${messages.join('; ')}`);
+    console.error(
+      `[seed-admin] BOJECT_ADMIN_PASSWORD does not meet requirements: ${messages.join('; ')}`
+    );
     process.exit(1);
   }
 
