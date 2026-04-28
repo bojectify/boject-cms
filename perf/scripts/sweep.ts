@@ -1,7 +1,6 @@
-import { spawnSync } from 'node:child_process';
+import { execSync, spawnSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { execSync } from 'node:child_process';
 import { Client } from 'pg';
 import { PrismaClient } from '../../apps/cms/generated/prisma/client.ts';
 import { loadNodeConfig } from '../lib/config-node.ts';
@@ -100,7 +99,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const reportDir = resolve('reports', runId);
   mkdirSync(reportDir, { recursive: true });
 
-  const rawPath = resolve(reportDir, 'raw.json');
+  // k6 `--out json=<path>` truncates per `k6 run`, so each scenario gets
+  // its own file. The renderer concatenates them via PERF_RAW_DIR.
+  let scenarioIndex = 0;
 
   await runSweep({
     plan,
@@ -129,6 +130,14 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       }
     },
     scenario: async (name, env) => {
+      const idx = String(scenarioIndex++).padStart(3, '0');
+      const envSuffix = Object.entries(env)
+        .map(([k, v]) => `${k.replace(/^PERF_/, '').toLowerCase()}=${v}`)
+        .join('_');
+      const rawPath = resolve(
+        reportDir,
+        `raw-${idx}-${name}${envSuffix ? `_${envSuffix}` : ''}.json`
+      );
       const result = spawnSync(
         'k6',
         ['run', '--out', `json=${rawPath}`, resolve('scenarios', `${name}.ts`)],
@@ -142,10 +151,13 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       }
     },
     render: async () => {
-      spawnSync('tsx', ['scripts/render-report.ts'], {
+      const result = spawnSync('tsx', ['scripts/render-report.ts'], {
         stdio: 'inherit',
-        env: { ...process.env, PERF_RAW_PATH: rawPath },
+        env: { ...process.env, PERF_RAW_DIR: reportDir },
       });
+      if (result.status !== 0) {
+        throw new Error(`render-report exited with ${result.status}`);
+      }
     },
   });
 
