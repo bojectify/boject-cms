@@ -4,6 +4,7 @@ import {
   type ScryptOptions,
 } from 'node:crypto';
 import type { PrismaClient } from '../../generated/prisma/client';
+import { PASSWORD_RULES, validatePassword } from '../../utils/validatePassword';
 
 export interface SeedAdminInput {
   email: string;
@@ -16,58 +17,6 @@ export interface SeedAdminInput {
 export interface SeedAdminResult {
   seeded: boolean;
   reason: 'created' | 'users-already-exist';
-}
-
-export const MIN_ADMIN_PASSWORD_LENGTH = 12;
-
-const WEAK_PASSWORD_BLOCKLIST = new Set([
-  'password',
-  'password123',
-  'admin',
-  'administrator',
-  'boject',
-  'changeme',
-  'qwerty',
-  'qwertyuiop',
-  'letmein',
-  '12345678',
-  '123456789',
-  '1234567890',
-  'iloveyou',
-]);
-
-export type AdminPasswordValidation =
-  | { ok: true }
-  | { ok: false; reason: string };
-
-// The seeded admin password is a one-shot value: there is no in-app password
-// rotation, so whatever first-boot writes is the credential forever (until
-// someone runs SQL). Validation here is the only gate.
-export function validateAdminPassword(
-  password: string,
-  email: string
-): AdminPasswordValidation {
-  const lower = password.toLowerCase();
-  if (WEAK_PASSWORD_BLOCKLIST.has(lower)) {
-    return {
-      ok: false,
-      reason: 'BOJECT_ADMIN_PASSWORD is on the weak-password blocklist',
-    };
-  }
-  const localPart = email.split('@')[0]?.toLowerCase() ?? '';
-  if (localPart.length > 0 && lower === localPart) {
-    return {
-      ok: false,
-      reason: 'BOJECT_ADMIN_PASSWORD must not match the email local-part',
-    };
-  }
-  if (password.length < MIN_ADMIN_PASSWORD_LENGTH) {
-    return {
-      ok: false,
-      reason: `BOJECT_ADMIN_PASSWORD must be at least ${MIN_ADMIN_PASSWORD_LENGTH} characters`,
-    };
-  }
-  return { ok: true };
 }
 
 export async function seedAdminIfEmpty(
@@ -137,9 +86,12 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     process.exit(1);
   }
 
-  const validation = validateAdminPassword(password, email);
-  if (!validation.ok) {
-    console.error(`[seed-admin] ${validation.reason}`);
+  const result = validatePassword(password, { email });
+  if (!result.ok) {
+    const messages = result.failures.map(
+      (id) => PASSWORD_RULES.find((r) => r.id === id)!.label
+    );
+    console.error(`[seed-admin] BOJECT_ADMIN_PASSWORD: ${messages.join('; ')}`);
     process.exit(1);
   }
 
