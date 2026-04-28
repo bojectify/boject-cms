@@ -25,8 +25,12 @@ const QUERIES: Record<string, string> = {
 };
 
 export const options = {
+  // Scenario block name doubles as the `scenario` tag on every emitted
+  // metric — k6 stamps it from this key, NOT from `options.tags`. Keep it
+  // in sync with the renderer's `renderSummaryMd` filter (`s.scenario ===
+  // 'flat'`) so Scenario 1B isn't empty in the report.
   scenarios: {
-    ramp: {
+    flat: {
       executor: 'ramping-arrival-rate',
       startRate: 50,
       timeUnit: '1s',
@@ -49,7 +53,7 @@ export const options = {
     // fail loudly rather than silently under-counting the tail.
     dropped_iterations: ['count<100'],
   },
-  tags: { scenario: 'flat', shape: QUERY_SHAPE },
+  tags: { shape: QUERY_SHAPE },
 };
 
 export default function flat() {

@@ -182,18 +182,25 @@ export async function renderPlots(stats: ScenarioStats[]): Promise<Buffer> {
   });
 }
 
-// Reads every `raw*.json` under a directory in sorted order and concatenates
-// them into a single NDJSON string. Used so the sweep can write one file per
-// scenario (k6's `--out json` truncates per `k6 run` invocation, so reusing a
-// single path silently drops every scenario but the last).
-export function loadRawFromDir(dir: string): string {
+// Reads every `raw*.json` in `dir` (sorted) and returns the parsed Points.
+// Each file is parsed independently — concatenating into one mega-string
+// blows past V8's max string length (~512 MB) on full sweeps where k6
+// emits hundreds of MB of NDJSON.
+export function parseRawDir(dir: string): RawPoint[] {
   const files = readdirSync(dir)
     .filter((f) => f.startsWith('raw') && f.endsWith('.json'))
     .sort();
   if (files.length === 0) {
     throw new Error(`No raw*.json files found in ${dir}`);
   }
-  return files.map((f) => readFileSync(resolve(dir, f), 'utf8')).join('\n');
+  const points: RawPoint[] = [];
+  for (const f of files) {
+    const raw = readFileSync(resolve(dir, f), 'utf8');
+    for (const p of parseRawJson(raw)) {
+      points.push(p);
+    }
+  }
+  return points;
 }
 
 // CLI entry — pathToFileURL handles symlinks, spaces in paths, and
@@ -205,18 +212,18 @@ if (
 ) {
   const rawDir = process.env.PERF_RAW_DIR;
   const rawPath = process.env.PERF_RAW_PATH;
-  let raw: string;
+  let points: RawPoint[];
   let outDir: string;
   if (rawDir) {
     const dirAbs = resolve(rawDir);
-    raw = loadRawFromDir(dirAbs);
+    points = parseRawDir(dirAbs);
     outDir = dirAbs;
   } else {
     const path = rawPath ?? 'reports/latest/raw.json';
-    raw = readFileSync(resolve(path), 'utf8');
+    const raw = readFileSync(resolve(path), 'utf8');
+    points = parseRawJson(raw);
     outDir = dirname(path);
   }
-  const points = parseRawJson(raw);
   const stats = computeScenarioStats(points);
 
   const gitSha = execSync('git rev-parse --short HEAD').toString().trim();

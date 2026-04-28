@@ -4,8 +4,8 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import {
   parseRawJson,
+  parseRawDir,
   computeScenarioStats,
-  loadRawFromDir,
   percentile,
   renderPlots,
   renderSummaryMd,
@@ -127,8 +127,8 @@ describe('empty inputs', () => {
   });
 });
 
-describe('loadRawFromDir', () => {
-  it('reads and concatenates raw*.json files in sort order, ignoring others', () => {
+describe('parseRawDir', () => {
+  it('parses raw*.json files in sort order, ignoring others', () => {
     const dir = mkdtempSync(join(tmpdir(), 'perf-render-'));
     writeFileSync(
       join(dir, 'raw-001-graphql-sitemap.json'),
@@ -139,8 +139,7 @@ describe('loadRawFromDir', () => {
       '{"metric":"http_req_duration","type":"Point","data":{"time":"t","value":2,"tags":{"scenario":"flat"}}}\n'
     );
     writeFileSync(join(dir, 'summary.md'), '# ignored');
-    const concatenated = loadRawFromDir(dir);
-    const points = parseRawJson(concatenated);
+    const points = parseRawDir(dir);
     expect(points).toHaveLength(2);
     expect(points.map((p) => p.data.tags.scenario)).toEqual([
       'sitemap',
@@ -148,9 +147,33 @@ describe('loadRawFromDir', () => {
     ]);
   });
 
+  it('parses each file independently — never concatenates into one string', () => {
+    // Regression for "RangeError: Invalid string length" on full sweeps.
+    // Each file is read + parsed in turn so we never hold more than one
+    // file's text at a time. Asserting both files contributed proves the
+    // streaming aggregation works without resorting to Array.join.
+    const dir = mkdtempSync(join(tmpdir(), 'perf-render-stream-'));
+    writeFileSync(
+      join(dir, 'raw-001.json'),
+      '{"metric":"http_req_duration","type":"Point","data":{"time":"t","value":10,"tags":{"scenario":"sitemap","page_size":"100"}}}\n'.repeat(
+        3
+      )
+    );
+    writeFileSync(
+      join(dir, 'raw-002.json'),
+      '{"metric":"http_req_duration","type":"Point","data":{"time":"t","value":20,"tags":{"scenario":"sitemap","page_size":"100"}}}\n'.repeat(
+        2
+      )
+    );
+    const points = parseRawDir(dir);
+    expect(points).toHaveLength(5);
+    expect(points.filter((p) => p.data.value === 10)).toHaveLength(3);
+    expect(points.filter((p) => p.data.value === 20)).toHaveLength(2);
+  });
+
   it('throws when the directory has no matching files', () => {
     const dir = mkdtempSync(join(tmpdir(), 'perf-render-empty-'));
-    expect(() => loadRawFromDir(dir)).toThrow(/No raw\*\.json files/);
+    expect(() => parseRawDir(dir)).toThrow(/No raw\*\.json files/);
   });
 });
 
