@@ -28,15 +28,28 @@ export PERF_API_KEY=boject_perf_key_for_load_tests_only
 
 ## Running
 
-```bash
-# Full sweep: 1K / 10K / 30K / 100K datasets, all page sizes, all VU levels
-pnpm perf:sweep
+The harness exercises the CMS over HTTP, so a Nuxt server has to be up
+**and pointed at the perf database** (the seed writes there; if your
+dev server is on the default `boject` DB it won't see PerfArticle and
+the rest-crud-cycle scenario fails with `PerfArticle content type not
+found`). Use the dedicated wrapper:
 
+```bash
+# Terminal 1 — CMS against the perf DB
+pnpm perf:dev   # = DATABASE_URL=...boject_perf pnpm --filter cms dev
+
+# Terminal 2 — load tests
+pnpm perf:sweep
+```
+
+Other commands:
+
+```bash
 # One scenario against the currently-seeded DB
 pnpm perf:scenario graphql-sitemap -- --env PERF_PAGE_SIZE=500 --env PERF_VUS=5
 
-# Seed without running anything
-pnpm perf:seed -- --size=10000
+# Seed (resets the perf DB first by default; pass --no-reset to layer)
+pnpm perf:seed --size=10000
 
 # Re-render the latest report from raw.json (useful while iterating on templates)
 pnpm perf:report
