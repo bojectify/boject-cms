@@ -51,7 +51,7 @@ docker run -d --name "$APP_NAME" \
   -e DATABASE_URL=postgresql://boject:boject@${PG_NAME}:5432/boject \
   -e NUXT_SESSION_PASSWORD="$(head -c 32 /dev/urandom | base64)" \
   -e BOJECT_ADMIN_EMAIL=admin@smoke.test \
-  -e BOJECT_ADMIN_PASSWORD=smoke-pass \
+  -e BOJECT_ADMIN_PASSWORD="$(head -c 16 /dev/urandom | base64)" \
   -e BOJECT_INITIAL_STARTER=/starters/base.boject.json \
   -v "${VOLUME_NAME}:/app/storage" \
   -v "${REPO_ROOT}/starters:/starters:ro" \
