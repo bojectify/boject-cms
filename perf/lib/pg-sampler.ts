@@ -55,24 +55,38 @@ export function formatCsvRow(s: Sample): string {
 
 export const CSV_HEADER = 'timestamp,total,active,idle,cpu_percent,mem_mb';
 
+// Container name varies with the docker compose project name (defaults to the
+// repo directory) and the compose service name (`db` in docker-compose.yml).
+// The default below matches `pnpm db:up` in this repo; override via env when
+// running against a different deployment.
+const DEFAULT_CONTAINER = 'boject-cms-db-1';
+
 async function dockerStatsDefault(): Promise<{
   cpu_percent: number;
   mem_mb: number;
 }> {
+  const container = process.env.PERF_SAMPLER_CONTAINER ?? DEFAULT_CONTAINER;
   return new Promise((resolve, reject) => {
     const child = spawn('docker', [
       'stats',
       '--no-stream',
       '--format',
       '{{json .}}',
-      'boject-cms-postgres-1',
+      container,
     ]);
     let buf = '';
+    let errBuf = '';
     child.stdout.on('data', (d) => {
       buf += d.toString();
     });
+    child.stderr.on('data', (d) => {
+      errBuf += d.toString();
+    });
     child.on('close', (code) => {
       if (code !== 0) {
+        console.error(
+          `[pg-sampler] docker stats ${container} exited ${code}: ${errBuf.trim()}`
+        );
         return resolve({ cpu_percent: 0, mem_mb: 0 });
       }
       try {
