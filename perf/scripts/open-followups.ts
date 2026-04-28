@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import { posix } from 'node:path';
 
 export interface FollowupIssue {
   title: string;
@@ -17,7 +18,10 @@ export interface BuildResult {
 }
 
 export function buildFollowups(opts: { reportPath: string }): BuildResult {
-  const ref = `\n\nReport: \`${opts.reportPath}/summary.md\``;
+  // posix.join collapses any trailing slash in `reportPath` so the rendered
+  // body is always `…runId/summary.md`, never `…runId//summary.md`.
+  const summary = posix.join(opts.reportPath, 'summary.md');
+  const ref = `\n\nReport: \`${summary}\``;
   const newIssues: FollowupIssue[] = [
     {
       title: 'Rate limiting on /api/graphql',
