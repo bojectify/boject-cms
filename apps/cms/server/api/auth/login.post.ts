@@ -34,6 +34,7 @@ export default defineEventHandler(async (event) => {
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
+      passwordVersion: user.passwordVersion,
     },
   });
 
