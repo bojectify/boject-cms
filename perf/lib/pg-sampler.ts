@@ -61,6 +61,23 @@ export const CSV_HEADER = 'timestamp,total,active,idle,cpu_percent,mem_mb';
 // running against a different deployment.
 const DEFAULT_CONTAINER = 'boject-cms-db-1';
 
+// Pure parser extracted so the regex/JSON behaviour is unit-testable
+// without spawning docker. Currently only matches `MiB` — non-MiB units
+// (KiB / GiB) yield mem_mb=0; the test suite documents this.
+export function parseDockerStatsJson(line: string): {
+  cpu_percent: number;
+  mem_mb: number;
+} {
+  const j = JSON.parse(line.trim()) as {
+    CPUPerc: string;
+    MemUsage: string;
+  };
+  const cpu = Number(j.CPUPerc.replace('%', '').trim());
+  const memMatch = j.MemUsage.match(/([\d.]+)\s*MiB/);
+  const mem = memMatch ? Number(memMatch[1]) : 0;
+  return { cpu_percent: cpu, mem_mb: mem };
+}
+
 async function dockerStatsDefault(): Promise<{
   cpu_percent: number;
   mem_mb: number;
@@ -90,19 +107,29 @@ async function dockerStatsDefault(): Promise<{
         return resolve({ cpu_percent: 0, mem_mb: 0 });
       }
       try {
-        const j = JSON.parse(buf.trim()) as {
-          CPUPerc: string;
-          MemUsage: string;
-        };
-        const cpu = Number(j.CPUPerc.replace('%', '').trim());
-        const memMatch = j.MemUsage.match(/([\d.]+)\s*MiB/);
-        const mem = memMatch ? Number(memMatch[1]) : 0;
-        resolve({ cpu_percent: cpu, mem_mb: mem });
+        resolve(parseDockerStatsJson(buf));
       } catch (err) {
         reject(err);
       }
     });
   });
+}
+
+// Fixed-cadence scheduler: the Nth sample is anchored at
+// `startedAt + N * intervalMs`. Returns the ms to sleep before that tick.
+// Returns 0 when work overran the slot — the caller should sample again
+// immediately rather than padding `intervalMs` on top of every overrun
+// (which would let drift accumulate).
+export function nextTickDelay(opts: {
+  startedAt: number;
+  tickIndex: number;
+  intervalMs: number;
+  now: number;
+}): number {
+  return Math.max(
+    0,
+    opts.startedAt + opts.tickIndex * opts.intervalMs - opts.now
+  );
 }
 
 export function parseIntervalMs(raw: string | undefined): number {
@@ -137,6 +164,9 @@ async function main(): Promise<void> {
   process.on('SIGINT', stop);
   process.on('SIGTERM', stop);
 
+  const startedAt = Date.now();
+  let tickIndex = 0;
+
   try {
     while (running) {
       try {
@@ -153,10 +183,17 @@ async function main(): Promise<void> {
         }
       }
       if (!running) break;
+      tickIndex++;
+      const sleepFor = nextTickDelay({
+        startedAt,
+        tickIndex,
+        intervalMs,
+        now: Date.now(),
+      });
       sleepAbort = new AbortController();
       const ac = sleepAbort;
       await new Promise<void>((resolve) => {
-        const t = setTimeout(resolve, intervalMs);
+        const t = setTimeout(resolve, sleepFor);
         ac.signal.addEventListener('abort', () => {
           clearTimeout(t);
           resolve();
