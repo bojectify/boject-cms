@@ -1,5 +1,11 @@
+import { prisma } from '../utils/prisma';
 import { startWorker, stopWorker } from '../utils/webhookWorker';
 
+// `prisma` is imported explicitly here because Nuxt server auto-imports do
+// not consistently resolve inside `defineNitroPlugin` callbacks in the
+// production bundle — the bundler emits a bare `prisma` reference and the
+// server crashes on boot with `ReferenceError: prisma is not defined`. API
+// routes and middleware are fine; plugins need the explicit import.
 export default defineNitroPlugin((nitroApp) => {
   // Skip the interval-driven worker in test mode. Integration tests boot a
   // dev Nitro server and would otherwise see the worker race their
