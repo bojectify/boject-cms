@@ -1,4 +1,5 @@
 // scripts/build-starters/validate.ts
+import { isObject } from '../../utils/isObject';
 import type {
   Overlay,
   OverlayContentType,
@@ -173,8 +174,4 @@ function validateField(
       });
     }
   }
-}
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

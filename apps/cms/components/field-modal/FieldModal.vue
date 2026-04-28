@@ -93,14 +93,7 @@ function updateOptions(val: unknown) {
   // multiple pickers (e.g. RICHTEXT embed + link allow-lists) can each
   // call updateOptions({ singleKey }) without erasing the others.
   const current = formOptions.value;
-  if (
-    val &&
-    typeof val === 'object' &&
-    !Array.isArray(val) &&
-    current &&
-    typeof current === 'object' &&
-    !Array.isArray(current)
-  ) {
+  if (isObject(val) && isObject(current)) {
     formOptions.value = { ...current, ...val };
     return;
   }
