@@ -7,6 +7,7 @@ import { loadNodeConfig } from '../lib/config-node';
 import { PERF_CONTENT_TYPES } from './contentTypes';
 import { generateRichtext } from './richtext-fixture';
 import { resetPerfDb } from './reset';
+import { ensurePerfDbBootstrap } from './bootstrap';
 
 export interface SeedRowOptions {
   articleCount: number;
@@ -264,6 +265,15 @@ if (
 
   const started = Date.now();
   try {
+    // Make sure the admin user (rest-crud-cycle session login) and perf API
+    // key (sitemap/flat scenarios) exist before the workload kicks off.
+    // Both upserts are idempotent.
+    await ensurePerfDbBootstrap({
+      prisma,
+      adminEmail: cfg.adminEmail,
+      adminPassword: cfg.adminPassword,
+    });
+
     await seedPerfData({ prisma, articleCount });
     console.log(
       `[perf:seed] inserted ${articleCount} articles in ${(
