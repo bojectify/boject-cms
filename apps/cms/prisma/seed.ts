@@ -43,6 +43,12 @@ const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'Refusing to run seed in production: this script writes a default admin and a known test API key.'
+    );
+  }
+
   const email = process.env.INTEGRATION_TEST_USERNAME ?? 'admin@example.com';
   const password = process.env.INTEGRATION_TEST_PASSWORD ?? 'password';
 
