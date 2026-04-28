@@ -140,5 +140,59 @@ describe('Authentication', async () => {
         $fetch('/api/content-types', { headers: { cookie } })
       ).rejects.toMatchObject({ status: 401 });
     });
+
+    it('rejects a session whose user has been deleted', async () => {
+      // Create a transient user, log in as them, delete the user, expect 401.
+      const transientEmail = `deleted-${Date.now()}@example.com`;
+      const transientPassword = 'transient-strong-password-1!';
+      await prisma.user.create({
+        data: {
+          email: transientEmail,
+          // Re-hash with the same scrypt scheme used in seed.ts so verifyPassword accepts it.
+          password: await (async () => {
+            const { randomBytes, scrypt: scryptCb } =
+              await import('node:crypto');
+            const salt = randomBytes(16);
+            const derived: Buffer = await new Promise((resolve, reject) => {
+              scryptCb(
+                transientPassword,
+                salt,
+                64,
+                {
+                  cost: 16384,
+                  blockSize: 8,
+                  parallelization: 1,
+                  maxmem: 32 * 1024 * 1024,
+                },
+                (err, dk) => (err ? reject(err) : resolve(dk))
+              );
+            });
+            const saltB64 = salt.toString('base64').replace(/=+$/, '');
+            const hashB64 = derived.toString('base64').replace(/=+$/, '');
+            return `$scrypt$n=16384,r=8,p=1$${saltB64}$${hashB64}`;
+          })(),
+          firstName: 'Deleted',
+          lastName: 'User',
+        },
+      });
+
+      const loginRes = await fetch('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({
+          email: transientEmail,
+          password: transientPassword,
+        }),
+        headers: { 'content-type': 'application/json' },
+      });
+      expect(loginRes.status).toBeLessThan(400);
+      const cookie = loginRes.headers.getSetCookie().join('; ');
+
+      // Delete the user out from under the session cookie
+      await prisma.user.delete({ where: { email: transientEmail } });
+
+      // The cookie should now 401 on any session-authed route
+      const res = await fetch('/api/content-types', { headers: { cookie } });
+      expect(res.status).toBe(401);
+    });
   });
 });
