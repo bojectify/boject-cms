@@ -1,9 +1,30 @@
 import type { H3Event } from 'h3';
+import { getRequestHeader } from 'h3';
+import { prisma } from './prisma';
+import { hashApiKey } from './apiKey';
 
-export async function validateApiKey(
-  event: H3Event
-): Promise<{ valid: true } | { valid: false; message: string }> {
-  const header = getRequestHeader(event, 'authorization');
+export type ValidateApiKeyResult =
+  | { valid: true; apiKeyId: string; keyPrefix: string }
+  | { valid: false; message: string };
+
+type ApiKeyClient = {
+  apiKey: {
+    findUnique: (args: { where: { keyHash: string } }) => Promise<{
+      id: string;
+      keyPrefix: string;
+      revokedAt: Date | null;
+    } | null>;
+    update: (args: {
+      where: { id: string };
+      data: { lastUsedAt: Date };
+    }) => Promise<unknown>;
+  };
+};
+
+export async function resolveApiKey(
+  client: ApiKeyClient,
+  header: string | undefined
+): Promise<ValidateApiKeyResult> {
   if (!header) {
     return { valid: false, message: 'Missing Authorization header' };
   }
@@ -14,7 +35,7 @@ export async function validateApiKey(
   }
 
   const keyHash = hashApiKey(match[1]!);
-  const apiKey = await prisma.apiKey.findUnique({ where: { keyHash } });
+  const apiKey = await client.apiKey.findUnique({ where: { keyHash } });
 
   if (!apiKey) {
     return { valid: false, message: 'Invalid API key' };
@@ -25,9 +46,16 @@ export async function validateApiKey(
   }
 
   // Fire-and-forget lastUsedAt update
-  prisma.apiKey
+  client.apiKey
     .update({ where: { id: apiKey.id }, data: { lastUsedAt: new Date() } })
     .catch(() => {});
 
-  return { valid: true };
+  return { valid: true, apiKeyId: apiKey.id, keyPrefix: apiKey.keyPrefix };
+}
+
+export async function validateApiKey(
+  event: H3Event
+): Promise<ValidateApiKeyResult> {
+  const header = getRequestHeader(event, 'authorization');
+  return resolveApiKey(prisma, header);
 }
