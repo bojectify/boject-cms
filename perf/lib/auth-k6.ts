@@ -1,6 +1,6 @@
 import http from 'k6/http';
 import { check } from 'k6';
-import { loadK6Config } from './config-k6';
+import { loadK6Config } from './config-k6.ts';
 
 export function apiKeyHeaders(): Record<string, string> {
   const cfg = loadK6Config();

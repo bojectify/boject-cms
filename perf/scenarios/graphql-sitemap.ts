@@ -5,9 +5,9 @@
 // key present (`SEED_PERF_KEY=1 pnpm prisma:seed` once per fresh DB).
 import http, { type RefinedResponse, type ResponseType } from 'k6/http';
 import { check, fail } from 'k6';
-import { loadK6Config } from '../lib/config-k6';
-import { apiKeyHeaders } from '../lib/auth-k6';
-import { drainLatency, drainWallClock } from '../lib/metrics-k6';
+import { loadK6Config } from '../lib/config-k6.ts';
+import { apiKeyHeaders } from '../lib/auth-k6.ts';
+import { drainLatency, drainWallClock } from '../lib/metrics-k6.ts';
 
 const PAGE_SIZE = Number(__ENV.PERF_PAGE_SIZE ?? '100');
 const VUS = Number(__ENV.PERF_VUS ?? '1');

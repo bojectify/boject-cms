@@ -1,10 +1,12 @@
 import { parseArgs } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
+import { Client } from 'pg';
 import { PrismaClient, Prisma } from '../../apps/cms/generated/prisma/client';
 import { loadNodeConfig } from '../lib/config-node';
 import { PERF_CONTENT_TYPES } from './contentTypes';
 import { generateRichtext } from './richtext-fixture';
+import { resetPerfDb } from './reset';
 
 export interface SeedRowOptions {
   articleCount: number;
@@ -223,7 +225,10 @@ if (
   import.meta.url === pathToFileURL(process.argv[1]).href
 ) {
   const { values } = parseArgs({
-    options: { size: { type: 'string', default: '10000' } },
+    options: {
+      size: { type: 'string', default: '10000' },
+      'no-reset': { type: 'boolean', default: false },
+    },
   });
   const articleCount = Number(values.size);
   if (!Number.isFinite(articleCount) || articleCount < 1) {
@@ -232,6 +237,26 @@ if (
   }
 
   const cfg = loadNodeConfig();
+
+  // Reset by default — the perf DB is disposable, and resetPerfDb already
+  // refuses any URL that doesn't end in /boject_perf, so this is safe. Pass
+  // --no-reset to layer on top of an existing dataset.
+  if (!values['no-reset']) {
+    const pg = new Client({ connectionString: cfg.perfDatabaseUrl });
+    await pg.connect();
+    try {
+      await resetPerfDb({
+        databaseUrl: cfg.perfDatabaseUrl,
+        runQuery: async (sql) => {
+          await pg.query(sql);
+        },
+      });
+      console.log(`[perf:seed] reset ${cfg.perfDatabaseUrl}`);
+    } finally {
+      await pg.end();
+    }
+  }
+
   // Prisma v7 with driver adapters requires PrismaPg (see CLAUDE.md).
   const { PrismaPg } = await import('@prisma/adapter-pg');
   const adapter = new PrismaPg({ connectionString: cfg.perfDatabaseUrl });

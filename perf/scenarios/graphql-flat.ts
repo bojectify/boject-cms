@@ -7,8 +7,8 @@
 // Requires the perf DB seeded and PERF_API_KEY exported.
 import http from 'k6/http';
 import { check } from 'k6';
-import { loadK6Config } from '../lib/config-k6';
-import { apiKeyHeaders } from '../lib/auth-k6';
+import { loadK6Config } from '../lib/config-k6.ts';
+import { apiKeyHeaders } from '../lib/auth-k6.ts';
 
 const QUERY_SHAPE = __ENV.PERF_QUERY_SHAPE ?? 'bare';
 

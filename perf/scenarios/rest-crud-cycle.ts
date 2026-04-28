@@ -6,15 +6,15 @@
 // Requires the perf DB seeded and admin@example.com / password reachable.
 import http from 'k6/http';
 import { group } from 'k6';
-import { loadK6Config } from '../lib/config-k6';
-import { sessionLoginCookie, sessionHeaders } from '../lib/auth-k6';
+import { loadK6Config } from '../lib/config-k6.ts';
+import { sessionLoginCookie, sessionHeaders } from '../lib/auth-k6.ts';
 import {
   crudCreateLatency,
   crudReadLatency,
   crudDeleteLatency,
   intentional429s,
   unexpectedErrors,
-} from '../lib/metrics-k6';
+} from '../lib/metrics-k6.ts';
 
 const N = Number(__ENV.PERF_CRUD_N ?? '10000');
 
