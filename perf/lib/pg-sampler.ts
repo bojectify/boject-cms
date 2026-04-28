@@ -105,10 +105,19 @@ async function dockerStatsDefault(): Promise<{
   });
 }
 
-// CLI entry
-if (import.meta.url === `file://${process.argv[1]}`) {
+export function parseIntervalMs(raw: string | undefined): number {
+  const n = Number(raw ?? '5000');
+  if (!Number.isFinite(n) || n <= 0) {
+    throw new Error(
+      `Invalid PERF_SAMPLER_INTERVAL_MS=${JSON.stringify(raw)} — expected a positive number of milliseconds`
+    );
+  }
+  return n;
+}
+
+async function main(): Promise<void> {
   const outPath = process.env.PERF_SAMPLER_OUT ?? 'pg-samples.csv';
-  const intervalMs = Number(process.env.PERF_SAMPLER_INTERVAL_MS ?? '5000');
+  const intervalMs = parseIntervalMs(process.env.PERF_SAMPLER_INTERVAL_MS);
   const cfg = loadNodeConfig();
   mkdirSync(dirname(outPath), { recursive: true });
   appendFileSync(outPath, CSV_HEADER + '\n');
@@ -116,22 +125,54 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const client = new Client({ connectionString: cfg.perfDatabaseUrl });
   await client.connect();
 
-  const stop = () => {
-    client.end().finally(() => process.exit(0));
+  // Cooperative shutdown: SIGINT/SIGTERM flips `running` and aborts the
+  // current sleep so Ctrl+C is responsive even between samples. The loop
+  // exits naturally; client.end() runs in the finally block exactly once.
+  let running = true;
+  let sleepAbort: AbortController | null = null;
+  const stop = (): void => {
+    running = false;
+    sleepAbort?.abort();
   };
   process.on('SIGINT', stop);
   process.on('SIGTERM', stop);
 
-  while (true) {
-    try {
-      const sample = await sampleOnce({
-        query: (sql) => client.query(sql),
-        dockerStats: dockerStatsDefault,
+  try {
+    while (running) {
+      try {
+        const sample = await sampleOnce({
+          query: (sql) => client.query(sql),
+          dockerStats: dockerStatsDefault,
+        });
+        appendFileSync(outPath, formatCsvRow(sample) + '\n');
+      } catch (err) {
+        // Suppress fallout from the in-flight query racing the signal —
+        // those errors are expected during graceful shutdown.
+        if (running) {
+          console.error('[pg-sampler]', err);
+        }
+      }
+      if (!running) break;
+      sleepAbort = new AbortController();
+      const ac = sleepAbort;
+      await new Promise<void>((resolve) => {
+        const t = setTimeout(resolve, intervalMs);
+        ac.signal.addEventListener('abort', () => {
+          clearTimeout(t);
+          resolve();
+        });
       });
-      appendFileSync(outPath, formatCsvRow(sample) + '\n');
-    } catch (err) {
-      console.error('[pg-sampler]', err);
+      sleepAbort = null;
     }
-    await new Promise((r) => setTimeout(r, intervalMs));
+  } finally {
+    await client.end();
   }
+}
+
+// CLI entry
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch((err: unknown) => {
+    console.error('[pg-sampler] fatal', err);
+    process.exit(1);
+  });
 }
