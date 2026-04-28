@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import {
   parseRawJson,
   computeScenarioStats,
+  loadRawFromDir,
+  percentile,
   renderSummaryMd,
   toCsv,
+  type RawPoint,
 } from './render-report';
 
 const fixture = readFileSync(
@@ -46,6 +50,76 @@ describe('renderSummaryMd', () => {
     expect(md).toContain('# Load test report — 2026-04-21 (git: abc1234)');
     expect(md).toContain('## Scenario 1A');
     expect(md).toContain('p99');
+  });
+});
+
+describe('percentile', () => {
+  it('uses nearest-rank on a 20-sample series — distinguishes p95 from max', () => {
+    // [10, 20, ..., 200] — values map directly to "1-indexed rank × 10".
+    const sorted = Array.from({ length: 20 }, (_, i) => (i + 1) * 10);
+    // p50: rank = ceil(0.5*20) = 10 → idx 9 → 100
+    expect(percentile(sorted, 0.5)).toBe(100);
+    // p95: rank = ceil(0.95*20) = 19 → idx 18 → 190 (NOT 200, which the
+    // old `floor(0.95*20)=19 → idx 19 → 200` formula returned).
+    expect(percentile(sorted, 0.95)).toBe(190);
+    // p99: rank = ceil(0.99*20) = 20 → idx 19 → 200
+    expect(percentile(sorted, 0.99)).toBe(200);
+  });
+
+  it('returns 0 for an empty sample set', () => {
+    expect(percentile([], 0.5)).toBe(0);
+  });
+
+  it('clamps to the max index when p × n exceeds the array', () => {
+    expect(percentile([1, 2, 3], 1.5)).toBe(3);
+  });
+});
+
+describe('computeScenarioStats — large group', () => {
+  it('reports nearest-rank p95 across a 20-sample group', () => {
+    const points: RawPoint[] = Array.from({ length: 20 }, (_, i) => ({
+      metric: 'http_req_duration',
+      type: 'Point',
+      data: {
+        time: '2026-04-21T10:00:00Z',
+        value: (i + 1) * 10,
+        tags: { scenario: 'sitemap', page_size: '500' },
+      },
+    }));
+    const stats = computeScenarioStats(points);
+    const sitemap500 = stats.find(
+      (s) => s.scenario === 'sitemap' && s.pageSize === '500'
+    )!;
+    expect(sitemap500.p50).toBe(100);
+    expect(sitemap500.p95).toBe(190);
+    expect(sitemap500.p99).toBe(200);
+  });
+});
+
+describe('loadRawFromDir', () => {
+  it('reads and concatenates raw*.json files in sort order, ignoring others', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'perf-render-'));
+    writeFileSync(
+      join(dir, 'raw-001-graphql-sitemap.json'),
+      '{"metric":"http_req_duration","type":"Point","data":{"time":"t","value":1,"tags":{"scenario":"sitemap"}}}\n'
+    );
+    writeFileSync(
+      join(dir, 'raw-002-graphql-flat.json'),
+      '{"metric":"http_req_duration","type":"Point","data":{"time":"t","value":2,"tags":{"scenario":"flat"}}}\n'
+    );
+    writeFileSync(join(dir, 'summary.md'), '# ignored');
+    const concatenated = loadRawFromDir(dir);
+    const points = parseRawJson(concatenated);
+    expect(points).toHaveLength(2);
+    expect(points.map((p) => p.data.tags.scenario)).toEqual([
+      'sitemap',
+      'flat',
+    ]);
+  });
+
+  it('throws when the directory has no matching files', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'perf-render-empty-'));
+    expect(() => loadRawFromDir(dir)).toThrow(/No raw\*\.json files/);
   });
 });
 

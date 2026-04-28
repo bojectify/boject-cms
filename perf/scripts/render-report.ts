@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readdirSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { execSync } from 'node:child_process';
 
@@ -30,9 +30,14 @@ export interface ScenarioStats {
   errorRate: number;
 }
 
-function percentile(sorted: number[], p: number): number {
+// Nearest-rank percentile: rank k = ceil(p * n), 1-indexed → idx = k - 1.
+// `Math.floor(p * n)` (the v1 form) lands on rank k+1 for integer p*n and
+// ends up returning the maximum for p99 across most input sizes — biasing
+// reports toward the worst observation.
+export function percentile(sorted: number[], p: number): number {
   if (sorted.length === 0) return 0;
-  const idx = Math.min(sorted.length - 1, Math.floor(sorted.length * p));
+  const rank = Math.max(1, Math.ceil(p * sorted.length));
+  const idx = Math.min(sorted.length - 1, rank - 1);
   return sorted[idx]!;
 }
 
@@ -138,11 +143,35 @@ export function renderSummaryMd(input: RenderInput): string {
   ].join('\n');
 }
 
+// Reads every `raw*.json` under a directory in sorted order and concatenates
+// them into a single NDJSON string. Used so the sweep can write one file per
+// scenario (k6's `--out json` truncates per `k6 run` invocation, so reusing a
+// single path silently drops every scenario but the last).
+export function loadRawFromDir(dir: string): string {
+  const files = readdirSync(dir)
+    .filter((f) => f.startsWith('raw') && f.endsWith('.json'))
+    .sort();
+  if (files.length === 0) {
+    throw new Error(`No raw*.json files found in ${dir}`);
+  }
+  return files.map((f) => readFileSync(resolve(dir, f), 'utf8')).join('\n');
+}
+
 // CLI entry
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const rawPath = process.env.PERF_RAW_PATH ?? 'reports/latest/raw.json';
-  const outDir = dirname(rawPath);
-  const raw = readFileSync(resolve(rawPath), 'utf8');
+  const rawDir = process.env.PERF_RAW_DIR;
+  const rawPath = process.env.PERF_RAW_PATH;
+  let raw: string;
+  let outDir: string;
+  if (rawDir) {
+    const dirAbs = resolve(rawDir);
+    raw = loadRawFromDir(dirAbs);
+    outDir = dirAbs;
+  } else {
+    const path = rawPath ?? 'reports/latest/raw.json';
+    raw = readFileSync(resolve(path), 'utf8');
+    outDir = dirname(path);
+  }
   const points = parseRawJson(raw);
   const stats = computeScenarioStats(points);
 
