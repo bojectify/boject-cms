@@ -7,7 +7,11 @@ export type ValidateApiKeyResult =
   | { valid: true; apiKeyId: string; keyPrefix: string }
   | { valid: false; message: string };
 
-type ApiKeyClient = {
+/**
+ * Minimal Prisma surface needed by resolveApiKey — kept narrow on
+ * purpose so unit tests can pass a hand-rolled fake.
+ */
+export type ApiKeyClient = {
   apiKey: {
     findUnique: (args: { where: { keyHash: string } }) => Promise<{
       id: string;

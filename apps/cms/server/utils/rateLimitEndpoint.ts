@@ -43,9 +43,13 @@ export function enforceMutationRateLimit(event: H3Event, endpoint: string) {
  */
 export function getGraphqlMax(): number {
   const raw = process.env.GRAPHQL_RATE_LIMIT_RPS;
+  // `!raw` covers undefined and empty string; the integer + positivity
+  // checks below cover NaN, fractional, exponential-truncated, and
+  // non-positive values. Silent fallback so an operator typo can't
+  // crash the server.
   if (!raw) return GRAPHQL_DEFAULT_MAX;
-  const parsed = parseInt(raw, 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) return GRAPHQL_DEFAULT_MAX;
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed <= 0) return GRAPHQL_DEFAULT_MAX;
   return parsed;
 }
 

@@ -58,6 +58,21 @@ describe('getGraphqlMax', () => {
     vi.stubEnv('GRAPHQL_RATE_LIMIT_RPS', 'NaN');
     expect(getGraphqlMax()).toBe(1000);
   });
+
+  it('parses scientific notation as an integer', () => {
+    vi.stubEnv('GRAPHQL_RATE_LIMIT_RPS', '1e3');
+    expect(getGraphqlMax()).toBe(1000);
+  });
+
+  it('falls back to 1000 for fractional values', () => {
+    vi.stubEnv('GRAPHQL_RATE_LIMIT_RPS', '1.5');
+    expect(getGraphqlMax()).toBe(1000);
+  });
+
+  it('falls back to 1000 for partial numeric values', () => {
+    vi.stubEnv('GRAPHQL_RATE_LIMIT_RPS', '500abc');
+    expect(getGraphqlMax()).toBe(1000);
+  });
 });
 
 describe('enforceGraphqlRateLimit', () => {
