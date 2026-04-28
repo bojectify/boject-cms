@@ -57,7 +57,7 @@ watch(
 );
 
 function cancel() {
-  if (window.history.length > 1) router.back();
+  if (import.meta.client && window.history.length > 1) router.back();
   else router.push('/');
 }
 
@@ -83,9 +83,22 @@ async function submit() {
     });
   } catch (err: unknown) {
     const status = (err as { status?: number }).status;
+    const data = (err as { data?: { error?: string; failures?: string[] } })
+      .data;
     if (status === 401) {
       errors.current = 'Current password is incorrect.';
       form.currentPassword = '';
+    } else if (status === 400 && data?.error === 'WEAK_PASSWORD') {
+      // Defense-in-depth: client + server rule sets are normally in sync, but
+      // surface a useful error if the server rejects a password the client
+      // approved (e.g. mid-deploy rule drift).
+      toast.add({
+        title: 'Password rejected',
+        description: data.failures?.length
+          ? `Failed: ${data.failures.join(', ')}`
+          : 'Please choose a different password.',
+        color: 'error',
+      });
     } else if (status === 429) {
       toast.add({
         title: 'Too many attempts',
