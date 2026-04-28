@@ -43,7 +43,7 @@
     "starters:check": "pnpm --filter cms starters:check",
     "storybook": "pnpm --filter cms storybook",
     "storybook:build": "pnpm --filter cms storybook:build",
-    "perf:dev": "DATABASE_URL=postgresql://boject:boject@localhost:5432/boject_perf pnpm --filter cms dev",
+    "perf:dev": "DATABASE_URL=postgresql://boject:boject@localhost:5432/boject_perf NITRO_HOST=0.0.0.0 pnpm --filter cms dev",
     "perf:seed": "pnpm --filter @boject/perf run seed",
     "perf:reset": "pnpm --filter @boject/perf run reset",
     "perf:sweep": "pnpm --filter @boject/perf run sweep",
