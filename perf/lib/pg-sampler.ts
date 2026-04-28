@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process';
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { loadNodeConfig } from './config-node.ts';
+import { loadNodeConfig } from './config-node';
 
 export interface Sample {
   timestamp: Date;
