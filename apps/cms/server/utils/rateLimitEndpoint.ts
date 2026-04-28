@@ -57,6 +57,10 @@ export function getGraphqlMax(): number {
  * Apply a per-API-key sliding-window rate limit on /api/graphql.
  * Threshold defaults to 1000 RPS, override via GRAPHQL_RATE_LIMIT_RPS.
  * Throws a 429 with Retry-After if the limit is exceeded.
+ *
+ * The bucket is in-process. In horizontally-scaled deployments the
+ * effective cap is N × replicas; use a shared rate limiter (Redis /
+ * postgres / external gateway) when scaling beyond one process.
  */
 export function enforceGraphqlRateLimit(event: H3Event, apiKeyId: string) {
   const { allowed, retryAfterMs } = rateLimit(
