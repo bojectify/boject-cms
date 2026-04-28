@@ -9,6 +9,8 @@ follow the links for the underlying data.
 - Full reports (summary + CSV + plots): [`perf/reports/`](../../perf/reports/)
 - Latest operator summary:
   [`2026-04-28-report-summary.md`](./2026-04-28-report-summary.md)
+  (full report:
+  [`perf/reports/2026-04-28-e869073/`](../../perf/reports/2026-04-28-e869073/))
 
 When a new sweep lands, copy the **Headline numbers**, **Recommendations**,
 and **Run notes** sections of `perf/reports/<run-id>/summary.md` into a new
