@@ -2,7 +2,9 @@
 
 ## Overview
 
-Apply a per-API-key sliding-window rate limit to `/api/graphql` in production. Threshold: **1000 requests per second per API key**, derived from the load-test report at `perf/reports/2026-04-28-e869073/summary.md`. The cap is conservative — Scenario 1B held p99 < 9 ms with 0% errors all the way up to the test ceiling of 2000 RPS, so 1000 leaves >2× headroom against measured behaviour.
+Apply a per-API-key sliding-window rate limit to `/api/graphql` in production. Default threshold: **1000 requests per second per API key**, derived from the load-test report at `perf/reports/2026-04-28-e869073/summary.md` (the report ran on the maintainer's local machine — Scenario 1B held p99 < 9 ms with 0% errors all the way up to the test ceiling of 2000 RPS, so 1000 leaves >2× headroom on that hardware).
+
+The threshold is operator-tunable via the `GRAPHQL_RATE_LIMIT_RPS` environment variable. Operators are expected to run the same `perf/` sweep against their own infrastructure, identify their hardware's soft breakpoint, and set the env var accordingly. The 1000 default exists so a fresh deployment is sensibly capped out of the box, not so it's the right answer for every host.
 
 This ticket (#121) is the foundation. Two follow-up tickets layer on top without reorganising what we land here:
 
@@ -17,7 +19,11 @@ This ticket (#121) is the foundation. Two follow-up tickets layer on top without
 
 **Add a sibling helper in `rateLimitEndpoint.ts`** rather than refactor the file into a generic core. Two callers (mutations + GraphQL) doesn't justify an abstraction; the parallel structure also keeps the 429 surface easy to migrate when #124 lands.
 
-**Strict 1-second sliding window of 1000 requests.** Matches the literal "1000 RPS" framing from the report and protects against burst behaviour — a client that briefly bursts to 1500 RPS gets 500 requests rejected with `Retry-After ≈ 1s` and recovers cleanly as the window slides forward. Rolling 60-second windows would smooth bursts but defeat the point of the cap. Memory cost: ~1000 timestamps in flight per active API key.
+**Strict 1-second sliding window of N requests** (N defaults to 1000, env-configurable). Matches the literal "RPS" framing from the report and protects against burst behaviour — a client that briefly bursts to N×1.5 RPS gets the excess rejected with `Retry-After ≈ 1s` and recovers cleanly as the window slides forward. Rolling 60-second windows would smooth bursts but defeat the point of the cap. Memory cost: ~N timestamps in flight per active API key.
+
+**Threshold read at runtime, not module init.** `parseInt(process.env.GRAPHQL_RATE_LIMIT_RPS ?? '1000', 10)` runs inside `enforceGraphqlRateLimit` on every call — cost is negligible (single parseInt + comparison vs. a sub-millisecond request budget) and tests can override with `process.env.GRAPHQL_RATE_LIMIT_RPS = '5'` without `vi.resetModules()` gymnastics. Invalid values (`NaN`, `≤ 0`) silently fall back to the 1000 default — operators who fat-finger the var see normal-default behaviour rather than a crashed server.
+
+**Window stays hardcoded at 1 second.** Making the window configurable too is YAGNI — the term "RPS" only makes sense with a 1-second window, and a separate `_WINDOW_MS` knob would invite confusing combinations like "100 requests per 5 minutes."
 
 **Skip the limiter in dev mode.** The handler already bypasses auth in dev so GraphiQL can introspect; the rate limiter follows the same gate. "Catch your infinite loop locally" isn't the limiter's job.
 
@@ -39,16 +45,24 @@ The function already loads the `apiKey` row to check `revokedAt`; surfacing `id`
 
 ### `apps/cms/server/utils/rateLimitEndpoint.ts`
 
-Add two constants and one helper alongside the existing mutation limiter:
+Add a constant, a parser, and one helper alongside the existing mutation limiter:
 
 ```ts
-const GRAPHQL_MAX = 1000;
+const GRAPHQL_DEFAULT_MAX = 1000;
 const GRAPHQL_WINDOW_MS = 1_000;
+
+function getGraphqlMax(): number {
+  const raw = process.env.GRAPHQL_RATE_LIMIT_RPS;
+  if (!raw) return GRAPHQL_DEFAULT_MAX;
+  const parsed = parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return GRAPHQL_DEFAULT_MAX;
+  return parsed;
+}
 
 export function enforceGraphqlRateLimit(event: H3Event, apiKeyId: string) {
   const { allowed, retryAfterMs } = rateLimit(
     `gql:${apiKeyId}`,
-    GRAPHQL_MAX,
+    getGraphqlMax(),
     GRAPHQL_WINDOW_MS
   );
   if (!allowed) {
@@ -62,6 +76,17 @@ export function enforceGraphqlRateLimit(event: H3Event, apiKeyId: string) {
 ```
 
 Same shape as `enforceMutationRateLimit`. The 429 body stays minimal — #124 will enrich both endpoints' responses in one pass.
+
+### `apps/cms/.env.example`
+
+Document the new env var:
+
+```env
+# GraphQL rate limit (per API key, per second). Defaults to 1000 if unset
+# or invalid. Run the perf/ sweep against your own infrastructure to pick
+# a threshold that matches your hardware's measured headroom.
+GRAPHQL_RATE_LIMIT_RPS=1000
+```
 
 ### `apps/cms/server/api/graphql/graphql.ts`
 
@@ -115,12 +140,13 @@ yoga(req, res)
 
 ### Unit test — `apps/cms/server/utils/rateLimitEndpoint.test.ts` (new file)
 
-Resets the rate-limit store between tests via `resetRateLimitStore()`.
+Resets the rate-limit store between tests via `resetRateLimitStore()`. Env-var manipulation uses `vi.stubEnv('GRAPHQL_RATE_LIMIT_RPS', ...)` per test with `vi.unstubAllEnvs()` in `afterEach` — keeps tests hermetic regardless of the developer's shell env.
 
-- Calling `enforceGraphqlRateLimit(mockEvent, 'test-key')` 1000 times in a row — all allowed, no throw.
-- 1001st call throws a 429 `H3Error` and sets the `Retry-After` header on the mock event.
-- Different `apiKeyId` values are independent buckets — `'a'` exhausting its limit doesn't affect `'b'`.
-- After the 1-second window expires (advance time via `vi.useFakeTimers()` + `vi.advanceTimersByTime`), the same key is allowed again.
+- **Default applies when env var unset.** `vi.stubEnv('GRAPHQL_RATE_LIMIT_RPS', '')` (or unstub); first 1000 calls allowed, 1001st throws 429.
+- **Env var honoured.** With `GRAPHQL_RATE_LIMIT_RPS=5`, first 5 calls allowed, 6th throws 429 with `Retry-After` set on the mock event.
+- **Invalid env values fall back to default.** `GRAPHQL_RATE_LIMIT_RPS='abc'`, `'-1'`, `'0'`, `'NaN'` each behave like an unset var (1000 cap).
+- **Independent buckets per `apiKeyId`.** With cap 5, exhausting `'a'` doesn't affect `'b'`.
+- **Window expiry.** With cap 5, exhaust the limit, advance fake timers past 1 second, the same key is allowed again.
 
 ### Validator test — `apps/cms/server/utils/validateApiKey.test.ts` (new file or extend)
 
@@ -141,8 +167,9 @@ Explicitly deferred to keep this PR focused:
 - **`X-RateLimit-*` response headers** → #123. Will read the same rate-limit store; no refactor of this work needed.
 - **Richer 429 body** (`retryAfter`, `suggestion`) → #124. Will touch both `enforceMutationRateLimit` and `enforceGraphqlRateLimit` together.
 - **Per-operation query-cost scoring** → #122. Independent — works alongside RPS limiting, not instead of it.
-- **Configurable threshold via env var.** Not needed yet — the 1000 RPS cap is operator-friendly out of the box, and a `GRAPHQL_RATE_LIMIT_MAX` knob can be added in one line if/when an operator asks. YAGNI for now.
+- **Configurable window size.** Window stays 1s; "RPS" only makes sense at that granularity. Re-evaluate if a future use case needs a different shape.
 - **Per-IP fallback when no API key** (e.g. anonymous dev mode). Dev bypasses auth; production requires a key. There is no third path.
+- **Boot-time validation / warning logs for invalid `GRAPHQL_RATE_LIMIT_RPS`.** Silent fallback is good enough for v1; #123 (rate-limit headers) will surface the effective cap to operators via `X-RateLimit-Limit`, which is a more actionable observability surface than a startup log line.
 
 ## Migration / Compatibility
 
