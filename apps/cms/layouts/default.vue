@@ -49,6 +49,13 @@ const userMenuItems = computed<DropdownMenuItem[][]>(() => [
   ],
   [
     {
+      label: 'Account',
+      icon: 'i-lucide-user',
+      to: '/account',
+    },
+  ],
+  [
+    {
       label: 'Logout',
       icon: 'i-lucide-log-out',
       onSelect: logout,
