@@ -10,6 +10,7 @@ import { rateLimit } from './rateLimit';
 const MUTATION_MAX = 50;
 const MUTATION_WINDOW_MS = 60_000;
 const GRAPHQL_DEFAULT_MAX = 1000;
+const GRAPHQL_WINDOW_MS = 1_000;
 
 /**
  * Apply a per-IP, per-endpoint sliding-window rate limit for mutating
@@ -46,4 +47,24 @@ export function getGraphqlMax(): number {
   const parsed = parseInt(raw, 10);
   if (!Number.isFinite(parsed) || parsed <= 0) return GRAPHQL_DEFAULT_MAX;
   return parsed;
+}
+
+/**
+ * Apply a per-API-key sliding-window rate limit on /api/graphql.
+ * Threshold defaults to 1000 RPS, override via GRAPHQL_RATE_LIMIT_RPS.
+ * Throws a 429 with Retry-After if the limit is exceeded.
+ */
+export function enforceGraphqlRateLimit(event: H3Event, apiKeyId: string) {
+  const { allowed, retryAfterMs } = rateLimit(
+    `gql:${apiKeyId}`,
+    getGraphqlMax(),
+    GRAPHQL_WINDOW_MS
+  );
+  if (!allowed) {
+    setResponseHeader(event, 'Retry-After', Math.ceil(retryAfterMs / 1000));
+    throw createError({
+      statusCode: 429,
+      statusMessage: 'Too many requests',
+    });
+  }
 }
