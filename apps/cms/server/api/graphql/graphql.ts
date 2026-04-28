@@ -2,6 +2,8 @@ import { createYoga } from 'graphql-yoga';
 import { defineEventHandler } from 'h3';
 import { maxDepthPlugin } from '@escape.tech/graphql-armor-max-depth';
 import { getSchema } from '../../graphql/schema';
+import { validateApiKey } from '../../utils/validateApiKey';
+import { enforceGraphqlRateLimit } from '../../utils/rateLimitEndpoint';
 
 const yoga = createYoga({
   schema: () => getSchema(),
@@ -23,6 +25,8 @@ export default defineEventHandler(async (event) => {
     setResponseStatus(event, 401);
     return { error: result.message };
   }
+
+  enforceGraphqlRateLimit(event, result.apiKeyId);
 
   return yoga(req, res);
 });
