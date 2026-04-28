@@ -2,6 +2,7 @@ import { Client } from 'pg';
 import { spawn } from 'node:child_process';
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { loadNodeConfig } from './config-node.ts';
 
 export interface Sample {
@@ -206,8 +207,13 @@ async function main(): Promise<void> {
   }
 }
 
-// CLI entry
-if (import.meta.url === `file://${process.argv[1]}`) {
+// CLI entry — pathToFileURL handles symlinks, spaces in paths, and
+// platform path separators. The naked `file://${argv[1]}` form silently
+// no-ops in those cases.
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
   main().catch((err: unknown) => {
     console.error('[pg-sampler] fatal', err);
     process.exit(1);

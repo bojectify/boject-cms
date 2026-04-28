@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { posix } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 export interface FollowupIssue {
   title: string;
@@ -79,8 +80,13 @@ export function buildFollowups(opts: { reportPath: string }): BuildResult {
   return { newIssues, comments };
 }
 
-// CLI entry
-if (import.meta.url === `file://${process.argv[1]}`) {
+// CLI entry — pathToFileURL handles symlinks, spaces in paths, and
+// platform path separators. The naked `file://${argv[1]}` form silently
+// no-ops in those cases.
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
   const reportPath = process.argv[2];
   const dryRun = process.argv.includes('--dry-run');
   if (!reportPath) {

@@ -1,4 +1,5 @@
 import { Client } from 'pg';
+import { pathToFileURL } from 'node:url';
 import { loadNodeConfig } from '../lib/config-node';
 
 export interface ResetOptions {
@@ -24,7 +25,10 @@ export async function resetPerfDb(opts: ResetOptions): Promise<void> {
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
   const cfg = loadNodeConfig();
   const client = new Client({ connectionString: cfg.perfDatabaseUrl });
   await client.connect();

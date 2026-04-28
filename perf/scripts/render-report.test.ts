@@ -96,6 +96,36 @@ describe('computeScenarioStats — large group', () => {
   });
 });
 
+describe('empty inputs', () => {
+  it('parseRawJson returns [] for an empty string', () => {
+    expect(parseRawJson('')).toEqual([]);
+  });
+
+  it('parseRawJson skips blank/whitespace-only lines', () => {
+    expect(parseRawJson('\n  \n\n')).toEqual([]);
+  });
+
+  it('computeScenarioStats returns [] when there are no points', () => {
+    expect(computeScenarioStats([])).toEqual([]);
+  });
+
+  it('renderSummaryMd produces a valid skeleton when stats is empty', () => {
+    const md = renderSummaryMd({
+      gitSha: 'abc1234',
+      date: '2026-04-21',
+      stats: [],
+    });
+    expect(md).toContain('# Load test report — 2026-04-21 (git: abc1234)');
+    expect(md).toContain('## Scenario 1A');
+    expect(md).toContain('Scenarios captured: 0');
+    expect(md).toContain('Total durations recorded: 0');
+  });
+
+  it('toCsv emits just the header row when stats is empty', () => {
+    expect(toCsv([])).toBe('scenario,page_size,count,p50,p95,p99,error_rate');
+  });
+});
+
 describe('loadRawFromDir', () => {
   it('reads and concatenates raw*.json files in sort order, ignoring others', () => {
     const dir = mkdtempSync(join(tmpdir(), 'perf-render-'));

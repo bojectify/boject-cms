@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { execSync } from 'node:child_process';
 
 export interface RawPoint {
@@ -157,8 +158,13 @@ export function loadRawFromDir(dir: string): string {
   return files.map((f) => readFileSync(resolve(dir, f), 'utf8')).join('\n');
 }
 
-// CLI entry
-if (import.meta.url === `file://${process.argv[1]}`) {
+// CLI entry — pathToFileURL handles symlinks, spaces in paths, and
+// platform path separators. The naked `file://${argv[1]}` form silently
+// no-ops in those cases.
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
   const rawDir = process.env.PERF_RAW_DIR;
   const rawPath = process.env.PERF_RAW_PATH;
   let raw: string;

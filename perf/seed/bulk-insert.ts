@@ -1,5 +1,6 @@
 import { parseArgs } from 'node:util';
 import { randomUUID } from 'node:crypto';
+import { pathToFileURL } from 'node:url';
 import { PrismaClient, Prisma } from '../../apps/cms/generated/prisma/client';
 import { loadNodeConfig } from '../lib/config-node';
 import { PERF_CONTENT_TYPES } from './contentTypes';
@@ -214,8 +215,13 @@ function resolveFieldOptions(
   return { targetContentTypeIds };
 }
 
-// CLI entry
-if (import.meta.url === `file://${process.argv[1]}`) {
+// CLI entry — pathToFileURL handles symlinks, spaces in paths, and
+// platform path separators. The naked `file://${argv[1]}` form silently
+// no-ops in those cases.
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
   const { values } = parseArgs({
     options: { size: { type: 'string', default: '10000' } },
   });

@@ -1,6 +1,7 @@
 import { execSync, spawnSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { Client } from 'pg';
 import { PrismaClient } from '../../apps/cms/generated/prisma/client.ts';
 import { loadNodeConfig } from '../lib/config-node.ts';
@@ -79,8 +80,13 @@ export async function runSweep(deps: RunDeps): Promise<void> {
   await deps.render();
 }
 
-// CLI entry
-if (import.meta.url === `file://${process.argv[1]}`) {
+// CLI entry — pathToFileURL handles symlinks, spaces in paths, and
+// platform path separators. The naked `file://${argv[1]}` form silently
+// no-ops in those cases.
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
   const sizes = (process.env.PERF_SIZES ?? '1000,10000,30000,100000')
     .split(',')
     .map((s) => Number(s.trim()));
