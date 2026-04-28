@@ -27,16 +27,47 @@ describe('parseRawJson', () => {
 });
 
 describe('computeScenarioStats', () => {
-  it('groups by scenario+page_size and computes percentiles', () => {
+  it('groups by (scenario, page_size, shape) and computes percentiles', () => {
     const points = parseRawJson(fixture);
     const stats = computeScenarioStats(points);
     const sitemap100 = stats.find(
       (s) => s.scenario === 'sitemap' && s.pageSize === '100'
     )!;
     expect(sitemap100.count).toBe(3);
+    expect(sitemap100.shape).toBe('-');
     expect(sitemap100.p50).toBeCloseTo(120.5, 1);
     expect(sitemap100.p99).toBeCloseTo(310.8, 1);
     expect(sitemap100.errorRate).toBe(0);
+  });
+
+  it('splits flat scenario into one row per shape', () => {
+    // Without per-shape splitting the bare/filtered/relation flat queries
+    // collapse into a single row and the JSONB-index evidence (#25) is
+    // invisible in metrics.csv. Regression test that the split happens.
+    const mk = (shape: string, value: number): RawPoint => ({
+      metric: 'http_req_duration',
+      type: 'Point',
+      data: {
+        time: '2026-04-28T00:00:00Z',
+        value,
+        tags: { scenario: 'flat', shape },
+      },
+    });
+    const points: RawPoint[] = [
+      mk('bare', 10),
+      mk('bare', 20),
+      mk('filtered', 30),
+      mk('filtered', 40),
+      mk('relation', 50),
+    ];
+    const stats = computeScenarioStats(points);
+    const flat = stats.filter((s) => s.scenario === 'flat');
+    expect(flat).toHaveLength(3);
+    const shapes = flat.map((s) => s.shape).sort();
+    expect(shapes).toEqual(['bare', 'filtered', 'relation']);
+    expect(flat.find((s) => s.shape === 'bare')!.count).toBe(2);
+    expect(flat.find((s) => s.shape === 'filtered')!.count).toBe(2);
+    expect(flat.find((s) => s.shape === 'relation')!.count).toBe(1);
   });
 });
 
@@ -51,6 +82,48 @@ describe('renderSummaryMd', () => {
     expect(md).toContain('# Load test report — 2026-04-21 (git: abc1234)');
     expect(md).toContain('## Scenario 1A');
     expect(md).toContain('p99');
+  });
+
+  it('uses page_size column for sitemap and shape column for flat', () => {
+    const stats = [
+      {
+        scenario: 'sitemap',
+        pageSize: '500',
+        shape: '-',
+        count: 10,
+        p50: 7,
+        p95: 11,
+        p99: 13,
+        errorRate: 0,
+      },
+      {
+        scenario: 'flat',
+        pageSize: '-',
+        shape: 'bare',
+        count: 100,
+        p50: 1,
+        p95: 5,
+        p99: 9,
+        errorRate: 0,
+      },
+      {
+        scenario: 'flat',
+        pageSize: '-',
+        shape: 'filtered',
+        count: 100,
+        p50: 2,
+        p95: 8,
+        p99: 14,
+        errorRate: 0,
+      },
+    ];
+    const md = renderSummaryMd({ gitSha: 'a', date: 'd', stats });
+    // Sitemap section advertises page_size; flat section advertises shape.
+    expect(md).toMatch(/## Scenario 1A[\s\S]*?\| page_size \|/);
+    expect(md).toMatch(/## Scenario 1B[\s\S]*?\| shape \|/);
+    // Both flat shapes should appear as separate rows.
+    expect(md).toMatch(/\| bare \| 100 \|/);
+    expect(md).toMatch(/\| filtered \| 100 \|/);
   });
 });
 
@@ -123,7 +196,9 @@ describe('empty inputs', () => {
   });
 
   it('toCsv emits just the header row when stats is empty', () => {
-    expect(toCsv([])).toBe('scenario,page_size,count,p50,p95,p99,error_rate');
+    expect(toCsv([])).toBe(
+      'scenario,page_size,shape,count,p50,p95,p99,error_rate'
+    );
   });
 });
 
@@ -183,6 +258,7 @@ describe('renderPlots', () => {
       {
         scenario: 'sitemap',
         pageSize: '100',
+        shape: '-',
         count: 10,
         p50: 50,
         p95: 120,
@@ -192,6 +268,7 @@ describe('renderPlots', () => {
       {
         scenario: 'sitemap',
         pageSize: '500',
+        shape: '-',
         count: 10,
         p50: 80,
         p95: 150,
@@ -211,11 +288,11 @@ describe('renderPlots', () => {
 });
 
 describe('toCsv', () => {
-  it('emits one row per scenario group with header', () => {
+  it('emits one row per scenario group with header (incl. shape)', () => {
     const points = parseRawJson(fixture);
     const csv = toCsv(computeScenarioStats(points));
     expect(csv.split('\n')[0]).toBe(
-      'scenario,page_size,count,p50,p95,p99,error_rate'
+      'scenario,page_size,shape,count,p50,p95,p99,error_rate'
     );
     expect(csv.split('\n').length).toBeGreaterThan(2);
   });

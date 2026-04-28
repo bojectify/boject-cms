@@ -25,6 +25,12 @@ export function parseRawJson(raw: string): RawPoint[] {
 export interface ScenarioStats {
   scenario: string;
   pageSize: string;
+  // GraphQL flat scenario tags each stage with `shape`
+  // (bare/filtered/relation). Sitemap and crud don't tag a shape, so it
+  // collapses to '-' for them. Splitting by shape is what surfaces the
+  // bare-vs-filtered JSONB-index evidence (issue #25) — without it the
+  // three flat shapes get aggregated into one row and the delta vanishes.
+  shape: string;
   count: number;
   p50: number;
   p95: number;
@@ -44,13 +50,14 @@ export function percentile(sorted: number[], p: number): number {
 }
 
 export function computeScenarioStats(points: RawPoint[]): ScenarioStats[] {
-  // Group http_req_duration by scenario+page_size
+  // Group http_req_duration by (scenario, page_size, shape).
   const groups = new Map<string, number[]>();
   const failGroups = new Map<string, { total: number; failed: number }>();
   for (const p of points) {
     const scenario = p.data.tags.scenario ?? 'unknown';
     const pageSize = p.data.tags.page_size ?? '-';
-    const key = `${scenario}|${pageSize}`;
+    const shape = p.data.tags.shape ?? '-';
+    const key = `${scenario}|${pageSize}|${shape}`;
     if (p.metric === 'http_req_duration') {
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key)!.push(p.data.value);
@@ -63,12 +70,17 @@ export function computeScenarioStats(points: RawPoint[]): ScenarioStats[] {
   }
 
   return Array.from(groups.entries()).map(([key, values]) => {
-    const [scenario, pageSize] = key.split('|') as [string, string];
+    const [scenario, pageSize, shape] = key.split('|') as [
+      string,
+      string,
+      string,
+    ];
     const sorted = [...values].sort((a, b) => a - b);
     const fg = failGroups.get(key);
     return {
       scenario,
       pageSize,
+      shape,
       count: values.length,
       p50: percentile(sorted, 0.5),
       p95: percentile(sorted, 0.95),
@@ -79,11 +91,12 @@ export function computeScenarioStats(points: RawPoint[]): ScenarioStats[] {
 }
 
 export function toCsv(stats: ScenarioStats[]): string {
-  const header = 'scenario,page_size,count,p50,p95,p99,error_rate';
+  const header = 'scenario,page_size,shape,count,p50,p95,p99,error_rate';
   const rows = stats.map((s) =>
     [
       s.scenario,
       s.pageSize,
+      s.shape,
       s.count,
       s.p50.toFixed(2),
       s.p95.toFixed(2),
@@ -100,16 +113,37 @@ export interface RenderInput {
   stats: ScenarioStats[];
 }
 
+// Per-scenario row formatters: sitemap surfaces page_size, flat surfaces
+// shape, crud aggregates without either dimension. The CSV keeps every
+// column (machine-readable); the markdown is tuned for human read.
+function metricsCells(s: ScenarioStats): string {
+  return `${s.count} | ${s.p50.toFixed(1)} | ${s.p95.toFixed(1)} | ${s.p99.toFixed(1)} | ${(s.errorRate * 100).toFixed(2)}%`;
+}
+
+const METRICS_HEADER =
+  'count | p50 (ms) | p95 (ms) | p99 (ms) | errors |\n| --- | --- | --- | --- | --- |';
+
 export function renderSummaryMd(input: RenderInput): string {
   const sitemap = input.stats.filter((s) => s.scenario === 'sitemap');
   const flat = input.stats.filter((s) => s.scenario === 'flat');
   const crud = input.stats.filter((s) => s.scenario === 'crud');
 
-  const row = (s: ScenarioStats) =>
-    `| ${s.scenario} | ${s.pageSize} | ${s.count} | ${s.p50.toFixed(1)} | ${s.p95.toFixed(1)} | ${s.p99.toFixed(1)} | ${(s.errorRate * 100).toFixed(2)}% |`;
+  const sitemapRow = (s: ScenarioStats): string =>
+    `| ${s.pageSize} | ${metricsCells(s)} |`;
+  const sitemapHeader = `| page_size | ${METRICS_HEADER.replace(
+    '| --- | --- | --- | --- | --- |',
+    '| --- | --- | --- | --- | --- | --- |'
+  )}`;
 
-  const header =
-    '| scenario | page_size | count | p50 (ms) | p95 (ms) | p99 (ms) | errors |\n| --- | --- | --- | --- | --- | --- | --- |';
+  const flatRow = (s: ScenarioStats): string =>
+    `| ${s.shape} | ${metricsCells(s)} |`;
+  const flatHeader = `| shape | ${METRICS_HEADER.replace(
+    '| --- | --- | --- | --- | --- |',
+    '| --- | --- | --- | --- | --- | --- |'
+  )}`;
+
+  const crudRow = (s: ScenarioStats): string => `| ${metricsCells(s)} |`;
+  const crudHeader = `| ${METRICS_HEADER}`;
 
   return [
     `# Load test report — ${input.date} (git: ${input.gitSha})`,
@@ -122,21 +156,21 @@ export function renderSummaryMd(input: RenderInput): string {
     `- Total durations recorded: ${input.stats.reduce((n, s) => n + s.count, 0)}`,
     '',
     '## Scenario 1A — GraphQL cursor pagination',
-    header,
-    ...sitemap.map(row),
+    sitemapHeader,
+    ...sitemap.map(sitemapRow),
     '',
     '## Scenario 1B — GraphQL flat RPS',
-    header,
-    ...flat.map(row),
+    flatHeader,
+    ...flat.map(flatRow),
     '',
     '## Scenario 2 — REST CRUD cycle',
-    header,
-    ...crud.map(row),
+    crudHeader,
+    ...crud.map(crudRow),
     '',
     '## Recommendations for CMS operators',
     '- GraphQL rate limit: fill in after reading scenario 1B soft-break',
     '- Default page size: choose the row in scenario 1A with best drain-time / p99 tradeoff',
-    '- JSONB indexing: attach evidence to #25 if filtered queries lag bare queries noticeably',
+    '- JSONB indexing: compare scenario 1B `bare` vs `filtered` p99 — attach the delta to #25',
     '',
     '## Recommendations for consumers',
     '- Page size: align with the operator recommendation',
