@@ -7,6 +7,7 @@ import {
   computeScenarioStats,
   loadRawFromDir,
   percentile,
+  renderPlots,
   renderSummaryMd,
   toCsv,
   type RawPoint,
@@ -150,6 +151,39 @@ describe('loadRawFromDir', () => {
   it('throws when the directory has no matching files', () => {
     const dir = mkdtempSync(join(tmpdir(), 'perf-render-empty-'));
     expect(() => loadRawFromDir(dir)).toThrow(/No raw\*\.json files/);
+  });
+});
+
+describe('renderPlots', () => {
+  it('produces a PNG buffer for sitemap latency by page size', async () => {
+    const stats = [
+      {
+        scenario: 'sitemap',
+        pageSize: '100',
+        count: 10,
+        p50: 50,
+        p95: 120,
+        p99: 300,
+        errorRate: 0,
+      },
+      {
+        scenario: 'sitemap',
+        pageSize: '500',
+        count: 10,
+        p50: 80,
+        p95: 150,
+        p99: 380,
+        errorRate: 0,
+      },
+    ];
+    const png = await renderPlots(stats);
+    expect(png).toBeInstanceOf(Buffer);
+    expect(png.length).toBeGreaterThan(500);
+    // PNG magic bytes — proves a real image was emitted, not just any Buffer.
+    expect(png[0]).toBe(0x89);
+    expect(png[1]).toBe(0x50);
+    expect(png[2]).toBe(0x4e);
+    expect(png[3]).toBe(0x47);
   });
 });
 

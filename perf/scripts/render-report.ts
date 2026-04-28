@@ -2,6 +2,7 @@ import { readdirSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { execSync } from 'node:child_process';
+import { ChartJSNodeCanvas } from 'chartjs-node-canvas';
 
 export interface RawPoint {
   metric: string;
@@ -144,6 +145,43 @@ export function renderSummaryMd(input: RenderInput): string {
   ].join('\n');
 }
 
+// Renders a 800×400 PNG bar chart of sitemap p50/p95/p99 by page_size.
+// Sitemap is the only scenario plotted in v1 — flat and crud render fine
+// as tables. Extend with additional charts as new shapes warrant them.
+export async function renderPlots(stats: ScenarioStats[]): Promise<Buffer> {
+  const canvas = new ChartJSNodeCanvas({ width: 800, height: 400 });
+  const sitemap = stats.filter((s) => s.scenario === 'sitemap');
+  return canvas.renderToBuffer({
+    type: 'bar',
+    data: {
+      labels: sitemap.map((s) => `size=${s.pageSize}`),
+      datasets: [
+        {
+          label: 'p50',
+          data: sitemap.map((s) => s.p50),
+          backgroundColor: '#4C9AFF',
+        },
+        {
+          label: 'p95',
+          data: sitemap.map((s) => s.p95),
+          backgroundColor: '#FFAB00',
+        },
+        {
+          label: 'p99',
+          data: sitemap.map((s) => s.p99),
+          backgroundColor: '#DE350B',
+        },
+      ],
+    },
+    options: {
+      plugins: {
+        title: { display: true, text: 'Sitemap p50/p95/p99 by page_size' },
+      },
+      scales: { y: { title: { display: true, text: 'ms' } } },
+    },
+  });
+}
+
 // Reads every `raw*.json` under a directory in sorted order and concatenates
 // them into a single NDJSON string. Used so the sweep can write one file per
 // scenario (k6's `--out json` truncates per `k6 run` invocation, so reusing a
@@ -188,5 +226,13 @@ if (
   mkdirSync(outDir, { recursive: true });
   writeFileSync(resolve(outDir, 'summary.md'), md);
   writeFileSync(resolve(outDir, 'metrics.csv'), toCsv(stats));
-  console.log(`[render-report] wrote ${outDir}/summary.md + metrics.csv`);
+
+  const plotsDir = resolve(outDir, 'plots');
+  mkdirSync(plotsDir, { recursive: true });
+  const sitemapPng = await renderPlots(stats);
+  writeFileSync(resolve(plotsDir, 'sitemap-latency.png'), sitemapPng);
+
+  console.log(
+    `[render-report] wrote ${outDir}/summary.md + metrics.csv + plots/`
+  );
 }
