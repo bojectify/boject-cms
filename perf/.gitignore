@@ -1,0 +1,10 @@
+node_modules
+*.log
+# Ignore transient sampler output; real sampler output lives under reports/
+/tmp-samples/
+
+# Reports are committed deliverables (summary.md / metrics.csv / plots/*.png).
+# Only the raw NDJSON is ignored — k6 emits 10s of MB per scenario, far too
+# noisy for review. See docs/superpowers/plans/2026-04-21-load-testing.md
+# §Task 18 / §Task 19 step 5 for the rationale.
+/reports/**/raw*.json

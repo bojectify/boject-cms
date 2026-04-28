@@ -1,0 +1,6 @@
+{"metric":"http_req_duration","type":"Point","data":{"time":"2026-04-21T10:00:00Z","value":45.2,"tags":{"scenario":"sitemap","page_size":"100"}}}
+{"metric":"http_req_duration","type":"Point","data":{"time":"2026-04-21T10:00:01Z","value":120.5,"tags":{"scenario":"sitemap","page_size":"100"}}}
+{"metric":"http_req_duration","type":"Point","data":{"time":"2026-04-21T10:00:02Z","value":310.8,"tags":{"scenario":"sitemap","page_size":"100"}}}
+{"metric":"http_req_duration","type":"Point","data":{"time":"2026-04-21T10:00:03Z","value":50.1,"tags":{"scenario":"sitemap","page_size":"500"}}}
+{"metric":"http_req_duration","type":"Point","data":{"time":"2026-04-21T10:00:04Z","value":85.4,"tags":{"scenario":"sitemap","page_size":"500"}}}
+{"metric":"http_req_failed","type":"Point","data":{"time":"2026-04-21T10:00:00Z","value":0,"tags":{"scenario":"sitemap"}}}

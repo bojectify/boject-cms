@@ -42,7 +42,14 @@
     "starters:build": "pnpm --filter cms starters:build",
     "starters:check": "pnpm --filter cms starters:check",
     "storybook": "pnpm --filter cms storybook",
-    "storybook:build": "pnpm --filter cms storybook:build"
+    "storybook:build": "pnpm --filter cms storybook:build",
+    "perf:dev": "DATABASE_URL=postgresql://boject:boject@localhost:5432/boject_perf NITRO_HOST=0.0.0.0 pnpm --filter cms dev",
+    "perf:seed": "pnpm --filter @boject/perf run seed",
+    "perf:reset": "pnpm --filter @boject/perf run reset",
+    "perf:sweep": "pnpm --filter @boject/perf run sweep",
+    "perf:report": "pnpm --filter @boject/perf run report",
+    "perf:followups": "pnpm --filter @boject/perf run followups",
+    "perf:scenario": "pnpm --filter @boject/perf run scenario"
   },
   "devDependencies": {
     "@types/node": "^24.12.2",

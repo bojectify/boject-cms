@@ -290,6 +290,15 @@ pnpm test:unit               # Unit tests only
 
 **Requirement:** Docker PostgreSQL must be running (integration tests auto-reset and seed the `boject_test` database via `apps/cms/vitest.globalSetup.ts`).
 
+## Performance
+
+Load-test harness, committed reports, and operator recommendations live under [`perf/`](perf/README.md). Latest operator-facing summary is mirrored into [`docs/performance/`](docs/performance/).
+
+```bash
+pnpm perf:dev      # CMS dev server pointed at boject_perf
+pnpm perf:sweep    # full sweep (~25 min) → perf/reports/<date>-<sha>/
+```
+
 ## Linting & Formatting
 
 - **ESLint** — Via `@nuxt/eslint` module. Config in `apps/cms/eslint.config.mjs`.
