@@ -335,16 +335,20 @@ docker build -f apps/cms/Dockerfile -t boject/cms:dev .
 **Run** (requires a reachable Postgres):
 
 ```bash
+ADMIN_PW=$(openssl rand -base64 16)
+echo "Admin password (save this — there is no in-app rotation yet): $ADMIN_PW"
 docker run --rm -p 4000:3000 \
   -e DATABASE_URL=postgresql://boject:boject@host.docker.internal:5432/boject \
   -e NUXT_SESSION_PASSWORD="$(openssl rand -base64 32)" \
   -e BOJECT_ADMIN_EMAIL=admin@local \
-  -e BOJECT_ADMIN_PASSWORD=changeme \
+  -e BOJECT_ADMIN_PASSWORD="$ADMIN_PW" \
   -v boject_storage:/app/storage \
   boject/cms:dev
 ```
 
 The server starts on port 3000 inside the container (mapped to 4000 above). Log in at `http://localhost:4000/login` with the credentials you set.
+
+`BOJECT_ADMIN_PASSWORD` is validated at first-boot: must be ≥12 characters, not on a weak-password blocklist (`password`, `admin`, `changeme`, …), and not match the email local-part. Weak values cause the container to exit non-zero. The seeded password is the credential indefinitely — there is no in-app password change yet (tracked in [#130](https://github.com/ness-EE/boject-cms/issues/130)).
 
 **Import a starter bundle on first boot:**
 
