@@ -13,6 +13,14 @@ import { CmsLink } from './extensions/CmsLink';
 import { ExternalLink } from './extensions/ExternalLink';
 import type { RichTextEditorProps } from './richTextEditor.types';
 import { QA_RICH_TEXT_EDITOR } from './richTextEditor.config';
+import { CHIP_EDIT_KEY } from './chipEdit';
+import type { ChipEditPayload } from './chipEdit';
+import type {
+  EntryPickerSelection,
+  EntryPickerUpdatePayload,
+} from '../entry-picker-modal/entryPickerModal.types';
+import type { ExternalLinkSavePayload } from '../external-link-modal/externalLinkModal.types';
+import type { LinkOptions } from '../link-options-form/linkOptionsForm.types';
 
 const props = withDefaults(defineProps<RichTextEditorProps>(), {
   testId: QA_RICH_TEXT_EDITOR.COMPONENT,
@@ -71,21 +79,103 @@ watch(
   }
 );
 
-function promptLink() {
-  if (!editor.value) return;
-  const url = window.prompt('URL');
-  if (url) editor.value.chain().focus().setLink({ href: url }).run();
+type EntryPickerState = {
+  open: boolean;
+  mode: 'cmsEmbed' | 'cmsLink';
+  selectedEntry: { contentTypeId: string; entryId: string } | null;
+  initialOptions: LinkOptions;
+  pos: number | null; // null = inserting; non-null = editing existing chip
+};
+
+type ExternalLinkState = {
+  open: boolean;
+  mode: 'insert' | 'edit';
+  initialHref: string;
+  initialOptions: LinkOptions;
+  pos: number | null;
+};
+
+const entryPickerState = ref<EntryPickerState>({
+  open: false,
+  mode: 'cmsEmbed',
+  selectedEntry: null,
+  initialOptions: { label: '', target: null, rel: null },
+  pos: null,
+});
+
+const externalLinkState = ref<ExternalLinkState>({
+  open: false,
+  mode: 'insert',
+  initialHref: '',
+  initialOptions: { label: '', target: null, rel: null },
+  pos: null,
+});
+
+function openInsertEmbed() {
+  entryPickerState.value = {
+    open: true,
+    mode: 'cmsEmbed',
+    selectedEntry: null,
+    initialOptions: { label: '', target: null, rel: null },
+    pos: null,
+  };
 }
 
-const pickerOpen = ref(false);
-function openEmbedPicker() {
-  pickerOpen.value = true;
+function openInsertCmsLink() {
+  entryPickerState.value = {
+    open: true,
+    mode: 'cmsLink',
+    selectedEntry: null,
+    initialOptions: { label: '', target: null, rel: null },
+    pos: null,
+  };
 }
-function handleEmbedSelect(data: {
-  contentTypeId: string;
-  entryId: string;
-  entryTitle: string;
-}) {
+
+function openInsertExternalLink() {
+  externalLinkState.value = {
+    open: true,
+    mode: 'insert',
+    initialHref: '',
+    initialOptions: { label: '', target: null, rel: null },
+    pos: null,
+  };
+}
+
+function openEditChip(payload: ChipEditPayload) {
+  if (payload.kind === 'externalLink') {
+    externalLinkState.value = {
+      open: true,
+      mode: 'edit',
+      initialHref: payload.attrs.href,
+      initialOptions: {
+        label: payload.attrs.label ?? '',
+        target: payload.attrs.target ?? null,
+        rel: payload.attrs.rel === 'nofollow' ? 'nofollow' : null,
+      },
+      pos: payload.pos,
+    };
+    return;
+  }
+  entryPickerState.value = {
+    open: true,
+    mode: payload.kind,
+    selectedEntry: {
+      contentTypeId: payload.attrs.contentTypeId,
+      entryId: payload.attrs.entryId,
+    },
+    initialOptions: {
+      label: payload.attrs.label ?? '',
+      target: payload.attrs.target ?? null,
+      rel: payload.attrs.rel === 'nofollow' ? 'nofollow' : null,
+    },
+    pos: payload.pos,
+  };
+}
+
+provide(CHIP_EDIT_KEY, openEditChip);
+
+function handleEntryPickerInsert(data: EntryPickerSelection) {
+  // cmsEmbed insert (no link options)
   if (!editor.value) return;
   editor.value
     .chain()
@@ -95,36 +185,92 @@ function handleEmbedSelect(data: {
       attrs: { contentTypeId: data.contentTypeId, entryId: data.entryId },
     })
     .run();
-  pickerOpen.value = false;
+  entryPickerState.value.open = false;
 }
 
-const linkPickerOpen = ref(false);
-function openCmsLinkPicker() {
+function handleEntryPickerSave(data: EntryPickerUpdatePayload) {
   if (!editor.value) return;
-  // Require a non-empty selection so we have text to wrap.
-  const { from, to } = editor.value.state.selection;
-  if (from === to) {
-    useToast().add({
-      title: 'Select some text to turn into an entry link.',
-      color: 'warning',
-    });
-    return;
+  const state = entryPickerState.value;
+  const isEdit = state.pos !== null;
+  const nodeType = state.mode;
+  const attrs: Record<string, unknown> = {
+    contentTypeId: data.contentTypeId,
+    entryId: data.entryId,
+  };
+  if (nodeType === 'cmsLink') {
+    if (data.label) attrs.label = data.label;
+    if (data.target) attrs.target = data.target;
+    if (data.rel) attrs.rel = data.rel;
+  } else {
+    if (data.label) attrs.label = data.label;
   }
-  linkPickerOpen.value = true;
+  if (isEdit && state.pos !== null) {
+    const pos = state.pos;
+    editor.value
+      .chain()
+      .focus()
+      .setNodeSelection(pos)
+      .deleteSelection()
+      .insertContentAt(pos, { type: nodeType, attrs })
+      .run();
+  } else {
+    editor.value.chain().focus().insertContent({ type: nodeType, attrs }).run();
+  }
+  entryPickerState.value.open = false;
 }
-function handleCmsLinkSelect(data: { contentTypeId: string; entryId: string }) {
+
+function handleEntryPickerRemove() {
   if (!editor.value) return;
-  // TODO: Task 9 wires up the new insert flow
-  // editor.value
-  //   .chain()
-  //   .focus()
-  //   .setCmsLink({
-  //     contentTypeId: data.contentTypeId,
-  //     entryId: data.entryId,
-  //   })
-  //   .run();
-  void data;
-  linkPickerOpen.value = false;
+  const state = entryPickerState.value;
+  if (state.pos !== null) {
+    editor.value
+      .chain()
+      .focus()
+      .setNodeSelection(state.pos)
+      .deleteSelection()
+      .run();
+  }
+  entryPickerState.value.open = false;
+}
+
+function handleExternalLinkSave(data: ExternalLinkSavePayload) {
+  if (!editor.value) return;
+  const state = externalLinkState.value;
+  const attrs: Record<string, unknown> = { href: data.href };
+  if (data.label) attrs.label = data.label;
+  if (data.target) attrs.target = data.target;
+  if (data.rel) attrs.rel = data.rel;
+  if (state.pos !== null) {
+    const pos = state.pos;
+    editor.value
+      .chain()
+      .focus()
+      .setNodeSelection(pos)
+      .deleteSelection()
+      .insertContentAt(pos, { type: 'externalLink', attrs })
+      .run();
+  } else {
+    editor.value
+      .chain()
+      .focus()
+      .insertContent({ type: 'externalLink', attrs })
+      .run();
+  }
+  externalLinkState.value.open = false;
+}
+
+function handleExternalLinkRemove() {
+  if (!editor.value) return;
+  const state = externalLinkState.value;
+  if (state.pos !== null) {
+    editor.value
+      .chain()
+      .focus()
+      .setNodeSelection(state.pos)
+      .deleteSelection()
+      .run();
+  }
+  externalLinkState.value.open = false;
 }
 
 onBeforeUnmount(() => {
@@ -224,8 +370,8 @@ onBeforeUnmount(() => {
         variant="ghost"
         size="xs"
         icon="i-lucide-link"
-        :color="editor.isActive('link') ? 'primary' : 'neutral'"
-        @click="promptLink"
+        color="neutral"
+        @click="openInsertExternalLink"
       />
       <UButton
         v-if="embedsEnabled"
@@ -235,17 +381,17 @@ onBeforeUnmount(() => {
         color="neutral"
         :data-testid="QA_RICH_TEXT_EDITOR.EMBED_BTN"
         aria-label="Insert inline embed"
-        @click="openEmbedPicker"
+        @click="openInsertEmbed"
       />
       <UButton
         v-if="cmsLinksEnabled"
         variant="ghost"
         size="xs"
         icon="i-lucide-link-2"
-        :color="editor?.isActive('cmsLink') ? 'primary' : 'neutral'"
+        color="neutral"
         :data-testid="QA_RICH_TEXT_EDITOR.CMS_LINK_BTN"
-        aria-label="Link to entry"
-        @click="openCmsLinkPicker"
+        aria-label="Insert entry link"
+        @click="openInsertCmsLink"
       />
     </div>
 
@@ -255,19 +401,31 @@ onBeforeUnmount(() => {
     />
 
     <EntryPickerModal
-      v-if="pickerOpen"
-      :open="pickerOpen"
-      :target-content-type-ids="targetContentTypeIds"
-      @select="handleEmbedSelect"
-      @close="pickerOpen = false"
+      v-if="entryPickerState.open"
+      :open="entryPickerState.open"
+      :target-content-type-ids="
+        entryPickerState.mode === 'cmsEmbed'
+          ? targetContentTypeIds
+          : linkTargetContentTypeIds
+      "
+      :mode="entryPickerState.mode"
+      :selected-entry="entryPickerState.selectedEntry"
+      :initial-options="entryPickerState.initialOptions"
+      @select="handleEntryPickerInsert"
+      @update="handleEntryPickerSave"
+      @remove="handleEntryPickerRemove"
+      @close="entryPickerState.open = false"
     />
 
-    <EntryPickerModal
-      v-if="linkPickerOpen"
-      :open="linkPickerOpen"
-      :target-content-type-ids="linkTargetContentTypeIds"
-      @select="handleCmsLinkSelect"
-      @close="linkPickerOpen = false"
+    <ExternalLinkModal
+      v-if="externalLinkState.open"
+      :open="externalLinkState.open"
+      :mode="externalLinkState.mode"
+      :initial-href="externalLinkState.initialHref"
+      :initial-options="externalLinkState.initialOptions"
+      @save="handleExternalLinkSave"
+      @remove="handleExternalLinkRemove"
+      @close="externalLinkState.open = false"
     />
   </div>
 </template>
