@@ -293,21 +293,16 @@ describe('enrichEntryDataWithEmbedIdentifiers', () => {
     expect(data).toEqual(snapshot);
   });
 
-  it('enriches a RICHTEXT body that contains only cmsLink marks (no embeds)', async () => {
+  it('enriches a RICHTEXT body that contains only cmsLink nodes (no embeds)', async () => {
     const data = {
       body: doc([
         {
           type: 'paragraph',
           content: [
+            { type: 'text', text: 'visit ' },
             {
-              type: 'text',
-              text: 'visit',
-              marks: [
-                {
-                  type: 'cmsLink',
-                  attrs: { contentTypeId: 'ct-1', entryId: 'e-1' },
-                },
-              ],
+              type: 'cmsLink',
+              attrs: { contentTypeId: 'ct-1', entryId: 'e-1' },
             },
           ],
         },
@@ -328,16 +323,15 @@ describe('enrichEntryDataWithEmbedIdentifiers', () => {
     expect(new Set(calledWith)).toEqual(new Set(['ct-1']));
 
     const bodyPara = (result.body as ReturnType<typeof doc>).content[0] as {
-      content: { marks: { attrs: Record<string, unknown> }[] }[];
+      content: { type: string; attrs?: Record<string, unknown> }[];
     };
-    expect(bodyPara.content[0]!.marks[0]!.attrs.contentTypeIdentifier).toBe(
-      'Page'
-    );
+    const linkNode = bodyPara.content[1]!;
+    expect(linkNode.attrs!.contentTypeIdentifier).toBe('Page');
   });
 });
 
 // ---------------------------------------------------------------------------
-// cmsLink mark coverage
+// cmsLink node coverage
 // ---------------------------------------------------------------------------
 
 const cmsLink = (
@@ -348,163 +342,190 @@ const cmsLink = (
   type: 'cmsLink',
   attrs: { contentTypeId, entryId, ...extra },
 });
-const externalLink = (href: string) => ({ type: 'link', attrs: { href } });
 
-describe('collectEmbedContentTypeIds — cmsLink marks', () => {
-  it('collects contentTypeId from a cmsLink mark on a text node', () => {
+describe('collectEmbedContentTypeIds — cmsLink nodes', () => {
+  it('collects contentTypeId from a cmsLink inline node', () => {
     const result = collectEmbedContentTypeIds(
-      doc([
-        {
-          type: 'paragraph',
-          content: [
-            { type: 'text', text: 'visit', marks: [cmsLink('ct-1', 'e-1')] },
-          ],
-        },
-      ])
+      doc([para([text('visit '), cmsLink('ct-1', 'e-1')])])
     );
     expect(result).toEqual(new Set(['ct-1']));
   });
 
-  it('ignores external link marks (type === "link")', () => {
+  it('ignores externalLink nodes (no contentTypeId)', () => {
     const result = collectEmbedContentTypeIds(
       doc([
-        {
-          type: 'paragraph',
-          content: [
-            { type: 'text', text: 'visit', marks: [externalLink('https://x')] },
-          ],
-        },
+        para([
+          text('visit '),
+          { type: 'externalLink', attrs: { href: 'https://x' } },
+        ]),
       ])
     );
     expect(result.size).toBe(0);
   });
 
-  it('combines contentTypeIds from embeds and link marks', () => {
+  it('combines contentTypeIds from embeds and cmsLink nodes', () => {
     const result = collectEmbedContentTypeIds(
-      doc([
-        para([
-          embed('ct-1', 'e-1'),
-          { type: 'text', text: 'and', marks: [cmsLink('ct-2', 'e-2')] },
-        ]),
-      ])
+      doc([para([embed('ct-1', 'e-1'), text('and '), cmsLink('ct-2', 'e-2')])])
     );
     expect(result).toEqual(new Set(['ct-1', 'ct-2']));
   });
 });
 
-describe('enrichBodyWithContentTypeIdentifiers — cmsLink marks', () => {
+describe('enrichBodyWithContentTypeIdentifiers — cmsLink nodes', () => {
   const map = new Map([
     ['ct-1', 'Author'],
     ['ct-2', 'Page'],
   ]);
 
-  it('stamps identifier on a cmsLink mark', () => {
-    const input = doc([
-      {
-        type: 'paragraph',
-        content: [
-          { type: 'text', text: 'visit', marks: [cmsLink('ct-2', 'e-1')] },
-        ],
-      },
-    ]);
+  it('stamps identifier on a cmsLink node', () => {
+    const input = doc([para([text('visit '), cmsLink('ct-2', 'e-1')])]);
     const result = enrichBodyWithContentTypeIdentifiers(input, map) as {
       content: {
-        content: { marks: { attrs: Record<string, unknown> }[] }[];
+        content: { type: string; attrs?: Record<string, unknown> }[];
       }[];
     };
-    expect(result.content[0]!.content[0]!.marks[0]!.attrs).toEqual({
+    const linkNode = result.content[0]!.content[1]!;
+    expect(linkNode.attrs).toEqual({
       contentTypeId: 'ct-2',
       entryId: 'e-1',
       contentTypeIdentifier: 'Page',
     });
   });
 
-  it('leaves external link marks untouched', () => {
+  it('leaves externalLink nodes content-shape untouched (no contentTypeIdentifier)', () => {
     const input = doc([
-      {
-        type: 'paragraph',
-        content: [
-          { type: 'text', text: 'visit', marks: [externalLink('https://x')] },
-        ],
-      },
+      para([
+        text('visit '),
+        { type: 'externalLink', attrs: { href: 'https://x' } },
+      ]),
     ]);
     const result = enrichBodyWithContentTypeIdentifiers(input, map) as {
       content: {
-        content: {
-          marks: { type: string; attrs: Record<string, unknown> }[];
-        }[];
+        content: { type: string; attrs?: Record<string, unknown> }[];
       }[];
     };
-    expect(result.content[0]!.content[0]!.marks[0]).toEqual({
-      type: 'link',
-      attrs: { href: 'https://x' },
-    });
+    const externalNode = result.content[0]!.content[1]!;
+    expect(externalNode.type).toBe('externalLink');
+    expect(externalNode.attrs).toEqual({ href: 'https://x' });
     expect(
-      'contentTypeIdentifier' in
-        (result.content[0]!.content[0]!.marks[0]!.attrs as Record<
-          string,
-          unknown
-        >)
+      'contentTypeIdentifier' in (externalNode.attrs as Record<string, unknown>)
     ).toBe(false);
   });
 
-  it('does not mutate the input when stamping a cmsLink', () => {
-    const input = doc([
-      {
-        type: 'paragraph',
-        content: [
-          { type: 'text', text: 'visit', marks: [cmsLink('ct-1', 'e-1')] },
-        ],
-      },
-    ]);
+  it('does not mutate the input when stamping a cmsLink node', () => {
+    const input = doc([para([text('visit '), cmsLink('ct-1', 'e-1')])]);
     const snapshot = JSON.parse(JSON.stringify(input));
     enrichBodyWithContentTypeIdentifiers(input, map);
     expect(input).toEqual(snapshot);
   });
 
-  it('overwrites stale contentTypeIdentifier on a cmsLink mark', () => {
+  it('overwrites stale contentTypeIdentifier on a cmsLink node', () => {
     const input = doc([
-      {
-        type: 'paragraph',
-        content: [
-          {
-            type: 'text',
-            text: 'visit',
-            marks: [cmsLink('ct-1', 'e-1', { contentTypeIdentifier: 'Old' })],
-          },
-        ],
-      },
+      para([
+        text('visit '),
+        cmsLink('ct-1', 'e-1', { contentTypeIdentifier: 'Old' }),
+      ]),
     ]);
     const result = enrichBodyWithContentTypeIdentifiers(input, map) as {
-      content: {
-        content: { marks: { attrs: Record<string, unknown> }[] }[];
-      }[];
+      content: { content: { attrs: Record<string, unknown> }[] }[];
     };
-    expect(
-      result.content[0]!.content[0]!.marks[0]!.attrs.contentTypeIdentifier
-    ).toBe('Author');
+    expect(result.content[0]!.content[1]!.attrs.contentTypeIdentifier).toBe(
+      'Author'
+    );
   });
 
-  it('leaves cmsLink mark attrs alone if contentTypeId is not in the map', () => {
-    const input = doc([
-      {
-        type: 'paragraph',
-        content: [
-          {
-            type: 'text',
-            text: 'visit',
-            marks: [cmsLink('ct-unknown', 'e-1')],
-          },
-        ],
-      },
-    ]);
+  it('leaves cmsLink node attrs alone if contentTypeId is not in the map', () => {
+    const input = doc([para([text('visit '), cmsLink('ct-unknown', 'e-1')])]);
     const result = enrichBodyWithContentTypeIdentifiers(input, map) as {
-      content: {
-        content: { marks: { attrs: Record<string, unknown> }[] }[];
-      }[];
+      content: { content: { attrs: Record<string, unknown> }[] }[];
     };
     expect(
-      'contentTypeIdentifier' in result.content[0]!.content[0]!.marks[0]!.attrs
+      'contentTypeIdentifier' in result.content[0]!.content[1]!.attrs
     ).toBe(false);
+  });
+
+  it('stamps contentTypeIdentifier on cmsLink nodes', async () => {
+    const body = doc([
+      para([
+        text('See '),
+        {
+          type: 'cmsLink',
+          attrs: { contentTypeId: 'ct-author', entryId: 'a1' },
+        },
+        text(' for details'),
+      ]),
+    ]);
+    const enriched = enrichBodyWithContentTypeIdentifiers(
+      body,
+      new Map([['ct-author', 'Author']])
+    );
+    const para0 = (enriched as { content: { content: unknown[] }[] })
+      .content[0]!;
+    const cmsLinkNode = para0.content.find(
+      (n: unknown): n is { attrs: Record<string, unknown> } =>
+        typeof n === 'object' &&
+        n !== null &&
+        (n as { type?: string }).type === 'cmsLink'
+    )!;
+    expect(cmsLinkNode.attrs.contentTypeIdentifier).toBe('Author');
+  });
+
+  it('stamps rel="noopener noreferrer" on cmsLink nodes with target="_blank"', () => {
+    const body = doc([
+      para([
+        {
+          type: 'cmsLink',
+          attrs: {
+            contentTypeId: 'ct-author',
+            entryId: 'a1',
+            target: '_blank',
+          },
+        },
+      ]),
+    ]);
+    const enriched = enrichBodyWithContentTypeIdentifiers(
+      body,
+      new Map([['ct-author', 'Author']])
+    );
+    const para0 = (enriched as { content: { content: unknown[] }[] })
+      .content[0]!;
+    const cmsLinkNode = para0.content[0] as { attrs: Record<string, unknown> };
+    expect(cmsLinkNode.attrs.rel).toBe('noopener noreferrer');
+  });
+
+  it('stamps rel="nofollow noopener noreferrer" when target=_blank and rel=nofollow', () => {
+    const body = doc([
+      para([
+        {
+          type: 'externalLink',
+          attrs: {
+            href: 'https://example.com',
+            target: '_blank',
+            rel: 'nofollow',
+          },
+        },
+      ]),
+    ]);
+    const enriched = enrichBodyWithContentTypeIdentifiers(body, new Map());
+    const para0 = (enriched as { content: { content: unknown[] }[] })
+      .content[0]!;
+    const node = para0.content[0] as { attrs: Record<string, unknown> };
+    expect(node.attrs.rel).toBe('nofollow noopener noreferrer');
+  });
+
+  it('does not modify rel when target is not _blank', () => {
+    const body = doc([
+      para([
+        {
+          type: 'externalLink',
+          attrs: { href: 'https://example.com', rel: 'nofollow' },
+        },
+      ]),
+    ]);
+    const enriched = enrichBodyWithContentTypeIdentifiers(body, new Map());
+    const para0 = (enriched as { content: { content: unknown[] }[] })
+      .content[0]!;
+    const node = para0.content[0] as { attrs: Record<string, unknown> };
+    expect(node.attrs.rel).toBe('nofollow');
   });
 });
