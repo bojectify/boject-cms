@@ -2,6 +2,7 @@ import type { Preview } from '@storybook/vue3-vite';
 import { setup } from '@storybook/vue3-vite';
 import { createMemoryHistory, createRouter } from 'vue-router';
 import { h } from 'vue';
+import ui from '@nuxt/ui/vue-plugin';
 import { initialize, mswLoader } from 'msw-storybook-addon';
 import '../assets/css/main.css';
 import { defaultHandlers } from './mocks/handlers';
@@ -20,6 +21,11 @@ const router = createRouter({
 
 setup((app) => {
   app.use(router);
+  // Register Nuxt UI's runtime so theme tokens (primary colour, button
+  // variants, switch/checkbox accents) flow through. Without this,
+  // components render with structural classes only — borders/typography
+  // come through but colour tokens fall back to defaults.
+  app.use(ui);
 
   // Nuxt UI components occasionally render <NuxtLink>; in Storybook (no Nuxt
   // runtime) alias it to <RouterLink> so Vue doesn't warn about an unresolved

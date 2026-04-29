@@ -1,5 +1,26 @@
 import { http, HttpResponse } from 'msw';
 
+const contentTypeNames: Record<string, string> = {
+  'ct-author': 'Author',
+  'ct-article': 'Article',
+};
+
+const entries: Record<
+  string,
+  { id: string; contentTypeId: string; data: Record<string, unknown> }
+> = {
+  a1: {
+    id: 'a1',
+    contentTypeId: 'ct-author',
+    data: { title: 'Ada Lovelace' },
+  },
+  a2: {
+    id: 'a2',
+    contentTypeId: 'ct-author',
+    data: { title: 'Grace Hopper' },
+  },
+};
+
 export const defaultHandlers = [
   http.get('/api/content-types/options', () =>
     HttpResponse.json([
@@ -7,24 +28,38 @@ export const defaultHandlers = [
       { label: 'Article', value: 'ct-article' },
     ])
   ),
-  http.get('/api/content-types/:id', ({ params }) =>
-    HttpResponse.json({
-      id: params.id,
+  http.get('/api/content-types/:id', ({ params }) => {
+    const id = params.id as string;
+    return HttpResponse.json({
+      id,
+      name: contentTypeNames[id] ?? 'Unknown',
       fields: [{ identifier: 'title', type: 'ENTRY_TITLE' }],
-    })
-  ),
+    });
+  }),
   http.get('/api/content-entries', ({ request }) => {
     const url = new URL(request.url);
     const ctId = url.searchParams.get('contentTypeId');
+    const items = Object.values(entries).filter(
+      (e) => e.contentTypeId === ctId
+    );
     return HttpResponse.json({
-      items:
-        ctId === 'ct-author'
-          ? [
-              { id: 'a1', data: { title: 'Ada Lovelace' } },
-              { id: 'a2', data: { title: 'Grace Hopper' } },
-            ]
-          : [],
-      total: ctId === 'ct-author' ? 2 : 0,
+      items: items.map((e) => ({ id: e.id, data: e.data })),
+      total: items.length,
+    });
+  }),
+  http.get('/api/content-entries/:id', ({ params }) => {
+    const entry = entries[params.id as string];
+    if (!entry)
+      return HttpResponse.json({ error: 'Not found' }, { status: 404 });
+    return HttpResponse.json({
+      id: entry.id,
+      contentTypeId: entry.contentTypeId,
+      data: entry.data,
+      contentType: {
+        id: entry.contentTypeId,
+        name: contentTypeNames[entry.contentTypeId] ?? 'Unknown',
+        fields: [{ identifier: 'title', type: 'ENTRY_TITLE' }],
+      },
     });
   }),
 ];
