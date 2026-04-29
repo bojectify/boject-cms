@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { NodeViewWrapper } from '@tiptap/vue-3';
 import type { NodeViewProps } from '@tiptap/core';
+import { CHIP_EDIT_KEY } from './chipEdit';
 
 const props = defineProps<NodeViewProps>();
+
+const openEdit = inject(CHIP_EDIT_KEY);
 
 const { resolveRef } = useRelationResolver();
 
@@ -48,30 +51,48 @@ watch(
   },
   { immediate: true }
 );
+
+const label = computed(() => props.node.attrs.label as string | null);
+const display = computed(() => label.value || resolved.value?.entryTitle || '');
+
+function onClick(event: MouseEvent) {
+  event.stopPropagation();
+  const contentTypeId = props.node.attrs.contentTypeId as string | null;
+  const entryId = props.node.attrs.entryId as string | null;
+  if (!contentTypeId || !entryId) return;
+  const pos = props.getPos();
+  if (typeof pos !== 'number') return;
+  props.editor.commands.setNodeSelection(pos);
+  openEdit?.({
+    kind: 'cmsEmbed',
+    pos,
+    attrs: {
+      contentTypeId,
+      entryId,
+      label: label.value,
+    },
+  });
+}
 </script>
 
 <template>
   <NodeViewWrapper
     as="span"
-    class="inline-flex items-center gap-1 px-1.5 py-0.5 mx-0.5 rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm align-baseline cursor-default"
+    class="rich-text-editor__chip rich-text-editor__chip--embed"
+    :class="{ 'rich-text-editor__chip--selected': selected }"
+    @click="onClick"
   >
+    <UIcon name="i-lucide-at-sign" class="rich-text-editor__chip-icon" />
     <template v-if="missing">
-      <UIcon name="i-lucide-link-2-off" class="size-3 text-red-500" />
-      <span class="italic text-muted">(deleted)</span>
+      <span class="rich-text-editor__chip-label italic text-muted">
+        Missing entry
+      </span>
     </template>
     <template v-else-if="resolved">
-      <UBadge
-        size="sm"
-        color="neutral"
-        variant="subtle"
-        class="text-[10px] px-1"
-      >
-        {{ resolved.contentTypeName }}
-      </UBadge>
-      <span>{{ resolved.entryTitle }}</span>
+      <span class="rich-text-editor__chip-label">{{ display }}</span>
     </template>
     <template v-else>
-      <UIcon name="i-lucide-loader-2" class="size-3 animate-spin text-muted" />
+      <span class="rich-text-editor__chip-label text-muted">Loading…</span>
     </template>
   </NodeViewWrapper>
 </template>
