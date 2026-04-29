@@ -46,7 +46,9 @@ const searchQuery = ref('');
 const createPopoverOpen = ref(false);
 
 // Currently highlighted entry: preselected on open in edit mode, set by clicking a row otherwise.
-const highlightedEntryId = ref<string | null>(null);
+const highlightedEntryId = ref<string | null>(
+  props.selectedEntry?.entryId ?? null
+);
 
 // Link options state (only used in cmsLink mode)
 const options = ref<LinkOptions>({ ...props.initialOptions });
