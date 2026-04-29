@@ -41,6 +41,12 @@ export const CmsEmbed = Node.create({
         renderHTML: (attrs) =>
           attrs.entryId ? { 'data-entry-id': attrs.entryId as string } : {},
       },
+      label: {
+        default: null,
+        parseHTML: (el) => el.getAttribute('data-label'),
+        renderHTML: (attrs) =>
+          attrs.label ? { 'data-label': attrs.label as string } : {},
+      },
     };
   },
 

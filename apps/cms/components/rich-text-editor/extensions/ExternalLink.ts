@@ -1,11 +1,9 @@
 import { Node, mergeAttributes } from '@tiptap/core';
 import { VueNodeViewRenderer } from '@tiptap/vue-3';
-import CmsLinkNodeView from '../CmsLinkNodeView.vue';
+import ExternalLinkNodeView from '../ExternalLinkNodeView.vue';
 
-export interface CmsLinkAttrs {
-  contentTypeId: string | null;
-  entryId: string | null;
-  contentTypeIdentifier: string | null;
+export interface ExternalLinkAttrs {
+  href: string;
   label: string | null;
   target: '_self' | '_blank' | null;
   rel: string | null;
@@ -13,10 +11,9 @@ export interface CmsLinkAttrs {
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
-    cmsLink: {
-      insertCmsLink: (attrs: {
-        contentTypeId: string;
-        entryId: string;
+    externalLink: {
+      insertExternalLink: (attrs: {
+        href: string;
         label?: string | null;
         target?: '_self' | '_blank' | null;
         rel?: 'nofollow' | null;
@@ -25,8 +22,8 @@ declare module '@tiptap/core' {
   }
 }
 
-export const CmsLink = Node.create({
-  name: 'cmsLink',
+export const ExternalLink = Node.create({
+  name: 'externalLink',
   group: 'inline',
   inline: true,
   atom: true,
@@ -35,30 +32,11 @@ export const CmsLink = Node.create({
 
   addAttributes() {
     return {
-      contentTypeId: {
-        default: null,
-        parseHTML: (el) => el.getAttribute('data-content-type-id'),
+      href: {
+        default: '',
+        parseHTML: (el) => el.getAttribute('href') ?? '',
         renderHTML: (attrs) =>
-          attrs.contentTypeId
-            ? { 'data-content-type-id': attrs.contentTypeId as string }
-            : {},
-      },
-      entryId: {
-        default: null,
-        parseHTML: (el) => el.getAttribute('data-entry-id'),
-        renderHTML: (attrs) =>
-          attrs.entryId ? { 'data-entry-id': attrs.entryId as string } : {},
-      },
-      contentTypeIdentifier: {
-        default: null,
-        parseHTML: (el) => el.getAttribute('data-content-type-identifier'),
-        renderHTML: (attrs) =>
-          attrs.contentTypeIdentifier
-            ? {
-                'data-content-type-identifier':
-                  attrs.contentTypeIdentifier as string,
-              }
-            : {},
+          attrs.href ? { href: attrs.href as string } : {},
       },
       label: {
         default: null,
@@ -81,16 +59,16 @@ export const CmsLink = Node.create({
   },
 
   parseHTML() {
-    return [{ tag: 'span[data-cms-link]' }];
+    return [{ tag: 'a[data-external-link]' }];
   },
 
   renderHTML({ HTMLAttributes }) {
-    return ['span', mergeAttributes(HTMLAttributes, { 'data-cms-link': '' })];
+    return ['a', mergeAttributes(HTMLAttributes, { 'data-external-link': '' })];
   },
 
   addCommands() {
     return {
-      insertCmsLink:
+      insertExternalLink:
         (attrs) =>
         ({ commands }) =>
           commands.insertContent({ type: this.name, attrs }),
@@ -98,6 +76,6 @@ export const CmsLink = Node.create({
   },
 
   addNodeView() {
-    return VueNodeViewRenderer(CmsLinkNodeView);
+    return VueNodeViewRenderer(ExternalLinkNodeView);
   },
 });

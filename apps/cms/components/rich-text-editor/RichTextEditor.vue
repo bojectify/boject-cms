@@ -5,12 +5,12 @@ import { Table } from '@tiptap/extension-table';
 import TableRow from '@tiptap/extension-table-row';
 import TableCell from '@tiptap/extension-table-cell';
 import TableHeader from '@tiptap/extension-table-header';
-import Link from '@tiptap/extension-link';
 import Image from '@tiptap/extension-image';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
 import { common, createLowlight } from 'lowlight';
 import { CmsEmbed } from './extensions/CmsEmbed';
 import { CmsLink } from './extensions/CmsLink';
+import { ExternalLink } from './extensions/ExternalLink';
 import type { RichTextEditorProps } from './richTextEditor.types';
 import { QA_RICH_TEXT_EDITOR } from './richTextEditor.config';
 
@@ -38,12 +38,12 @@ const cmsLinksEnabled = computed(
 // mid-session would not hot-reconfigure the editor.
 const extensions = computed(() => {
   const base = [
-    StarterKit.configure({ codeBlock: false }),
+    StarterKit.configure({ codeBlock: false, link: false }),
     Table.configure({ resizable: true }),
     TableRow,
     TableCell,
     TableHeader,
-    Link.configure({ openOnClick: false }),
+    ExternalLink,
     Image,
     CodeBlockLowlight.configure({ lowlight }),
   ];
@@ -114,14 +114,16 @@ function openCmsLinkPicker() {
 }
 function handleCmsLinkSelect(data: { contentTypeId: string; entryId: string }) {
   if (!editor.value) return;
-  editor.value
-    .chain()
-    .focus()
-    .setCmsLink({
-      contentTypeId: data.contentTypeId,
-      entryId: data.entryId,
-    })
-    .run();
+  // TODO: Task 9 wires up the new insert flow
+  // editor.value
+  //   .chain()
+  //   .focus()
+  //   .setCmsLink({
+  //     contentTypeId: data.contentTypeId,
+  //     entryId: data.entryId,
+  //   })
+  //   .run();
+  void data;
   linkPickerOpen.value = false;
 }
 
