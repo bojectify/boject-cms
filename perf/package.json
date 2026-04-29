@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "vitest run",
-    "test:unit": "vitest run",
+    "test:unit": "vitest run --project unit",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "typecheck:k6": "tsc --noEmit -p tsconfig.k6.json",
     "seed": "tsx seed/bulk-insert.ts",
@@ -18,8 +18,8 @@
   "dependencies": {
     "@prisma/adapter-pg": "^7.4.1",
     "@prisma/client": "^7.4.1",
-    "chartjs-node-canvas": "^5.0.0",
     "chart.js": "^4.5.0",
+    "chartjs-node-canvas": "^5.0.0",
     "pg": "^8.13.1",
     "tsx": "^4.21.0"
   },
@@ -28,6 +28,6 @@
     "@types/node": "^24.12.2",
     "@types/pg": "^8.11.10",
     "typescript": "^5.9.3",
-    "vitest": "^3.2.4"
+    "vitest": "^4.1.5"
   }
 }

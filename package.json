@@ -25,6 +25,7 @@
     "test:integration": "pnpm --filter cms test:integration",
     "test:unit": "pnpm -r --if-present test:unit",
     "test:e2e": "pnpm -r --if-present test:e2e",
+    "test:storybook": "pnpm -r --if-present test:storybook",
     "typecheck": "pnpm --filter cms typecheck",
     "typecheck:scripts": "tsc --noEmit -p scripts/tsconfig.json",
     "prisma:generate": "pnpm --filter cms prisma:generate",
@@ -56,6 +57,7 @@
     "lefthook": "^2.1.1",
     "prettier": "^3.8.1",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.5"
   }
 }
