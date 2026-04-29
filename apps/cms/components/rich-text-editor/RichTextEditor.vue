@@ -300,4 +300,19 @@ onBeforeUnmount(() => {
 .rich-text-editor__content :deep(pre code) {
   @apply bg-transparent p-0;
 }
+.rich-text-editor__content :deep(.ProseMirror a) {
+  @apply text-primary underline;
+}
+.rich-text-editor__content :deep(.ProseMirror a.cms-link)::before {
+  --cms-link-icon: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M9 17H7A5 5 0 0 1 7 7h2'/><path d='M15 7h2a5 5 0 1 1 0 10h-2'/><line x1='8' y1='12' x2='16' y2='12'/></svg>");
+  content: '';
+  display: inline-block;
+  width: 0.875em;
+  height: 0.875em;
+  margin-right: 0.25em;
+  vertical-align: -0.125em;
+  background-color: currentColor;
+  -webkit-mask: var(--cms-link-icon) no-repeat center / contain;
+  mask: var(--cms-link-icon) no-repeat center / contain;
+}
 </style>
