@@ -246,7 +246,7 @@ onBeforeUnmount(() => {
 
     <EditorContent
       :editor="editor"
-      class="prose dark:prose-invert max-w-none p-4 min-h-[200px]"
+      class="rich-text-editor__content p-4 min-h-[200px]"
     />
 
     <EntryPickerModal
@@ -266,3 +266,38 @@ onBeforeUnmount(() => {
     />
   </div>
 </template>
+
+<style scoped>
+@reference '~/assets/css/main.css';
+
+.rich-text-editor__content :deep(h1) {
+  @apply text-3xl font-bold mt-6 mb-2;
+}
+.rich-text-editor__content :deep(h2) {
+  @apply text-2xl font-semibold mt-5 mb-2;
+}
+.rich-text-editor__content :deep(h3) {
+  @apply text-xl font-semibold mt-4 mb-2;
+}
+.rich-text-editor__content :deep(p) {
+  @apply my-2;
+}
+.rich-text-editor__content :deep(ul) {
+  @apply list-disc pl-6 my-2;
+}
+.rich-text-editor__content :deep(ol) {
+  @apply list-decimal pl-6 my-2;
+}
+.rich-text-editor__content :deep(blockquote) {
+  @apply border-l-4 border-gray-300 dark:border-gray-700 pl-4 my-2 text-gray-600 dark:text-gray-400 italic;
+}
+.rich-text-editor__content :deep(code) {
+  @apply font-mono text-sm bg-gray-100 dark:bg-gray-800 px-1 rounded;
+}
+.rich-text-editor__content :deep(pre) {
+  @apply font-mono text-sm bg-gray-100 dark:bg-gray-800 p-3 rounded my-2 overflow-x-auto;
+}
+.rich-text-editor__content :deep(pre code) {
+  @apply bg-transparent p-0;
+}
+</style>
