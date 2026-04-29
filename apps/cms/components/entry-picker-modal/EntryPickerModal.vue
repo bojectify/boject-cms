@@ -245,7 +245,7 @@ function handleCreate(contentTypeId: string) {
             class="flex items-center h-12 px-3 mx-0 rounded-lg gap-3 cursor-pointer transition-colors"
             :class="
               entry.id === highlightedEntryId
-                ? 'bg-primary-50 dark:bg-primary-950 ring-1 ring-primary'
+                ? 'bg-primary-50 dark:bg-primary-950 ring-1 ring-primary ring-inset'
                 : 'hover:bg-gray-50 dark:hover:bg-gray-800'
             "
             @click="highlight(entry)"
