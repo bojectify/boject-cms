@@ -18,6 +18,9 @@ export default defineConfig({
   },
   test: {
     fileParallelism: false,
+    setupFiles: [
+      fileURLToPath(new URL('./vitest.workerSetup.ts', import.meta.url)),
+    ],
     coverage: {
       provider: 'v8', // or 'istanbul'
     },
@@ -47,7 +50,12 @@ export default defineConfig({
             'server/middleware/**/*.test.ts',
           ],
           globals: true,
-          globalSetup: './vitest.globalSetup.ts',
+          globalSetup: fileURLToPath(
+            new URL('./vitest.globalSetup.ts', import.meta.url)
+          ),
+          setupFiles: [
+            fileURLToPath(new URL('./vitest.workerSetup.ts', import.meta.url)),
+          ],
         },
       },
       {
@@ -64,7 +72,11 @@ export default defineConfig({
       },
       {
         extends: true,
-        plugins: [storybookTest({ configDir: '.storybook' })],
+        plugins: [
+          storybookTest({
+            configDir: fileURLToPath(new URL('./.storybook', import.meta.url)),
+          }),
+        ],
         optimizeDeps: {
           include: ['storybook/test'],
         },
