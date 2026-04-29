@@ -5,13 +5,13 @@ export interface RichtextReference {
 
 /**
  * Walk a ProseMirror JSON document and return the deduplicated set of
- * (contentTypeId, entryId) pairs referenced by:
- *   - `cmsEmbed` atom nodes (attrs.contentTypeId / attrs.entryId)
- *   - `cmsLink` marks attached to text nodes (attrs.contentTypeId / attrs.entryId)
+ * (contentTypeId, entryId) pairs referenced by `cmsEmbed` and `cmsLink`
+ * inline atom nodes. `externalLink` nodes are ignored (they reference URLs,
+ * not entries).
  *
  * Order is document-traversal order. The pair `(ct, e)` appears at most once
- * even if it occurs multiple times across embeds and links. Pairs with
- * missing, non-string, or empty-string ids are silently skipped.
+ * even if it occurs multiple times across cmsEmbed and cmsLink nodes. Pairs
+ * with missing, non-string, or empty-string ids are silently skipped.
  *
  * Recursion is capped at depth 1000; references deeper than that are silently
  * dropped.
@@ -41,22 +41,11 @@ export function collectRichtextReferences(body: unknown): RichtextReference[] {
     const n = node as {
       type?: unknown;
       attrs?: unknown;
-      marks?: unknown;
       content?: unknown;
     };
 
-    if (n.type === 'cmsEmbed') {
+    if (n.type === 'cmsEmbed' || n.type === 'cmsLink') {
       pushIfValid(n.attrs);
-    }
-
-    if (n.type === 'text' && Array.isArray(n.marks)) {
-      for (const mark of n.marks) {
-        if (!mark || typeof mark !== 'object') continue;
-        const m = mark as { type?: unknown; attrs?: unknown };
-        if (m.type === 'cmsLink') {
-          pushIfValid(m.attrs);
-        }
-      }
     }
 
     if (Array.isArray(n.content)) {
