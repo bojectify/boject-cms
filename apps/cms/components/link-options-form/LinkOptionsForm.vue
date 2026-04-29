@@ -49,15 +49,19 @@ const nofollow = computed({
         :data-testid="QA_LINK_OPTIONS_FORM.LABEL_INPUT"
       />
     </UFormField>
-    <USwitch
-      v-model="newTab"
-      label="Open in new tab"
-      :data-testid="QA_LINK_OPTIONS_FORM.TARGET_TOGGLE"
-    />
-    <USwitch
-      v-model="nofollow"
-      label="Add nofollow"
-      :data-testid="QA_LINK_OPTIONS_FORM.NOFOLLOW_TOGGLE"
-    />
+    <label class="flex items-center gap-2 cursor-pointer w-fit">
+      <USwitch
+        v-model="newTab"
+        :data-testid="QA_LINK_OPTIONS_FORM.TARGET_TOGGLE"
+      />
+      <span class="text-sm">Open in new tab</span>
+    </label>
+    <label class="flex items-center gap-2 cursor-pointer w-fit">
+      <USwitch
+        v-model="nofollow"
+        :data-testid="QA_LINK_OPTIONS_FORM.NOFOLLOW_TOGGLE"
+      />
+      <span class="text-sm">Add nofollow</span>
+    </label>
   </div>
 </template>
