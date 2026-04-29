@@ -5,7 +5,9 @@ export default defineConfig({
     exclude: ['scenarios/**', 'reports/**'],
     passWithNoTests: true,
     pool: 'forks',
-    poolOptions: { forks: { singleFork: true } },
+    maxWorkers: 1,
+    isolate: false,
+    sequence: { groupOrder: 1 },
     projects: [
       {
         extends: true,
