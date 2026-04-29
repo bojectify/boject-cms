@@ -38,7 +38,7 @@ async function load() {
     missing.value = false;
   } catch (err) {
     if (attempt !== lastAttempt) return;
-    console.error('Failed to resolve cmsEmbed reference', err);
+    console.error('Failed to resolve cmsLink reference', err);
     missing.value = true;
     resolved.value = null;
   }
@@ -64,12 +64,14 @@ function onClick(event: MouseEvent) {
   if (typeof pos !== 'number') return;
   props.editor.commands.setNodeSelection(pos);
   openEdit?.({
-    kind: 'cmsEmbed',
+    kind: 'cmsLink',
     pos,
     attrs: {
       contentTypeId,
       entryId,
       label: label.value,
+      target: props.node.attrs.target as '_self' | '_blank' | null,
+      rel: props.node.attrs.rel as string | null,
     },
   });
 }
@@ -78,11 +80,11 @@ function onClick(event: MouseEvent) {
 <template>
   <NodeViewWrapper
     as="span"
-    class="rich-text-editor__chip rich-text-editor__chip--embed"
+    class="rich-text-editor__chip rich-text-editor__chip--link"
     :class="{ 'rich-text-editor__chip--selected': selected }"
     @click="onClick"
   >
-    <UIcon name="i-lucide-at-sign" class="rich-text-editor__chip-icon" />
+    <UIcon name="i-lucide-link-2" class="rich-text-editor__chip-icon" />
     <template v-if="missing">
       <span class="rich-text-editor__chip-label italic text-muted">
         Missing entry

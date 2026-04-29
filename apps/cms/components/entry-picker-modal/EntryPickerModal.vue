@@ -1,18 +1,34 @@
 <script setup lang="ts">
-import type { EntryPickerModalProps } from './entryPickerModal.types';
+import type {
+  EntryPickerModalProps,
+  EntryPickerSelection,
+  EntryPickerUpdatePayload,
+} from './entryPickerModal.types';
+import type { LinkOptions } from '~/components/link-options-form/linkOptionsForm.types';
 import { QA_ENTRY_PICKER_MODAL } from './entryPickerModal.config';
 
 const props = withDefaults(defineProps<EntryPickerModalProps>(), {
   testId: QA_ENTRY_PICKER_MODAL.COMPONENT,
+  mode: 'cmsEmbed',
+  selectedEntry: null,
+  initialOptions: () => ({ label: '', target: null, rel: null }),
 });
 
 const emit = defineEmits<{
-  select: [
-    data: { contentTypeId: string; entryId: string; entryTitle: string },
-  ];
+  select: [data: EntryPickerSelection];
+  update: [data: EntryPickerUpdatePayload];
+  remove: [];
   create: [contentTypeId: string];
   close: [];
 }>();
+
+const isEditMode = computed(() => props.selectedEntry !== null);
+
+const headerLabel = computed(() => {
+  const action = isEditMode.value ? 'Edit' : 'Insert';
+  const noun = props.mode === 'cmsLink' ? 'link' : 'embed';
+  return `${action} ${noun}`;
+});
 
 // Fetch content type metadata for tabs
 const { data: contentTypeOptions } = useAuthedFetch<
@@ -29,6 +45,14 @@ const activeTab = ref<string | null>(null);
 const searchQuery = ref('');
 const createPopoverOpen = ref(false);
 
+// Currently highlighted entry: preselected on open in edit mode, set by clicking a row otherwise.
+const highlightedEntryId = ref<string | null>(
+  props.selectedEntry?.entryId ?? null
+);
+
+// Link options state (only used in cmsLink mode)
+const options = ref<LinkOptions>({ ...props.initialOptions });
+
 // Reset state when modal opens
 watch(
   () => props.open,
@@ -37,6 +61,8 @@ watch(
       activeTab.value = null;
       searchQuery.value = '';
       createPopoverOpen.value = false;
+      highlightedEntryId.value = props.selectedEntry?.entryId ?? null;
+      options.value = { ...props.initialOptions };
     }
   }
 );
@@ -74,7 +100,6 @@ watch(
       const typeName =
         targetTypes.value.find((t) => t.value === typeId)?.label ?? 'Unknown';
 
-      // Find ENTRY_TITLE field to extract display name
       const contentType = await $fetch<{
         fields: Array<{ identifier: string; type: string }>;
       }>(`/api/content-types/${typeId}`);
@@ -95,6 +120,15 @@ watch(
 
     entries.value = results;
     isLoading.value = false;
+
+    // Once loaded, scroll the highlighted row into view if any
+    if (highlightedEntryId.value) {
+      await nextTick();
+      const el = document.querySelector(
+        `[data-entry-id="${highlightedEntryId.value}"]`
+      );
+      el?.scrollIntoView({ block: 'nearest' });
+    }
   },
   { immediate: true }
 );
@@ -111,12 +145,39 @@ const filteredEntries = computed(() => {
   return list;
 });
 
-function handleSelect(entry: (typeof entries.value)[0]) {
-  emit('select', {
-    contentTypeId: entry.contentTypeId,
-    entryId: entry.id,
-    entryTitle: entry.entryTitle,
-  });
+const highlightedEntry = computed(() =>
+  entries.value.find((e) => e.id === highlightedEntryId.value)
+);
+
+function highlight(entry: { id: string }) {
+  highlightedEntryId.value = entry.id;
+}
+
+function onSave() {
+  const e = highlightedEntry.value;
+  if (!e) return;
+  if (isEditMode.value) {
+    emit('update', {
+      contentTypeId: e.contentTypeId,
+      entryId: e.id,
+      entryTitle: e.entryTitle,
+      ...options.value,
+    });
+  } else if (props.mode === 'cmsLink') {
+    // Insert with options
+    emit('update', {
+      contentTypeId: e.contentTypeId,
+      entryId: e.id,
+      entryTitle: e.entryTitle,
+      ...options.value,
+    });
+  } else {
+    emit('select', {
+      contentTypeId: e.contentTypeId,
+      entryId: e.id,
+      entryTitle: e.entryTitle,
+    });
+  }
 }
 
 function handleCreate(contentTypeId: string) {
@@ -136,7 +197,7 @@ function handleCreate(contentTypeId: string) {
     "
   >
     <template #header>
-      <h3 class="text-lg font-semibold">Link Entry</h3>
+      <h3 class="text-lg font-semibold">{{ headerLabel }}</h3>
     </template>
 
     <template #body>
@@ -146,7 +207,7 @@ function handleCreate(contentTypeId: string) {
           <UButton
             size="xs"
             :variant="activeTab === null ? 'solid' : 'soft'"
-            :color="activeTab === null ? 'neutral' : 'neutral'"
+            color="neutral"
             @click="activeTab = null"
           >
             All
@@ -156,7 +217,7 @@ function handleCreate(contentTypeId: string) {
             :key="t.value"
             size="xs"
             :variant="activeTab === t.value ? 'solid' : 'soft'"
-            :color="activeTab === t.value ? 'neutral' : 'neutral'"
+            color="neutral"
             @click="activeTab = t.value"
           >
             {{ t.label }}
@@ -182,8 +243,14 @@ function handleCreate(contentTypeId: string) {
           <div
             v-for="entry in filteredEntries"
             :key="entry.id"
-            class="flex items-center h-12 px-3 mx-0 rounded-lg gap-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-            @click="handleSelect(entry)"
+            :data-entry-id="entry.id"
+            class="flex items-center h-12 px-3 mx-0 rounded-lg gap-3 cursor-pointer transition-colors"
+            :class="
+              entry.id === highlightedEntryId
+                ? 'bg-primary-50 dark:bg-primary-950 ring-1 ring-primary ring-inset'
+                : 'hover:bg-gray-50 dark:hover:bg-gray-800'
+            "
+            @click="highlight(entry)"
           >
             <div
               class="flex items-center justify-center w-7 h-7 rounded-md bg-gray-100 dark:bg-gray-700 shrink-0"
@@ -208,50 +275,77 @@ function handleCreate(contentTypeId: string) {
             No entries found
           </p>
         </div>
+
+        <LinkOptionsForm
+          v-if="mode === 'cmsLink'"
+          v-model="options"
+          :label-placeholder="highlightedEntry?.entryTitle ?? ''"
+        />
       </div>
     </template>
 
     <template #footer>
-      <div class="flex justify-end">
-        <div class="relative">
-          <div
-            v-if="createPopoverOpen && targetTypes.length > 1"
-            class="absolute bottom-full right-0 mb-2 w-52 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg overflow-hidden z-10"
-          >
-            <div class="px-3 pt-2 pb-1">
-              <span
-                class="text-xs font-medium text-muted uppercase tracking-wide"
-              >
-                Create new
-              </span>
-            </div>
+      <div class="flex justify-between gap-2 w-full">
+        <UButton
+          v-if="isEditMode"
+          color="error"
+          variant="ghost"
+          @click="emit('remove')"
+        >
+          Remove
+        </UButton>
+        <div class="flex gap-2 ml-auto items-center">
+          <div class="relative">
             <div
-              v-for="t in targetTypes"
-              :key="t.value"
-              class="flex items-center h-10 px-3 gap-2.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors"
-              @click="handleCreate(t.value)"
+              v-if="createPopoverOpen && targetTypes.length > 1"
+              class="absolute bottom-full right-0 mb-2 w-52 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg overflow-hidden z-10"
             >
-              <div
-                class="flex items-center justify-center w-6 h-6 rounded-md bg-gray-100 dark:bg-gray-700 shrink-0"
-              >
+              <div class="px-3 pt-2 pb-1">
                 <span
-                  class="text-xs font-semibold text-gray-600 dark:text-gray-300"
+                  class="text-xs font-medium text-muted uppercase tracking-wide"
                 >
-                  {{ t.label.charAt(0).toUpperCase() }}
+                  Create new
                 </span>
               </div>
-              <span class="text-sm font-medium">{{ t.label }}</span>
+              <div
+                v-for="t in targetTypes"
+                :key="t.value"
+                class="flex items-center h-10 px-3 gap-2.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                @click="handleCreate(t.value)"
+              >
+                <div
+                  class="flex items-center justify-center w-6 h-6 rounded-md bg-gray-100 dark:bg-gray-700 shrink-0"
+                >
+                  <span
+                    class="text-xs font-semibold text-gray-600 dark:text-gray-300"
+                  >
+                    {{ t.label.charAt(0).toUpperCase() }}
+                  </span>
+                </div>
+                <span class="text-sm font-medium">{{ t.label }}</span>
+              </div>
             </div>
+            <UButton
+              variant="ghost"
+              icon="i-lucide-plus"
+              @click="
+                targetTypes.length === 1
+                  ? handleCreate(targetTypes[0]!.value)
+                  : (createPopoverOpen = !createPopoverOpen)
+              "
+            >
+              Create new...
+            </UButton>
           </div>
+          <UButton color="neutral" variant="ghost" @click="emit('close')">
+            Cancel
+          </UButton>
           <UButton
-            icon="i-lucide-plus"
-            @click="
-              targetTypes.length === 1
-                ? handleCreate(targetTypes[0]!.value)
-                : (createPopoverOpen = !createPopoverOpen)
-            "
+            color="primary"
+            :disabled="!highlightedEntry"
+            @click="onSave"
           >
-            Create new...
+            Save
           </UButton>
         </div>
       </div>

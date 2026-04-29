@@ -250,7 +250,7 @@ describe('validateEntryData — IMAGE', () => {
   });
 });
 
-describe('validateEntryData — RICHTEXT entry links (cmsLink marks)', () => {
+describe('validateEntryData — RICHTEXT entry links (cmsLink nodes)', () => {
   const fields = (
     allowedLinks: string[]
   ): Parameters<typeof validateEntryData>[1] => [
@@ -269,23 +269,24 @@ describe('validateEntryData — RICHTEXT entry links (cmsLink marks)', () => {
       {
         type: 'paragraph',
         content: [
+          { type: 'text', text: 'before ' },
           {
-            type: 'text',
-            text: 'click',
-            marks: [{ type: 'cmsLink', attrs: { contentTypeId, entryId } }],
+            type: 'cmsLink',
+            attrs: { contentTypeId, entryId },
           },
+          { type: 'text', text: ' after' },
         ],
       },
     ],
   });
 
-  it('accepts a cmsLink mark whose contentTypeId is in linkTargetContentTypeIds', async () => {
+  it('accepts a cmsLink node whose contentTypeId is in linkTargetContentTypeIds', async () => {
     const data = { body: docWithLink('ct-page', 'e-1') };
     const result = await validateEntryData(data, fields(['ct-page']));
     expect(result.body).toEqual(data.body);
   });
 
-  it('rejects a cmsLink mark whose contentTypeId is NOT in linkTargetContentTypeIds', async () => {
+  it('rejects a cmsLink node whose contentTypeId is NOT in linkTargetContentTypeIds', async () => {
     const data = { body: docWithLink('ct-other', 'e-1') };
     await expect(
       validateEntryData(data, fields(['ct-page']))
@@ -297,7 +298,7 @@ describe('validateEntryData — RICHTEXT entry links (cmsLink marks)', () => {
     });
   });
 
-  it('rejects any cmsLink mark when linkTargetContentTypeIds is empty', async () => {
+  it('rejects any cmsLink node when linkTargetContentTypeIds is empty', async () => {
     const data = { body: docWithLink('ct-page', 'e-1') };
     await expect(validateEntryData(data, fields([]))).rejects.toMatchObject({
       statusCode: 400,
@@ -307,22 +308,14 @@ describe('validateEntryData — RICHTEXT entry links (cmsLink marks)', () => {
     });
   });
 
-  it('rejects a cmsLink mark missing required ids', async () => {
+  it('rejects a cmsLink node missing required ids', async () => {
     const data = {
       body: {
         type: 'doc',
         content: [
           {
             type: 'paragraph',
-            content: [
-              {
-                type: 'text',
-                text: 'click',
-                marks: [
-                  { type: 'cmsLink', attrs: { contentTypeId: 'ct-page' } },
-                ],
-              },
-            ],
+            content: [{ type: 'cmsLink', attrs: { contentTypeId: 'ct-page' } }],
           },
         ],
       },
@@ -359,60 +352,182 @@ describe('validateEntryData — RICHTEXT entry links (cmsLink marks)', () => {
     expect(result.body).toEqual(data.body);
   });
 
-  it('accepts a cmsLink mark when the text node also carries other marks', async () => {
+  it('rejects a cmsLink node missing both contentTypeId and entryId', async () => {
     const data = {
       body: {
         type: 'doc',
         content: [
           {
             type: 'paragraph',
-            content: [
-              {
-                type: 'text',
-                text: 'click',
-                marks: [
-                  { type: 'bold' },
-                  {
-                    type: 'cmsLink',
-                    attrs: { contentTypeId: 'ct-page', entryId: 'e-1' },
-                  },
-                  { type: 'italic' },
-                ],
-              },
-            ],
+            content: [{ type: 'cmsLink', attrs: {} }],
           },
         ],
       },
     };
-    const result = await validateEntryData(data, fields(['ct-page']));
+    await expect(
+      validateEntryData(data, fields(['ct-page']))
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      statusMessage: expect.stringContaining(
+        'Body: Invalid entry link (missing contentTypeId or entryId)'
+      ),
+    });
+  });
+});
+
+describe('validateEntryData — RICHTEXT external links (externalLink nodes)', () => {
+  const fields = (): Parameters<typeof validateEntryData>[1] => [
+    {
+      identifier: 'body',
+      name: 'Body',
+      type: 'RICHTEXT',
+      required: false,
+      options: null,
+    },
+  ];
+
+  const docWithExternalLink = (attrs: Record<string, unknown>) => ({
+    type: 'doc',
+    content: [
+      {
+        type: 'paragraph',
+        content: [
+          { type: 'text', text: 'see ' },
+          { type: 'externalLink', attrs },
+          { type: 'text', text: ' for details' },
+        ],
+      },
+    ],
+  });
+
+  it('accepts an externalLink with a valid https href', async () => {
+    const data = { body: docWithExternalLink({ href: 'https://example.com' }) };
+    const result = await validateEntryData(data, fields());
     expect(result.body).toEqual(data.body);
   });
 
-  it('ignores a cmsLink mark attached to a non-text node', async () => {
-    // The validator only inspects marks on text nodes — pinning the
-    // design decision so a future refactor that walks marks on every
-    // node is caught.
+  it('accepts http, mailto and tel schemes', async () => {
+    for (const href of [
+      'http://example.com',
+      'mailto:hello@example.com',
+      'tel:+441234567890',
+      'tel:+6494461709',
+    ]) {
+      const data = { body: docWithExternalLink({ href }) };
+      const result = await validateEntryData(data, fields());
+      expect(result.body).toEqual(data.body);
+    }
+  });
+
+  it('rejects an externalLink with missing href', async () => {
+    const data = { body: docWithExternalLink({}) };
+    await expect(validateEntryData(data, fields())).rejects.toMatchObject({
+      statusCode: 400,
+      statusMessage: expect.stringContaining(
+        'Body: External link is missing href'
+      ),
+    });
+  });
+
+  it('rejects an externalLink with empty-string href', async () => {
+    const data = { body: docWithExternalLink({ href: '' }) };
+    await expect(validateEntryData(data, fields())).rejects.toMatchObject({
+      statusCode: 400,
+      statusMessage: expect.stringContaining(
+        'Body: External link is missing href'
+      ),
+    });
+  });
+
+  it('rejects an externalLink with invalid URL', async () => {
+    const data = { body: docWithExternalLink({ href: 'not a url' }) };
+    await expect(validateEntryData(data, fields())).rejects.toMatchObject({
+      statusCode: 400,
+      statusMessage: expect.stringContaining(
+        'Body: External link href is not a valid URL'
+      ),
+    });
+  });
+
+  it('rejects an externalLink with javascript: scheme', async () => {
     const data = {
-      body: {
-        type: 'doc',
-        content: [
-          {
-            type: 'paragraph',
-            marks: [
-              {
-                type: 'cmsLink',
-                attrs: { contentTypeId: 'ct-other', entryId: 'e-1' },
-              },
-            ],
-            content: [{ type: 'text', text: 'plain' }],
-          },
-        ],
-      },
+      body: docWithExternalLink({ href: 'javascript:alert(1)' }),
     };
-    // Pass an empty link allow-list so that, if the validator did walk
-    // non-text nodes' marks, this would throw "Entry links are not
-    // allowed in this field". It must NOT throw.
-    const result = await validateEntryData(data, fields([]));
-    expect(result.body).toEqual(data.body);
+    await expect(validateEntryData(data, fields())).rejects.toMatchObject({
+      statusCode: 400,
+      statusMessage: expect.stringContaining(
+        "External link scheme 'javascript:' is not allowed"
+      ),
+    });
+  });
+
+  it('rejects an externalLink with file: scheme', async () => {
+    const data = {
+      body: docWithExternalLink({ href: 'file:///etc/passwd' }),
+    };
+    await expect(validateEntryData(data, fields())).rejects.toMatchObject({
+      statusCode: 400,
+      statusMessage: expect.stringContaining(
+        "External link scheme 'file:' is not allowed"
+      ),
+    });
+  });
+
+  it('rejects an externalLink with empty mailto: payload', async () => {
+    const data = { body: docWithExternalLink({ href: 'mailto:' }) };
+    await expect(validateEntryData(data, fields())).rejects.toMatchObject({
+      statusCode: 400,
+      statusMessage: expect.stringContaining(
+        'External link mailto target is missing'
+      ),
+    });
+  });
+
+  it('rejects an externalLink with empty tel: payload', async () => {
+    const data = { body: docWithExternalLink({ href: 'tel:' }) };
+    await expect(validateEntryData(data, fields())).rejects.toMatchObject({
+      statusCode: 400,
+      statusMessage: expect.stringContaining(
+        'External link tel target is missing'
+      ),
+    });
+  });
+
+  it('rejects an externalLink with embedded credentials', async () => {
+    const data = {
+      body: docWithExternalLink({ href: 'https://user:pass@example.com' }),
+    };
+    await expect(validateEntryData(data, fields())).rejects.toMatchObject({
+      statusCode: 400,
+      statusMessage: expect.stringContaining('must not embed credentials'),
+    });
+  });
+
+  it('rejects an externalLink with username only', async () => {
+    const data = {
+      body: docWithExternalLink({ href: 'https://user@example.com' }),
+    };
+    await expect(validateEntryData(data, fields())).rejects.toMatchObject({
+      statusCode: 400,
+      statusMessage: expect.stringContaining('must not embed credentials'),
+    });
+  });
+
+  it('rejects a protocol-relative URL (regression — no base means parse fails)', async () => {
+    const data = { body: docWithExternalLink({ href: '//example.com' }) };
+    await expect(validateEntryData(data, fields())).rejects.toMatchObject({
+      statusCode: 400,
+      statusMessage: expect.stringContaining(
+        'External link href is not a valid URL'
+      ),
+    });
+  });
+
+  it('rejects an externalLink with whitespace-only href', async () => {
+    const data = { body: docWithExternalLink({ href: '   ' }) };
+    await expect(validateEntryData(data, fields())).rejects.toMatchObject({
+      statusCode: 400,
+      statusMessage: expect.stringContaining('External link is missing href'),
+    });
   });
 });

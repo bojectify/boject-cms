@@ -335,14 +335,23 @@ export async function validateEntryData(
   return validated;
 }
 
+const ALLOWED_EXTERNAL_LINK_SCHEMES = ['http:', 'https:', 'mailto:', 'tel:'];
+
 /**
  * Walk a ProseMirror JSON document, asserting:
- *   - every `cmsEmbed` node's `contentTypeId` is in `allowedEmbedTypes`
- *   - every `cmsLink` mark's `contentTypeId` is in `allowedLinkTypes`
- * Empty allow-lists mean the corresponding feature is not allowed at all.
- * External link marks (type === 'link') are unaffected.
- * cmsLink marks are only inspected on text nodes — matching the
- * ProseMirror schema we accept.
+ *   - every `cmsEmbed` node's `contentTypeId` is in `allowedEmbedTypes`;
+ *   - every `cmsLink` node's `contentTypeId` is in `allowedLinkTypes`;
+ *   - every `externalLink` node has:
+ *       - a non-empty href that parses as a URL,
+ *       - a scheme in the allow-list (http, https, mailto, tel),
+ *       - a non-empty pathname for mailto: and tel: links,
+ *       - no embedded user:password credentials.
+ * Empty allow-lists for embed/link mean the corresponding feature is not
+ * allowed at all. URL-parse failures, disallowed schemes, empty mailto/tel
+ * targets, and credentialed URLs all throw 400.
+ *
+ * Legacy stock-Link `mark`s on text nodes are not inspected — they are
+ * silently ignored.
  */
 function validateRichtextReferences(
   doc: unknown,
@@ -355,7 +364,6 @@ function validateRichtextReferences(
     const n = node as {
       type?: unknown;
       attrs?: unknown;
-      marks?: unknown;
       content?: unknown;
     };
 
@@ -384,33 +392,69 @@ function validateRichtextReferences(
       }
     }
 
-    if (n.type === 'text' && Array.isArray(n.marks)) {
-      for (const mark of n.marks) {
-        if (!mark || typeof mark !== 'object') continue;
-        const m = mark as { type?: unknown; attrs?: unknown };
-        if (m.type !== 'cmsLink') continue;
-        const a = (m.attrs ?? {}) as Record<string, unknown>;
-        if (
-          typeof a.contentTypeId !== 'string' ||
-          typeof a.entryId !== 'string'
-        ) {
-          throw createError({
-            statusCode: 400,
-            statusMessage: `${fieldName}: Invalid entry link (missing contentTypeId or entryId).`,
-          });
-        }
-        if (allowedLinkTypes.length === 0) {
-          throw createError({
-            statusCode: 400,
-            statusMessage: `${fieldName}: Entry links are not allowed in this field.`,
-          });
-        }
-        if (!allowedLinkTypes.includes(a.contentTypeId)) {
-          throw createError({
-            statusCode: 400,
-            statusMessage: `${fieldName}: Entry link references a content type that is not allowed for this field.`,
-          });
-        }
+    if (n.type === 'cmsLink') {
+      const attrs = (n.attrs ?? {}) as Record<string, unknown>;
+      if (
+        typeof attrs.contentTypeId !== 'string' ||
+        typeof attrs.entryId !== 'string'
+      ) {
+        throw createError({
+          statusCode: 400,
+          statusMessage: `${fieldName}: Invalid entry link (missing contentTypeId or entryId).`,
+        });
+      }
+      if (allowedLinkTypes.length === 0) {
+        throw createError({
+          statusCode: 400,
+          statusMessage: `${fieldName}: Entry links are not allowed in this field.`,
+        });
+      }
+      if (!allowedLinkTypes.includes(attrs.contentTypeId)) {
+        throw createError({
+          statusCode: 400,
+          statusMessage: `${fieldName}: Entry link references a content type that is not allowed for this field.`,
+        });
+      }
+    }
+
+    if (n.type === 'externalLink') {
+      const attrs = (n.attrs ?? {}) as Record<string, unknown>;
+      const href = attrs.href;
+      if (typeof href !== 'string' || href.trim() === '') {
+        throw createError({
+          statusCode: 400,
+          statusMessage: `${fieldName}: External link is missing href.`,
+        });
+      }
+      let parsed: URL;
+      try {
+        parsed = new URL(href);
+      } catch {
+        throw createError({
+          statusCode: 400,
+          statusMessage: `${fieldName}: External link href is not a valid URL.`,
+        });
+      }
+      if (!ALLOWED_EXTERNAL_LINK_SCHEMES.includes(parsed.protocol)) {
+        throw createError({
+          statusCode: 400,
+          statusMessage: `${fieldName}: External link scheme '${parsed.protocol}' is not allowed.`,
+        });
+      }
+      if (
+        (parsed.protocol === 'mailto:' || parsed.protocol === 'tel:') &&
+        parsed.pathname.trim() === ''
+      ) {
+        throw createError({
+          statusCode: 400,
+          statusMessage: `${fieldName}: External link ${parsed.protocol.replace(':', '')} target is missing.`,
+        });
+      }
+      if (parsed.username !== '' || parsed.password !== '') {
+        throw createError({
+          statusCode: 400,
+          statusMessage: `${fieldName}: External link must not embed credentials.`,
+        });
       }
     }
 
