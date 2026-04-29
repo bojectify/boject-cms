@@ -41,8 +41,66 @@ setup((app) => {
 
 initialize({ onUnhandledRequest: 'bypass' });
 
+// Nuxt UI keys dark mode off the `dark` class on <html>. In the real app
+// `@nuxtjs/color-mode` toggles it; in Storybook we drive it directly from
+// the toolbar global. `auto` follows the OS via prefers-color-scheme and
+// keeps tracking it via a media query listener so the canvas flips when
+// the OS does.
+type ThemeGlobal = 'light' | 'dark' | 'auto';
+
+const autoMql =
+  typeof window !== 'undefined'
+    ? window.matchMedia('(prefers-color-scheme: dark)')
+    : null;
+
+let autoListener: ((e: MediaQueryListEvent) => void) | null = null;
+
+function applyTheme(theme: ThemeGlobal) {
+  if (typeof document === 'undefined') return;
+  const root = document.documentElement;
+
+  if (autoListener && autoMql) {
+    autoMql.removeEventListener('change', autoListener);
+    autoListener = null;
+  }
+
+  if (theme === 'auto') {
+    const sync = () => root.classList.toggle('dark', !!autoMql?.matches);
+    sync();
+    if (autoMql) {
+      autoListener = sync;
+      autoMql.addEventListener('change', autoListener);
+    }
+    return;
+  }
+
+  root.classList.toggle('dark', theme === 'dark');
+}
+
 const preview: Preview = {
   loaders: [mswLoader],
+  globalTypes: {
+    theme: {
+      description: 'Colour theme',
+      defaultValue: 'light',
+      toolbar: {
+        title: 'Theme',
+        icon: 'circlehollow',
+        items: [
+          { value: 'light', icon: 'sun', title: 'Light' },
+          { value: 'dark', icon: 'moon', title: 'Dark' },
+          { value: 'auto', icon: 'mirror', title: 'OS preference' },
+        ],
+        dynamicTitle: true,
+      },
+    },
+  },
+  decorators: [
+    (story, ctx) => {
+      applyTheme((ctx.globals.theme ?? 'light') as ThemeGlobal);
+      return story();
+    },
+  ],
   parameters: {
     controls: { matchers: { color: /(background|color)$/i, date: /Date$/i } },
     msw: { handlers: defaultHandlers },
