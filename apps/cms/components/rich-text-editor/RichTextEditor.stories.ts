@@ -42,24 +42,32 @@ const sampleDoc = {
       content: [
         { type: 'text', text: 'A paragraph with an ' },
         {
-          type: 'text',
-          marks: [{ type: 'link', attrs: { href: 'https://example.com' } }],
-          text: 'external URL link',
+          type: 'externalLink',
+          attrs: { href: 'https://example.com' },
         },
         { type: 'text', text: ' and a ' },
         {
-          type: 'text',
-          marks: [
-            {
-              type: 'cmsLink',
-              attrs: {
-                contentTypeId: 'ct-author',
-                entryId: 'a1',
-                contentTypeIdentifier: 'Author',
-              },
-            },
-          ],
-          text: 'CMS entry link',
+          type: 'cmsLink',
+          attrs: {
+            contentTypeId: 'ct-author',
+            entryId: 'a1',
+            contentTypeIdentifier: 'Author',
+          },
+        },
+        { type: 'text', text: '.' },
+      ],
+    },
+    {
+      type: 'paragraph',
+      content: [
+        { type: 'text', text: 'And here is an embed: ' },
+        {
+          type: 'cmsEmbed',
+          attrs: {
+            contentTypeId: 'ct-author',
+            entryId: 'a1',
+            contentTypeIdentifier: 'Author',
+          },
         },
         { type: 'text', text: '.' },
       ],
