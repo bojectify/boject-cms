@@ -397,7 +397,7 @@ onBeforeUnmount(() => {
 
     <EditorContent
       :editor="editor"
-      class="rich-text-editor__content p-4 min-h-[200px]"
+      class="rich-text-editor__content min-h-[200px]"
     />
 
     <EntryPickerModal
@@ -495,5 +495,18 @@ onBeforeUnmount(() => {
 .rich-text-editor__content
   :deep(.rich-text-editor__chip--external .rich-text-editor__chip-icon) {
   @apply text-amber-600 dark:text-amber-400;
+}
+.rich-text-editor__content :deep(.ProseMirror) {
+  @apply p-4;
+  outline: none;
+}
+.rich-text-editor__content :deep(.ProseMirror:focus-visible) {
+  @apply ring-2 ring-primary ring-inset rounded;
+}
+.rich-text-editor__content :deep(.ProseMirror h1:first-child),
+.rich-text-editor__content :deep(.ProseMirror h2:first-child),
+.rich-text-editor__content :deep(.ProseMirror h3:first-child),
+.rich-text-editor__content :deep(.ProseMirror p:first-child) {
+  @apply mt-0;
 }
 </style>
