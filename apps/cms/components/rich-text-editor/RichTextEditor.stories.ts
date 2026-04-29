@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/vue3-vite';
+import { expect, userEvent, waitFor, within } from 'storybook/test';
 import RichTextEditor from './RichTextEditor.vue';
 
 const meta: Meta<typeof RichTextEditor> = {
@@ -144,5 +145,36 @@ export const AllStyledNodes: Story = {
     modelValue: sampleDoc,
     targetContentTypeIds: ['ct-author'],
     linkTargetContentTypeIds: ['ct-author'],
+  },
+};
+
+// Verifies the full Storybook plumbing end-to-end: MSW fixtures resolve the
+// chip's referenced entry, the auto-imported `useRelationResolver` composable
+// fetches it, and clicking the rendered chip opens the entry picker modal
+// (which itself uses `useAuthedFetch` + `$fetch` shims).
+export const ChipClickEdit: Story = {
+  args: {
+    modelValue: sampleDoc,
+    targetContentTypeIds: ['ct-author'],
+    linkTargetContentTypeIds: ['ct-author'],
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    const chip = await canvas.findByText(
+      'Ada Lovelace',
+      {
+        selector: '.rich-text-editor__chip--link .rich-text-editor__chip-label',
+      },
+      { timeout: 5000 }
+    );
+    await userEvent.click(chip);
+
+    // The modal renders via Teleport, so query the document body, not the canvas.
+    const body = within(document.body);
+    await waitFor(
+      () => expect(body.getByText(/edit link/i)).toBeInTheDocument(),
+      { timeout: 5000 }
+    );
   },
 };
