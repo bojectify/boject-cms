@@ -49,7 +49,7 @@ vite.resolve.alias = {
 
 Then stories / components importing from `~/composables/useRelationResolver` get the mock in Storybook and the real thing everywhere else.
 
-For Nuxt-auto-imported helpers (`useAuthedFetch`, `$fetch`, `useToast`, `navigateTo`, etc.) that appear as globals in components, consider extending Nuxt UI's bundled `unplugin-auto-import` via its `autoImport.dirs` option (see `main.ts`) and pointing it at a Storybook-only shims directory. Not set up today — components using these auto-imports need a per-story workaround until that plumbing lands.
+Nuxt-auto-imported helpers (`useAuthedFetch`, `$fetch`, `useToast`, `navigateTo`, `useRequestHeaders`, `useRequestFetch`) are wired into Storybook via the same `unplugin-auto-import` instance Nuxt UI bundles (see `main.ts`). Three directories feed it: `./shims/` (Nuxt globals), `../composables/` (real project composables — picked up by name), and `../utils/` (auto-imported helpers like `mapFieldToConfig`). Add a new shim by exporting it from `shims/nuxt-autoimports.ts`; project composables don't need shimming as long as their dependencies (`useFetch`, `$fetch`, etc.) are shimmed.
 
 ### 3. Provide/inject — decorators
 
