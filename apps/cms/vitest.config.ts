@@ -53,9 +53,6 @@ export default defineConfig({
           globalSetup: fileURLToPath(
             new URL('./vitest.globalSetup.ts', import.meta.url)
           ),
-          setupFiles: [
-            fileURLToPath(new URL('./vitest.workerSetup.ts', import.meta.url)),
-          ],
         },
       },
       {
