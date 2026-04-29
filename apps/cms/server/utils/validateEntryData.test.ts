@@ -411,6 +411,7 @@ describe('validateEntryData — RICHTEXT external links (externalLink nodes)', (
       'http://example.com',
       'mailto:hello@example.com',
       'tel:+441234567890',
+      'tel:+6494461709',
     ]) {
       const data = { body: docWithExternalLink({ href }) };
       const result = await validateEntryData(data, fields());
