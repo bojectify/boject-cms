@@ -1101,7 +1101,7 @@ describe('GraphQL API', async () => {
       }).catch(() => {});
     });
 
-    it('combines cmsEmbed nodes and cmsLink marks in references with cross-source dedup', async () => {
+    it('combines cmsEmbed and cmsLink nodes in references with cross-source dedup', async () => {
       const cookie = await getSessionCookie();
 
       // Locate the body field id and patch its options to also allow link targets to RtTag.
@@ -1150,28 +1150,16 @@ describe('GraphQL API', async () => {
                       attrs: { contentTypeId: tagTypeId, entryId: tag1Id },
                     },
                     { type: 'text', text: ' and ' },
-                    // Link wrapping text, also targeting tag1 — must dedup
+                    // Link node, also targeting tag1 — must dedup
                     {
-                      type: 'text',
-                      text: 'see news',
-                      marks: [
-                        {
-                          type: 'cmsLink',
-                          attrs: { contentTypeId: tagTypeId, entryId: tag1Id },
-                        },
-                      ],
+                      type: 'cmsLink',
+                      attrs: { contentTypeId: tagTypeId, entryId: tag1Id },
                     },
                     { type: 'text', text: ' or ' },
                     // Link to tag2
                     {
-                      type: 'text',
-                      text: 'sport',
-                      marks: [
-                        {
-                          type: 'cmsLink',
-                          attrs: { contentTypeId: tagTypeId, entryId: tag2Id },
-                        },
-                      ],
+                      type: 'cmsLink',
+                      attrs: { contentTypeId: tagTypeId, entryId: tag2Id },
                     },
                   ],
                 },
@@ -1188,10 +1176,8 @@ describe('GraphQL API', async () => {
             json: {
               content: Array<{
                 content: Array<{
-                  marks?: Array<{
-                    type: string;
-                    attrs: Record<string, unknown>;
-                  }>;
+                  type: string;
+                  attrs?: Record<string, unknown>;
                 }>;
               }>;
             };
@@ -1223,22 +1209,20 @@ describe('GraphQL API', async () => {
       const slugs = refs.map((r) => r.slug).sort();
       expect(slugs).toEqual(['news', 'sport']);
 
-      // Confirm cmsLink marks in the round-tripped json carry the
+      // Confirm cmsLink nodes in the round-tripped json carry the
       // server-stamped contentTypeIdentifier — proves the enrich pipeline
       // actually fired during POST and the value survives the GraphQL fetch.
-      const cmsLinkMarks: Array<{ attrs: Record<string, unknown> }> = [];
+      const cmsLinkNodes: Array<{ attrs: Record<string, unknown> }> = [];
       for (const para of res.data.rtArticle.body.json.content) {
         for (const child of para.content) {
-          for (const mark of child.marks ?? []) {
-            if (mark.type === 'cmsLink') {
-              cmsLinkMarks.push({ attrs: mark.attrs });
-            }
+          if (child.type === 'cmsLink' && child.attrs) {
+            cmsLinkNodes.push({ attrs: child.attrs });
           }
         }
       }
-      expect(cmsLinkMarks).toHaveLength(2);
-      for (const m of cmsLinkMarks) {
-        expect(m.attrs.contentTypeIdentifier).toBe('RtTag');
+      expect(cmsLinkNodes).toHaveLength(2);
+      for (const n of cmsLinkNodes) {
+        expect(n.attrs.contentTypeIdentifier).toBe('RtTag');
       }
 
       // Cleanup: delete this test's article so the wildcard sweep at the end is faster
@@ -1248,7 +1232,7 @@ describe('GraphQL API', async () => {
       }).catch(() => {});
     });
 
-    it('rejects entry creation with a cmsLink mark targeting a disallowed type', async () => {
+    it('rejects entry creation with a cmsLink node targeting a disallowed type', async () => {
       const cookie = await getSessionCookie();
 
       // Create a sibling content type that the body field does NOT allow as a link target.
@@ -1293,17 +1277,11 @@ describe('GraphQL API', async () => {
                   type: 'paragraph',
                   content: [
                     {
-                      type: 'text',
-                      text: 'click',
-                      marks: [
-                        {
-                          type: 'cmsLink',
-                          attrs: {
-                            contentTypeId: other.id,
-                            entryId: otherEntry.id,
-                          },
-                        },
-                      ],
+                      type: 'cmsLink',
+                      attrs: {
+                        contentTypeId: other.id,
+                        entryId: otherEntry.id,
+                      },
                     },
                   ],
                 },
