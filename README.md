@@ -31,7 +31,7 @@ docker compose up -d
 pnpm install
 
 # Copy the .env template
-cp .env.example .env
+cp apps/cms/.env.example apps/cms/.env
 
 # Run database migrations
 pnpm prisma:migrate
@@ -65,9 +65,10 @@ The app runs at http://localhost:4000. The GraphQL playground (GraphiQL) is avai
 | `pnpm lint:fix`         | Lint and auto-fix                             |
 | `pnpm format`           | Check formatting with Prettier                |
 | `pnpm format:fix`       | Format all files                              |
-| `pnpm test`             | Run all tests once                            |
-| `pnpm test:integration` | Run integration tests only                    |
-| `pnpm test:unit`        | Run unit tests only                           |
+| `pnpm test`             | Run all tests once (workspace-wide)           |
+| `pnpm test:integration` | Run CMS integration tests only                |
+| `pnpm test:unit`        | Run unit tests across all packages            |
+| `pnpm test:storybook`   | Run Storybook interaction tests (browser)     |
 | `pnpm typecheck`        | Run TypeScript type checker                   |
 | `pnpm apikey:create`    | Create a new API key                          |
 | `pnpm apikey:list`      | List all API keys                             |

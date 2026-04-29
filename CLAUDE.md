@@ -24,9 +24,10 @@ pnpm lint                     # Lint with ESLint
 pnpm lint:fix                 # Lint and auto-fix
 pnpm format                   # Check formatting with Prettier
 pnpm format:fix               # Format all files with Prettier
-pnpm test                     # Run all tests once (alias: pnpm test:run)
-pnpm test:integration         # Run integration tests only (server/api + server/middleware)
-pnpm test:unit                # Run unit tests only (scripts, starters, server/utils)
+pnpm test                     # Run all tests across the workspace (cms + packages + perf)
+pnpm test:integration         # Run CMS integration tests only (server/api + server/middleware)
+pnpm test:unit                # Run unit tests across all packages (`pnpm -r --if-present test:unit`)
+pnpm test:storybook           # Run Storybook interaction tests in browser mode
 pnpm typecheck                # Run TypeScript type checker (nuxi typecheck)
 pnpm apikey:create <name>     # Create a new API key (prints raw key once)
 pnpm apikey:list              # List all API keys (prefix, name, status, last used)
@@ -59,7 +60,8 @@ Note: `prisma migrate dev` requires an interactive terminal. When running from a
 - **EntrySidebar component** — Right-hand sidebar (`apps/cms/components/entry-sidebar/EntrySidebar.vue`) that owns the entry editor's publishing surface: Publish / Save Draft / Discard Changes action buttons (state-driven per `status` + `isDirty` + `hasPublishedVersion`), a status badge, the published-version timestamp, and an Information section (Entry ID with copy-to-clipboard button, Content Type link, Created, Updated). Reuses `useContentTable().formatDate` for timestamps. `onSaveDraft`/`onPublish`/`onDiscardChanges` props are wired to the page's wrappers around `useContentEntryEditor`'s save methods.
 - **useAuthedFetch composable** — `apps/cms/composables/useAuthedFetch.ts` is a thin wrapper around `useFetch` that calls `useRequestHeaders(['cookie'])` and forwards the cookie header into every server-side fetch. **Required for any authenticated `/api/*` call in setup** — plain `useFetch` during SSR does NOT inherit the browser's session cookie, so the auth middleware returns 401 and the page renders empty before hydration overwrites it. Signature mirrors `useFetch` exactly. For imperative `$fetch` calls during SSR-sensitive render paths (e.g. `useRelationResolver`), use Nuxt's built-in `useRequestFetch()` instead — it returns a request-aware `$fetch` with the same cookie-forwarding behaviour. For `$fetch` inside client-only event handlers (save buttons, modal opens, upload handlers), keep plain `$fetch` — the browser attaches the cookie automatically.
 - **Content field types** — `apps/cms/types/contentEditor.ts` defines the `FieldConfig` discriminated union used by `ContentEditor`. Auto-imported by Nuxt. Includes `RichtextFieldConfig` (renders Tiptap editor) and `MultirelationFieldConfig` (renders multi-select for many-to-many relations).
-- **Tiptap rich text editor** — `apps/cms/components/rich-text-editor/RichTextEditor.vue` provides a full-featured rich text editor using `@tiptap/vue-3`. Extensions: StarterKit (excluding codeBlock), Table/TableRow/TableCell/TableHeader, Link (external URL), Image, CodeBlockLowlight (with lowlight syntax highlighting), and conditionally `CmsEmbed` (inline atom node, registered when `targetContentTypeIds` is non-empty) + `CmsLink` (mark wrapping text, registered when `linkTargetContentTypeIds` is non-empty). Toolbar exposes a separate "Insert inline embed" button (entry picker, embeds allow-list) and "Link to entry" button (entry picker scoped to the link allow-list — emits a Nuxt UI toast if no text is selected). Emits v-model JSON (ProseMirror document). Editor instance is destroyed on `onBeforeUnmount`.
+- **Tiptap rich text editor** — `apps/cms/components/rich-text-editor/RichTextEditor.vue` provides a full-featured rich text editor using `@tiptap/vue-3`. Extensions: StarterKit (excluding codeBlock), Table/TableRow/TableCell/TableHeader, Link (external URL — extended with `target` and `rel` attrs), Image, CodeBlockLowlight (with lowlight syntax highlighting), and conditionally `CmsEmbed` (inline atom node, registered when `targetContentTypeIds` is non-empty) + `CmsLink` (mark wrapping text, registered when `linkTargetContentTypeIds` is non-empty). Toolbar exposes a separate "Insert inline embed" button (entry picker, embeds allow-list), "Link to entry" button (entry picker scoped to the link allow-list — emits a Nuxt UI toast if no text is selected), and an external-URL Link button that opens `ExternalLinkModal` for URL + label + `target` (`_self`/`_blank`) + `rel` (`nofollow`) configuration. Emits v-model JSON (ProseMirror document). Editor instance is destroyed on `onBeforeUnmount`.
+- **Link option components** — `apps/cms/components/external-link-modal/ExternalLinkModal.vue` is the URL-link insert/edit modal used by the RTE; it embeds `apps/cms/components/link-options-form/LinkOptionsForm.vue` (the shared label + target + rel control surface, also reused by the entry-link flow). Types live alongside in `externalLinkModal.types.ts` / `linkOptionsForm.types.ts`.
 - **FieldModal component** — `apps/cms/components/field-modal/FieldModal.vue` provides a modal dialog for adding and editing content type fields. Props: `open`, `mode` ('add'|'edit'), `field` (existing field data or null), `fieldTypeOptions`, `entryCount`. Emits: `close`, `save`, `delete`. Exposes a `#type-options` scoped slot (`{ type, options, updateOptions }`) for type-specific configuration UI (e.g. SELECT choices). In add mode: name, identifier (auto-generated), type dropdown, required toggle. In edit mode: name and required editable, identifier and type read-only, info bar with identifier and entry count, danger zone for deletion (hidden for ENTRY_TITLE fields).
 - **RelationField component** — `apps/cms/components/relation-field/RelationField.vue` renders a single RELATION field in the entry editor. Shows an empty "Add entry" card or a filled card with entry title, content type initial, and remove button. Emits: `add`, `edit`, `remove`.
 - **MultiRelationField component** — `apps/cms/components/multi-relation-field/MultiRelationField.vue` renders a MULTIRELATION field with draggable entry cards and an "Add entry" button. Uses vuedraggable for reordering. Emits: `add`, `edit(index)`, `remove(index)`, `reorder(items)`.
@@ -201,6 +203,8 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder. The schema is
 - `apps/cms/composables/useAuthedFetch.ts` — `useFetch` wrapper that forwards session cookies during SSR
 - `apps/cms/composables/useContentEntryEditor.ts` — Entry editing composable (fetch, save, slug generation)
 - `apps/cms/composables/useRelationResolver.ts` — Resolves relation references to display data
+- `apps/cms/composables/useRelationFieldState.ts` — Shared state machine for RELATION/MULTIRELATION fields (picker open/close, edit pane stack)
+- `apps/cms/composables/paneOrchestrator.ts` — Coordinates pane-stack navigation (open/close/replace) for the entry editor's nested editor panes
 - `apps/cms/server/api/health.get.ts` — Health check endpoint (returns database connection status)
 - `apps/cms/server/api/content.get.ts` — Paginated content listing (`ContentEntry` joined with `ContentType`, sorted by `updatedAt` desc)
 - `apps/cms/server/api/content-types.get.ts` — Content type list endpoint (paginated, includes field/entry counts)
@@ -248,9 +252,12 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder. The schema is
 - `apps/cms/generated/pothos-types.ts` — Pothos-Prisma type bridge (gitignored, regenerated)
 - `docker-compose.yml` — Local PostgreSQL 17 container
 - `apps/cms/eslint.config.mjs` — ESLint flat config (extends Nuxt-generated config, loads `@typescript-eslint` plugin)
-- `lefthook.yml` — Pre-commit (lint, format, typecheck) and pre-push (test) hook configuration
-- `apps/cms/vitest.config.ts` — Vitest configuration (two projects: integration + unit; fileParallelism disabled)
+- `lefthook.yml` — Pre-commit (lint, format, typecheck per package) and pre-push (`pnpm test` + storybook tests) hook configuration
+- `apps/cms/vitest.config.ts` — Vitest configuration (three projects: integration + unit + storybook; fileParallelism disabled)
 - `apps/cms/vitest.globalSetup.ts` — Resets and seeds the `boject_test` database before integration tests run
+- `apps/cms/vitest.workerSetup.ts` — Per-worker setup applied to every Vitest project
+- `vitest.config.ts` (repo root) — Workspace-level Vitest config that aggregates `apps/cms`, `packages/*`, and `perf` so `pnpm -r test` and Wallaby see one unified test surface
+- `wallaby.cjs` — Wallaby autoconfig that pins `workers: { initial: 1, regular: 1 }` so integration tests sharing `boject_test` and the booted Nuxt dev server do not run in parallel
 - `apps/cms/pages/content-types/index.vue` — Content type listing page
 - `apps/cms/pages/content-types/new.vue` — Content type creation with field builder
 - `apps/cms/pages/content-types/[id]/index.vue` — Content type edit with field management
@@ -262,6 +269,7 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder. The schema is
 - `apps/cms/server/api/graphql/graphql.test.ts` — GraphQL API integration tests
 - `apps/cms/server/api/content/content.test.ts` — Content endpoint filter integration tests
 - `apps/cms/server/api/auth/auth.test.ts` — Auth endpoint and middleware integration tests
+- `apps/cms/server/api/account/account-password.test.ts` — Self-service password change integration tests (rate limit, validation, passwordVersion bump, cookie re-issue)
 - `apps/cms/server/api/content-types/content-types.test.ts` — Content type and field management integration tests
 - `apps/cms/server/api/content-entries/content-entries.test.ts` — Content entry CRUD integration tests
 - `apps/cms/server/middleware/csrf.test.ts` — CSRF middleware integration tests
@@ -312,7 +320,7 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder. The schema is
 - **ESLint** — Via `@nuxt/eslint` module (registered in `apps/cms/nuxt.config.ts`). Includes Vue, TypeScript, and Nuxt-specific rules. Config in `apps/cms/eslint.config.mjs`. Custom config covers `**/*.ts` files with `@typescript-eslint/parser` and `@typescript-eslint/eslint-plugin`. A separate block sets `parserOptions.parser` to `@typescript-eslint/parser` for `**/*.vue` files (the Nuxt-generated config uses `vue-eslint-parser` but doesn't configure a TypeScript sub-parser). Underscore-prefixed variables are allowed as unused (`varsIgnorePattern: '^_'`). Destructured rest siblings are also ignored (`ignoreRestSiblings: true`).
 - **Prettier** — Single quotes, trailing commas (es5), semicolons, 2-space indent, 80 char width. Config in `.prettierrc.yml`.
 - **eslint-config-prettier** — Disables ESLint rules that conflict with Prettier.
-- **Lefthook** — Pre-commit hooks run ESLint and Prettier in parallel on staged files. Pre-push hook runs the test suite. Config in `lefthook.yml`.
+- **Lefthook** — Pre-commit hooks run ESLint, Prettier, and per-package `typecheck` jobs (cms, create-boject-cms, boject-cli, root scripts) in parallel on staged files. Pre-push runs the full `pnpm test` suite plus `pnpm --filter cms test:storybook`. The Wallaby fast-path skip on the `test` job is described below; the storybook-test job can be skipped via `SKIP_STORYBOOK_TEST=1`. Config in `lefthook.yml`.
 
 ## Git Push Workflow (Wallaby fast path)
 
@@ -326,7 +334,7 @@ The pre-push hook also verifies Wallaby is actually live (checks `~/.wallaby/.pr
 
 ## Testing
 
-- **Vitest** — Test runner, configured via `apps/cms/vitest.config.ts` with plain `defineConfig` (not `@nuxt/test-utils/config` due to Nuxt 4.3 incompatibility). Two test projects: `integration` (server/api + server/middleware tests, with `globalSetup` for DB reset/seed) and `unit` (scripts, starters, server/utils tests, no DB needed). `fileParallelism: false` prevents port conflicts between test files.
+- **Vitest** — Test runner, configured via `apps/cms/vitest.config.ts` with plain `defineConfig` (not `@nuxt/test-utils/config` due to Nuxt 4.3 incompatibility). Three test projects: `integration` (server/api + server/middleware tests, with `globalSetup` for DB reset/seed), `unit` (scripts, server/utils, utils tests, no DB needed), and `storybook` (browser-mode interaction tests). `fileParallelism: false` prevents port conflicts between test files. The repo root `vitest.config.ts` aggregates `apps/cms`, `packages/boject-cli`, `packages/create-boject-cms`, and `perf` into a single workspace so `pnpm test` (root) and Wallaby see one unified test surface.
 - **@nuxt/test-utils** — Starts a Nuxt dev server for integration tests. Tests must use `setup({ dev: true })` (production mode masks GraphQL errors).
 - **Test location** — Colocated with source files (e.g. `apps/cms/server/api/graphql/graphql.test.ts`).
 - **Test API key** — All REST and GraphQL integration tests authenticate with a deterministic test key (`boject_test_key_for_integration_tests_only`) seeded via `apps/cms/prisma/seed.ts`.
