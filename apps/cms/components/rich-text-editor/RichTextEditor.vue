@@ -209,6 +209,7 @@ onBeforeUnmount(() => {
         variant="ghost"
         size="xs"
         icon="i-lucide-table"
+        color="neutral"
         @click="
           editor
             .chain()
@@ -221,6 +222,7 @@ onBeforeUnmount(() => {
         variant="ghost"
         size="xs"
         icon="i-lucide-link"
+        :color="editor.isActive('link') ? 'primary' : 'neutral'"
         @click="promptLink"
       />
       <UButton
@@ -228,6 +230,7 @@ onBeforeUnmount(() => {
         variant="ghost"
         size="xs"
         icon="i-lucide-at-sign"
+        color="neutral"
         :data-testid="QA_RICH_TEXT_EDITOR.EMBED_BTN"
         aria-label="Insert inline embed"
         @click="openEmbedPicker"
