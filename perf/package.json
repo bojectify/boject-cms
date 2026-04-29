@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "vitest run",
-    "test:unit": "vitest run",
+    "test:unit": "vitest run --project unit",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "typecheck:k6": "tsc --noEmit -p tsconfig.k6.json",
     "seed": "tsx seed/bulk-insert.ts",
