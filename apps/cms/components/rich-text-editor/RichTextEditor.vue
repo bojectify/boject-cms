@@ -270,6 +270,12 @@ onBeforeUnmount(() => {
   </div>
 </template>
 
+<!--
+  Hand-rolled editor typography. We deliberately don't use Tailwind's `prose`
+  classes — `@tailwindcss/typography` is not installed, and re-adding it
+  cascades aggressive defaults onto custom marks (cmsLink, cmsEmbed) and
+  toolbar chrome. Keep these rules anchored on `.rich-text-editor__content`.
+-->
 <style scoped>
 @reference '~/assets/css/main.css';
 
