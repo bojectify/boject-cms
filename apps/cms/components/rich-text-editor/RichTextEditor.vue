@@ -141,6 +141,14 @@ function openInsertExternalLink() {
   };
 }
 
+// `rel` may carry server-injected safety tokens (`noopener noreferrer`)
+// alongside the user-toggleable `nofollow`. Parse the token set rather than
+// matching the literal string.
+function relIncludesNofollow(rel: string | null | undefined): boolean {
+  if (typeof rel !== 'string') return false;
+  return rel.split(/\s+/).includes('nofollow');
+}
+
 function openEditChip(payload: ChipEditPayload) {
   if (payload.kind === 'externalLink') {
     externalLinkState.value = {
@@ -150,7 +158,7 @@ function openEditChip(payload: ChipEditPayload) {
       initialOptions: {
         label: payload.attrs.label ?? '',
         target: payload.attrs.target ?? null,
-        rel: payload.attrs.rel === 'nofollow' ? 'nofollow' : null,
+        rel: relIncludesNofollow(payload.attrs.rel) ? 'nofollow' : null,
       },
       pos: payload.pos,
     };
@@ -166,7 +174,7 @@ function openEditChip(payload: ChipEditPayload) {
     initialOptions: {
       label: payload.attrs.label ?? '',
       target: payload.attrs.target ?? null,
-      rel: payload.attrs.rel === 'nofollow' ? 'nofollow' : null,
+      rel: relIncludesNofollow(payload.attrs.rel) ? 'nofollow' : null,
     },
     pos: payload.pos,
   };
