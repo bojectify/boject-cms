@@ -1548,9 +1548,6 @@ describe('GraphQL API', async () => {
         },
       });
       articleUntagged = aU.id;
-
-      // Reserved for use in subsequent tasks (filter execution + cleanup).
-      void [articleTaggedXY, articleTaggedX, articleUntagged];
     });
 
     it('exposes RELATION filter on the per-type Where input', async () => {
@@ -1647,6 +1644,66 @@ describe('GraphQL API', async () => {
       }`);
       const ids = data.filterPlayerList.edges.map((e) => e.node.id).sort();
       expect(ids).toEqual([playerOnA, playerOnB].sort());
+    });
+
+    it('filters MULTIRELATION by contains', async () => {
+      const { data } = await gql<{
+        filterArticleList: Connection<{ id: string; title: string }>;
+      }>(`{
+        filterArticleList(first: 10, where: { tags: { contains: "${tagX}" } }) {
+          edges { node { id title } }
+        }
+      }`);
+      const ids = data.filterArticleList.edges.map((e) => e.node.id).sort();
+      expect(ids).toEqual([articleTaggedX, articleTaggedXY].sort());
+    });
+
+    it('filters MULTIRELATION by containsAny (OR)', async () => {
+      const { data } = await gql<{
+        filterArticleList: Connection<{ id: string }>;
+      }>(`{
+        filterArticleList(first: 10, where: { tags: { containsAny: ["${tagX}", "${tagY}"] } }) {
+          edges { node { id } }
+        }
+      }`);
+      const ids = data.filterArticleList.edges.map((e) => e.node.id).sort();
+      expect(ids).toEqual([articleTaggedX, articleTaggedXY].sort());
+    });
+
+    it('filters MULTIRELATION by containsAll (AND)', async () => {
+      const { data } = await gql<{
+        filterArticleList: Connection<{ id: string }>;
+      }>(`{
+        filterArticleList(first: 10, where: { tags: { containsAll: ["${tagX}", "${tagY}"] } }) {
+          edges { node { id } }
+        }
+      }`);
+      const ids = data.filterArticleList.edges.map((e) => e.node.id);
+      expect(ids).toEqual([articleTaggedXY]);
+    });
+
+    it('filters MULTIRELATION by isEmpty true', async () => {
+      const { data } = await gql<{
+        filterArticleList: Connection<{ id: string }>;
+      }>(`{
+        filterArticleList(first: 10, where: { tags: { isEmpty: true } }) {
+          edges { node { id } }
+        }
+      }`);
+      const ids = data.filterArticleList.edges.map((e) => e.node.id);
+      expect(ids).toEqual([articleUntagged]);
+    });
+
+    it('filters MULTIRELATION by isEmpty false', async () => {
+      const { data } = await gql<{
+        filterArticleList: Connection<{ id: string }>;
+      }>(`{
+        filterArticleList(first: 10, where: { tags: { isEmpty: false } }) {
+          edges { node { id } }
+        }
+      }`);
+      const ids = data.filterArticleList.edges.map((e) => e.node.id).sort();
+      expect(ids).toEqual([articleTaggedX, articleTaggedXY].sort());
     });
   });
 });

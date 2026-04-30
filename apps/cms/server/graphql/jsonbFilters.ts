@@ -275,6 +275,50 @@ export async function queryDynamicEntries(
             Prisma.sql`(v."data"->${ident} IS NOT NULL AND v."data"->${ident} <> 'null'::jsonb AND v."data"->${ident}->>'entryId' IS NOT NULL)`
           );
         }
+      } else if (field.type === 'MULTIRELATION') {
+        const ident = Prisma.raw(`'${field.identifier}'`);
+        if (typeof filter.contains === 'string' && filter.contains.length > 0) {
+          conditions.push(
+            Prisma.sql`v."data"->${ident} @> jsonb_build_array(jsonb_build_object('entryId', ${filter.contains}::text))`
+          );
+        }
+        if (
+          Array.isArray(filter.containsAny) &&
+          filter.containsAny.length > 0
+        ) {
+          const ids = (filter.containsAny as unknown[]).filter(
+            (x): x is string => typeof x === 'string' && x.length > 0
+          );
+          if (ids.length === 0) {
+            conditions.push(Prisma.sql`FALSE`);
+          } else {
+            conditions.push(
+              Prisma.sql`(jsonb_typeof(v."data"->${ident}) = 'array' AND EXISTS (SELECT 1 FROM jsonb_array_elements(v."data"->${ident}) AS ref WHERE ref->>'entryId' = ANY(${ids})))`
+            );
+          }
+        }
+        if (
+          Array.isArray(filter.containsAll) &&
+          filter.containsAll.length > 0
+        ) {
+          const ids = (filter.containsAll as unknown[]).filter(
+            (x): x is string => typeof x === 'string' && x.length > 0
+          );
+          for (const id of ids) {
+            conditions.push(
+              Prisma.sql`v."data"->${ident} @> jsonb_build_array(jsonb_build_object('entryId', ${id}::text))`
+            );
+          }
+        }
+        if (filter.isEmpty === true) {
+          conditions.push(
+            Prisma.sql`(v."data"->${ident} IS NULL OR v."data"->${ident} = 'null'::jsonb OR (CASE WHEN jsonb_typeof(v."data"->${ident}) = 'array' THEN jsonb_array_length(v."data"->${ident}) = 0 ELSE FALSE END))`
+          );
+        } else if (filter.isEmpty === false) {
+          conditions.push(
+            Prisma.sql`(CASE WHEN jsonb_typeof(v."data"->${ident}) = 'array' THEN jsonb_array_length(v."data"->${ident}) > 0 ELSE FALSE END)`
+          );
+        }
       }
     }
   }
