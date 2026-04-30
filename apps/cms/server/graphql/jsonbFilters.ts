@@ -310,6 +310,9 @@ export async function queryDynamicEntries(
             );
           }
         }
+        // CASE WHEN guards jsonb_array_length against scalar-null data:
+        // Postgres does not guarantee left-to-right AND short-circuit in WHERE,
+        // so a bare `typeof = 'array' AND length(...)` can crash on JSONB null.
         if (filter.isEmpty === true) {
           conditions.push(
             Prisma.sql`(v."data"->${ident} IS NULL OR v."data"->${ident} = 'null'::jsonb OR (CASE WHEN jsonb_typeof(v."data"->${ident}) = 'array' THEN jsonb_array_length(v."data"->${ident}) = 0 ELSE FALSE END))`
