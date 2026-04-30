@@ -24,4 +24,6 @@ model ContentEntryVersion {
   updatedBy   String?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
+
+  @@index([data(ops: JsonbPathOps)], type: Gin, map: "ContentEntryVersion_data_gin_idx")
 }

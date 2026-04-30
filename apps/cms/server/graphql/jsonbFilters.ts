@@ -47,12 +47,31 @@ export function registerDynamicFilterInputs(
     }),
   });
 
+  const DynRelationFilter = builder.inputType('DynRelationFilter', {
+    fields: (t) => ({
+      equals: t.id(),
+      in: t.idList(),
+      isNull: t.boolean(),
+    }),
+  });
+
+  const DynMultirelationFilter = builder.inputType('DynMultirelationFilter', {
+    fields: (t) => ({
+      contains: t.id(),
+      containsAny: t.idList(),
+      containsAll: t.idList(),
+      isEmpty: t.boolean(),
+    }),
+  });
+
   return {
     DynStringFilter,
     DynFloatFilter,
     DynBooleanFilter,
     DynDateTimeFilter,
     DynContentStatusFilter,
+    DynRelationFilter,
+    DynMultirelationFilter,
   };
 }
 
@@ -68,8 +87,8 @@ const FIELD_TYPE_TO_FILTER_KEY: Record<string, keyof DynFilterRefs | null> = {
   DATETIME: 'DynDateTimeFilter',
   SELECT: 'DynStringFilter',
   RICHTEXT: null,
-  RELATION: null,
-  MULTIRELATION: null,
+  RELATION: 'DynRelationFilter',
+  MULTIRELATION: 'DynMultirelationFilter',
 };
 
 export function getFilterKeyForFieldType(
@@ -228,6 +247,85 @@ export async function queryDynamicEntries(
           'v'
         );
         conditions.push(...dateConditions.map((c) => c.sql));
+      } else if (field.type === 'RELATION') {
+        const ident = Prisma.raw(`'${field.identifier}'`);
+        if (typeof filter.equals === 'string' && filter.equals.length > 0) {
+          conditions.push(
+            Prisma.sql`v."data"->${ident}->>'entryId' = ${filter.equals}`
+          );
+        }
+        if (Array.isArray(filter.in) && filter.in.length > 0) {
+          const ids = (filter.in as unknown[]).filter(
+            (x): x is string => typeof x === 'string' && x.length > 0
+          );
+          if (ids.length === 0) {
+            conditions.push(Prisma.sql`FALSE`);
+          } else {
+            conditions.push(
+              Prisma.sql`v."data"->${ident}->>'entryId' = ANY(${ids})`
+            );
+          }
+        }
+        if (filter.isNull === true) {
+          conditions.push(
+            Prisma.sql`(v."data"->${ident} IS NULL OR v."data"->${ident} = 'null'::jsonb OR v."data"->${ident}->>'entryId' IS NULL)`
+          );
+        } else if (filter.isNull === false) {
+          conditions.push(
+            Prisma.sql`(v."data"->${ident} IS NOT NULL AND v."data"->${ident} <> 'null'::jsonb AND v."data"->${ident}->>'entryId' IS NOT NULL)`
+          );
+        }
+      } else if (field.type === 'MULTIRELATION') {
+        const ident = Prisma.raw(`'${field.identifier}'`);
+        if (typeof filter.contains === 'string' && filter.contains.length > 0) {
+          conditions.push(
+            Prisma.sql`v."data"->${ident} @> jsonb_build_array(jsonb_build_object('entryId', ${filter.contains}::text))`
+          );
+        }
+        if (
+          Array.isArray(filter.containsAny) &&
+          filter.containsAny.length > 0
+        ) {
+          const ids = (filter.containsAny as unknown[]).filter(
+            (x): x is string => typeof x === 'string' && x.length > 0
+          );
+          if (ids.length === 0) {
+            conditions.push(Prisma.sql`FALSE`);
+          } else {
+            conditions.push(
+              Prisma.sql`(jsonb_typeof(v."data"->${ident}) = 'array' AND EXISTS (SELECT 1 FROM jsonb_array_elements(v."data"->${ident}) AS ref WHERE ref->>'entryId' = ANY(${ids})))`
+            );
+          }
+        }
+        if (
+          Array.isArray(filter.containsAll) &&
+          filter.containsAll.length > 0
+        ) {
+          const ids = (filter.containsAll as unknown[]).filter(
+            (x): x is string => typeof x === 'string' && x.length > 0
+          );
+          if (ids.length === 0) {
+            conditions.push(Prisma.sql`FALSE`);
+          } else {
+            for (const id of ids) {
+              conditions.push(
+                Prisma.sql`v."data"->${ident} @> jsonb_build_array(jsonb_build_object('entryId', ${id}::text))`
+              );
+            }
+          }
+        }
+        // CASE WHEN guards jsonb_array_length against scalar-null data:
+        // Postgres does not guarantee left-to-right AND short-circuit in WHERE,
+        // so a bare `typeof = 'array' AND length(...)` can crash on JSONB null.
+        if (filter.isEmpty === true) {
+          conditions.push(
+            Prisma.sql`(v."data"->${ident} IS NULL OR v."data"->${ident} = 'null'::jsonb OR (CASE WHEN jsonb_typeof(v."data"->${ident}) = 'array' THEN jsonb_array_length(v."data"->${ident}) = 0 ELSE FALSE END))`
+          );
+        } else if (filter.isEmpty === false) {
+          conditions.push(
+            Prisma.sql`(CASE WHEN jsonb_typeof(v."data"->${ident}) = 'array' THEN jsonb_array_length(v."data"->${ident}) > 0 ELSE FALSE END)`
+          );
+        }
       }
     }
   }
