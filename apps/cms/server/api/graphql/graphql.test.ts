@@ -1550,14 +1550,7 @@ describe('GraphQL API', async () => {
       articleUntagged = aU.id;
 
       // Reserved for use in subsequent tasks (filter execution + cleanup).
-      void [
-        playerOnA,
-        playerOnB,
-        unassignedPlayer,
-        articleTaggedXY,
-        articleTaggedX,
-        articleUntagged,
-      ];
+      void [articleTaggedXY, articleTaggedX, articleUntagged];
     });
 
     it('exposes RELATION filter on the per-type Where input', async () => {
@@ -1606,6 +1599,54 @@ describe('GraphQL API', async () => {
       expect(tagsField!.type.name ?? tagsField!.type.ofType?.name).toBe(
         'DynMultirelationFilter'
       );
+    });
+
+    it('filters RELATION by equals', async () => {
+      const { data } = await gql<{
+        filterPlayerList: Connection<{ id: string; name: string }>;
+      }>(`{
+        filterPlayerList(first: 10, where: { team: { equals: "${teamA}" } }) {
+          edges { node { id name } }
+        }
+      }`);
+      const ids = data.filterPlayerList.edges.map((e) => e.node.id);
+      expect(ids).toEqual([playerOnA]);
+    });
+
+    it('filters RELATION by in', async () => {
+      const { data } = await gql<{
+        filterPlayerList: Connection<{ id: string; name: string }>;
+      }>(`{
+        filterPlayerList(first: 10, where: { team: { in: ["${teamA}", "${teamB}"] } }) {
+          edges { node { id name } }
+        }
+      }`);
+      const ids = data.filterPlayerList.edges.map((e) => e.node.id).sort();
+      expect(ids).toEqual([playerOnA, playerOnB].sort());
+    });
+
+    it('filters RELATION by isNull true (unassigned)', async () => {
+      const { data } = await gql<{
+        filterPlayerList: Connection<{ id: string; name: string }>;
+      }>(`{
+        filterPlayerList(first: 10, where: { team: { isNull: true } }) {
+          edges { node { id name } }
+        }
+      }`);
+      const ids = data.filterPlayerList.edges.map((e) => e.node.id);
+      expect(ids).toEqual([unassignedPlayer]);
+    });
+
+    it('filters RELATION by isNull false (only assigned)', async () => {
+      const { data } = await gql<{
+        filterPlayerList: Connection<{ id: string }>;
+      }>(`{
+        filterPlayerList(first: 10, where: { team: { isNull: false } }) {
+          edges { node { id } }
+        }
+      }`);
+      const ids = data.filterPlayerList.edges.map((e) => e.node.id).sort();
+      expect(ids).toEqual([playerOnA, playerOnB].sort());
     });
   });
 });

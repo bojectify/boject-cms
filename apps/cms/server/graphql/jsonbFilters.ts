@@ -247,6 +247,34 @@ export async function queryDynamicEntries(
           'v'
         );
         conditions.push(...dateConditions.map((c) => c.sql));
+      } else if (field.type === 'RELATION') {
+        const ident = Prisma.raw(`'${field.identifier}'`);
+        if (typeof filter.equals === 'string' && filter.equals.length > 0) {
+          conditions.push(
+            Prisma.sql`v."data"->${ident}->>'entryId' = ${filter.equals}`
+          );
+        }
+        if (Array.isArray(filter.in) && filter.in.length > 0) {
+          const ids = (filter.in as unknown[]).filter(
+            (x): x is string => typeof x === 'string' && x.length > 0
+          );
+          if (ids.length === 0) {
+            conditions.push(Prisma.sql`FALSE`);
+          } else {
+            conditions.push(
+              Prisma.sql`v."data"->${ident}->>'entryId' = ANY(${ids})`
+            );
+          }
+        }
+        if (filter.isNull === true) {
+          conditions.push(
+            Prisma.sql`(v."data"->${ident} IS NULL OR v."data"->${ident} = 'null'::jsonb OR v."data"->${ident}->>'entryId' IS NULL)`
+          );
+        } else if (filter.isNull === false) {
+          conditions.push(
+            Prisma.sql`(v."data"->${ident} IS NOT NULL AND v."data"->${ident} <> 'null'::jsonb AND v."data"->${ident}->>'entryId' IS NOT NULL)`
+          );
+        }
       }
     }
   }
