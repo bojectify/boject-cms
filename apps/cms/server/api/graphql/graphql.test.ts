@@ -21,7 +21,10 @@ async function getSessionCookie(): Promise<string> {
   return _sessionCookie;
 }
 
-type GqlResponse<T> = { data: T; errors?: { message: string }[] };
+type GqlResponse<T> = {
+  data: T;
+  errors?: { message: string; extensions?: Record<string, unknown> }[];
+};
 
 function gql<T>(query: string) {
   return $fetch<GqlResponse<T>>('/api/graphql', {
@@ -2204,6 +2207,7 @@ describe('GraphQL API', async () => {
       const res = await gql<{ filterPlayer2List: Connection<{ id: string }> }>(
         query
       );
+      expect(res.errors?.[0]?.extensions?.code).toBe('BAD_USER_INPUT');
       expect(res.errors?.[0]?.message).toMatch(
         /relation filter nesting exceeds maximum depth/
       );

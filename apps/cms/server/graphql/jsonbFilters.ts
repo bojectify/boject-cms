@@ -190,7 +190,8 @@ export function buildEntryConditions(
     // Use GraphQLError directly so Yoga's maskedErrors does not replace the
     // message with "Unexpected error." — h3's createError is masked.
     throw new GraphQLError(
-      `relation filter nesting exceeds maximum depth (${MAX_RELATION_FILTER_DEPTH})`
+      `relation filter nesting exceeds maximum depth (${MAX_RELATION_FILTER_DEPTH})`,
+      { extensions: { code: 'BAD_USER_INPUT' } }
     );
   }
 
