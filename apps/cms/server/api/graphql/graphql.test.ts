@@ -1705,5 +1705,38 @@ describe('GraphQL API', async () => {
       const ids = data.filterArticleList.edges.map((e) => e.node.id).sort();
       expect(ids).toEqual([articleTaggedX, articleTaggedXY].sort());
     });
+
+    it('cleans up relation filtering test data', async () => {
+      const cookie = await getSessionCookie();
+      const allEntryIds = [
+        playerOnA,
+        playerOnB,
+        unassignedPlayer,
+        articleTaggedXY,
+        articleTaggedX,
+        articleUntagged,
+        teamA,
+        teamB,
+        tagX,
+        tagY,
+      ];
+      for (const id of allEntryIds) {
+        await $fetch<unknown>(`/api/content-entries/${id}`, {
+          method: 'DELETE',
+          headers: { Cookie: cookie },
+        });
+      }
+      for (const typeId of [
+        playerTypeId,
+        articleTypeId,
+        teamTypeId,
+        tagTypeId,
+      ]) {
+        await $fetch<unknown>(`/api/content-types/${typeId}`, {
+          method: 'DELETE',
+          headers: { Cookie: cookie },
+        });
+      }
+    });
   });
 });
