@@ -47,12 +47,31 @@ export function registerDynamicFilterInputs(
     }),
   });
 
+  const DynRelationFilter = builder.inputType('DynRelationFilter', {
+    fields: (t) => ({
+      equals: t.id(),
+      in: t.idList(),
+      isNull: t.boolean(),
+    }),
+  });
+
+  const DynMultirelationFilter = builder.inputType('DynMultirelationFilter', {
+    fields: (t) => ({
+      contains: t.id(),
+      containsAny: t.idList(),
+      containsAll: t.idList(),
+      isEmpty: t.boolean(),
+    }),
+  });
+
   return {
     DynStringFilter,
     DynFloatFilter,
     DynBooleanFilter,
     DynDateTimeFilter,
     DynContentStatusFilter,
+    DynRelationFilter,
+    DynMultirelationFilter,
   };
 }
 
@@ -68,8 +87,8 @@ const FIELD_TYPE_TO_FILTER_KEY: Record<string, keyof DynFilterRefs | null> = {
   DATETIME: 'DynDateTimeFilter',
   SELECT: 'DynStringFilter',
   RICHTEXT: null,
-  RELATION: null,
-  MULTIRELATION: null,
+  RELATION: 'DynRelationFilter',
+  MULTIRELATION: 'DynMultirelationFilter',
 };
 
 export function getFilterKeyForFieldType(

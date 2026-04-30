@@ -1329,4 +1329,283 @@ describe('GraphQL API', async () => {
       }
     });
   });
+
+  describe('Relation filtering', () => {
+    let teamTypeId: string;
+    let playerTypeId: string;
+    let articleTypeId: string;
+    let tagTypeId: string;
+    let teamA: string;
+    let teamB: string;
+    let tagX: string;
+    let tagY: string;
+    let playerOnA: string;
+    let playerOnB: string;
+    let unassignedPlayer: string;
+    let articleTaggedXY: string;
+    let articleTaggedX: string;
+    let articleUntagged: string;
+
+    it('sets up relation filtering test data', async () => {
+      const teamType = await $fetch<{ id: string }>('/api/content-types', {
+        method: 'POST',
+        headers: { Cookie: await getSessionCookie() },
+        body: {
+          name: 'Filter Team',
+          identifier: 'FilterTeam',
+          fields: [
+            {
+              identifier: 'name',
+              name: 'Name',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+          ],
+        },
+      });
+      teamTypeId = teamType.id;
+
+      const tagType = await $fetch<{ id: string }>('/api/content-types', {
+        method: 'POST',
+        headers: { Cookie: await getSessionCookie() },
+        body: {
+          name: 'Filter Tag',
+          identifier: 'FilterTag',
+          fields: [
+            {
+              identifier: 'name',
+              name: 'Name',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+          ],
+        },
+      });
+      tagTypeId = tagType.id;
+
+      const playerType = await $fetch<{ id: string }>('/api/content-types', {
+        method: 'POST',
+        headers: { Cookie: await getSessionCookie() },
+        body: {
+          name: 'Filter Player',
+          identifier: 'FilterPlayer',
+          fields: [
+            {
+              identifier: 'name',
+              name: 'Name',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+            {
+              identifier: 'team',
+              name: 'Team',
+              type: 'RELATION',
+              options: { targetContentTypeIds: [teamTypeId] },
+            },
+          ],
+        },
+      });
+      playerTypeId = playerType.id;
+
+      const articleType = await $fetch<{ id: string }>('/api/content-types', {
+        method: 'POST',
+        headers: { Cookie: await getSessionCookie() },
+        body: {
+          name: 'Filter Article',
+          identifier: 'FilterArticle',
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+            {
+              identifier: 'tags',
+              name: 'Tags',
+              type: 'MULTIRELATION',
+              options: { targetContentTypeIds: [tagTypeId] },
+            },
+          ],
+        },
+      });
+      articleTypeId = articleType.id;
+
+      const ta = await $fetch<{ id: string }>('/api/content-entries', {
+        method: 'POST',
+        headers: { Cookie: await getSessionCookie() },
+        body: {
+          contentTypeId: teamTypeId,
+          data: { name: 'Team A' },
+          status: 'PUBLISHED',
+        },
+      });
+      teamA = ta.id;
+      const tb = await $fetch<{ id: string }>('/api/content-entries', {
+        method: 'POST',
+        headers: { Cookie: await getSessionCookie() },
+        body: {
+          contentTypeId: teamTypeId,
+          data: { name: 'Team B' },
+          status: 'PUBLISHED',
+        },
+      });
+      teamB = tb.id;
+      const tx = await $fetch<{ id: string }>('/api/content-entries', {
+        method: 'POST',
+        headers: { Cookie: await getSessionCookie() },
+        body: {
+          contentTypeId: tagTypeId,
+          data: { name: 'X' },
+          status: 'PUBLISHED',
+        },
+      });
+      tagX = tx.id;
+      const ty = await $fetch<{ id: string }>('/api/content-entries', {
+        method: 'POST',
+        headers: { Cookie: await getSessionCookie() },
+        body: {
+          contentTypeId: tagTypeId,
+          data: { name: 'Y' },
+          status: 'PUBLISHED',
+        },
+      });
+      tagY = ty.id;
+
+      const pA = await $fetch<{ id: string }>('/api/content-entries', {
+        method: 'POST',
+        headers: { Cookie: await getSessionCookie() },
+        body: {
+          contentTypeId: playerTypeId,
+          data: {
+            name: 'P-OnA',
+            team: { contentTypeId: teamTypeId, entryId: teamA },
+          },
+          status: 'PUBLISHED',
+        },
+      });
+      playerOnA = pA.id;
+      const pB = await $fetch<{ id: string }>('/api/content-entries', {
+        method: 'POST',
+        headers: { Cookie: await getSessionCookie() },
+        body: {
+          contentTypeId: playerTypeId,
+          data: {
+            name: 'P-OnB',
+            team: { contentTypeId: teamTypeId, entryId: teamB },
+          },
+          status: 'PUBLISHED',
+        },
+      });
+      playerOnB = pB.id;
+      const pU = await $fetch<{ id: string }>('/api/content-entries', {
+        method: 'POST',
+        headers: { Cookie: await getSessionCookie() },
+        body: {
+          contentTypeId: playerTypeId,
+          data: { name: 'P-Unassigned' },
+          status: 'PUBLISHED',
+        },
+      });
+      unassignedPlayer = pU.id;
+
+      const aXY = await $fetch<{ id: string }>('/api/content-entries', {
+        method: 'POST',
+        headers: { Cookie: await getSessionCookie() },
+        body: {
+          contentTypeId: articleTypeId,
+          data: {
+            title: 'A-XY',
+            tags: [
+              { contentTypeId: tagTypeId, entryId: tagX },
+              { contentTypeId: tagTypeId, entryId: tagY },
+            ],
+          },
+          status: 'PUBLISHED',
+        },
+      });
+      articleTaggedXY = aXY.id;
+      const aX = await $fetch<{ id: string }>('/api/content-entries', {
+        method: 'POST',
+        headers: { Cookie: await getSessionCookie() },
+        body: {
+          contentTypeId: articleTypeId,
+          data: {
+            title: 'A-X',
+            tags: [{ contentTypeId: tagTypeId, entryId: tagX }],
+          },
+          status: 'PUBLISHED',
+        },
+      });
+      articleTaggedX = aX.id;
+      const aU = await $fetch<{ id: string }>('/api/content-entries', {
+        method: 'POST',
+        headers: { Cookie: await getSessionCookie() },
+        body: {
+          contentTypeId: articleTypeId,
+          data: { title: 'A-U' },
+          status: 'PUBLISHED',
+        },
+      });
+      articleUntagged = aU.id;
+
+      // Reserved for use in subsequent tasks (filter execution + cleanup).
+      void [
+        playerOnA,
+        playerOnB,
+        unassignedPlayer,
+        articleTaggedXY,
+        articleTaggedX,
+        articleUntagged,
+      ];
+    });
+
+    it('exposes RELATION filter on the per-type Where input', async () => {
+      const { data } = await gql<{
+        __type: {
+          inputFields: Array<{
+            name: string;
+            type: {
+              name: string | null;
+              ofType: { name: string | null } | null;
+            };
+          }>;
+        } | null;
+      }>(`{
+        __type(name: "FilterPlayerWhere") {
+          inputFields { name type { name ofType { name } } }
+        }
+      }`);
+      expect(data.__type).not.toBeNull();
+      const teamField = data.__type!.inputFields.find((f) => f.name === 'team');
+      expect(teamField).toBeDefined();
+      expect(teamField!.type.name ?? teamField!.type.ofType?.name).toBe(
+        'DynRelationFilter'
+      );
+    });
+
+    it('exposes MULTIRELATION filter on the per-type Where input', async () => {
+      const { data } = await gql<{
+        __type: {
+          inputFields: Array<{
+            name: string;
+            type: {
+              name: string | null;
+              ofType: { name: string | null } | null;
+            };
+          }>;
+        } | null;
+      }>(`{
+        __type(name: "FilterArticleWhere") {
+          inputFields { name type { name ofType { name } } }
+        }
+      }`);
+      expect(data.__type).not.toBeNull();
+      const tagsField = data.__type!.inputFields.find((f) => f.name === 'tags');
+      expect(tagsField).toBeDefined();
+      expect(tagsField!.type.name ?? tagsField!.type.ofType?.name).toBe(
+        'DynMultirelationFilter'
+      );
+    });
+  });
 });
