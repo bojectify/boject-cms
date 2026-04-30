@@ -1329,4 +1329,426 @@ describe('GraphQL API', async () => {
       }
     });
   });
+
+  describe('Relation filtering', () => {
+    let teamTypeId: string;
+    let playerTypeId: string;
+    let articleTypeId: string;
+    let tagTypeId: string;
+    let teamA: string;
+    let teamB: string;
+    let tagX: string;
+    let tagY: string;
+    let playerOnA: string;
+    let playerOnB: string;
+    let unassignedPlayer: string;
+    let articleTaggedXY: string;
+    let articleTaggedX: string;
+    let articleUntagged: string;
+
+    it('sets up relation filtering test data', async () => {
+      const teamType = await $fetch<{ id: string }>('/api/content-types', {
+        method: 'POST',
+        headers: { Cookie: await getSessionCookie() },
+        body: {
+          name: 'Filter Team',
+          identifier: 'FilterTeam',
+          fields: [
+            {
+              identifier: 'name',
+              name: 'Name',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+          ],
+        },
+      });
+      teamTypeId = teamType.id;
+
+      const tagType = await $fetch<{ id: string }>('/api/content-types', {
+        method: 'POST',
+        headers: { Cookie: await getSessionCookie() },
+        body: {
+          name: 'Filter Tag',
+          identifier: 'FilterTag',
+          fields: [
+            {
+              identifier: 'name',
+              name: 'Name',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+          ],
+        },
+      });
+      tagTypeId = tagType.id;
+
+      const playerType = await $fetch<{ id: string }>('/api/content-types', {
+        method: 'POST',
+        headers: { Cookie: await getSessionCookie() },
+        body: {
+          name: 'Filter Player',
+          identifier: 'FilterPlayer',
+          fields: [
+            {
+              identifier: 'name',
+              name: 'Name',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+            {
+              identifier: 'team',
+              name: 'Team',
+              type: 'RELATION',
+              options: { targetContentTypeIds: [teamTypeId] },
+            },
+          ],
+        },
+      });
+      playerTypeId = playerType.id;
+
+      const articleType = await $fetch<{ id: string }>('/api/content-types', {
+        method: 'POST',
+        headers: { Cookie: await getSessionCookie() },
+        body: {
+          name: 'Filter Article',
+          identifier: 'FilterArticle',
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+            {
+              identifier: 'tags',
+              name: 'Tags',
+              type: 'MULTIRELATION',
+              options: { targetContentTypeIds: [tagTypeId] },
+            },
+          ],
+        },
+      });
+      articleTypeId = articleType.id;
+
+      const ta = await $fetch<{ id: string }>('/api/content-entries', {
+        method: 'POST',
+        headers: { Cookie: await getSessionCookie() },
+        body: {
+          contentTypeId: teamTypeId,
+          data: { name: 'Team A' },
+          status: 'PUBLISHED',
+        },
+      });
+      teamA = ta.id;
+      const tb = await $fetch<{ id: string }>('/api/content-entries', {
+        method: 'POST',
+        headers: { Cookie: await getSessionCookie() },
+        body: {
+          contentTypeId: teamTypeId,
+          data: { name: 'Team B' },
+          status: 'PUBLISHED',
+        },
+      });
+      teamB = tb.id;
+      const tx = await $fetch<{ id: string }>('/api/content-entries', {
+        method: 'POST',
+        headers: { Cookie: await getSessionCookie() },
+        body: {
+          contentTypeId: tagTypeId,
+          data: { name: 'X' },
+          status: 'PUBLISHED',
+        },
+      });
+      tagX = tx.id;
+      const ty = await $fetch<{ id: string }>('/api/content-entries', {
+        method: 'POST',
+        headers: { Cookie: await getSessionCookie() },
+        body: {
+          contentTypeId: tagTypeId,
+          data: { name: 'Y' },
+          status: 'PUBLISHED',
+        },
+      });
+      tagY = ty.id;
+
+      const pA = await $fetch<{ id: string }>('/api/content-entries', {
+        method: 'POST',
+        headers: { Cookie: await getSessionCookie() },
+        body: {
+          contentTypeId: playerTypeId,
+          data: {
+            name: 'P-OnA',
+            team: { contentTypeId: teamTypeId, entryId: teamA },
+          },
+          status: 'PUBLISHED',
+        },
+      });
+      playerOnA = pA.id;
+      const pB = await $fetch<{ id: string }>('/api/content-entries', {
+        method: 'POST',
+        headers: { Cookie: await getSessionCookie() },
+        body: {
+          contentTypeId: playerTypeId,
+          data: {
+            name: 'P-OnB',
+            team: { contentTypeId: teamTypeId, entryId: teamB },
+          },
+          status: 'PUBLISHED',
+        },
+      });
+      playerOnB = pB.id;
+      const pU = await $fetch<{ id: string }>('/api/content-entries', {
+        method: 'POST',
+        headers: { Cookie: await getSessionCookie() },
+        body: {
+          contentTypeId: playerTypeId,
+          data: { name: 'P-Unassigned' },
+          status: 'PUBLISHED',
+        },
+      });
+      unassignedPlayer = pU.id;
+
+      const aXY = await $fetch<{ id: string }>('/api/content-entries', {
+        method: 'POST',
+        headers: { Cookie: await getSessionCookie() },
+        body: {
+          contentTypeId: articleTypeId,
+          data: {
+            title: 'A-XY',
+            tags: [
+              { contentTypeId: tagTypeId, entryId: tagX },
+              { contentTypeId: tagTypeId, entryId: tagY },
+            ],
+          },
+          status: 'PUBLISHED',
+        },
+      });
+      articleTaggedXY = aXY.id;
+      const aX = await $fetch<{ id: string }>('/api/content-entries', {
+        method: 'POST',
+        headers: { Cookie: await getSessionCookie() },
+        body: {
+          contentTypeId: articleTypeId,
+          data: {
+            title: 'A-X',
+            tags: [{ contentTypeId: tagTypeId, entryId: tagX }],
+          },
+          status: 'PUBLISHED',
+        },
+      });
+      articleTaggedX = aX.id;
+      const aU = await $fetch<{ id: string }>('/api/content-entries', {
+        method: 'POST',
+        headers: { Cookie: await getSessionCookie() },
+        body: {
+          contentTypeId: articleTypeId,
+          data: { title: 'A-U' },
+          status: 'PUBLISHED',
+        },
+      });
+      articleUntagged = aU.id;
+    });
+
+    it('exposes RELATION filter on the per-type Where input', async () => {
+      const { data } = await gql<{
+        __type: {
+          inputFields: Array<{
+            name: string;
+            type: {
+              name: string | null;
+              ofType: { name: string | null } | null;
+            };
+          }>;
+        } | null;
+      }>(`{
+        __type(name: "FilterPlayerWhere") {
+          inputFields { name type { name ofType { name } } }
+        }
+      }`);
+      expect(data.__type).not.toBeNull();
+      const teamField = data.__type!.inputFields.find((f) => f.name === 'team');
+      expect(teamField).toBeDefined();
+      expect(teamField!.type.name ?? teamField!.type.ofType?.name).toBe(
+        'DynRelationFilter'
+      );
+    });
+
+    it('exposes MULTIRELATION filter on the per-type Where input', async () => {
+      const { data } = await gql<{
+        __type: {
+          inputFields: Array<{
+            name: string;
+            type: {
+              name: string | null;
+              ofType: { name: string | null } | null;
+            };
+          }>;
+        } | null;
+      }>(`{
+        __type(name: "FilterArticleWhere") {
+          inputFields { name type { name ofType { name } } }
+        }
+      }`);
+      expect(data.__type).not.toBeNull();
+      const tagsField = data.__type!.inputFields.find((f) => f.name === 'tags');
+      expect(tagsField).toBeDefined();
+      expect(tagsField!.type.name ?? tagsField!.type.ofType?.name).toBe(
+        'DynMultirelationFilter'
+      );
+    });
+
+    it('filters RELATION by equals', async () => {
+      const { data } = await gql<{
+        filterPlayerList: Connection<{ id: string; name: string }>;
+      }>(`{
+        filterPlayerList(first: 10, where: { team: { equals: "${teamA}" } }) {
+          edges { node { id name } }
+        }
+      }`);
+      const ids = data.filterPlayerList.edges.map((e) => e.node.id);
+      expect(ids).toEqual([playerOnA]);
+    });
+
+    it('filters RELATION by in', async () => {
+      const { data } = await gql<{
+        filterPlayerList: Connection<{ id: string; name: string }>;
+      }>(`{
+        filterPlayerList(first: 10, where: { team: { in: ["${teamA}", "${teamB}"] } }) {
+          edges { node { id name } }
+        }
+      }`);
+      const ids = data.filterPlayerList.edges.map((e) => e.node.id).sort();
+      expect(ids).toEqual([playerOnA, playerOnB].sort());
+    });
+
+    it('filters RELATION by isNull true (unassigned)', async () => {
+      const { data } = await gql<{
+        filterPlayerList: Connection<{ id: string; name: string }>;
+      }>(`{
+        filterPlayerList(first: 10, where: { team: { isNull: true } }) {
+          edges { node { id name } }
+        }
+      }`);
+      const ids = data.filterPlayerList.edges.map((e) => e.node.id);
+      expect(ids).toEqual([unassignedPlayer]);
+    });
+
+    it('filters RELATION by isNull false (only assigned)', async () => {
+      const { data } = await gql<{
+        filterPlayerList: Connection<{ id: string }>;
+      }>(`{
+        filterPlayerList(first: 10, where: { team: { isNull: false } }) {
+          edges { node { id } }
+        }
+      }`);
+      const ids = data.filterPlayerList.edges.map((e) => e.node.id).sort();
+      expect(ids).toEqual([playerOnA, playerOnB].sort());
+    });
+
+    it('filters MULTIRELATION by contains', async () => {
+      const { data } = await gql<{
+        filterArticleList: Connection<{ id: string; title: string }>;
+      }>(`{
+        filterArticleList(first: 10, where: { tags: { contains: "${tagX}" } }) {
+          edges { node { id title } }
+        }
+      }`);
+      const ids = data.filterArticleList.edges.map((e) => e.node.id).sort();
+      expect(ids).toEqual([articleTaggedX, articleTaggedXY].sort());
+    });
+
+    it('filters MULTIRELATION by containsAny (OR)', async () => {
+      const { data } = await gql<{
+        filterArticleList: Connection<{ id: string }>;
+      }>(`{
+        filterArticleList(first: 10, where: { tags: { containsAny: ["${tagX}", "${tagY}"] } }) {
+          edges { node { id } }
+        }
+      }`);
+      const ids = data.filterArticleList.edges.map((e) => e.node.id).sort();
+      expect(ids).toEqual([articleTaggedX, articleTaggedXY].sort());
+    });
+
+    it('filters MULTIRELATION by containsAll (AND)', async () => {
+      const { data } = await gql<{
+        filterArticleList: Connection<{ id: string }>;
+      }>(`{
+        filterArticleList(first: 10, where: { tags: { containsAll: ["${tagX}", "${tagY}"] } }) {
+          edges { node { id } }
+        }
+      }`);
+      const ids = data.filterArticleList.edges.map((e) => e.node.id);
+      expect(ids).toEqual([articleTaggedXY]);
+    });
+
+    it('filters MULTIRELATION by containsAll with empty-after-sanitisation list returns no rows', async () => {
+      const { data } = await gql<{
+        filterArticleList: Connection<{ id: string }>;
+      }>(`{
+        filterArticleList(first: 10, where: { tags: { containsAll: [""] } }) {
+          edges { node { id } }
+        }
+      }`);
+      expect(data.filterArticleList.edges).toEqual([]);
+    });
+
+    it('filters MULTIRELATION by isEmpty true', async () => {
+      const { data } = await gql<{
+        filterArticleList: Connection<{ id: string }>;
+      }>(`{
+        filterArticleList(first: 10, where: { tags: { isEmpty: true } }) {
+          edges { node { id } }
+        }
+      }`);
+      const ids = data.filterArticleList.edges.map((e) => e.node.id);
+      expect(ids).toEqual([articleUntagged]);
+    });
+
+    it('filters MULTIRELATION by isEmpty false', async () => {
+      const { data } = await gql<{
+        filterArticleList: Connection<{ id: string }>;
+      }>(`{
+        filterArticleList(first: 10, where: { tags: { isEmpty: false } }) {
+          edges { node { id } }
+        }
+      }`);
+      const ids = data.filterArticleList.edges.map((e) => e.node.id).sort();
+      expect(ids).toEqual([articleTaggedX, articleTaggedXY].sort());
+    });
+
+    it('cleans up relation filtering test data', async () => {
+      const cookie = await getSessionCookie();
+      const allEntryIds = [
+        playerOnA,
+        playerOnB,
+        unassignedPlayer,
+        articleTaggedXY,
+        articleTaggedX,
+        articleUntagged,
+        teamA,
+        teamB,
+        tagX,
+        tagY,
+      ].filter((id): id is string => Boolean(id));
+      for (const id of allEntryIds) {
+        await $fetch<unknown>(`/api/content-entries/${id}`, {
+          method: 'DELETE',
+          headers: { cookie },
+        }).catch(() => {});
+      }
+      const allTypeIds = [
+        playerTypeId,
+        articleTypeId,
+        teamTypeId,
+        tagTypeId,
+      ].filter((id): id is string => Boolean(id));
+      for (const typeId of allTypeIds) {
+        await $fetch<unknown>(`/api/content-types/${typeId}`, {
+          method: 'DELETE',
+          headers: { cookie },
+        }).catch(() => {});
+      }
+    });
+  });
 });
