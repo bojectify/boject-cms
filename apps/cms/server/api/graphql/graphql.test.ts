@@ -1765,11 +1765,11 @@ describe('GraphQL API', async () => {
     let tagTypeId: string;
     let multiTargetTypeId: string;
     let teamA: string;
-    let _teamB: string;
+    let teamB: string;
     let tagX: string;
     let _tagY: string;
     let playerOnA: string;
-    let _playerOnB: string;
+    let playerOnB: string;
     let articleTaggedXY: string;
     let articleTaggedX: string;
 
@@ -1910,7 +1910,7 @@ describe('GraphQL API', async () => {
           status: 'PUBLISHED',
         },
       });
-      _teamB = tb.id;
+      teamB = tb.id;
       const tx = await $fetch<{ id: string }>('/api/content-entries', {
         method: 'POST',
         headers: { cookie },
@@ -1952,12 +1952,12 @@ describe('GraphQL API', async () => {
           contentTypeId: playerTypeId,
           data: {
             name: 'P2-OnB',
-            team: { contentTypeId: teamTypeId, entryId: _teamB },
+            team: { contentTypeId: teamTypeId, entryId: teamB },
           },
           status: 'PUBLISHED',
         },
       });
-      _playerOnB = pB.id;
+      playerOnB = pB.id;
 
       const aXY = await $fetch<{ id: string }>('/api/content-entries', {
         method: 'POST',
@@ -2077,6 +2077,54 @@ describe('GraphQL API', async () => {
       expect(ref!.type.name ?? ref!.type.ofType?.name).toBe(
         'DynRelationFilter'
       );
+    });
+
+    it('filters RELATION by is { equals } (1 level)', async () => {
+      const { data } = await gql<{
+        filterPlayer2List: Connection<{ id: string }>;
+      }>(`{
+        filterPlayer2List(first: 10, where: { team: { is: { slug: { equals: "team-a" } } } }) {
+          edges { node { id } }
+        }
+      }`);
+      expect(data.filterPlayer2List.edges.map((e) => e.node.id)).toEqual([
+        playerOnA,
+      ]);
+    });
+
+    it('filters RELATION by is { in: [slugs] } via name contains', async () => {
+      const { data } = await gql<{
+        filterPlayer2List: Connection<{ id: string }>;
+      }>(`{
+        filterPlayer2List(first: 10, where: { team: { is: { name: { contains: "Team" } } } }) {
+          edges { node { id } }
+        }
+      }`);
+      expect(data.filterPlayer2List.edges.map((e) => e.node.id).sort()).toEqual(
+        [playerOnA, playerOnB].sort()
+      );
+    });
+
+    it('combines is with flat equals (AND semantics)', async () => {
+      const { data: pass } = await gql<{
+        filterPlayer2List: Connection<{ id: string }>;
+      }>(`{
+        filterPlayer2List(first: 10, where: { team: { equals: "${teamA}", is: { slug: { equals: "team-a" } } } }) {
+          edges { node { id } }
+        }
+      }`);
+      expect(pass.filterPlayer2List.edges.map((e) => e.node.id)).toEqual([
+        playerOnA,
+      ]);
+
+      const { data: fail } = await gql<{
+        filterPlayer2List: Connection<{ id: string }>;
+      }>(`{
+        filterPlayer2List(first: 10, where: { team: { equals: "${teamA}", is: { slug: { equals: "team-b" } } } }) {
+          edges { node { id } }
+        }
+      }`);
+      expect(fail.filterPlayer2List.edges).toEqual([]);
     });
   });
 });

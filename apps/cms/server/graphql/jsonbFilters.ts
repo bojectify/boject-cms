@@ -112,6 +112,7 @@ interface WhereArgs {
 interface FieldDef {
   identifier: string;
   type: string;
+  options?: unknown;
 }
 
 export function buildDateConditions(
@@ -291,6 +292,44 @@ export function buildEntryConditions(
         conditions.push(
           Prisma.sql`(${v}."data"->${ident} IS NOT NULL AND ${v}."data"->${ident} <> 'null'::jsonb AND ${v}."data"->${ident}->>'entryId' IS NOT NULL)`
         );
+      }
+      if (filter.is && typeof filter.is === 'object') {
+        const opts = field.options as {
+          targetContentTypeIds?: string[];
+        } | null;
+        const targetIds = opts?.targetContentTypeIds ?? [];
+        if (targetIds.length === 1) {
+          const targetType = contentTypes.find((c) => c.id === targetIds[0]);
+          if (targetType) {
+            const childAlias = {
+              entry: `e${depth + 1}`,
+              version: `v${depth + 1}`,
+            };
+            const childConditions = buildEntryConditions(
+              filter.is as WhereArgs,
+              targetType,
+              contentTypes,
+              childAlias,
+              depth + 1
+            );
+            const childWhere =
+              childConditions.length > 0
+                ? Prisma.join(childConditions, ' AND ')
+                : Prisma.sql`TRUE`;
+            const cAlias = Prisma.raw(`"${childAlias.entry}"`);
+            const cVAlias = Prisma.raw(`"${childAlias.version}"`);
+            conditions.push(
+              Prisma.sql`EXISTS (
+                SELECT 1 FROM "ContentEntry" ${cAlias}
+                JOIN "ContentEntryVersion" ${cVAlias} ON ${cVAlias}."entryId" = ${cAlias}."id"
+                WHERE ${cAlias}."id"::text = (${v}."data"->${ident}->>'entryId')
+                  AND ${cAlias}."contentTypeId" = ${targetType.id}
+                  AND ${cVAlias}."status" = 'PUBLISHED'
+                  AND ${childWhere}
+              )`
+            );
+          }
+        }
       }
     } else if (field.type === 'MULTIRELATION') {
       const ident = Prisma.raw(`'${field.identifier}'`);
