@@ -1795,6 +1795,19 @@ describe('GraphQL API', async () => {
       });
       teamTypeId = teamType.id;
 
+      // Add a self-referencing parentTeam field to FilterTeam2 so we can chain
+      // RELATION { is: ... } filters to arbitrary depth in the depth-cap tests.
+      await $fetch(`/api/content-types/${teamTypeId}/fields`, {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          identifier: 'parentTeam',
+          name: 'Parent Team',
+          type: 'RELATION',
+          options: { targetContentTypeIds: [teamTypeId] },
+        },
+      });
+
       const tagType = await $fetch<{ id: string }>('/api/content-types', {
         method: 'POST',
         headers: { cookie },
@@ -2164,6 +2177,36 @@ describe('GraphQL API', async () => {
       expect(data.filterArticle2List.edges.map((e) => e.node.id)).toEqual([
         articleTaggedXY,
       ]);
+    });
+
+    it('allows nesting up to MAX_RELATION_FILTER_DEPTH', async () => {
+      // 5-level chain: team.is.parentTeam.is.parentTeam.is.parentTeam.is.parentTeam.is.slug
+      // (depths 1..5). Should resolve without error even if it returns no rows.
+      const query = `{
+        filterPlayer2List(first: 10, where: {
+          team: { is: { parentTeam: { is: { parentTeam: { is: { parentTeam: { is: { parentTeam: { is: { slug: { equals: "team-a" } } } } } } } } } } }
+        }) { edges { node { id } } }
+      }`;
+      const res = await gql<{ filterPlayer2List: Connection<{ id: string }> }>(
+        query
+      );
+      expect(res.errors).toBeUndefined();
+      expect(Array.isArray(res.data.filterPlayer2List.edges)).toBe(true);
+    });
+
+    it('rejects nesting beyond MAX_RELATION_FILTER_DEPTH', async () => {
+      // 6-level chain — depth 6 exceeds the cap.
+      const query = `{
+        filterPlayer2List(first: 10, where: {
+          team: { is: { parentTeam: { is: { parentTeam: { is: { parentTeam: { is: { parentTeam: { is: { parentTeam: { is: { slug: { equals: "team-a" } } } } } } } } } } } } }
+        }) { edges { node { id } } }
+      }`;
+      const res = await gql<{ filterPlayer2List: Connection<{ id: string }> }>(
+        query
+      );
+      expect(res.errors?.[0]?.message).toMatch(
+        /relation filter nesting exceeds maximum depth/
+      );
     });
   });
 });

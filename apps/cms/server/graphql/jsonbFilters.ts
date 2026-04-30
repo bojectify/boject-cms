@@ -3,6 +3,7 @@ import type { ContentEntryShape } from './dynamicTypes';
 import type { ContentStatusEnumRef } from './types/contentStatus';
 import { Prisma } from '#prisma';
 import { createError } from 'h3';
+import { GraphQLError } from 'graphql';
 import { prisma } from '../utils/prisma';
 
 export function registerDynamicFilterInputs(
@@ -186,10 +187,11 @@ export function buildEntryConditions(
   depth: number
 ): Prisma.Sql[] {
   if (depth > MAX_RELATION_FILTER_DEPTH) {
-    throw createError({
-      statusCode: 400,
-      statusMessage: `relation filter nesting exceeds maximum depth (${MAX_RELATION_FILTER_DEPTH})`,
-    });
+    // Use GraphQLError directly so Yoga's maskedErrors does not replace the
+    // message with "Unexpected error." — h3's createError is masked.
+    throw new GraphQLError(
+      `relation filter nesting exceeds maximum depth (${MAX_RELATION_FILTER_DEPTH})`
+    );
   }
 
   const conditions: Prisma.Sql[] = [];
