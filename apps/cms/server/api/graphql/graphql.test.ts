@@ -1767,7 +1767,7 @@ describe('GraphQL API', async () => {
     let teamA: string;
     let teamB: string;
     let tagX: string;
-    let _tagY: string;
+    let tagY: string;
     let playerOnA: string;
     let playerOnB: string;
     let articleTaggedXY: string;
@@ -1930,7 +1930,7 @@ describe('GraphQL API', async () => {
           status: 'PUBLISHED',
         },
       });
-      _tagY = ty.id;
+      tagY = ty.id;
 
       const pA = await $fetch<{ id: string }>('/api/content-entries', {
         method: 'POST',
@@ -1968,7 +1968,7 @@ describe('GraphQL API', async () => {
             title: 'A2-XY',
             tags: [
               { contentTypeId: tagTypeId, entryId: tagX },
-              { contentTypeId: tagTypeId, entryId: _tagY },
+              { contentTypeId: tagTypeId, entryId: tagY },
             ],
           },
           status: 'PUBLISHED',
@@ -2125,6 +2125,45 @@ describe('GraphQL API', async () => {
         }
       }`);
       expect(fail.filterPlayer2List.edges).toEqual([]);
+    });
+
+    it('filters MULTIRELATION by some { equals } (at-least-one match)', async () => {
+      const { data } = await gql<{
+        filterArticle2List: Connection<{ id: string }>;
+      }>(`{
+        filterArticle2List(first: 10, where: { tags: { some: { name: { equals: "Rugby" } } } }) {
+          edges { node { id } }
+        }
+      }`);
+      expect(
+        data.filterArticle2List.edges.map((e) => e.node.id).sort()
+      ).toEqual([articleTaggedX, articleTaggedXY].sort());
+    });
+
+    it('filters MULTIRELATION by some — no match', async () => {
+      const { data } = await gql<{
+        filterArticle2List: Connection<{ id: string }>;
+      }>(`{
+        filterArticle2List(first: 10, where: { tags: { some: { name: { equals: "nonexistent" } } } }) {
+          edges { node { id } }
+        }
+      }`);
+      expect(data.filterArticle2List.edges).toEqual([]);
+    });
+
+    it('combines some with containsAny (AND semantics)', async () => {
+      // articleTaggedXY has tags X (rugby) and Y (football); containsAny=[tagY] passes AND some.name=Rugby (X) passes.
+      // articleTaggedX has only X; containsAny=[tagY] fails.
+      const { data } = await gql<{
+        filterArticle2List: Connection<{ id: string }>;
+      }>(`{
+        filterArticle2List(first: 10, where: { tags: { containsAny: ["${tagY}"], some: { name: { equals: "Rugby" } } } }) {
+          edges { node { id } }
+        }
+      }`);
+      expect(data.filterArticle2List.edges.map((e) => e.node.id)).toEqual([
+        articleTaggedXY,
+      ]);
     });
   });
 });

@@ -364,6 +364,46 @@ export function buildEntryConditions(
           }
         }
       }
+      if (filter.some && typeof filter.some === 'object') {
+        const opts = field.options as {
+          targetContentTypeIds?: string[];
+        } | null;
+        const targetIds = opts?.targetContentTypeIds ?? [];
+        if (targetIds.length === 1) {
+          const targetType = contentTypes.find((c) => c.id === targetIds[0]);
+          if (targetType) {
+            const childAlias = {
+              entry: `e${depth + 1}`,
+              version: `v${depth + 1}`,
+            };
+            const childConditions = buildEntryConditions(
+              filter.some as WhereArgs,
+              targetType,
+              contentTypes,
+              childAlias,
+              depth + 1
+            );
+            const childWhere =
+              childConditions.length > 0
+                ? Prisma.join(childConditions, ' AND ')
+                : Prisma.sql`TRUE`;
+            const cAlias = Prisma.raw(`"${childAlias.entry}"`);
+            const cVAlias = Prisma.raw(`"${childAlias.version}"`);
+            // Outer jsonb_typeof guard avoids jsonb_array_elements errors on
+            // scalar-null data — same pattern as isEmpty above.
+            conditions.push(
+              Prisma.sql`(jsonb_typeof(${v}."data"->${ident}) = 'array' AND EXISTS (
+                SELECT 1 FROM jsonb_array_elements(${v}."data"->${ident}) AS ref
+                JOIN "ContentEntry" ${cAlias} ON ${cAlias}."id"::text = (ref->>'entryId')
+                JOIN "ContentEntryVersion" ${cVAlias} ON ${cVAlias}."entryId" = ${cAlias}."id"
+                WHERE ${cAlias}."contentTypeId" = ${targetType.id}
+                  AND ${cVAlias}."status" = 'PUBLISHED'
+                  AND ${childWhere}
+              ))`
+            );
+          }
+        }
+      }
       // CASE WHEN guards jsonb_array_length against scalar-null data:
       // Postgres does not guarantee left-to-right AND short-circuit in WHERE,
       // so a bare `typeof = 'array' AND length(...)` can crash on JSONB null.
