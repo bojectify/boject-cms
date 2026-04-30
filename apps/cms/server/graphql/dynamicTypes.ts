@@ -423,7 +423,6 @@ export function registerDynamicTypes(
             return queryDynamicEntries(
               ct.id,
               args.where as never,
-              ct.fields,
               contentTypes,
               limit,
               offset

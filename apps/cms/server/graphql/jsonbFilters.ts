@@ -179,7 +179,8 @@ export interface ContentTypeForFilter {
 export function buildEntryConditions(
   whereArgs: WhereArgs | null | undefined,
   contentType: ContentTypeForFilter,
-  _contentTypes: ContentTypeForFilter[],
+  // reserved for Task 3-5 recursive relation target lookups
+  contentTypes: ContentTypeForFilter[],
   alias: { entry: string; version: string },
   depth: number
 ): Prisma.Sql[] {
@@ -345,13 +346,17 @@ export function buildEntryConditions(
 export async function queryDynamicEntries(
   contentTypeId: string,
   whereArgs: WhereArgs | null | undefined,
-  _fields: FieldDef[],
   contentTypes: ContentTypeForFilter[],
   limit: number,
   offset: number
 ): Promise<ContentEntryShape[]> {
   const contentType = contentTypes.find((ct) => ct.id === contentTypeId);
-  if (!contentType) return [];
+  if (!contentType) {
+    throw createError({
+      statusCode: 500,
+      statusMessage: `unknown contentType ${contentTypeId} in filter context`,
+    });
+  }
 
   const conditions: Prisma.Sql[] = [
     Prisma.sql`e."contentTypeId" = ${contentTypeId}`,
