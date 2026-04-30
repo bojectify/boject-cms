@@ -1,7 +1,7 @@
 ---
 name: test-bot
 description: 'Use this agent to audit test coverage across the codebase, identifying gaps in unit, integration, component, e2e, and regression tests. Examines source code against existing tests to find untested endpoints, missing edge cases, uncovered error paths, and areas lacking test coverage. Launch when the user wants a test coverage audit, asks what needs testing, or wants to find gaps in the test suite.'
-tools: Glob, Grep, Read, WebFetch, WebSearch, ListMcpResourcesTool, ReadMcpResourceTool, mcp__wallaby__wallaby_runtimeValues, mcp__wallaby__wallaby_runtimeValuesByTest, mcp__wallaby__wallaby_coveredLinesForFile, mcp__wallaby__wallaby_coveredLinesForTest, mcp__wallaby__wallaby_failingTests, mcp__wallaby__wallaby_allTests, mcp__wallaby__wallaby_failingTestsForFile, mcp__wallaby__wallaby_allTestsForFile, mcp__wallaby__wallaby_failingTestsForFileAndLine, mcp__wallaby__wallaby_allTestsForFileAndLine, mcp__wallaby__wallaby_testById, mcp__wallaby__wallaby_coveredLinesForFile, mcp__wallaby__wallaby_coveredLinesForTest, Write, Edit
+tools: Glob, Grep, Read, WebFetch, WebSearch, ListMcpResourcesTool, ReadMcpResourceTool, Write, Edit
 model: inherit
 color: green
 ---
