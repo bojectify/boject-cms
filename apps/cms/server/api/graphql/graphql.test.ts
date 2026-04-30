@@ -1569,8 +1569,11 @@ describe('GraphQL API', async () => {
       expect(data.__type).not.toBeNull();
       const teamField = data.__type!.inputFields.find((f) => f.name === 'team');
       expect(teamField).toBeDefined();
+      // Single-target RELATION fields use a per-relation filter input that
+      // wraps the flat operators with a nested `is` referencing the target's
+      // Where (Task 2 of GraphQL nested relation filters).
       expect(teamField!.type.name ?? teamField!.type.ofType?.name).toBe(
-        'DynRelationFilter'
+        'FilterPlayerTeamRelationFilter'
       );
     });
 
@@ -1593,8 +1596,11 @@ describe('GraphQL API', async () => {
       expect(data.__type).not.toBeNull();
       const tagsField = data.__type!.inputFields.find((f) => f.name === 'tags');
       expect(tagsField).toBeDefined();
+      // Single-target MULTIRELATION fields use a per-relation filter input
+      // that wraps the flat operators with a nested `some` referencing the
+      // target's Where (Task 2 of GraphQL nested relation filters).
       expect(tagsField!.type.name ?? tagsField!.type.ofType?.name).toBe(
-        'DynMultirelationFilter'
+        'FilterArticleTagsMultirelationFilter'
       );
     });
 
@@ -1749,6 +1755,328 @@ describe('GraphQL API', async () => {
           headers: { cookie },
         }).catch(() => {});
       }
+    });
+  });
+
+  describe('Nested relation filtering', () => {
+    let teamTypeId: string;
+    let playerTypeId: string;
+    let articleTypeId: string;
+    let tagTypeId: string;
+    let multiTargetTypeId: string;
+    let teamA: string;
+    let _teamB: string;
+    let tagX: string;
+    let _tagY: string;
+    let playerOnA: string;
+    let _playerOnB: string;
+    let articleTaggedXY: string;
+    let articleTaggedX: string;
+
+    it('sets up nested filtering test data', async () => {
+      const cookie = await getSessionCookie();
+
+      const teamType = await $fetch<{ id: string }>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: 'Filter Team 2',
+          identifier: 'FilterTeam2',
+          fields: [
+            {
+              identifier: 'name',
+              name: 'Name',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+            { identifier: 'slug', name: 'Slug', type: 'SLUG' },
+          ],
+        },
+      });
+      teamTypeId = teamType.id;
+
+      const tagType = await $fetch<{ id: string }>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: 'Filter Tag 2',
+          identifier: 'FilterTag2',
+          fields: [
+            {
+              identifier: 'name',
+              name: 'Name',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+            { identifier: 'slug', name: 'Slug', type: 'SLUG' },
+          ],
+        },
+      });
+      tagTypeId = tagType.id;
+
+      const playerType = await $fetch<{ id: string }>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: 'Filter Player 2',
+          identifier: 'FilterPlayer2',
+          fields: [
+            {
+              identifier: 'name',
+              name: 'Name',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+            {
+              identifier: 'team',
+              name: 'Team',
+              type: 'RELATION',
+              options: { targetContentTypeIds: [teamTypeId] },
+            },
+          ],
+        },
+      });
+      playerTypeId = playerType.id;
+
+      const articleType = await $fetch<{ id: string }>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: 'Filter Article 2',
+          identifier: 'FilterArticle2',
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+            {
+              identifier: 'tags',
+              name: 'Tags',
+              type: 'MULTIRELATION',
+              options: { targetContentTypeIds: [tagTypeId] },
+            },
+          ],
+        },
+      });
+      articleTypeId = articleType.id;
+
+      const multiTargetType = await $fetch<{ id: string }>(
+        '/api/content-types',
+        {
+          method: 'POST',
+          headers: { cookie },
+          body: {
+            name: 'Filter Multi Target',
+            identifier: 'FilterMultiTarget',
+            fields: [
+              {
+                identifier: 'name',
+                name: 'Name',
+                type: 'ENTRY_TITLE',
+                required: true,
+              },
+              {
+                identifier: 'ref',
+                name: 'Ref',
+                type: 'RELATION',
+                options: {
+                  targetContentTypeIds: [teamTypeId, tagTypeId],
+                },
+              },
+            ],
+          },
+        }
+      );
+      multiTargetTypeId = multiTargetType.id;
+
+      const ta = await $fetch<{ id: string }>('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: teamTypeId,
+          data: { name: 'Team A 2', slug: 'team-a' },
+          status: 'PUBLISHED',
+        },
+      });
+      teamA = ta.id;
+      const tb = await $fetch<{ id: string }>('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: teamTypeId,
+          data: { name: 'Team B 2', slug: 'team-b' },
+          status: 'PUBLISHED',
+        },
+      });
+      _teamB = tb.id;
+      const tx = await $fetch<{ id: string }>('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: tagTypeId,
+          data: { name: 'Rugby', slug: 'rugby' },
+          status: 'PUBLISHED',
+        },
+      });
+      tagX = tx.id;
+      const ty = await $fetch<{ id: string }>('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: tagTypeId,
+          data: { name: 'Football', slug: 'football' },
+          status: 'PUBLISHED',
+        },
+      });
+      _tagY = ty.id;
+
+      const pA = await $fetch<{ id: string }>('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: playerTypeId,
+          data: {
+            name: 'P2-OnA',
+            team: { contentTypeId: teamTypeId, entryId: teamA },
+          },
+          status: 'PUBLISHED',
+        },
+      });
+      playerOnA = pA.id;
+      const pB = await $fetch<{ id: string }>('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: playerTypeId,
+          data: {
+            name: 'P2-OnB',
+            team: { contentTypeId: teamTypeId, entryId: _teamB },
+          },
+          status: 'PUBLISHED',
+        },
+      });
+      _playerOnB = pB.id;
+
+      const aXY = await $fetch<{ id: string }>('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: articleTypeId,
+          data: {
+            title: 'A2-XY',
+            tags: [
+              { contentTypeId: tagTypeId, entryId: tagX },
+              { contentTypeId: tagTypeId, entryId: _tagY },
+            ],
+          },
+          status: 'PUBLISHED',
+        },
+      });
+      articleTaggedXY = aXY.id;
+      const aX = await $fetch<{ id: string }>('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: articleTypeId,
+          data: {
+            title: 'A2-X',
+            tags: [{ contentTypeId: tagTypeId, entryId: tagX }],
+          },
+          status: 'PUBLISHED',
+        },
+      });
+      articleTaggedX = aX.id;
+
+      // Reference asserted-defined ids to silence unused-var lint while
+      // keeping fixtures available for Tasks 3-5.
+      expect(multiTargetTypeId).toBeTruthy();
+      expect(playerOnA).toBeTruthy();
+      expect(articleTaggedXY).toBeTruthy();
+      expect(articleTaggedX).toBeTruthy();
+    });
+
+    it('exposes per-relation filter input on single-target RELATION', async () => {
+      const { data } = await gql<{
+        __type: {
+          inputFields: Array<{
+            name: string;
+            type: {
+              name: string | null;
+              ofType: { name: string | null } | null;
+            };
+          }>;
+        } | null;
+      }>(`{
+        __type(name: "FilterPlayer2Where") {
+          inputFields { name type { name ofType { name } } }
+        }
+      }`);
+      const teamField = data.__type!.inputFields.find((f) => f.name === 'team');
+      expect(teamField!.type.name ?? teamField!.type.ofType?.name).toBe(
+        'FilterPlayer2TeamRelationFilter'
+      );
+    });
+
+    it('per-relation RELATION input includes is + flat operators', async () => {
+      const { data } = await gql<{
+        __type: {
+          inputFields: Array<{ name: string; type: { name: string | null } }>;
+        } | null;
+      }>(`{
+        __type(name: "FilterPlayer2TeamRelationFilter") {
+          inputFields { name type { name } }
+        }
+      }`);
+      const names = data.__type!.inputFields.map((f) => f.name).sort();
+      expect(names).toEqual(['equals', 'in', 'is', 'isNull']);
+      const isField = data.__type!.inputFields.find((f) => f.name === 'is');
+      expect(isField!.type.name).toBe('FilterTeam2Where');
+    });
+
+    it('per-relation MULTIRELATION input includes some + flat operators', async () => {
+      const { data } = await gql<{
+        __type: {
+          inputFields: Array<{ name: string; type: { name: string | null } }>;
+        } | null;
+      }>(`{
+        __type(name: "FilterArticle2TagsMultirelationFilter") {
+          inputFields { name type { name } }
+        }
+      }`);
+      const names = data.__type!.inputFields.map((f) => f.name).sort();
+      expect(names).toEqual([
+        'contains',
+        'containsAll',
+        'containsAny',
+        'isEmpty',
+        'some',
+      ]);
+      const someField = data.__type!.inputFields.find((f) => f.name === 'some');
+      expect(someField!.type.name).toBe('FilterTag2Where');
+    });
+
+    it('polymorphic RELATION still uses shared DynRelationFilter (no is)', async () => {
+      const { data } = await gql<{
+        __type: {
+          inputFields: Array<{
+            name: string;
+            type: {
+              name: string | null;
+              ofType: { name: string | null } | null;
+            };
+          }>;
+        } | null;
+      }>(`{
+        __type(name: "FilterMultiTargetWhere") {
+          inputFields { name type { name ofType { name } } }
+        }
+      }`);
+      const ref = data.__type!.inputFields.find((f) => f.name === 'ref');
+      expect(ref!.type.name ?? ref!.type.ofType?.name).toBe(
+        'DynRelationFilter'
+      );
     });
   });
 });
