@@ -1682,6 +1682,17 @@ describe('GraphQL API', async () => {
       expect(ids).toEqual([articleTaggedXY]);
     });
 
+    it('filters MULTIRELATION by containsAll with empty-after-sanitisation list returns no rows', async () => {
+      const { data } = await gql<{
+        filterArticleList: Connection<{ id: string }>;
+      }>(`{
+        filterArticleList(first: 10, where: { tags: { containsAll: [""] } }) {
+          edges { node { id } }
+        }
+      }`);
+      expect(data.filterArticleList.edges).toEqual([]);
+    });
+
     it('filters MULTIRELATION by isEmpty true', async () => {
       const { data } = await gql<{
         filterArticleList: Connection<{ id: string }>;

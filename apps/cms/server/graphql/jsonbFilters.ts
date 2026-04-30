@@ -304,10 +304,14 @@ export async function queryDynamicEntries(
           const ids = (filter.containsAll as unknown[]).filter(
             (x): x is string => typeof x === 'string' && x.length > 0
           );
-          for (const id of ids) {
-            conditions.push(
-              Prisma.sql`v."data"->${ident} @> jsonb_build_array(jsonb_build_object('entryId', ${id}::text))`
-            );
+          if (ids.length === 0) {
+            conditions.push(Prisma.sql`FALSE`);
+          } else {
+            for (const id of ids) {
+              conditions.push(
+                Prisma.sql`v."data"->${ident} @> jsonb_build_array(jsonb_build_object('entryId', ${id}::text))`
+              );
+            }
           }
         }
         // CASE WHEN guards jsonb_array_length against scalar-null data:
