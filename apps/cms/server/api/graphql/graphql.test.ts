@@ -2212,5 +2212,38 @@ describe('GraphQL API', async () => {
         /relation filter nesting exceeds maximum depth/
       );
     });
+
+    it('cleans up nested relation filtering test data', async () => {
+      const cookie = await getSessionCookie();
+      const allEntryIds = [
+        playerOnA,
+        playerOnB,
+        articleTaggedXY,
+        articleTaggedX,
+        teamA,
+        teamB,
+        tagX,
+        tagY,
+      ].filter((id): id is string => Boolean(id));
+      for (const id of allEntryIds) {
+        await $fetch<unknown>(`/api/content-entries/${id}`, {
+          method: 'DELETE',
+          headers: { cookie },
+        }).catch(() => {});
+      }
+      const allTypeIds = [
+        playerTypeId,
+        articleTypeId,
+        multiTargetTypeId,
+        teamTypeId,
+        tagTypeId,
+      ].filter((id): id is string => Boolean(id));
+      for (const typeId of allTypeIds) {
+        await $fetch<unknown>(`/api/content-types/${typeId}`, {
+          method: 'DELETE',
+          headers: { cookie },
+        }).catch(() => {});
+      }
+    });
   });
 });
