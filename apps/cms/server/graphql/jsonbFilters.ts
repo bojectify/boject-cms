@@ -2,6 +2,7 @@ import type { Builder } from './builder';
 import type { ContentEntryShape } from './dynamicTypes';
 import type { ContentStatusEnumRef } from './types/contentStatus';
 import { Prisma } from '#prisma';
+import { createError } from 'h3';
 import { prisma } from '../utils/prisma';
 
 export function registerDynamicFilterInputs(
@@ -167,168 +168,201 @@ export function registerContentEntryWhere(
   });
 }
 
-export async function queryDynamicEntries(
-  contentTypeId: string,
+export const MAX_RELATION_FILTER_DEPTH = 5;
+
+export interface ContentTypeForFilter {
+  id: string;
+  identifier: string;
+  fields: FieldDef[];
+}
+
+export function buildEntryConditions(
   whereArgs: WhereArgs | null | undefined,
-  fields: FieldDef[],
-  limit: number,
-  offset: number
-): Promise<ContentEntryShape[]> {
-  const conditions: Prisma.Sql[] = [
-    Prisma.sql`e."contentTypeId" = ${contentTypeId}`,
-  ];
+  contentType: ContentTypeForFilter,
+  _contentTypes: ContentTypeForFilter[],
+  alias: { entry: string; version: string },
+  depth: number
+): Prisma.Sql[] {
+  if (depth > MAX_RELATION_FILTER_DEPTH) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: `relation filter nesting exceeds maximum depth (${MAX_RELATION_FILTER_DEPTH})`,
+    });
+  }
 
-  if (whereArgs) {
-    if (whereArgs.status?.equals) {
-      conditions.push(Prisma.sql`v."status" = ${whereArgs.status.equals}`);
+  const conditions: Prisma.Sql[] = [];
+  if (!whereArgs) return conditions;
+
+  const v = Prisma.raw(`"${alias.version}"`);
+
+  if (whereArgs.status?.equals) {
+    conditions.push(Prisma.sql`${v}."status" = ${whereArgs.status.equals}`);
+  }
+
+  for (const sysField of ['createdAt', 'updatedAt'] as const) {
+    if (whereArgs[sysField] && typeof whereArgs[sysField] === 'object') {
+      const dateConditions = buildDateConditions(
+        sysField,
+        whereArgs[sysField] as Record<string, unknown>,
+        false,
+        alias.version
+      );
+      conditions.push(...dateConditions.map((c) => c.sql));
     }
+  }
 
-    for (const sysField of ['createdAt', 'updatedAt'] as const) {
-      if (whereArgs[sysField] && typeof whereArgs[sysField] === 'object') {
-        const dateConditions = buildDateConditions(
-          sysField,
-          whereArgs[sysField] as Record<string, unknown>,
-          false,
-          'v'
+  for (const field of contentType.fields) {
+    const filterValue = whereArgs[field.identifier];
+    if (!filterValue || typeof filterValue !== 'object') continue;
+    const filter = filterValue as Record<string, unknown>;
+
+    if (
+      field.type === 'ENTRY_TITLE' ||
+      field.type === 'SLUG' ||
+      field.type === 'TEXT' ||
+      field.type === 'TEXTAREA' ||
+      field.type === 'SELECT'
+    ) {
+      if (filter.equals != null) {
+        conditions.push(
+          Prisma.sql`${v}."data"->>${Prisma.raw(`'${field.identifier}'`)} = ${String(filter.equals)}`
         );
-        conditions.push(...dateConditions.map((c) => c.sql));
       }
-    }
-
-    for (const field of fields) {
-      const filterValue = whereArgs[field.identifier];
-      if (!filterValue || typeof filterValue !== 'object') continue;
-      const filter = filterValue as Record<string, unknown>;
-
-      if (
-        field.type === 'ENTRY_TITLE' ||
-        field.type === 'SLUG' ||
-        field.type === 'TEXT' ||
-        field.type === 'TEXTAREA' ||
-        field.type === 'SELECT'
-      ) {
-        if (filter.equals != null) {
-          conditions.push(
-            Prisma.sql`v."data"->>${Prisma.raw(`'${field.identifier}'`)} = ${String(filter.equals)}`
-          );
-        }
-        if (filter.contains != null) {
-          conditions.push(
-            Prisma.sql`v."data"->>${Prisma.raw(`'${field.identifier}'`)} ILIKE ${'%' + String(filter.contains) + '%'}`
-          );
-        }
-      } else if (field.type === 'NUMBER') {
-        const numOps = ['equals', 'gt', 'gte', 'lt', 'lte'] as const;
-        const sqlOps: Record<string, string> = {
-          equals: '=',
-          gt: '>',
-          gte: '>=',
-          lt: '<',
-          lte: '<=',
-        };
-        for (const op of numOps) {
-          if (filter[op] != null) {
-            conditions.push(
-              Prisma.sql`(v."data"->>${Prisma.raw(`'${field.identifier}'`)})::float ${Prisma.raw(sqlOps[op]!)} ${Number(filter[op])}`
-            );
-          }
-        }
-      } else if (field.type === 'BOOLEAN') {
-        if (filter.equals != null) {
-          conditions.push(
-            Prisma.sql`(v."data"->>${Prisma.raw(`'${field.identifier}'`)})::boolean = ${Boolean(filter.equals)}`
-          );
-        }
-      } else if (field.type === 'DATETIME') {
-        const dateConditions = buildDateConditions(
-          field.identifier,
-          filter,
-          true,
-          'v'
+      if (filter.contains != null) {
+        conditions.push(
+          Prisma.sql`${v}."data"->>${Prisma.raw(`'${field.identifier}'`)} ILIKE ${'%' + String(filter.contains) + '%'}`
         );
-        conditions.push(...dateConditions.map((c) => c.sql));
-      } else if (field.type === 'RELATION') {
-        const ident = Prisma.raw(`'${field.identifier}'`);
-        if (typeof filter.equals === 'string' && filter.equals.length > 0) {
+      }
+    } else if (field.type === 'NUMBER') {
+      const numOps = ['equals', 'gt', 'gte', 'lt', 'lte'] as const;
+      const sqlOps: Record<string, string> = {
+        equals: '=',
+        gt: '>',
+        gte: '>=',
+        lt: '<',
+        lte: '<=',
+      };
+      for (const op of numOps) {
+        if (filter[op] != null) {
           conditions.push(
-            Prisma.sql`v."data"->${ident}->>'entryId' = ${filter.equals}`
+            Prisma.sql`(${v}."data"->>${Prisma.raw(`'${field.identifier}'`)})::float ${Prisma.raw(sqlOps[op]!)} ${Number(filter[op])}`
           );
         }
-        if (Array.isArray(filter.in) && filter.in.length > 0) {
-          const ids = (filter.in as unknown[]).filter(
-            (x): x is string => typeof x === 'string' && x.length > 0
+      }
+    } else if (field.type === 'BOOLEAN') {
+      if (filter.equals != null) {
+        conditions.push(
+          Prisma.sql`(${v}."data"->>${Prisma.raw(`'${field.identifier}'`)})::boolean = ${Boolean(filter.equals)}`
+        );
+      }
+    } else if (field.type === 'DATETIME') {
+      const dateConditions = buildDateConditions(
+        field.identifier,
+        filter,
+        true,
+        alias.version
+      );
+      conditions.push(...dateConditions.map((c) => c.sql));
+    } else if (field.type === 'RELATION') {
+      const ident = Prisma.raw(`'${field.identifier}'`);
+      if (typeof filter.equals === 'string' && filter.equals.length > 0) {
+        conditions.push(
+          Prisma.sql`${v}."data"->${ident}->>'entryId' = ${filter.equals}`
+        );
+      }
+      if (Array.isArray(filter.in) && filter.in.length > 0) {
+        const ids = (filter.in as unknown[]).filter(
+          (x): x is string => typeof x === 'string' && x.length > 0
+        );
+        if (ids.length === 0) {
+          conditions.push(Prisma.sql`FALSE`);
+        } else {
+          conditions.push(
+            Prisma.sql`${v}."data"->${ident}->>'entryId' = ANY(${ids})`
           );
-          if (ids.length === 0) {
-            conditions.push(Prisma.sql`FALSE`);
-          } else {
+        }
+      }
+      if (filter.isNull === true) {
+        conditions.push(
+          Prisma.sql`(${v}."data"->${ident} IS NULL OR ${v}."data"->${ident} = 'null'::jsonb OR ${v}."data"->${ident}->>'entryId' IS NULL)`
+        );
+      } else if (filter.isNull === false) {
+        conditions.push(
+          Prisma.sql`(${v}."data"->${ident} IS NOT NULL AND ${v}."data"->${ident} <> 'null'::jsonb AND ${v}."data"->${ident}->>'entryId' IS NOT NULL)`
+        );
+      }
+    } else if (field.type === 'MULTIRELATION') {
+      const ident = Prisma.raw(`'${field.identifier}'`);
+      if (typeof filter.contains === 'string' && filter.contains.length > 0) {
+        conditions.push(
+          Prisma.sql`${v}."data"->${ident} @> jsonb_build_array(jsonb_build_object('entryId', ${filter.contains}::text))`
+        );
+      }
+      if (Array.isArray(filter.containsAny) && filter.containsAny.length > 0) {
+        const ids = (filter.containsAny as unknown[]).filter(
+          (x): x is string => typeof x === 'string' && x.length > 0
+        );
+        if (ids.length === 0) {
+          conditions.push(Prisma.sql`FALSE`);
+        } else {
+          conditions.push(
+            Prisma.sql`(jsonb_typeof(${v}."data"->${ident}) = 'array' AND EXISTS (SELECT 1 FROM jsonb_array_elements(${v}."data"->${ident}) AS ref WHERE ref->>'entryId' = ANY(${ids})))`
+          );
+        }
+      }
+      if (Array.isArray(filter.containsAll) && filter.containsAll.length > 0) {
+        const ids = (filter.containsAll as unknown[]).filter(
+          (x): x is string => typeof x === 'string' && x.length > 0
+        );
+        if (ids.length === 0) {
+          conditions.push(Prisma.sql`FALSE`);
+        } else {
+          for (const id of ids) {
             conditions.push(
-              Prisma.sql`v."data"->${ident}->>'entryId' = ANY(${ids})`
+              Prisma.sql`${v}."data"->${ident} @> jsonb_build_array(jsonb_build_object('entryId', ${id}::text))`
             );
           }
         }
-        if (filter.isNull === true) {
-          conditions.push(
-            Prisma.sql`(v."data"->${ident} IS NULL OR v."data"->${ident} = 'null'::jsonb OR v."data"->${ident}->>'entryId' IS NULL)`
-          );
-        } else if (filter.isNull === false) {
-          conditions.push(
-            Prisma.sql`(v."data"->${ident} IS NOT NULL AND v."data"->${ident} <> 'null'::jsonb AND v."data"->${ident}->>'entryId' IS NOT NULL)`
-          );
-        }
-      } else if (field.type === 'MULTIRELATION') {
-        const ident = Prisma.raw(`'${field.identifier}'`);
-        if (typeof filter.contains === 'string' && filter.contains.length > 0) {
-          conditions.push(
-            Prisma.sql`v."data"->${ident} @> jsonb_build_array(jsonb_build_object('entryId', ${filter.contains}::text))`
-          );
-        }
-        if (
-          Array.isArray(filter.containsAny) &&
-          filter.containsAny.length > 0
-        ) {
-          const ids = (filter.containsAny as unknown[]).filter(
-            (x): x is string => typeof x === 'string' && x.length > 0
-          );
-          if (ids.length === 0) {
-            conditions.push(Prisma.sql`FALSE`);
-          } else {
-            conditions.push(
-              Prisma.sql`(jsonb_typeof(v."data"->${ident}) = 'array' AND EXISTS (SELECT 1 FROM jsonb_array_elements(v."data"->${ident}) AS ref WHERE ref->>'entryId' = ANY(${ids})))`
-            );
-          }
-        }
-        if (
-          Array.isArray(filter.containsAll) &&
-          filter.containsAll.length > 0
-        ) {
-          const ids = (filter.containsAll as unknown[]).filter(
-            (x): x is string => typeof x === 'string' && x.length > 0
-          );
-          if (ids.length === 0) {
-            conditions.push(Prisma.sql`FALSE`);
-          } else {
-            for (const id of ids) {
-              conditions.push(
-                Prisma.sql`v."data"->${ident} @> jsonb_build_array(jsonb_build_object('entryId', ${id}::text))`
-              );
-            }
-          }
-        }
-        // CASE WHEN guards jsonb_array_length against scalar-null data:
-        // Postgres does not guarantee left-to-right AND short-circuit in WHERE,
-        // so a bare `typeof = 'array' AND length(...)` can crash on JSONB null.
-        if (filter.isEmpty === true) {
-          conditions.push(
-            Prisma.sql`(v."data"->${ident} IS NULL OR v."data"->${ident} = 'null'::jsonb OR (CASE WHEN jsonb_typeof(v."data"->${ident}) = 'array' THEN jsonb_array_length(v."data"->${ident}) = 0 ELSE FALSE END))`
-          );
-        } else if (filter.isEmpty === false) {
-          conditions.push(
-            Prisma.sql`(CASE WHEN jsonb_typeof(v."data"->${ident}) = 'array' THEN jsonb_array_length(v."data"->${ident}) > 0 ELSE FALSE END)`
-          );
-        }
+      }
+      // CASE WHEN guards jsonb_array_length against scalar-null data:
+      // Postgres does not guarantee left-to-right AND short-circuit in WHERE,
+      // so a bare `typeof = 'array' AND length(...)` can crash on JSONB null.
+      if (filter.isEmpty === true) {
+        conditions.push(
+          Prisma.sql`(${v}."data"->${ident} IS NULL OR ${v}."data"->${ident} = 'null'::jsonb OR (CASE WHEN jsonb_typeof(${v}."data"->${ident}) = 'array' THEN jsonb_array_length(${v}."data"->${ident}) = 0 ELSE FALSE END))`
+        );
+      } else if (filter.isEmpty === false) {
+        conditions.push(
+          Prisma.sql`(CASE WHEN jsonb_typeof(${v}."data"->${ident}) = 'array' THEN jsonb_array_length(${v}."data"->${ident}) > 0 ELSE FALSE END)`
+        );
       }
     }
   }
+
+  return conditions;
+}
+
+export async function queryDynamicEntries(
+  contentTypeId: string,
+  whereArgs: WhereArgs | null | undefined,
+  _fields: FieldDef[],
+  contentTypes: ContentTypeForFilter[],
+  limit: number,
+  offset: number
+): Promise<ContentEntryShape[]> {
+  const contentType = contentTypes.find((ct) => ct.id === contentTypeId);
+  if (!contentType) return [];
+
+  const conditions: Prisma.Sql[] = [
+    Prisma.sql`e."contentTypeId" = ${contentTypeId}`,
+    ...buildEntryConditions(
+      whereArgs,
+      contentType,
+      contentTypes,
+      { entry: 'e', version: 'v' },
+      0
+    ),
+  ];
 
   const whereClause = Prisma.join(conditions, ' AND ');
 

@@ -424,6 +424,7 @@ export function registerDynamicTypes(
               ct.id,
               args.where as never,
               ct.fields,
+              contentTypes,
               limit,
               offset
             );
