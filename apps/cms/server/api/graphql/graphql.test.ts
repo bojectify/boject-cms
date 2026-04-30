@@ -1719,23 +1719,24 @@ describe('GraphQL API', async () => {
         teamB,
         tagX,
         tagY,
-      ];
+      ].filter((id): id is string => Boolean(id));
       for (const id of allEntryIds) {
         await $fetch<unknown>(`/api/content-entries/${id}`, {
           method: 'DELETE',
-          headers: { Cookie: cookie },
-        });
+          headers: { cookie },
+        }).catch(() => {});
       }
-      for (const typeId of [
+      const allTypeIds = [
         playerTypeId,
         articleTypeId,
         teamTypeId,
         tagTypeId,
-      ]) {
+      ].filter((id): id is string => Boolean(id));
+      for (const typeId of allTypeIds) {
         await $fetch<unknown>(`/api/content-types/${typeId}`, {
           method: 'DELETE',
-          headers: { Cookie: cookie },
-        });
+          headers: { cookie },
+        }).catch(() => {});
       }
     });
   });
