@@ -116,6 +116,15 @@ interface FieldDef {
   options?: unknown;
 }
 
+const COMPARISON_OPS = ['equals', 'gt', 'gte', 'lt', 'lte'] as const;
+const COMPARISON_SQL_OPS: Record<(typeof COMPARISON_OPS)[number], string> = {
+  equals: '=',
+  gt: '>',
+  gte: '>=',
+  lt: '<',
+  lte: '<=',
+};
+
 export function buildDateConditions(
   identifier: string,
   filter: Record<string, unknown>,
@@ -123,19 +132,11 @@ export function buildDateConditions(
   tablePrefix?: string
 ): JsonbCondition[] {
   const conditions: JsonbCondition[] = [];
-  const ops = ['equals', 'gt', 'gte', 'lt', 'lte'] as const;
-  const sqlOps: Record<string, string> = {
-    equals: '=',
-    gt: '>',
-    gte: '>=',
-    lt: '<',
-    lte: '<=',
-  };
 
   const colPrefix = tablePrefix ? `${tablePrefix}.` : '';
   const dataRef = tablePrefix ? `${tablePrefix}."data"` : 'data';
 
-  for (const op of ops) {
+  for (const op of COMPARISON_OPS) {
     if (filter[op] != null) {
       const value =
         filter[op] instanceof Date
@@ -143,11 +144,11 @@ export function buildDateConditions(
           : String(filter[op]);
       if (isJsonb) {
         conditions.push({
-          sql: Prisma.sql`(${Prisma.raw(dataRef)}->>${Prisma.raw(`'${identifier}'`)})::timestamptz ${Prisma.raw(sqlOps[op]!)} ${value}::timestamptz`,
+          sql: Prisma.sql`(${Prisma.raw(dataRef)}->>${Prisma.raw(`'${identifier}'`)})::timestamptz ${Prisma.raw(COMPARISON_SQL_OPS[op])} ${value}::timestamptz`,
         });
       } else {
         conditions.push({
-          sql: Prisma.sql`${Prisma.raw(`${colPrefix}"${identifier}"`)} ${Prisma.raw(sqlOps[op]!)} ${value}::timestamptz`,
+          sql: Prisma.sql`${Prisma.raw(`${colPrefix}"${identifier}"`)} ${Prisma.raw(COMPARISON_SQL_OPS[op])} ${value}::timestamptz`,
         });
       }
     }
@@ -239,18 +240,10 @@ export function buildEntryConditions(
         );
       }
     } else if (field.type === 'NUMBER') {
-      const numOps = ['equals', 'gt', 'gte', 'lt', 'lte'] as const;
-      const sqlOps: Record<string, string> = {
-        equals: '=',
-        gt: '>',
-        gte: '>=',
-        lt: '<',
-        lte: '<=',
-      };
-      for (const op of numOps) {
+      for (const op of COMPARISON_OPS) {
         if (filter[op] != null) {
           conditions.push(
-            Prisma.sql`(${v}."data"->>${Prisma.raw(`'${field.identifier}'`)})::float ${Prisma.raw(sqlOps[op]!)} ${Number(filter[op])}`
+            Prisma.sql`(${v}."data"->>${Prisma.raw(`'${field.identifier}'`)})::float ${Prisma.raw(COMPARISON_SQL_OPS[op])} ${Number(filter[op])}`
           );
         }
       }
