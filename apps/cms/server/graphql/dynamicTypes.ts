@@ -170,6 +170,18 @@ export function registerDynamicTypes(
 
   const typeRefs = new Map<string, ReturnType<Builder['objectRef']>>();
 
+  // PASS 1: reserve a Where inputRef per content type so per-relation filter
+  // inputs can forward-reference their target's Where via closure. Pothos
+  // resolves field-callback references at schema-build time, so refs created
+  // here can be used in implement() callbacks below regardless of order.
+  const whereInputRefs = new Map<string, ReturnType<Builder['inputRef']>>();
+  for (const ct of contentTypes) {
+    whereInputRefs.set(
+      ct.id,
+      builder.inputRef<Record<string, unknown>>(`${ct.identifier}Where`)
+    );
+  }
+
   for (const ct of contentTypes) {
     const scalarFields = ct.fields.filter(
       (f) => FIELD_TYPE_TO_SCALAR[f.type] !== undefined
@@ -179,7 +191,54 @@ export function registerDynamicTypes(
       (f) => getFilterKeyForFieldType(f.type) !== null
     );
 
-    const WhereInput = builder.inputType(`${ct.identifier}Where`, {
+    // Per-(content-type, field) filter inputs for single-target RELATION /
+    // MULTIRELATION fields. These add `is` / `some` referencing the target
+    // type's Where in addition to the flat operators from PR #140.
+    // Polymorphic (multi-target) and unset fields keep the shared
+    // DynRelationFilter / DynMultirelationFilter from jsonbFilters.ts.
+    const perRelationFilters = new Map<
+      string,
+      ReturnType<Builder['inputType']>
+    >();
+    for (const field of filterableFields) {
+      if (field.type !== 'RELATION' && field.type !== 'MULTIRELATION') continue;
+      const opts = field.options as { targetContentTypeIds?: string[] } | null;
+      const targetIds = opts?.targetContentTypeIds ?? [];
+      if (targetIds.length !== 1) continue;
+      const targetRef = whereInputRefs.get(targetIds[0]!);
+      if (!targetRef) continue;
+
+      const pascalField =
+        field.identifier.charAt(0).toUpperCase() + field.identifier.slice(1);
+      const inputName =
+        field.type === 'RELATION'
+          ? `${ct.identifier}${pascalField}RelationFilter`
+          : `${ct.identifier}${pascalField}MultirelationFilter`;
+
+      const ref = builder.inputType(inputName, {
+        fields: (t) => {
+          if (field.type === 'RELATION') {
+            return {
+              equals: t.id(),
+              in: t.idList(),
+              isNull: t.boolean(),
+              is: t.field({ type: targetRef as never }),
+            } as never;
+          }
+          return {
+            contains: t.id(),
+            containsAny: t.idList(),
+            containsAll: t.idList(),
+            isEmpty: t.boolean(),
+            some: t.field({ type: targetRef as never }),
+          } as never;
+        },
+      });
+      perRelationFilters.set(field.id, ref);
+    }
+
+    const whereRef = whereInputRefs.get(ct.id)!;
+    const WhereInput = builder.inputType(whereRef as never, {
       fields: (t) => {
         const whereFields: Record<string, unknown> = {
           status: t.field({ type: dynFilters.DynContentStatusFilter }),
@@ -187,6 +246,11 @@ export function registerDynamicTypes(
           updatedAt: t.field({ type: dynFilters.DynDateTimeFilter }),
         };
         for (const field of filterableFields) {
+          const perRel = perRelationFilters.get(field.id);
+          if (perRel) {
+            whereFields[field.identifier] = t.field({ type: perRel as never });
+            continue;
+          }
           const filterKey = getFilterKeyForFieldType(field.type);
           if (filterKey) {
             whereFields[field.identifier] = t.field({
@@ -423,7 +487,7 @@ export function registerDynamicTypes(
             return queryDynamicEntries(
               ct.id,
               args.where as never,
-              ct.fields,
+              contentTypes,
               limit,
               offset
             );
