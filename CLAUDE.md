@@ -256,8 +256,7 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder. The schema is
 - `apps/cms/vitest.config.ts` — Vitest configuration (three projects: integration + unit + storybook; fileParallelism disabled)
 - `apps/cms/vitest.globalSetup.ts` — Resets and seeds the `boject_test` database before integration tests run
 - `apps/cms/vitest.workerSetup.ts` — Per-worker setup applied to every Vitest project
-- `vitest.config.ts` (repo root) — Workspace-level Vitest config that aggregates `apps/cms`, `packages/*`, and `perf` so `pnpm -r test` and Wallaby see one unified test surface
-- `wallaby.cjs` — Wallaby autoconfig that pins `workers: { initial: 1, regular: 1 }` so integration tests sharing `boject_test` and the booted Nuxt dev server do not run in parallel
+- `vitest.config.ts` (repo root) — Workspace-level Vitest config that aggregates `apps/cms`, `packages/*`, and `perf` into one unified test surface for `pnpm -r test`
 - `apps/cms/pages/content-types/index.vue` — Content type listing page
 - `apps/cms/pages/content-types/new.vue` — Content type creation with field builder
 - `apps/cms/pages/content-types/[id]/index.vue` — Content type edit with field management
@@ -320,21 +319,11 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder. The schema is
 - **ESLint** — Via `@nuxt/eslint` module (registered in `apps/cms/nuxt.config.ts`). Includes Vue, TypeScript, and Nuxt-specific rules. Config in `apps/cms/eslint.config.mjs`. Custom config covers `**/*.ts` files with `@typescript-eslint/parser` and `@typescript-eslint/eslint-plugin`. A separate block sets `parserOptions.parser` to `@typescript-eslint/parser` for `**/*.vue` files (the Nuxt-generated config uses `vue-eslint-parser` but doesn't configure a TypeScript sub-parser). Underscore-prefixed variables are allowed as unused (`varsIgnorePattern: '^_'`). Destructured rest siblings are also ignored (`ignoreRestSiblings: true`).
 - **Prettier** — Single quotes, trailing commas (es5), semicolons, 2-space indent, 80 char width. Config in `.prettierrc.yml`.
 - **eslint-config-prettier** — Disables ESLint rules that conflict with Prettier.
-- **Lefthook** — Pre-commit hooks run ESLint, Prettier, and per-package `typecheck` jobs (cms, create-boject-cms, boject-cli, root scripts) in parallel on staged files. Pre-push runs the full `pnpm test` suite plus `pnpm --filter cms test:storybook`. The Wallaby fast-path skip on the `test` job is described below; the storybook-test job can be skipped via `SKIP_STORYBOOK_TEST=1`. Config in `lefthook.yml`.
-
-## Git Push Workflow (Wallaby fast path)
-
-Before pushing, attempt to check Wallaby for failing tests via `wallaby_failingTests` MCP tool:
-
-1. **Wallaby unavailable** — If the MCP call fails, hangs, is rejected, the MCP server is not connected, OR the response is `<No data available>` / empty / null (Wallaby is not running in the IDE — the MCP process is persistent and answers even when there's no live test runner to query), fall back to a normal `git push` (the full test suite runs via the pre-push hook). **Do not** set `WALLABY_VERIFIED=1` in this case.
-2. **No failures** — Only set this when Wallaby returned a structured response confirming an empty failures array. Push with `WALLABY_VERIFIED=1 git push` — this skips the `test` job in the pre-push hook (Wallaby already validated). Other pre-push jobs still run.
-3. **Failures found** — Report the failing tests to the user instead of pushing.
-
-The pre-push hook also verifies Wallaby is actually live (checks `~/.wallaby/.processes/` is non-empty) before honoring `WALLABY_VERIFIED=1` — if you set the flag while Wallaby is stopped, the hook ignores it and runs the full suite anyway.
+- **Lefthook** — Pre-commit hooks run ESLint, Prettier, and per-package `typecheck` jobs (cms, create-boject-cms, boject-cli, root scripts) in parallel on staged files. Pre-push runs the full `pnpm test` suite plus `pnpm --filter cms test:storybook`; the storybook-test job can be skipped via `SKIP_STORYBOOK_TEST=1`. Config in `lefthook.yml`.
 
 ## Testing
 
-- **Vitest** — Test runner, configured via `apps/cms/vitest.config.ts` with plain `defineConfig` (not `@nuxt/test-utils/config` due to Nuxt 4.3 incompatibility). Three test projects: `integration` (server/api + server/middleware tests, with `globalSetup` for DB reset/seed), `unit` (scripts, server/utils, utils tests, no DB needed), and `storybook` (browser-mode interaction tests). `fileParallelism: false` prevents port conflicts between test files. The repo root `vitest.config.ts` aggregates `apps/cms`, `packages/boject-cli`, `packages/create-boject-cms`, and `perf` into a single workspace so `pnpm test` (root) and Wallaby see one unified test surface.
+- **Vitest** — Test runner, configured via `apps/cms/vitest.config.ts` with plain `defineConfig` (not `@nuxt/test-utils/config` due to Nuxt 4.3 incompatibility). Three test projects: `integration` (server/api + server/middleware tests, with `globalSetup` for DB reset/seed), `unit` (scripts, server/utils, utils tests, no DB needed), and `storybook` (browser-mode interaction tests). `fileParallelism: false` prevents port conflicts between test files. The repo root `vitest.config.ts` aggregates `apps/cms`, `packages/boject-cli`, `packages/create-boject-cms`, and `perf` into a single workspace for `pnpm test` (root).
 - **@nuxt/test-utils** — Starts a Nuxt dev server for integration tests. Tests must use `setup({ dev: true })` (production mode masks GraphQL errors).
 - **Test location** — Colocated with source files (e.g. `apps/cms/server/api/graphql/graphql.test.ts`).
 - **Test API key** — All REST and GraphQL integration tests authenticate with a deterministic test key (`boject_test_key_for_integration_tests_only`) seeded via `apps/cms/prisma/seed.ts`.
