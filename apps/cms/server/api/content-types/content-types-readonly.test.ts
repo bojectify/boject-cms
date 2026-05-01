@@ -45,7 +45,8 @@ interface SeededContentType {
 }
 
 // Tasks 5-10 will consume this via HTTP endpoints (PUT/DELETE/fields etc.).
-let _seeded: SeededContentType;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+let seeded: SeededContentType;
 
 describe('Schema read-only flag (BOJECT_SCHEMA_READONLY=true)', async () => {
   await setup({ dev: true });
@@ -75,7 +76,7 @@ describe('Schema read-only flag (BOJECT_SCHEMA_READONLY=true)', async () => {
       },
       include: { fields: true },
     });
-    _seeded = { id: ct.id, fieldId: ct.fields[0]!.id };
+    seeded = { id: ct.id, fieldId: ct.fields[0]!.id };
   });
 
   beforeEach(() => {
