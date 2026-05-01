@@ -24,7 +24,6 @@ const prisma = new PrismaClient({ adapter: prismaAdapter });
 
 let _sessionCookie: string | null = null;
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function getSessionCookie(): Promise<string> {
   if (_sessionCookie) return _sessionCookie;
   const response = await fetch('/api/auth/login', {
@@ -45,7 +44,8 @@ interface SeededContentType {
   fieldId: string;
 }
 
-let seeded: SeededContentType;
+// Tasks 5-10 will consume this via HTTP endpoints (PUT/DELETE/fields etc.).
+let _seeded: SeededContentType;
 
 describe('Schema read-only flag (BOJECT_SCHEMA_READONLY=true)', async () => {
   await setup({ dev: true });
@@ -75,7 +75,7 @@ describe('Schema read-only flag (BOJECT_SCHEMA_READONLY=true)', async () => {
       },
       include: { fields: true },
     });
-    seeded = { id: ct.id, fieldId: ct.fields[0]!.id };
+    _seeded = { id: ct.id, fieldId: ct.fields[0]!.id };
   });
 
   beforeEach(() => {
@@ -85,8 +85,25 @@ describe('Schema read-only flag (BOJECT_SCHEMA_READONLY=true)', async () => {
   // Per-endpoint tests land in Tasks 4-10.
   // Negative tests (reads, content-entries, CSRF order) land in Task 11.
 
-  it('placeholder — file boots and seeds successfully', () => {
-    expect(seeded.id).toBeDefined();
-    expect(seeded.fieldId).toBeDefined();
+  it('returns 403 SCHEMA_READONLY on POST /api/content-types', async () => {
+    const cookie = await getSessionCookie();
+    const res = await fetch('/api/content-types', {
+      method: 'POST',
+      headers: { cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: `Should Not Create ${Date.now()}`,
+        fields: [
+          {
+            identifier: 'title',
+            name: 'Title',
+            type: 'ENTRY_TITLE',
+            required: true,
+          },
+        ],
+      }),
+    });
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { data?: { error?: string } };
+    expect(body.data?.error).toBe('SCHEMA_READONLY');
   });
 });
