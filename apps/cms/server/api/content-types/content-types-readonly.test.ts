@@ -45,7 +45,6 @@ interface SeededContentType {
 }
 
 // Tasks 5-10 will consume this via HTTP endpoints (PUT/DELETE/fields etc.).
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 let seeded: SeededContentType;
 
 describe('Schema read-only flag (BOJECT_SCHEMA_READONLY=true)', async () => {
@@ -102,6 +101,18 @@ describe('Schema read-only flag (BOJECT_SCHEMA_READONLY=true)', async () => {
           },
         ],
       }),
+    });
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { data?: { error?: string } };
+    expect(body.data?.error).toBe('SCHEMA_READONLY');
+  });
+
+  it('returns 403 SCHEMA_READONLY on PUT /api/content-types/[id]', async () => {
+    const cookie = await getSessionCookie();
+    const res = await fetch(`/api/content-types/${seeded.id}`, {
+      method: 'PUT',
+      headers: { cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Renamed' }),
     });
     expect(res.status).toBe(403);
     const body = (await res.json()) as { data?: { error?: string } };
