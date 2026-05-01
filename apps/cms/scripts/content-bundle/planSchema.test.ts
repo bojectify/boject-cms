@@ -1833,6 +1833,85 @@ describe('planSchema', () => {
     });
   });
 
+  describe('plan ordering', () => {
+    it('separates type creates from field creates so pass-1/pass-2 is preserved', () => {
+      const bundle: Bundle = {
+        version: 2,
+        exportedAt: '2026-05-01T00:00:00.000Z',
+        portable: true,
+        contentTypes: [
+          {
+            id: null,
+            identifier: 'Author',
+            name: 'Author',
+            description: null,
+            fields: [
+              {
+                id: null,
+                identifier: 'name',
+                name: 'Name',
+                type: 'ENTRY_TITLE',
+                required: true,
+                order: 0,
+                options: null,
+              },
+            ],
+          },
+          {
+            id: null,
+            identifier: 'Article',
+            name: 'Article',
+            description: null,
+            fields: [
+              {
+                id: null,
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                required: true,
+                order: 0,
+                options: null,
+              },
+            ],
+          },
+        ],
+      };
+      const snapshot: CurrentSchemaSnapshot = {
+        contentTypes: [
+          {
+            id: 'ct-article',
+            identifier: 'Article',
+            name: 'Article',
+            description: null,
+            fields: [
+              {
+                id: 'f-1',
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                required: true,
+                unique: true,
+                order: 0,
+                options: null,
+              },
+            ],
+            entryCount: 0,
+          },
+        ],
+        fieldUsage: new Map(),
+      };
+      const plan = planSchema(bundle, snapshot);
+      // Author is brand new → contentTypes.create with its fields embedded.
+      // Article exists with the title field → no field create here.
+      expect(plan.contentTypes.create).toHaveLength(1);
+      expect(plan.contentTypes.create[0]!.identifier).toBe('Author');
+      expect(plan.contentTypes.create[0]!.fields).toHaveLength(1);
+      // No fields.create entry for Author — its fields ride along with the
+      // type create. Pass 2 only handles fields against pre-existing types.
+      expect(plan.fields.create).toEqual([]);
+    });
+  });
+
   describe('field-level: removal (rows 7, 8)', () => {
     it('blocks field removal without allowDestructive, no entries (row 7)', () => {
       const bundle: Bundle = {
