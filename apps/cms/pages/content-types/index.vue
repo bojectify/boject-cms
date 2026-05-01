@@ -3,6 +3,7 @@ import type { TableColumn } from '@nuxt/ui';
 import { useContentTable } from '~/composables/useContentTable';
 
 const { formatDate } = useContentTable();
+const schemaReadonly = useSchemaReadonly();
 
 const page = ref(1);
 const { data, status } = await useAuthedFetch<{
@@ -45,10 +46,22 @@ const tableData = computed(() =>
   <div class="p-6">
     <div class="flex items-center justify-between mb-4">
       <h1 class="text-2xl font-bold">Content Types</h1>
-      <UButton to="/content-types/new" icon="i-lucide-plus">
+      <UButton
+        v-if="!schemaReadonly"
+        to="/content-types/new"
+        icon="i-lucide-plus"
+      >
         New Content Type
       </UButton>
     </div>
+    <UAlert
+      v-if="schemaReadonly"
+      color="info"
+      icon="i-lucide-lock"
+      title="Schema is read-only on this environment"
+      description="Edit in dev and deploy via git."
+      class="mb-4"
+    />
     <UTable
       :data="tableData"
       :columns="columns"
