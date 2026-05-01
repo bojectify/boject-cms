@@ -169,6 +169,35 @@ function diffFieldUpdate(
     }
   }
 
+  // SELECT choice changes (rows 17, 18, 19)
+  if (bf.type === 'SELECT') {
+    const bundleChoices = (bf.options?.choices as string[] | undefined) ?? [];
+    const dbChoices = (dbField.options?.choices as string[] | undefined) ?? [];
+    const removed = dbChoices.filter((c) => !bundleChoices.includes(c));
+    const added = bundleChoices.filter((c) => !dbChoices.includes(c));
+
+    const usage = fieldUsage.get(`${typeIdentifier}:${bf.identifier}`);
+    const usedRemoved = removed.filter(
+      (c) => (usage?.selectChoiceCounts?.get(c) ?? 0) > 0
+    );
+
+    if (usedRemoved.length > 0) {
+      const detail = usedRemoved
+        .map((c) => `"${c}" (${usage?.selectChoiceCounts?.get(c)} entries)`)
+        .join(', ');
+      plan.blockers.push({
+        code: 'SELECT_CHOICE_REMOVED_IN_USE',
+        message: `Cannot remove SELECT choices in use on "${typeIdentifier}.${bf.identifier}": ${detail}. Update entries first.`,
+        path: `fields.${typeIdentifier}.${bf.identifier}`,
+      });
+      return;
+    }
+
+    if (added.length > 0 || removed.length > 0) {
+      changes.options = { ...(bf.options ?? {}), choices: bundleChoices };
+    }
+  }
+
   if (Object.keys(changes).length === 0) return;
   plan.fields.update.push({
     id: dbField.id,

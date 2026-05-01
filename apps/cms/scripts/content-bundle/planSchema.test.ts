@@ -956,6 +956,199 @@ describe('planSchema', () => {
     });
   });
 
+  describe('field-level: SELECT choice changes (rows 17, 18, 19)', () => {
+    it('plans an options update when a choice is added (row 17)', () => {
+      const bundle: Bundle = {
+        version: 2,
+        exportedAt: '2026-05-01T00:00:00.000Z',
+        portable: true,
+        contentTypes: [
+          {
+            id: null,
+            identifier: 'Post',
+            name: 'Post',
+            description: null,
+            fields: [
+              {
+                id: null,
+                identifier: 'category',
+                name: 'Category',
+                type: 'SELECT',
+                required: false,
+                order: 0,
+                options: { choices: ['news', 'opinion', 'review'] },
+              },
+            ],
+          },
+        ],
+      };
+      const snapshot: CurrentSchemaSnapshot = {
+        contentTypes: [
+          {
+            id: 'ct-1',
+            identifier: 'Post',
+            name: 'Post',
+            description: null,
+            fields: [
+              {
+                id: 'f-1',
+                identifier: 'category',
+                name: 'Category',
+                type: 'SELECT',
+                required: false,
+                unique: false,
+                order: 0,
+                options: { choices: ['news', 'opinion'] },
+              },
+            ],
+            entryCount: 0,
+          },
+        ],
+        fieldUsage: new Map(),
+      };
+      const plan = planSchema(bundle, snapshot);
+      expect(plan.fields.update).toHaveLength(1);
+      expect(plan.fields.update[0]!.changes.options).toEqual({
+        choices: ['news', 'opinion', 'review'],
+      });
+      expect(plan.blockers).toEqual([]);
+    });
+
+    it('plans an options update when an unused choice is removed (row 18)', () => {
+      const bundle: Bundle = {
+        version: 2,
+        exportedAt: '2026-05-01T00:00:00.000Z',
+        portable: true,
+        contentTypes: [
+          {
+            id: null,
+            identifier: 'Post',
+            name: 'Post',
+            description: null,
+            fields: [
+              {
+                id: null,
+                identifier: 'category',
+                name: 'Category',
+                type: 'SELECT',
+                required: false,
+                order: 0,
+                options: { choices: ['news'] },
+              },
+            ],
+          },
+        ],
+      };
+      const snapshot: CurrentSchemaSnapshot = {
+        contentTypes: [
+          {
+            id: 'ct-1',
+            identifier: 'Post',
+            name: 'Post',
+            description: null,
+            fields: [
+              {
+                id: 'f-1',
+                identifier: 'category',
+                name: 'Category',
+                type: 'SELECT',
+                required: false,
+                unique: false,
+                order: 0,
+                options: { choices: ['news', 'opinion'] },
+              },
+            ],
+            entryCount: 5,
+          },
+        ],
+        fieldUsage: new Map([
+          [
+            'Post:category',
+            {
+              entriesWithValue: 5,
+              selectChoiceCounts: new Map([['news', 5]]),
+            },
+          ],
+        ]),
+      };
+      const plan = planSchema(bundle, snapshot);
+      expect(plan.fields.update).toHaveLength(1);
+      expect(plan.fields.update[0]!.changes.options).toEqual({
+        choices: ['news'],
+      });
+      expect(plan.blockers).toEqual([]);
+    });
+
+    it('blocks removing a choice that entries reference (row 19)', () => {
+      const bundle: Bundle = {
+        version: 2,
+        exportedAt: '2026-05-01T00:00:00.000Z',
+        portable: true,
+        contentTypes: [
+          {
+            id: null,
+            identifier: 'Post',
+            name: 'Post',
+            description: null,
+            fields: [
+              {
+                id: null,
+                identifier: 'category',
+                name: 'Category',
+                type: 'SELECT',
+                required: false,
+                order: 0,
+                options: { choices: ['news'] },
+              },
+            ],
+          },
+        ],
+      };
+      const snapshot: CurrentSchemaSnapshot = {
+        contentTypes: [
+          {
+            id: 'ct-1',
+            identifier: 'Post',
+            name: 'Post',
+            description: null,
+            fields: [
+              {
+                id: 'f-1',
+                identifier: 'category',
+                name: 'Category',
+                type: 'SELECT',
+                required: false,
+                unique: false,
+                order: 0,
+                options: { choices: ['news', 'opinion'] },
+              },
+            ],
+            entryCount: 6,
+          },
+        ],
+        fieldUsage: new Map([
+          [
+            'Post:category',
+            {
+              entriesWithValue: 6,
+              selectChoiceCounts: new Map([
+                ['news', 4],
+                ['opinion', 2],
+              ]),
+            },
+          ],
+        ]),
+      };
+      const plan = planSchema(bundle, snapshot);
+      expect(plan.fields.update).toEqual([]);
+      expect(plan.blockers).toHaveLength(1);
+      expect(plan.blockers[0]!.code).toBe('SELECT_CHOICE_REMOVED_IN_USE');
+      expect(plan.blockers[0]!.path).toBe('fields.Post.category');
+      expect(plan.blockers[0]!.message).toContain('opinion');
+      expect(plan.blockers[0]!.message).toContain('2');
+    });
+  });
+
   describe('field-level: type change blocker (row 16)', () => {
     it('blocks a field type change even with allowDestructive', () => {
       const bundle: Bundle = {
