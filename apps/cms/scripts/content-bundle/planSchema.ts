@@ -103,6 +103,30 @@ export function planSchema(
     });
   }
 
+  // Final cross-reference pass: RELATION/MULTIRELATION targets must exist in
+  // either the bundle or the DB snapshot. Runs after all type-walk loops so a
+  // target created in the same bundle resolves correctly.
+  const allKnownTypeIdentifiers = new Set<string>([
+    ...bundleTypes.map((c) => c.identifier),
+    ...current.contentTypes.map((c) => c.identifier),
+  ]);
+  for (const bt of bundleTypes) {
+    for (const bf of bt.fields) {
+      if (bf.type !== 'RELATION' && bf.type !== 'MULTIRELATION') continue;
+      const targets =
+        (bf.options?.targetContentTypeIdentifiers as string[] | undefined) ??
+        [];
+      const missing = targets.filter((t) => !allKnownTypeIdentifiers.has(t));
+      if (missing.length > 0) {
+        plan.blockers.push({
+          code: 'RELATION_TARGET_NOT_FOUND',
+          message: `Field "${bt.identifier}.${bf.identifier}" targets unknown content type(s): ${missing.join(', ')}.`,
+          path: `fields.${bt.identifier}.${bf.identifier}`,
+        });
+      }
+    }
+  }
+
   return plan;
 }
 

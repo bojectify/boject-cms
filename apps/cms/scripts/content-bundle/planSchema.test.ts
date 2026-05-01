@@ -1175,6 +1175,22 @@ describe('planSchema', () => {
               },
             ],
           },
+          // Author and Editor are in the bundle so the cross-ref pass resolves
+          // them. Adding Editor is the change under test.
+          {
+            id: null,
+            identifier: 'Author',
+            name: 'Author',
+            description: null,
+            fields: [],
+          },
+          {
+            id: null,
+            identifier: 'Editor',
+            name: 'Editor',
+            description: null,
+            fields: [],
+          },
         ],
       };
       const snapshot: CurrentSchemaSnapshot = {
@@ -1198,6 +1214,22 @@ describe('planSchema', () => {
                 },
               },
             ],
+            entryCount: 0,
+          },
+          {
+            id: 'ct-author',
+            identifier: 'Author',
+            name: 'Author',
+            description: null,
+            fields: [],
+            entryCount: 0,
+          },
+          {
+            id: 'ct-editor',
+            identifier: 'Editor',
+            name: 'Editor',
+            description: null,
+            fields: [],
             entryCount: 0,
           },
         ],
@@ -1235,6 +1267,14 @@ describe('planSchema', () => {
               },
             ],
           },
+          // Author is in the bundle so the cross-ref pass resolves it.
+          {
+            id: null,
+            identifier: 'Author',
+            name: 'Author',
+            description: null,
+            fields: [],
+          },
         ],
       };
       const snapshot: CurrentSchemaSnapshot = {
@@ -1257,6 +1297,14 @@ describe('planSchema', () => {
               },
             ],
             entryCount: 4,
+          },
+          {
+            id: 'ct-author',
+            identifier: 'Author',
+            name: 'Author',
+            description: null,
+            fields: [],
+            entryCount: 0,
           },
         ],
         fieldUsage: new Map([
@@ -1297,6 +1345,22 @@ describe('planSchema', () => {
               },
             ],
           },
+          // Author and Editor are in the bundle so the cross-ref pass resolves
+          // them. The test is that removing Editor (still in DB use) is blocked.
+          {
+            id: null,
+            identifier: 'Author',
+            name: 'Author',
+            description: null,
+            fields: [],
+          },
+          {
+            id: null,
+            identifier: 'Editor',
+            name: 'Editor',
+            description: null,
+            fields: [],
+          },
         ],
       };
       const snapshot: CurrentSchemaSnapshot = {
@@ -1319,6 +1383,22 @@ describe('planSchema', () => {
               },
             ],
             entryCount: 6,
+          },
+          {
+            id: 'ct-author',
+            identifier: 'Author',
+            name: 'Author',
+            description: null,
+            fields: [],
+            entryCount: 0,
+          },
+          {
+            id: 'ct-editor',
+            identifier: 'Editor',
+            name: 'Editor',
+            description: null,
+            fields: [],
+            entryCount: 0,
           },
         ],
         fieldUsage: new Map([
@@ -1631,6 +1711,125 @@ describe('planSchema', () => {
       expect(
         plan.blockers.some((b) => b.code === 'CONTENT_TYPE_IDENTIFIER_CHANGE')
       ).toBe(false);
+    });
+  });
+
+  describe('cross-references', () => {
+    it('resolves a RELATION targeting a type also in the bundle', () => {
+      const bundle: Bundle = {
+        version: 2,
+        exportedAt: '2026-05-01T00:00:00.000Z',
+        portable: true,
+        contentTypes: [
+          {
+            id: null,
+            identifier: 'Author',
+            name: 'Author',
+            description: null,
+            fields: [],
+          },
+          {
+            id: null,
+            identifier: 'Article',
+            name: 'Article',
+            description: null,
+            fields: [
+              {
+                id: null,
+                identifier: 'author',
+                name: 'Author',
+                type: 'RELATION',
+                required: false,
+                order: 0,
+                options: { targetContentTypeIdentifiers: ['Author'] },
+              },
+            ],
+          },
+        ],
+      };
+      const plan = planSchema(bundle, emptySnapshot);
+      expect(plan.blockers).toEqual([]);
+    });
+
+    it('resolves a RELATION targeting a type already in the DB', () => {
+      // Article is in the bundle; Author exists only in the DB snapshot (not
+      // in the bundle). The cross-ref pass unions both sets, so Author is
+      // known and no RELATION_TARGET_NOT_FOUND is emitted. Author being absent
+      // from the bundle produces an unrelated CONTENT_TYPE_REMOVAL_NEEDS_FLAG
+      // blocker — we assert only that the cross-ref blocker is absent.
+      const bundle: Bundle = {
+        version: 2,
+        exportedAt: '2026-05-01T00:00:00.000Z',
+        portable: true,
+        contentTypes: [
+          {
+            id: null,
+            identifier: 'Article',
+            name: 'Article',
+            description: null,
+            fields: [
+              {
+                id: null,
+                identifier: 'author',
+                name: 'Author',
+                type: 'RELATION',
+                required: false,
+                order: 0,
+                options: { targetContentTypeIdentifiers: ['Author'] },
+              },
+            ],
+          },
+        ],
+      };
+      const snapshot: CurrentSchemaSnapshot = {
+        contentTypes: [
+          {
+            id: 'ct-author',
+            identifier: 'Author',
+            name: 'Author',
+            description: null,
+            fields: [],
+            entryCount: 0,
+          },
+        ],
+        fieldUsage: new Map(),
+      };
+      const plan = planSchema(bundle, snapshot);
+      expect(
+        plan.blockers.some((b) => b.code === 'RELATION_TARGET_NOT_FOUND')
+      ).toBe(false);
+    });
+
+    it('blocks a RELATION targeting a type that exists in neither the bundle nor the DB', () => {
+      const bundle: Bundle = {
+        version: 2,
+        exportedAt: '2026-05-01T00:00:00.000Z',
+        portable: true,
+        contentTypes: [
+          {
+            id: null,
+            identifier: 'Article',
+            name: 'Article',
+            description: null,
+            fields: [
+              {
+                id: null,
+                identifier: 'author',
+                name: 'Author',
+                type: 'RELATION',
+                required: false,
+                order: 0,
+                options: { targetContentTypeIdentifiers: ['MissingType'] },
+              },
+            ],
+          },
+        ],
+      };
+      const plan = planSchema(bundle, emptySnapshot);
+      expect(plan.blockers).toHaveLength(1);
+      expect(plan.blockers[0]!.code).toBe('RELATION_TARGET_NOT_FOUND');
+      expect(plan.blockers[0]!.path).toBe('fields.Article.author');
+      expect(plan.blockers[0]!.message).toContain('MissingType');
     });
   });
 
