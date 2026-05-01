@@ -56,14 +56,14 @@ describe('snapshotCurrentSchema', () => {
     const authorEntry = await prisma.contentEntry.create({
       data: {
         contentTypeId: author.id,
-        entryTitle: 'Olly',
-        slug: 'olly',
+        entryTitle: 'Dave',
+        slug: 'dave',
         versions: {
           create: [
             {
               status: 'PUBLISHED',
-              entryTitle: 'Olly',
-              data: { name: 'Olly' },
+              entryTitle: 'Dave',
+              data: { name: 'Dave' },
               publishedAt: new Date(),
             },
           ],
