@@ -1,0 +1,92 @@
+// apps/cms/server/api/content-types/content-types-readonly.test.ts
+//
+// Integration tests for the BOJECT_SCHEMA_READONLY flag.
+//
+// IMPORTANT: This file boots a second Nuxt dev server with the flag
+// set. Setting BOJECT_SCHEMA_READONLY at module scope (before
+// `setup()` is called) ensures Nitro picks it up when reading
+// runtimeConfig at server boot. Do not move this assignment inside
+// `describe` or `beforeAll` — it must run before `setup`.
+/* eslint-disable import/first */
+process.env.BOJECT_SCHEMA_READONLY = 'true';
+
+import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
+import { setup, fetch } from '@nuxt/test-utils/e2e';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { PrismaClient } from '../../../generated/prisma/client';
+import { TEST_USERNAME, TEST_PASSWORD } from '../../test/credentials';
+import { resetRateLimitStore } from '../../utils/rateLimit';
+/* eslint-enable import/first */
+
+const prismaUrl = 'postgresql://boject:boject@localhost:5432/boject_test';
+const prismaAdapter = new PrismaPg({ connectionString: prismaUrl });
+const prisma = new PrismaClient({ adapter: prismaAdapter });
+
+let _sessionCookie: string | null = null;
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+async function getSessionCookie(): Promise<string> {
+  if (_sessionCookie) return _sessionCookie;
+  const response = await fetch('/api/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({
+      email: TEST_USERNAME,
+      password: TEST_PASSWORD,
+    }),
+    headers: { 'Content-Type': 'application/json' },
+  });
+  const cookies = response.headers.getSetCookie();
+  _sessionCookie = cookies.join('; ');
+  return _sessionCookie;
+}
+
+interface SeededContentType {
+  id: string;
+  fieldId: string;
+}
+
+let seeded: SeededContentType;
+
+describe('Schema read-only flag (BOJECT_SCHEMA_READONLY=true)', async () => {
+  await setup({ dev: true });
+
+  beforeAll(async () => {
+    // Seed via direct Prisma so we have real IDs to poke. Direct DB
+    // writes bypass the readonly guard (it lives in the HTTP handlers,
+    // not at the model layer) — that's correct: the entrypoint's
+    // boot-time apply path also goes via Prisma directly and must
+    // continue to work even on a readonly instance.
+    const ct = await prisma.contentType.create({
+      data: {
+        name: `Readonly Seed ${Date.now()}`,
+        identifier: `ReadonlySeed${Date.now()}`,
+        fields: {
+          create: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+              unique: true,
+              order: 0,
+            },
+          ],
+        },
+      },
+      include: { fields: true },
+    });
+    seeded = { id: ct.id, fieldId: ct.fields[0]!.id };
+  });
+
+  beforeEach(() => {
+    resetRateLimitStore();
+  });
+
+  // Per-endpoint tests land in Tasks 4-10.
+  // Negative tests (reads, content-entries, CSRF order) land in Task 11.
+
+  it('placeholder — file boots and seeds successfully', () => {
+    expect(seeded.id).toBeDefined();
+    expect(seeded.fieldId).toBeDefined();
+  });
+});
