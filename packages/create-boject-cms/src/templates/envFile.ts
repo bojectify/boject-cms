@@ -21,5 +21,11 @@ export function renderEnvFile({
   if (starter !== 'none') {
     lines.push(`BOJECT_INITIAL_STARTER=/starters/${starter}.boject.json`);
   }
+  lines.push(
+    '',
+    '# Set to "true" on production / staging to disable schema editing in the UI.',
+    '# Schema changes should flow from git on locked environments.',
+    '# BOJECT_SCHEMA_READONLY=true'
+  );
   return lines.join('\n') + '\n';
 }
