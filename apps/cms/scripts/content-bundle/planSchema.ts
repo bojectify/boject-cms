@@ -307,12 +307,16 @@ function shallowOptionsEqual(
   b: Record<string, unknown> | null | undefined
 ): boolean {
   if (a === b) return true;
-  if (!a || !b) return Boolean(!a && !b);
-  const aKeys = Object.keys(a);
-  const bKeys = Object.keys(b);
+  // Treat null, undefined, and {} as equivalent: a field with no
+  // options on the bundle side and `options: null` on the DB side
+  // (or vice versa) should not produce a spurious diff.
+  const aObj = a ?? {};
+  const bObj = b ?? {};
+  const aKeys = Object.keys(aObj);
+  const bKeys = Object.keys(bObj);
   if (aKeys.length !== bKeys.length) return false;
   for (const k of aKeys) {
-    if (JSON.stringify(a[k]) !== JSON.stringify(b[k])) return false;
+    if (JSON.stringify(aObj[k]) !== JSON.stringify(bObj[k])) return false;
   }
   return true;
 }
