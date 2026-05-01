@@ -575,6 +575,186 @@ describe('planSchema', () => {
     });
   });
 
+  describe('field-level: required transitions (rows 10, 11, 12)', () => {
+    it('plans optional → required when no entries have null (row 10)', () => {
+      const bundle: Bundle = {
+        version: 2,
+        exportedAt: '2026-05-01T00:00:00.000Z',
+        portable: true,
+        contentTypes: [
+          {
+            id: null,
+            identifier: 'Article',
+            name: 'Article',
+            description: null,
+            fields: [
+              {
+                id: null,
+                identifier: 'tagline',
+                name: 'Tagline',
+                type: 'TEXT',
+                required: true,
+                order: 0,
+                options: null,
+              },
+            ],
+          },
+        ],
+      };
+      const snapshot: CurrentSchemaSnapshot = {
+        contentTypes: [
+          {
+            id: 'ct-1',
+            identifier: 'Article',
+            name: 'Article',
+            description: null,
+            fields: [
+              {
+                id: 'f-1',
+                identifier: 'tagline',
+                name: 'Tagline',
+                type: 'TEXT',
+                required: false,
+                unique: false,
+                order: 0,
+                options: null,
+              },
+            ],
+            entryCount: 3,
+          },
+        ],
+        fieldUsage: new Map([['Article:tagline', { entriesWithValue: 3 }]]),
+      };
+      const plan = planSchema(bundle, snapshot);
+      expect(plan.fields.update).toEqual([
+        {
+          id: 'f-1',
+          contentTypeIdentifier: 'Article',
+          fieldIdentifier: 'tagline',
+          changes: { required: true },
+        },
+      ]);
+      expect(plan.blockers).toEqual([]);
+    });
+
+    it('blocks optional → required when entries have null (row 11)', () => {
+      const bundle: Bundle = {
+        version: 2,
+        exportedAt: '2026-05-01T00:00:00.000Z',
+        portable: true,
+        contentTypes: [
+          {
+            id: null,
+            identifier: 'Article',
+            name: 'Article',
+            description: null,
+            fields: [
+              {
+                id: null,
+                identifier: 'tagline',
+                name: 'Tagline',
+                type: 'TEXT',
+                required: true,
+                order: 0,
+                options: null,
+              },
+            ],
+          },
+        ],
+      };
+      const snapshot: CurrentSchemaSnapshot = {
+        contentTypes: [
+          {
+            id: 'ct-1',
+            identifier: 'Article',
+            name: 'Article',
+            description: null,
+            fields: [
+              {
+                id: 'f-1',
+                identifier: 'tagline',
+                name: 'Tagline',
+                type: 'TEXT',
+                required: false,
+                unique: false,
+                order: 0,
+                options: null,
+              },
+            ],
+            entryCount: 5,
+          },
+        ],
+        fieldUsage: new Map([['Article:tagline', { entriesWithValue: 3 }]]),
+      };
+      const plan = planSchema(bundle, snapshot);
+      expect(plan.fields.update).toEqual([]);
+      expect(plan.blockers).toHaveLength(1);
+      expect(plan.blockers[0]!.code).toBe('OPTIONAL_TO_REQUIRED_HAS_NULLS');
+      expect(plan.blockers[0]!.path).toBe('fields.Article.tagline');
+      expect(plan.blockers[0]!.message).toContain('2'); // 5 - 3 = 2 missing
+    });
+
+    it('plans required → optional always (row 12)', () => {
+      const bundle: Bundle = {
+        version: 2,
+        exportedAt: '2026-05-01T00:00:00.000Z',
+        portable: true,
+        contentTypes: [
+          {
+            id: null,
+            identifier: 'Article',
+            name: 'Article',
+            description: null,
+            fields: [
+              {
+                id: null,
+                identifier: 'tagline',
+                name: 'Tagline',
+                type: 'TEXT',
+                required: false,
+                order: 0,
+                options: null,
+              },
+            ],
+          },
+        ],
+      };
+      const snapshot: CurrentSchemaSnapshot = {
+        contentTypes: [
+          {
+            id: 'ct-1',
+            identifier: 'Article',
+            name: 'Article',
+            description: null,
+            fields: [
+              {
+                id: 'f-1',
+                identifier: 'tagline',
+                name: 'Tagline',
+                type: 'TEXT',
+                required: true,
+                unique: false,
+                order: 0,
+                options: null,
+              },
+            ],
+            entryCount: 99,
+          },
+        ],
+        fieldUsage: new Map(),
+      };
+      const plan = planSchema(bundle, snapshot);
+      expect(plan.fields.update).toEqual([
+        {
+          id: 'f-1',
+          contentTypeIdentifier: 'Article',
+          fieldIdentifier: 'tagline',
+          changes: { required: false },
+        },
+      ]);
+    });
+  });
+
   describe('type-level: identifier change blocker (row 5)', () => {
     it('blocks an identifier change attempted via a non-portable bundle (id matches, identifier differs)', () => {
       const bundle: Bundle = {

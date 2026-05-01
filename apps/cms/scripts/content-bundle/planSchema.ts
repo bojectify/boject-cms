@@ -70,7 +70,7 @@ export function planSchema(
 
     const update = diffTypeMetadata(bt, db);
     if (update) plan.contentTypes.update.push(update);
-    diffFieldsForType(plan, bt, db);
+    diffFieldsForType(plan, bt, db, current.fieldUsage);
   }
 
   for (const dbType of current.contentTypes) {
@@ -109,11 +109,34 @@ function diffFieldUpdate(
   plan: SchemaPlan,
   typeIdentifier: string,
   bf: BundleField,
-  dbField: CurrentSchemaSnapshot['contentTypes'][number]['fields'][number]
+  dbField: CurrentSchemaSnapshot['contentTypes'][number]['fields'][number],
+  entryCount: number,
+  fieldUsage: CurrentSchemaSnapshot['fieldUsage']
 ): void {
   const changes: FieldUpdate['changes'] = {};
   if (bf.name !== dbField.name) changes.name = bf.name;
   if (bf.order !== dbField.order) changes.order = bf.order;
+
+  // required transitions (rows 10, 11, 12)
+  if (bf.required !== dbField.required) {
+    if (bf.required) {
+      const usage = fieldUsage.get(`${typeIdentifier}:${bf.identifier}`);
+      const entriesWithValue = usage?.entriesWithValue ?? 0;
+      const missing = entryCount - entriesWithValue;
+      if (missing > 0) {
+        plan.blockers.push({
+          code: 'OPTIONAL_TO_REQUIRED_HAS_NULLS',
+          message: `Cannot mark "${bf.identifier}" required — ${missing} entries on "${typeIdentifier}" have a null/missing value for it. Backfill them first.`,
+          path: `fields.${typeIdentifier}.${bf.identifier}`,
+        });
+      } else {
+        changes.required = true;
+      }
+    } else {
+      changes.required = false;
+    }
+  }
+
   if (Object.keys(changes).length === 0) return;
   plan.fields.update.push({
     id: dbField.id,
@@ -137,7 +160,8 @@ function diffTypeMetadata(
 function diffFieldsForType(
   plan: SchemaPlan,
   bt: BundleContentType,
-  db: CurrentSchemaSnapshot['contentTypes'][number]
+  db: CurrentSchemaSnapshot['contentTypes'][number],
+  fieldUsage: CurrentSchemaSnapshot['fieldUsage']
 ): void {
   const dbFieldByIdentifier = new Map(db.fields.map((f) => [f.identifier, f]));
   const dbFieldById = new Map(db.fields.map((f) => [f.id, f]));
@@ -182,6 +206,13 @@ function diffFieldsForType(
       }
       continue;
     }
-    diffFieldUpdate(plan, bt.identifier, bf, dbField);
+    diffFieldUpdate(
+      plan,
+      bt.identifier,
+      bf,
+      dbField,
+      db.entryCount,
+      fieldUsage
+    );
   }
 }
