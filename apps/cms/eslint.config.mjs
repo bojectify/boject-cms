@@ -24,7 +24,11 @@ export default withNuxt(
       'no-unused-vars': 'off',
       '@typescript-eslint/no-unused-vars': [
         'error',
-        { varsIgnorePattern: '^_', ignoreRestSiblings: true },
+        {
+          varsIgnorePattern: '^_',
+          argsIgnorePattern: '^_',
+          ignoreRestSiblings: true,
+        },
       ],
     },
   },
@@ -42,7 +46,11 @@ export default withNuxt(
       'no-unused-vars': 'off',
       '@typescript-eslint/no-unused-vars': [
         'error',
-        { varsIgnorePattern: '^_', ignoreRestSiblings: true },
+        {
+          varsIgnorePattern: '^_',
+          argsIgnorePattern: '^_',
+          ignoreRestSiblings: true,
+        },
       ],
     },
   },
