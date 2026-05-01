@@ -124,4 +124,139 @@ describe('export → import round-trip', () => {
       entryId: news!.id,
     });
   });
+
+  it('preserves the unique flag on TEXT fields and implicit-true on ENTRY_TITLE', async () => {
+    await reset();
+    await prisma.contentType.create({
+      data: {
+        identifier: 'UniqueRoundtrip',
+        name: 'UniqueRoundtrip',
+        fields: {
+          create: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+              unique: true,
+              order: 0,
+            },
+            {
+              identifier: 'sku',
+              name: 'SKU',
+              type: 'TEXT',
+              required: false,
+              unique: true,
+              order: 1,
+            },
+            {
+              identifier: 'tagline',
+              name: 'Tagline',
+              type: 'TEXT',
+              required: false,
+              unique: false,
+              order: 2,
+            },
+          ],
+        },
+      },
+    });
+
+    const exported = await exportBundle(prisma, {
+      mode: 'schema',
+      portable: true,
+    });
+    const exportedType = exported.contentTypes!.find(
+      (c) => c.identifier === 'UniqueRoundtrip'
+    )!;
+    expect(
+      exportedType.fields.find((f) => f.identifier === 'title')!.unique
+    ).toBe(true);
+    expect(
+      exportedType.fields.find((f) => f.identifier === 'sku')!.unique
+    ).toBe(true);
+    expect(
+      exportedType.fields.find((f) => f.identifier === 'tagline')!.unique
+    ).toBe(false);
+
+    await reset();
+    await importBundle(prisma, exported, { mode: 'schema' });
+
+    const reimportedTitle = await prisma.contentTypeField.findFirst({
+      where: { identifier: 'title' },
+    });
+    const reimportedSku = await prisma.contentTypeField.findFirst({
+      where: { identifier: 'sku' },
+    });
+    const reimportedTagline = await prisma.contentTypeField.findFirst({
+      where: { identifier: 'tagline' },
+    });
+    expect(reimportedTitle?.unique).toBe(true);
+    expect(reimportedSku?.unique).toBe(true);
+    expect(reimportedTagline?.unique).toBe(false);
+  });
+
+  it('imports a legacy bundle (no unique field) with ENTRY_TITLE/SLUG implicit-true', async () => {
+    // Simulates a bundle exported by an older version of the CMS that
+    // didn't carry `unique`. ENTRY_TITLE and SLUG must still come in
+    // as unique=true; everything else defaults to false.
+    await reset();
+    const legacyBundle = {
+      version: 2,
+      exportedAt: '2026-04-01T00:00:00.000Z',
+      portable: true,
+      contentTypes: [
+        {
+          id: null,
+          identifier: 'LegacyType',
+          name: 'Legacy',
+          description: null,
+          fields: [
+            {
+              id: null,
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE' as const,
+              required: true,
+              order: 0,
+              options: null,
+            },
+            {
+              id: null,
+              identifier: 'slug',
+              name: 'Slug',
+              type: 'SLUG' as const,
+              required: false,
+              order: 1,
+              options: null,
+            },
+            {
+              id: null,
+              identifier: 'note',
+              name: 'Note',
+              type: 'TEXT' as const,
+              required: false,
+              order: 2,
+              options: null,
+            },
+          ],
+        },
+      ],
+    };
+
+    await importBundle(prisma, legacyBundle, { mode: 'schema' });
+
+    const title = await prisma.contentTypeField.findFirst({
+      where: { identifier: 'title' },
+    });
+    const slug = await prisma.contentTypeField.findFirst({
+      where: { identifier: 'slug' },
+    });
+    const note = await prisma.contentTypeField.findFirst({
+      where: { identifier: 'note' },
+    });
+    expect(title?.unique).toBe(true);
+    expect(slug?.unique).toBe(true);
+    expect(note?.unique).toBe(false);
+  });
 });
