@@ -88,6 +88,14 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     databaseUrl: process.env.DATABASE_URL ?? '',
+    schemaReadonly:
+      process.env.BOJECT_SCHEMA_READONLY === 'true' ||
+      process.env.BOJECT_SCHEMA_READONLY === '1',
+    public: {
+      schemaReadonly:
+        process.env.BOJECT_SCHEMA_READONLY === 'true' ||
+        process.env.BOJECT_SCHEMA_READONLY === '1',
+    },
     session: {
       cookie: {
         sameSite: 'strict',

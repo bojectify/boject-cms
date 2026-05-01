@@ -2,8 +2,10 @@ import { assertUuid } from '../../utils/validation';
 import { withPrismaErrors } from '../../utils/prismaErrors';
 import { enforceMutationRateLimit } from '../../utils/rateLimitEndpoint';
 import { invalidateSchema } from '../../graphql/schema';
+import { assertSchemaEditable } from '../../utils/schemaReadOnly';
 
 export default defineEventHandler(async (event) => {
+  assertSchemaEditable(event);
   enforceMutationRateLimit(event, 'content-types.delete');
   const id = assertUuid(getRouterParam(event, 'id'), 'id');
 

@@ -50,4 +50,16 @@ describe('renderEnvFile', () => {
     const env = renderEnvFile({ ...baseParams, starter: 'base' });
     expect(env.endsWith('\n')).toBe(true);
   });
+
+  it('includes a commented BOJECT_SCHEMA_READONLY opt-in line', () => {
+    const env = renderEnvFile({ ...baseParams, starter: 'base' });
+    expect(env).toMatch(/^# BOJECT_SCHEMA_READONLY=true$/m);
+  });
+
+  it('does not enable BOJECT_SCHEMA_READONLY by default', () => {
+    const env = renderEnvFile({ ...baseParams, starter: 'base' });
+    // Match a non-commented assignment specifically — the commented
+    // form is allowed and asserted above.
+    expect(env).not.toMatch(/^BOJECT_SCHEMA_READONLY=/m);
+  });
 });

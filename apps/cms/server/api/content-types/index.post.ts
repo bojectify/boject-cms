@@ -10,6 +10,7 @@ import { withPrismaErrors } from '../../utils/prismaErrors';
 import { enforceMutationRateLimit } from '../../utils/rateLimitEndpoint';
 import { invalidateSchema } from '../../graphql/schema';
 import { resolveUniqueFlag } from '../../utils/validateFieldUnique';
+import { assertSchemaEditable } from '../../utils/schemaReadOnly';
 
 const VALID_FIELD_TYPES = new Set<string>([
   'ENTRY_TITLE',
@@ -29,6 +30,7 @@ const VALID_FIELD_TYPES = new Set<string>([
 const NAME_MAX = 200;
 
 export default defineEventHandler(async (event) => {
+  assertSchemaEditable(event);
   enforceMutationRateLimit(event, 'content-types.post');
   const body = await readBody<Record<string, unknown>>(event);
 
