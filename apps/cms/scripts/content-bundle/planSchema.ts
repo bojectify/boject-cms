@@ -8,7 +8,7 @@
 // docs/superpowers/specs/2026-05-01-schema-as-code-planner-design.md.
 // Each row maps to a small predicate inside this file.
 
-import type { BundleContentType } from './types';
+import type { BundleContentType, BundleField } from './types';
 import type {
   Bundle,
   CurrentSchemaSnapshot,
@@ -69,6 +69,7 @@ export function planSchema(
 
     const update = diffTypeMetadata(bt, db);
     if (update) plan.contentTypes.update.push(update);
+    diffFieldsForType(plan, bt, db);
   }
 
   for (const dbType of current.contentTypes) {
@@ -112,4 +113,60 @@ function diffTypeMetadata(
   if (bt.description !== db.description) changes.description = bt.description;
   if (Object.keys(changes).length === 0) return null;
   return { id: db.id, identifier: bt.identifier, changes };
+}
+
+function diffFieldsForType(
+  plan: SchemaPlan,
+  bt: BundleContentType,
+  db: CurrentSchemaSnapshot['contentTypes'][number]
+): void {
+  const dbFieldByIdentifier = new Map(db.fields.map((f) => [f.identifier, f]));
+  const dbFieldById = new Map(db.fields.map((f) => [f.id, f]));
+
+  // Field-identifier-change detection (analog of row 5 at field
+  // level). Only fires for non-portable bundles where bf.id is
+  // non-null and matches a DB field by id with a different
+  // identifier. Mirrors the silent immutability the field PUT
+  // endpoint already enforces.
+  const renamingBundleFieldIdentifiers = new Set<string>();
+  const renamedDbFieldIds = new Set<string>();
+  for (const bf of bt.fields) {
+    if (!bf.id) continue;
+    const dbByIdMatch = dbFieldById.get(bf.id);
+    if (!dbByIdMatch) continue;
+    if (dbByIdMatch.identifier !== bf.identifier) {
+      plan.blockers.push({
+        code: 'FIELD_IDENTIFIER_CHANGE',
+        message: `Cannot rename field "${dbByIdMatch.identifier}" to "${bf.identifier}" on "${bt.identifier}". Field identifiers are immutable; remove and re-create with allowDestructive instead.`,
+        path: `fields.${bt.identifier}.${bf.identifier}`,
+      });
+      renamingBundleFieldIdentifiers.add(bf.identifier);
+      renamedDbFieldIds.add(dbByIdMatch.id);
+    }
+  }
+
+  for (const bf of bt.fields as BundleField[]) {
+    if (renamingBundleFieldIdentifiers.has(bf.identifier)) continue;
+    const dbField = dbFieldByIdentifier.get(bf.identifier);
+    if (!dbField) {
+      plan.fields.create.push({
+        contentTypeId: db.id,
+        contentTypeIdentifier: bt.identifier,
+        field: bf,
+      });
+      if (bf.required && db.entryCount > 0) {
+        plan.warnings.push({
+          code: 'NEW_REQUIRED_FIELD_WITH_ENTRIES',
+          message: `New required field "${bf.identifier}" added to "${bt.identifier}" which has ${db.entryCount} entries. Existing entries will be missing this value until backfilled.`,
+          path: `fields.${bt.identifier}.${bf.identifier}`,
+        });
+      }
+      continue;
+    }
+    // Update + removal handling lands in subsequent tasks. Note:
+    // when later tasks add removal handling, that walk must also
+    // skip dbField.id values in renamedDbFieldIds (pass the set
+    // through diffFieldsForType's local closure).
+    void dbField;
+  }
 }

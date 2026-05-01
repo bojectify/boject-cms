@@ -241,6 +241,218 @@ describe('planSchema', () => {
     });
   });
 
+  describe('field-level: create on existing type (row 6)', () => {
+    it('plans a field create on an existing type when no entries exist (safe)', () => {
+      const bundle: Bundle = {
+        version: 2,
+        exportedAt: '2026-05-01T00:00:00.000Z',
+        portable: true,
+        contentTypes: [
+          {
+            id: null,
+            identifier: 'Article',
+            name: 'Article',
+            description: null,
+            fields: [
+              {
+                id: null,
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                required: true,
+                order: 0,
+                options: null,
+              },
+              {
+                id: null,
+                identifier: 'tagline',
+                name: 'Tagline',
+                type: 'TEXT',
+                required: false,
+                order: 1,
+                options: null,
+              },
+            ],
+          },
+        ],
+      };
+      const snapshot: CurrentSchemaSnapshot = {
+        contentTypes: [
+          {
+            id: 'ct-1',
+            identifier: 'Article',
+            name: 'Article',
+            description: null,
+            fields: [
+              {
+                id: 'f-1',
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                required: true,
+                unique: true,
+                order: 0,
+                options: null,
+              },
+            ],
+            entryCount: 0,
+          },
+        ],
+        fieldUsage: new Map(),
+      };
+      const plan = planSchema(bundle, snapshot);
+      expect(plan.fields.create).toHaveLength(1);
+      expect(plan.fields.create[0]!.contentTypeIdentifier).toBe('Article');
+      expect(plan.fields.create[0]!.field.identifier).toBe('tagline');
+      expect(plan.warnings).toEqual([]);
+    });
+
+    it('blocks a field-identifier change attempted via a non-portable bundle', () => {
+      const bundle: Bundle = {
+        version: 2,
+        exportedAt: '2026-05-01T00:00:00.000Z',
+        portable: false,
+        contentTypes: [
+          {
+            id: 'ct-1',
+            identifier: 'Article',
+            name: 'Article',
+            description: null,
+            fields: [
+              {
+                id: 'f-1',
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                required: true,
+                order: 0,
+                options: null,
+              },
+              {
+                id: 'f-2',
+                identifier: 'renamedTagline',
+                name: 'Tagline',
+                type: 'TEXT',
+                required: false,
+                order: 1,
+                options: null,
+              },
+            ],
+          },
+        ],
+      };
+      const snapshot: CurrentSchemaSnapshot = {
+        contentTypes: [
+          {
+            id: 'ct-1',
+            identifier: 'Article',
+            name: 'Article',
+            description: null,
+            fields: [
+              {
+                id: 'f-1',
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                required: true,
+                unique: true,
+                order: 0,
+                options: null,
+              },
+              {
+                id: 'f-2',
+                identifier: 'tagline',
+                name: 'Tagline',
+                type: 'TEXT',
+                required: false,
+                unique: false,
+                order: 1,
+                options: null,
+              },
+            ],
+            entryCount: 0,
+          },
+        ],
+        fieldUsage: new Map(),
+      };
+      const plan = planSchema(bundle, snapshot);
+      expect(plan.blockers).toHaveLength(1);
+      expect(plan.blockers[0]!.code).toBe('FIELD_IDENTIFIER_CHANGE');
+      expect(plan.blockers[0]!.path).toBe('fields.Article.renamedTagline');
+      expect(plan.blockers[0]!.message).toContain('tagline');
+      expect(plan.blockers[0]!.message).toContain('renamedTagline');
+      // Suppress noise: no spurious create or removal blocker for the
+      // pretend-renamed field.
+      expect(plan.fields.create).toEqual([]);
+      expect(plan.fields.remove).toEqual([]);
+    });
+
+    it('warns on a new required field when entries exist (row 6 warning path)', () => {
+      const bundle: Bundle = {
+        version: 2,
+        exportedAt: '2026-05-01T00:00:00.000Z',
+        portable: true,
+        contentTypes: [
+          {
+            id: null,
+            identifier: 'Article',
+            name: 'Article',
+            description: null,
+            fields: [
+              {
+                id: null,
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                required: true,
+                order: 0,
+                options: null,
+              },
+              {
+                id: null,
+                identifier: 'category',
+                name: 'Category',
+                type: 'TEXT',
+                required: true,
+                order: 1,
+                options: null,
+              },
+            ],
+          },
+        ],
+      };
+      const snapshot: CurrentSchemaSnapshot = {
+        contentTypes: [
+          {
+            id: 'ct-1',
+            identifier: 'Article',
+            name: 'Article',
+            description: null,
+            fields: [
+              {
+                id: 'f-1',
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                required: true,
+                unique: true,
+                order: 0,
+                options: null,
+              },
+            ],
+            entryCount: 5,
+          },
+        ],
+        fieldUsage: new Map(),
+      };
+      const plan = planSchema(bundle, snapshot);
+      expect(plan.fields.create).toHaveLength(1);
+      expect(plan.warnings).toHaveLength(1);
+      expect(plan.warnings[0]!.code).toBe('NEW_REQUIRED_FIELD_WITH_ENTRIES');
+      expect(plan.warnings[0]!.path).toBe('fields.Article.category');
+    });
+  });
+
   describe('type-level: identifier change blocker (row 5)', () => {
     it('blocks an identifier change attempted via a non-portable bundle (id matches, identifier differs)', () => {
       const bundle: Bundle = {
