@@ -118,4 +118,35 @@ describe('Schema read-only flag (BOJECT_SCHEMA_READONLY=true)', async () => {
     const body = (await res.json()) as { data?: { error?: string } };
     expect(body.data?.error).toBe('SCHEMA_READONLY');
   });
+
+  it('returns 403 SCHEMA_READONLY on DELETE /api/content-types/[id]', async () => {
+    const cookie = await getSessionCookie();
+    // Create a fresh content type via direct Prisma so we have a
+    // disposable target — the seeded type is reused by negative tests.
+    const target = await prisma.contentType.create({
+      data: {
+        name: `Disposable ${Date.now()}`,
+        identifier: `Disposable${Date.now()}`,
+        fields: {
+          create: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+              unique: true,
+              order: 0,
+            },
+          ],
+        },
+      },
+    });
+    const res = await fetch(`/api/content-types/${target.id}`, {
+      method: 'DELETE',
+      headers: { cookie },
+    });
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { data?: { error?: string } };
+    expect(body.data?.error).toBe('SCHEMA_READONLY');
+  });
 });
