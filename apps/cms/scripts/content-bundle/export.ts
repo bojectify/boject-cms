@@ -87,6 +87,7 @@ export async function exportBundle(
           name: f.name,
           type: f.type,
           required: f.required,
+          unique: f.unique,
           order: f.order,
           options: outOpts,
         };

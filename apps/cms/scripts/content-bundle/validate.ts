@@ -148,6 +148,17 @@ function validateField(
     return;
   }
 
+  if (
+    'unique' in f &&
+    f.unique !== undefined &&
+    typeof f.unique !== 'boolean'
+  ) {
+    errors.push({
+      path: `${path}.unique`,
+      message: 'must be a boolean if present',
+    });
+  }
+
   if (f.type === 'SELECT') {
     const choices = (f.options as { choices?: string[] } | null)?.choices;
     if (!Array.isArray(choices) || choices.length === 0) {
