@@ -180,4 +180,29 @@ describe('Schema read-only flag (BOJECT_SCHEMA_READONLY=true)', async () => {
     const body = (await res.json()) as { data?: { error?: string } };
     expect(body.data?.error).toBe('SCHEMA_READONLY');
   });
+
+  it('returns 403 SCHEMA_READONLY on DELETE /api/content-types/[id]/fields/[fieldId]', async () => {
+    const cookie = await getSessionCookie();
+    // Add a disposable field to the seeded type via direct Prisma —
+    // we need a non-ENTRY_TITLE field because deleting the only
+    // ENTRY_TITLE is otherwise blocked at handler layer with 400.
+    const field = await prisma.contentTypeField.create({
+      data: {
+        contentTypeId: seeded.id,
+        identifier: `disposable${Date.now()}`,
+        name: 'Disposable',
+        type: 'TEXT',
+        required: false,
+        unique: false,
+        order: 99,
+      },
+    });
+    const res = await fetch(
+      `/api/content-types/${seeded.id}/fields/${field.id}`,
+      { method: 'DELETE', headers: { cookie } }
+    );
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { data?: { error?: string } };
+    expect(body.data?.error).toBe('SCHEMA_READONLY');
+  });
 });
