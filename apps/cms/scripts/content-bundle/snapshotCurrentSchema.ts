@@ -33,9 +33,28 @@ export async function snapshotCurrentSchema(
     include: { versions: true },
   });
 
+  // Pre-compute the live version per entry once (instead of per-field
+  // per-entry) and pre-group entries by contentTypeId so the per-field
+  // walk only scans entries belonging to that type. Without this, the
+  // per-field loop was O(types × fields × all_entries); now each field
+  // only sees its own type's entries.
+  const liveVersionByEntryId = new Map<string, Version>();
+  const entriesByTypeId = new Map<string, typeof entries>();
+  for (const entry of entries) {
+    const live = pickLiveVersion(entry.versions);
+    if (live) liveVersionByEntryId.set(entry.id, live);
+    let bucket = entriesByTypeId.get(entry.contentTypeId);
+    if (!bucket) {
+      bucket = [];
+      entriesByTypeId.set(entry.contentTypeId, bucket);
+    }
+    bucket.push(entry);
+  }
+
   const fieldUsage = new Map<string, FieldUsage>();
 
   for (const ct of types) {
+    const typeEntries = entriesByTypeId.get(ct.id) ?? [];
     for (const field of ct.fields) {
       const key = `${ct.identifier}:${field.identifier}`;
       const usage: FieldUsage = { entriesWithValue: 0 };
@@ -49,9 +68,8 @@ export async function snapshotCurrentSchema(
       if (trackRelationTargets) usage.relationTargetCounts = new Map();
       const valuesByEntry: Map<string, unknown> = new Map(); // for duplicates
 
-      for (const entry of entries) {
-        if (entry.contentTypeId !== ct.id) continue;
-        const liveVersion = pickLiveVersion(entry.versions);
+      for (const entry of typeEntries) {
+        const liveVersion = liveVersionByEntryId.get(entry.id);
         if (!liveVersion) continue;
         const data = liveVersion.data as Record<string, unknown>;
         const value = data?.[field.identifier];
