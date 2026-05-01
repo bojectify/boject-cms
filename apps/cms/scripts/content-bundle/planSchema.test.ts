@@ -1633,4 +1633,216 @@ describe('planSchema', () => {
       ).toBe(false);
     });
   });
+
+  describe('field-level: removal (rows 7, 8)', () => {
+    it('blocks field removal without allowDestructive, no entries (row 7)', () => {
+      const bundle: Bundle = {
+        version: 2,
+        exportedAt: '2026-05-01T00:00:00.000Z',
+        portable: true,
+        contentTypes: [
+          {
+            id: null,
+            identifier: 'Article',
+            name: 'Article',
+            description: null,
+            fields: [
+              {
+                id: null,
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                required: true,
+                order: 0,
+                options: null,
+              },
+            ],
+          },
+        ],
+      };
+      const snapshot: CurrentSchemaSnapshot = {
+        contentTypes: [
+          {
+            id: 'ct-1',
+            identifier: 'Article',
+            name: 'Article',
+            description: null,
+            fields: [
+              {
+                id: 'f-1',
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                required: true,
+                unique: true,
+                order: 0,
+                options: null,
+              },
+              {
+                id: 'f-2',
+                identifier: 'oldField',
+                name: 'Old Field',
+                type: 'TEXT',
+                required: false,
+                unique: false,
+                order: 1,
+                options: null,
+              },
+            ],
+            entryCount: 0,
+          },
+        ],
+        fieldUsage: new Map(),
+      };
+      const plan = planSchema(bundle, snapshot);
+      expect(plan.fields.remove).toEqual([]);
+      expect(plan.blockers).toHaveLength(1);
+      expect(plan.blockers[0]!.code).toBe('FIELD_REMOVAL_NEEDS_FLAG');
+      expect(plan.blockers[0]!.path).toBe('fields.Article.oldField');
+    });
+
+    it('unlocks field removal with allowDestructive, no entries (row 7)', () => {
+      const bundle: Bundle = {
+        version: 2,
+        exportedAt: '2026-05-01T00:00:00.000Z',
+        portable: true,
+        contentTypes: [
+          {
+            id: null,
+            identifier: 'Article',
+            name: 'Article',
+            description: null,
+            fields: [
+              {
+                id: null,
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                required: true,
+                order: 0,
+                options: null,
+              },
+            ],
+          },
+        ],
+      };
+      const snapshot: CurrentSchemaSnapshot = {
+        contentTypes: [
+          {
+            id: 'ct-1',
+            identifier: 'Article',
+            name: 'Article',
+            description: null,
+            fields: [
+              {
+                id: 'f-1',
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                required: true,
+                unique: true,
+                order: 0,
+                options: null,
+              },
+              {
+                id: 'f-2',
+                identifier: 'oldField',
+                name: 'Old Field',
+                type: 'TEXT',
+                required: false,
+                unique: false,
+                order: 1,
+                options: null,
+              },
+            ],
+            entryCount: 0,
+          },
+        ],
+        fieldUsage: new Map(),
+      };
+      const plan = planSchema(bundle, snapshot, { allowDestructive: true });
+      expect(plan.blockers).toEqual([]);
+      expect(plan.fields.remove).toEqual([
+        {
+          id: 'f-2',
+          contentTypeIdentifier: 'Article',
+          fieldIdentifier: 'oldField',
+          entriesWithValue: 0,
+        },
+      ]);
+    });
+
+    it('unlocks field removal with allowDestructive when entries hold values, but surfaces a warning (row 8)', () => {
+      const bundle: Bundle = {
+        version: 2,
+        exportedAt: '2026-05-01T00:00:00.000Z',
+        portable: true,
+        contentTypes: [
+          {
+            id: null,
+            identifier: 'Article',
+            name: 'Article',
+            description: null,
+            fields: [
+              {
+                id: null,
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                required: true,
+                order: 0,
+                options: null,
+              },
+            ],
+          },
+        ],
+      };
+      const snapshot: CurrentSchemaSnapshot = {
+        contentTypes: [
+          {
+            id: 'ct-1',
+            identifier: 'Article',
+            name: 'Article',
+            description: null,
+            fields: [
+              {
+                id: 'f-1',
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                required: true,
+                unique: true,
+                order: 0,
+                options: null,
+              },
+              {
+                id: 'f-2',
+                identifier: 'oldField',
+                name: 'Old Field',
+                type: 'TEXT',
+                required: false,
+                unique: false,
+                order: 1,
+                options: null,
+              },
+            ],
+            entryCount: 7,
+          },
+        ],
+        fieldUsage: new Map([['Article:oldField', { entriesWithValue: 5 }]]),
+      };
+      const plan = planSchema(bundle, snapshot, { allowDestructive: true });
+      expect(plan.fields.remove).toEqual([
+        {
+          id: 'f-2',
+          contentTypeIdentifier: 'Article',
+          fieldIdentifier: 'oldField',
+          entriesWithValue: 5,
+        },
+      ]);
+      expect(plan.warnings).toHaveLength(1);
+      expect(plan.warnings[0]!.code).toBe('FIELD_REMOVAL_DATA_LOSS');
+      expect(plan.warnings[0]!.path).toBe('fields.Article.oldField');
+    });
+  });
 });

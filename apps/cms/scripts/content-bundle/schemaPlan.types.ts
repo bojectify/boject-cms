@@ -95,6 +95,7 @@ export interface FieldRemoval {
 }
 
 export type WarningCode =
+  | 'FIELD_REMOVAL_DATA_LOSS'
   | 'NEW_REQUIRED_FIELD_WITH_ENTRIES'
   | 'OPTIONAL_TO_REQUIRED_NO_NULLS'
   | 'UNRECOGNISED_FIELD_OPTION';

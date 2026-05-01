@@ -71,7 +71,7 @@ export function planSchema(
 
     const update = diffTypeMetadata(bt, db);
     if (update) plan.contentTypes.update.push(update);
-    diffFieldsForType(plan, bt, db, current.fieldUsage);
+    diffFieldsForType(plan, bt, db, current.fieldUsage, options);
   }
 
   for (const dbType of current.contentTypes) {
@@ -297,7 +297,8 @@ function diffFieldsForType(
   plan: SchemaPlan,
   bt: BundleContentType,
   db: CurrentSchemaSnapshot['contentTypes'][number],
-  fieldUsage: CurrentSchemaSnapshot['fieldUsage']
+  fieldUsage: CurrentSchemaSnapshot['fieldUsage'],
+  options: PlanOptions = {}
 ): void {
   const dbFieldByIdentifier = new Map(db.fields.map((f) => [f.identifier, f]));
   const dbFieldById = new Map(db.fields.map((f) => [f.id, f]));
@@ -350,5 +351,36 @@ function diffFieldsForType(
       db.entryCount,
       fieldUsage
     );
+  }
+
+  const bundleFieldIdentifiers = new Set(bt.fields.map((f) => f.identifier));
+  for (const dbField of db.fields) {
+    if (bundleFieldIdentifiers.has(dbField.identifier)) continue;
+    if (renamedDbFieldIds.has(dbField.id)) continue; // Suppress noise from rename detection.
+
+    if (!options.allowDestructive) {
+      plan.blockers.push({
+        code: 'FIELD_REMOVAL_NEEDS_FLAG',
+        message: `Cannot remove field "${dbField.identifier}" from "${bt.identifier}" without allowDestructive.`,
+        path: `fields.${bt.identifier}.${dbField.identifier}`,
+      });
+      continue;
+    }
+
+    const usage = fieldUsage.get(`${bt.identifier}:${dbField.identifier}`);
+    const entriesWithValue = usage?.entriesWithValue ?? 0;
+    plan.fields.remove.push({
+      id: dbField.id,
+      contentTypeIdentifier: bt.identifier,
+      fieldIdentifier: dbField.identifier,
+      entriesWithValue,
+    });
+    if (entriesWithValue > 0) {
+      plan.warnings.push({
+        code: 'FIELD_REMOVAL_DATA_LOSS',
+        message: `Removing "${bt.identifier}.${dbField.identifier}" will wipe values held by ${entriesWithValue} entries.`,
+        path: `fields.${bt.identifier}.${dbField.identifier}`,
+      });
+    }
   }
 }
