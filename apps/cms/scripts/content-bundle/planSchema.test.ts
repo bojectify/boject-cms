@@ -956,6 +956,64 @@ describe('planSchema', () => {
     });
   });
 
+  describe('field-level: type change blocker (row 16)', () => {
+    it('blocks a field type change even with allowDestructive', () => {
+      const bundle: Bundle = {
+        version: 2,
+        exportedAt: '2026-05-01T00:00:00.000Z',
+        portable: true,
+        contentTypes: [
+          {
+            id: null,
+            identifier: 'Article',
+            name: 'Article',
+            description: null,
+            fields: [
+              {
+                id: null,
+                identifier: 'count',
+                name: 'Count',
+                type: 'NUMBER',
+                required: false,
+                order: 0,
+                options: null,
+              },
+            ],
+          },
+        ],
+      };
+      const snapshot: CurrentSchemaSnapshot = {
+        contentTypes: [
+          {
+            id: 'ct-1',
+            identifier: 'Article',
+            name: 'Article',
+            description: null,
+            fields: [
+              {
+                id: 'f-1',
+                identifier: 'count',
+                name: 'Count',
+                type: 'TEXT',
+                required: false,
+                unique: false,
+                order: 0,
+                options: null,
+              },
+            ],
+            entryCount: 0,
+          },
+        ],
+        fieldUsage: new Map(),
+      };
+      const plan = planSchema(bundle, snapshot, { allowDestructive: true });
+      expect(plan.fields.update).toEqual([]);
+      expect(plan.blockers).toHaveLength(1);
+      expect(plan.blockers[0]!.code).toBe('FIELD_TYPE_CHANGE');
+      expect(plan.blockers[0]!.path).toBe('fields.Article.count');
+    });
+  });
+
   describe('type-level: identifier change blocker (row 5)', () => {
     it('blocks an identifier change attempted via a non-portable bundle (id matches, identifier differs)', () => {
       const bundle: Bundle = {

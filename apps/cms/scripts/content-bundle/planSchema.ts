@@ -114,6 +114,15 @@ function diffFieldUpdate(
   entryCount: number,
   fieldUsage: CurrentSchemaSnapshot['fieldUsage']
 ): void {
+  if (bf.type !== dbField.type) {
+    plan.blockers.push({
+      code: 'FIELD_TYPE_CHANGE',
+      message: `Cannot change "${typeIdentifier}.${bf.identifier}" from ${dbField.type} to ${bf.type}. Type changes are never allowed; rename the field instead.`,
+      path: `fields.${typeIdentifier}.${bf.identifier}`,
+    });
+    return; // skip all other update logic
+  }
+
   const changes: FieldUpdate['changes'] = {};
   if (bf.name !== dbField.name) changes.name = bf.name;
   if (bf.order !== dbField.order) changes.order = bf.order;
