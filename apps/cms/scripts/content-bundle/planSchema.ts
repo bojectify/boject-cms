@@ -12,6 +12,7 @@ import type { BundleContentType, BundleField } from './types';
 import type {
   Bundle,
   CurrentSchemaSnapshot,
+  FieldUpdate,
   PlanOptions,
   SchemaPlan,
   TypeUpdate,
@@ -104,6 +105,24 @@ export function planSchema(
   return plan;
 }
 
+function diffFieldUpdate(
+  plan: SchemaPlan,
+  typeIdentifier: string,
+  bf: BundleField,
+  dbField: CurrentSchemaSnapshot['contentTypes'][number]['fields'][number]
+): void {
+  const changes: FieldUpdate['changes'] = {};
+  if (bf.name !== dbField.name) changes.name = bf.name;
+  if (bf.order !== dbField.order) changes.order = bf.order;
+  if (Object.keys(changes).length === 0) return;
+  plan.fields.update.push({
+    id: dbField.id,
+    contentTypeIdentifier: typeIdentifier,
+    fieldIdentifier: bf.identifier,
+    changes,
+  });
+}
+
 function diffTypeMetadata(
   bt: BundleContentType,
   db: CurrentSchemaSnapshot['contentTypes'][number]
@@ -145,7 +164,7 @@ function diffFieldsForType(
     }
   }
 
-  for (const bf of bt.fields as BundleField[]) {
+  for (const bf of bt.fields) {
     if (renamingBundleFieldIdentifiers.has(bf.identifier)) continue;
     const dbField = dbFieldByIdentifier.get(bf.identifier);
     if (!dbField) {
@@ -163,10 +182,6 @@ function diffFieldsForType(
       }
       continue;
     }
-    // Update + removal handling lands in subsequent tasks. Note:
-    // when later tasks add removal handling, that walk must also
-    // skip dbField.id values in renamedDbFieldIds (pass the set
-    // through diffFieldsForType's local closure).
-    void dbField;
+    diffFieldUpdate(plan, bt.identifier, bf, dbField);
   }
 }
