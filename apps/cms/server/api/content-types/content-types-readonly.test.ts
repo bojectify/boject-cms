@@ -219,4 +219,58 @@ describe('Schema read-only flag (BOJECT_SCHEMA_READONLY=true)', async () => {
     const body = (await res.json()) as { data?: { error?: string } };
     expect(body.data?.error).toBe('SCHEMA_READONLY');
   });
+
+  describe('boundary — non-schema endpoints unaffected', () => {
+    it('GET /api/content-types still returns 200', async () => {
+      const cookie = await getSessionCookie();
+      const res = await fetch('/api/content-types', {
+        headers: { cookie },
+      });
+      expect(res.status).toBe(200);
+    });
+
+    it('POST /api/content-entries succeeds against the seeded type', async () => {
+      const cookie = await getSessionCookie();
+      const res = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contentTypeId: seeded.id,
+          data: { title: `Entry ${Date.now()}` },
+        }),
+      });
+      // Content-entry mutations are deliberately not gated by the
+      // readonly flag — the flag draws a line at schema editing only.
+      expect(res.status).toBe(201);
+    });
+  });
+
+  describe('guard order', () => {
+    it('CSRF middleware runs before the readonly guard', async () => {
+      const cookie = await getSessionCookie();
+      // CSRF middleware rejects same-origin-mismatch with 403 before
+      // the handler runs. Without a valid Origin/Referer, this fails
+      // CSRF; if the readonly guard fired first, the data.error would
+      // be SCHEMA_READONLY. We expect a CSRF-shaped 403 instead.
+      const res = await fetch('/api/content-types', {
+        method: 'POST',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          // Mismatched origin to trigger CSRF rejection
+          Origin: 'https://evil.example.com',
+        },
+        body: JSON.stringify({
+          name: `Should Not Reach Handler ${Date.now()}`,
+          fields: [],
+        }),
+      });
+      expect(res.status).toBe(403);
+      const body = (await res.json()) as { data?: { error?: string } };
+      // CSRF rejection has no data.error === 'SCHEMA_READONLY' marker.
+      // If this assertion fails (data.error IS 'SCHEMA_READONLY'), the
+      // readonly guard ran before CSRF, which would be a regression.
+      expect(body.data?.error).not.toBe('SCHEMA_READONLY');
+    });
+  });
 });
