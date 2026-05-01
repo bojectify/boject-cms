@@ -17,6 +17,7 @@ import type {
   SchemaPlan,
   TypeUpdate,
 } from './schemaPlan.types';
+import { effectiveBundleUnique } from './schemaPlan.types';
 
 export function planSchema(
   bundle: Bundle,
@@ -134,6 +135,28 @@ function diffFieldUpdate(
       }
     } else {
       changes.required = false;
+    }
+  }
+
+  // unique transitions (rows 13, 14, 15)
+  const bundleUnique = effectiveBundleUnique(bf);
+  if (bundleUnique !== dbField.unique) {
+    if (bundleUnique) {
+      const usage = fieldUsage.get(`${typeIdentifier}:${bf.identifier}`);
+      const dups = usage?.duplicateValues ?? [];
+      if (dups.length > 0) {
+        const affectedEntryIds = dups.flatMap((d) => d.entryIds);
+        plan.blockers.push({
+          code: 'UNIQUE_CONFLICT',
+          message: `Cannot mark "${bf.identifier}" unique — ${affectedEntryIds.length} entries on "${typeIdentifier}" share duplicate values.`,
+          path: `fields.${typeIdentifier}.${bf.identifier}`,
+          affectedEntryIds,
+        });
+      } else {
+        changes.unique = true;
+      }
+    } else {
+      changes.unique = false;
     }
   }
 

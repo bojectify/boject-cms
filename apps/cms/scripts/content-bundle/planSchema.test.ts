@@ -755,6 +755,207 @@ describe('planSchema', () => {
     });
   });
 
+  describe('field-level: unique transitions (rows 13, 14, 15)', () => {
+    it('plans unique false → true when no duplicates exist (row 13)', () => {
+      const bundle: Bundle = {
+        version: 2,
+        exportedAt: '2026-05-01T00:00:00.000Z',
+        portable: true,
+        contentTypes: [
+          {
+            id: null,
+            identifier: 'Product',
+            name: 'Product',
+            description: null,
+            fields: [
+              {
+                id: null,
+                identifier: 'sku',
+                name: 'SKU',
+                type: 'TEXT',
+                required: false,
+                unique: true,
+                order: 0,
+                options: null,
+              },
+            ],
+          },
+        ],
+      };
+      const snapshot: CurrentSchemaSnapshot = {
+        contentTypes: [
+          {
+            id: 'ct-1',
+            identifier: 'Product',
+            name: 'Product',
+            description: null,
+            fields: [
+              {
+                id: 'f-1',
+                identifier: 'sku',
+                name: 'SKU',
+                type: 'TEXT',
+                required: false,
+                unique: false,
+                order: 0,
+                options: null,
+              },
+            ],
+            entryCount: 3,
+          },
+        ],
+        fieldUsage: new Map([
+          ['Product:sku', { entriesWithValue: 3, duplicateValues: [] }],
+        ]),
+      };
+      const plan = planSchema(bundle, snapshot);
+      expect(plan.fields.update).toEqual([
+        {
+          id: 'f-1',
+          contentTypeIdentifier: 'Product',
+          fieldIdentifier: 'sku',
+          changes: { unique: true },
+        },
+      ]);
+      expect(plan.blockers).toEqual([]);
+    });
+
+    it('blocks unique false → true when duplicates exist (row 14)', () => {
+      const bundle: Bundle = {
+        version: 2,
+        exportedAt: '2026-05-01T00:00:00.000Z',
+        portable: true,
+        contentTypes: [
+          {
+            id: null,
+            identifier: 'Product',
+            name: 'Product',
+            description: null,
+            fields: [
+              {
+                id: null,
+                identifier: 'sku',
+                name: 'SKU',
+                type: 'TEXT',
+                required: false,
+                unique: true,
+                order: 0,
+                options: null,
+              },
+            ],
+          },
+        ],
+      };
+      const snapshot: CurrentSchemaSnapshot = {
+        contentTypes: [
+          {
+            id: 'ct-1',
+            identifier: 'Product',
+            name: 'Product',
+            description: null,
+            fields: [
+              {
+                id: 'f-1',
+                identifier: 'sku',
+                name: 'SKU',
+                type: 'TEXT',
+                required: false,
+                unique: false,
+                order: 0,
+                options: null,
+              },
+            ],
+            entryCount: 4,
+          },
+        ],
+        fieldUsage: new Map([
+          [
+            'Product:sku',
+            {
+              entriesWithValue: 4,
+              duplicateValues: [
+                { value: 'ABC', entryIds: ['e1', 'e2'] },
+                { value: 'DEF', entryIds: ['e3', 'e4'] },
+              ],
+            },
+          ],
+        ]),
+      };
+      const plan = planSchema(bundle, snapshot);
+      expect(plan.fields.update).toEqual([]);
+      expect(plan.blockers).toHaveLength(1);
+      expect(plan.blockers[0]!.code).toBe('UNIQUE_CONFLICT');
+      expect(plan.blockers[0]!.path).toBe('fields.Product.sku');
+      expect(plan.blockers[0]!.affectedEntryIds).toEqual([
+        'e1',
+        'e2',
+        'e3',
+        'e4',
+      ]);
+    });
+
+    it('plans unique true → false always (row 15)', () => {
+      const bundle: Bundle = {
+        version: 2,
+        exportedAt: '2026-05-01T00:00:00.000Z',
+        portable: true,
+        contentTypes: [
+          {
+            id: null,
+            identifier: 'Product',
+            name: 'Product',
+            description: null,
+            fields: [
+              {
+                id: null,
+                identifier: 'sku',
+                name: 'SKU',
+                type: 'TEXT',
+                required: false,
+                unique: false,
+                order: 0,
+                options: null,
+              },
+            ],
+          },
+        ],
+      };
+      const snapshot: CurrentSchemaSnapshot = {
+        contentTypes: [
+          {
+            id: 'ct-1',
+            identifier: 'Product',
+            name: 'Product',
+            description: null,
+            fields: [
+              {
+                id: 'f-1',
+                identifier: 'sku',
+                name: 'SKU',
+                type: 'TEXT',
+                required: false,
+                unique: true,
+                order: 0,
+                options: null,
+              },
+            ],
+            entryCount: 99,
+          },
+        ],
+        fieldUsage: new Map(),
+      };
+      const plan = planSchema(bundle, snapshot);
+      expect(plan.fields.update).toEqual([
+        {
+          id: 'f-1',
+          contentTypeIdentifier: 'Product',
+          fieldIdentifier: 'sku',
+          changes: { unique: false },
+        },
+      ]);
+    });
+  });
+
   describe('type-level: identifier change blocker (row 5)', () => {
     it('blocks an identifier change attempted via a non-portable bundle (id matches, identifier differs)', () => {
       const bundle: Bundle = {
