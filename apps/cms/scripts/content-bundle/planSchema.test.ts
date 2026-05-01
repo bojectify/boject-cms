@@ -1342,6 +1342,119 @@ describe('planSchema', () => {
     });
   });
 
+  describe('field-level: RICHTEXT and unrecognised options (rows 23, 24)', () => {
+    it('plans an options update for RICHTEXT allow-list change (row 23)', () => {
+      const bundle: Bundle = {
+        version: 2,
+        exportedAt: '2026-05-01T00:00:00.000Z',
+        portable: true,
+        contentTypes: [
+          {
+            id: null,
+            identifier: 'Article',
+            name: 'Article',
+            description: null,
+            fields: [
+              {
+                id: null,
+                identifier: 'body',
+                name: 'Body',
+                type: 'RICHTEXT',
+                required: false,
+                order: 0,
+                options: { targetContentTypeIds: ['ct-img'] },
+              },
+            ],
+          },
+        ],
+      };
+      const snapshot: CurrentSchemaSnapshot = {
+        contentTypes: [
+          {
+            id: 'ct-1',
+            identifier: 'Article',
+            name: 'Article',
+            description: null,
+            fields: [
+              {
+                id: 'f-1',
+                identifier: 'body',
+                name: 'Body',
+                type: 'RICHTEXT',
+                required: false,
+                unique: false,
+                order: 0,
+                options: { targetContentTypeIds: [] },
+              },
+            ],
+            entryCount: 99,
+          },
+        ],
+        fieldUsage: new Map(),
+      };
+      const plan = planSchema(bundle, snapshot);
+      expect(plan.fields.update).toHaveLength(1);
+      expect(plan.warnings).toEqual([]);
+      expect(plan.blockers).toEqual([]);
+    });
+
+    it('warns on unrecognised option keys (row 24)', () => {
+      const bundle: Bundle = {
+        version: 2,
+        exportedAt: '2026-05-01T00:00:00.000Z',
+        portable: true,
+        contentTypes: [
+          {
+            id: null,
+            identifier: 'Article',
+            name: 'Article',
+            description: null,
+            fields: [
+              {
+                id: null,
+                identifier: 'tagline',
+                name: 'Tagline',
+                type: 'TEXT',
+                required: false,
+                order: 0,
+                options: { newFutureOption: true },
+              },
+            ],
+          },
+        ],
+      };
+      const snapshot: CurrentSchemaSnapshot = {
+        contentTypes: [
+          {
+            id: 'ct-1',
+            identifier: 'Article',
+            name: 'Article',
+            description: null,
+            fields: [
+              {
+                id: 'f-1',
+                identifier: 'tagline',
+                name: 'Tagline',
+                type: 'TEXT',
+                required: false,
+                unique: false,
+                order: 0,
+                options: null,
+              },
+            ],
+            entryCount: 0,
+          },
+        ],
+        fieldUsage: new Map(),
+      };
+      const plan = planSchema(bundle, snapshot);
+      expect(plan.fields.update).toHaveLength(1);
+      expect(plan.warnings).toHaveLength(1);
+      expect(plan.warnings[0]!.code).toBe('UNRECOGNISED_FIELD_OPTION');
+      expect(plan.warnings[0]!.message).toContain('newFutureOption');
+    });
+  });
+
   describe('field-level: type change blocker (row 16)', () => {
     it('blocks a field type change even with allowDestructive', () => {
       const bundle: Bundle = {

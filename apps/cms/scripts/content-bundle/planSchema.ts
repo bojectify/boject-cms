@@ -233,6 +233,31 @@ function diffFieldUpdate(
     }
   }
 
+  // Generic options-diff fall-through (rows 23, 24)
+  // SELECT, RELATION, MULTIRELATION are handled by their dedicated blocks above.
+  const knownHandledTypes = new Set(['SELECT', 'RELATION', 'MULTIRELATION']);
+  if (
+    !knownHandledTypes.has(bf.type) &&
+    !shallowOptionsEqual(bf.options, dbField.options)
+  ) {
+    changes.options = bf.options ?? {};
+    // RICHTEXT is documented-safe in the spec (row 23) — no warning.
+    if (bf.type !== 'RICHTEXT') {
+      const unknownKeys = Object.keys(bf.options ?? {}).filter(
+        (k) =>
+          !(k in (dbField.options ?? {})) ||
+          bf.options?.[k] !== dbField.options?.[k]
+      );
+      if (unknownKeys.length > 0) {
+        plan.warnings.push({
+          code: 'UNRECOGNISED_FIELD_OPTION',
+          message: `Field "${typeIdentifier}.${bf.identifier}" has option keys the planner does not recognise: ${unknownKeys.join(', ')}. Passing through to the applier; Prisma will validate at apply time.`,
+          path: `fields.${typeIdentifier}.${bf.identifier}`,
+        });
+      }
+    }
+  }
+
   if (Object.keys(changes).length === 0) return;
   plan.fields.update.push({
     id: dbField.id,
@@ -251,6 +276,21 @@ function diffTypeMetadata(
   if (bt.description !== db.description) changes.description = bt.description;
   if (Object.keys(changes).length === 0) return null;
   return { id: db.id, identifier: bt.identifier, changes };
+}
+
+function shallowOptionsEqual(
+  a: Record<string, unknown> | null | undefined,
+  b: Record<string, unknown> | null | undefined
+): boolean {
+  if (a === b) return true;
+  if (!a || !b) return Boolean(!a && !b);
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+  if (aKeys.length !== bKeys.length) return false;
+  for (const k of aKeys) {
+    if (JSON.stringify(a[k]) !== JSON.stringify(b[k])) return false;
+  }
+  return true;
 }
 
 function diffFieldsForType(
