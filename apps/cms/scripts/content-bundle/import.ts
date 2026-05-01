@@ -1,11 +1,26 @@
 import type { PrismaClient, FieldType, Prisma } from '#prisma';
-import type { Bundle, BundleEntry, BundleMode, ImportResult } from './types';
+import type {
+  Bundle,
+  BundleEntry,
+  BundleField,
+  BundleMode,
+  ImportResult,
+} from './types';
 import { validateBundle } from './validate';
 import { decodeDataRefs } from './portable';
 
 export interface ImportOptions {
   mode: BundleMode;
   author?: string;
+}
+
+// Mirrors apps/cms/server/utils/validateFieldUnique.ts::resolveUniqueFlag
+// without depending on h3 (this module runs from `tsx` standalone too).
+// ENTRY_TITLE and SLUG are always unique; everything else honours the
+// bundle's flag (defaulting to false for legacy bundles that don't carry it).
+function resolveBundleFieldUnique(f: BundleField): boolean {
+  if (f.type === 'ENTRY_TITLE' || f.type === 'SLUG') return true;
+  return f.unique === true;
 }
 
 export async function importBundle(
@@ -108,6 +123,7 @@ export async function importBundle(
                   name: f.name,
                   type: f.type,
                   required: f.required,
+                  unique: resolveBundleFieldUnique(f),
                   order: f.order,
                   options: (opts ?? undefined) as Prisma.InputJsonValue,
                 };

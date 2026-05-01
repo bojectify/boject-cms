@@ -15,6 +15,7 @@ export interface BundleField {
   name: string;
   type: FieldType;
   required: boolean;
+  unique?: boolean;
   order: number;
   options: BundleFieldOptions | null;
 }
