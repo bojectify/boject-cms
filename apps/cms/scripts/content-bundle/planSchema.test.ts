@@ -1149,6 +1149,199 @@ describe('planSchema', () => {
     });
   });
 
+  describe('field-level: RELATION target changes (rows 20, 21, 22)', () => {
+    it('plans an options update when a target is added (row 20)', () => {
+      const bundle: Bundle = {
+        version: 2,
+        exportedAt: '2026-05-01T00:00:00.000Z',
+        portable: true,
+        contentTypes: [
+          {
+            id: null,
+            identifier: 'Article',
+            name: 'Article',
+            description: null,
+            fields: [
+              {
+                id: null,
+                identifier: 'author',
+                name: 'Author',
+                type: 'RELATION',
+                required: false,
+                order: 0,
+                options: {
+                  targetContentTypeIdentifiers: ['Author', 'Editor'],
+                },
+              },
+            ],
+          },
+        ],
+      };
+      const snapshot: CurrentSchemaSnapshot = {
+        contentTypes: [
+          {
+            id: 'ct-1',
+            identifier: 'Article',
+            name: 'Article',
+            description: null,
+            fields: [
+              {
+                id: 'f-1',
+                identifier: 'author',
+                name: 'Author',
+                type: 'RELATION',
+                required: false,
+                unique: false,
+                order: 0,
+                options: {
+                  targetContentTypeIdentifiers: ['Author'],
+                },
+              },
+            ],
+            entryCount: 0,
+          },
+        ],
+        fieldUsage: new Map(),
+      };
+      const plan = planSchema(bundle, snapshot);
+      expect(plan.fields.update).toHaveLength(1);
+      expect(
+        (plan.fields.update[0]!.changes.options as Record<string, unknown>)
+          .targetContentTypeIdentifiers
+      ).toEqual(['Author', 'Editor']);
+      expect(plan.blockers).toEqual([]);
+    });
+
+    it('plans an options update when an unused target is removed (row 21)', () => {
+      const bundle: Bundle = {
+        version: 2,
+        exportedAt: '2026-05-01T00:00:00.000Z',
+        portable: true,
+        contentTypes: [
+          {
+            id: null,
+            identifier: 'Article',
+            name: 'Article',
+            description: null,
+            fields: [
+              {
+                id: null,
+                identifier: 'author',
+                name: 'Author',
+                type: 'RELATION',
+                required: false,
+                order: 0,
+                options: { targetContentTypeIdentifiers: ['Author'] },
+              },
+            ],
+          },
+        ],
+      };
+      const snapshot: CurrentSchemaSnapshot = {
+        contentTypes: [
+          {
+            id: 'ct-1',
+            identifier: 'Article',
+            name: 'Article',
+            description: null,
+            fields: [
+              {
+                id: 'f-1',
+                identifier: 'author',
+                name: 'Author',
+                type: 'RELATION',
+                required: false,
+                unique: false,
+                order: 0,
+                options: { targetContentTypeIdentifiers: ['Author', 'Editor'] },
+              },
+            ],
+            entryCount: 4,
+          },
+        ],
+        fieldUsage: new Map([
+          [
+            'Article:author',
+            {
+              entriesWithValue: 4,
+              relationTargetCounts: new Map([['Author', 4]]),
+            },
+          ],
+        ]),
+      };
+      const plan = planSchema(bundle, snapshot);
+      expect(plan.fields.update).toHaveLength(1);
+      expect(plan.blockers).toEqual([]);
+    });
+
+    it('blocks removing a target with active relations (row 22)', () => {
+      const bundle: Bundle = {
+        version: 2,
+        exportedAt: '2026-05-01T00:00:00.000Z',
+        portable: true,
+        contentTypes: [
+          {
+            id: null,
+            identifier: 'Article',
+            name: 'Article',
+            description: null,
+            fields: [
+              {
+                id: null,
+                identifier: 'author',
+                name: 'Author',
+                type: 'RELATION',
+                required: false,
+                order: 0,
+                options: { targetContentTypeIdentifiers: ['Author'] },
+              },
+            ],
+          },
+        ],
+      };
+      const snapshot: CurrentSchemaSnapshot = {
+        contentTypes: [
+          {
+            id: 'ct-1',
+            identifier: 'Article',
+            name: 'Article',
+            description: null,
+            fields: [
+              {
+                id: 'f-1',
+                identifier: 'author',
+                name: 'Author',
+                type: 'RELATION',
+                required: false,
+                unique: false,
+                order: 0,
+                options: { targetContentTypeIdentifiers: ['Author', 'Editor'] },
+              },
+            ],
+            entryCount: 6,
+          },
+        ],
+        fieldUsage: new Map([
+          [
+            'Article:author',
+            {
+              entriesWithValue: 6,
+              relationTargetCounts: new Map([
+                ['Author', 4],
+                ['Editor', 2],
+              ]),
+            },
+          ],
+        ]),
+      };
+      const plan = planSchema(bundle, snapshot);
+      expect(plan.fields.update).toEqual([]);
+      expect(plan.blockers).toHaveLength(1);
+      expect(plan.blockers[0]!.code).toBe('RELATION_TARGET_REMOVED_IN_USE');
+      expect(plan.blockers[0]!.message).toContain('Editor');
+    });
+  });
+
   describe('field-level: type change blocker (row 16)', () => {
     it('blocks a field type change even with allowDestructive', () => {
       const bundle: Bundle = {

@@ -198,6 +198,41 @@ function diffFieldUpdate(
     }
   }
 
+  // RELATION/MULTIRELATION target changes (rows 20, 21, 22)
+  if (bf.type === 'RELATION' || bf.type === 'MULTIRELATION') {
+    const bundleTargets =
+      (bf.options?.targetContentTypeIdentifiers as string[] | undefined) ?? [];
+    const dbTargets =
+      (dbField.options?.targetContentTypeIdentifiers as string[] | undefined) ??
+      [];
+    const removedTargets = dbTargets.filter((t) => !bundleTargets.includes(t));
+    const addedTargets = bundleTargets.filter((t) => !dbTargets.includes(t));
+
+    const usage = fieldUsage.get(`${typeIdentifier}:${bf.identifier}`);
+    const usedRemoved = removedTargets.filter(
+      (t) => (usage?.relationTargetCounts?.get(t) ?? 0) > 0
+    );
+
+    if (usedRemoved.length > 0) {
+      const detail = usedRemoved
+        .map((t) => `"${t}" (${usage?.relationTargetCounts?.get(t)} relations)`)
+        .join(', ');
+      plan.blockers.push({
+        code: 'RELATION_TARGET_REMOVED_IN_USE',
+        message: `Cannot remove relation targets in use on "${typeIdentifier}.${bf.identifier}": ${detail}. Update entries first.`,
+        path: `fields.${typeIdentifier}.${bf.identifier}`,
+      });
+      return;
+    }
+
+    if (addedTargets.length > 0 || removedTargets.length > 0) {
+      changes.options = {
+        ...(bf.options ?? {}),
+        targetContentTypeIdentifiers: bundleTargets,
+      };
+    }
+  }
+
   if (Object.keys(changes).length === 0) return;
   plan.fields.update.push({
     id: dbField.id,
