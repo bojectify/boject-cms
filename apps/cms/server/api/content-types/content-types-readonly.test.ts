@@ -165,4 +165,19 @@ describe('Schema read-only flag (BOJECT_SCHEMA_READONLY=true)', async () => {
     const body = (await res.json()) as { data?: { error?: string } };
     expect(body.data?.error).toBe('SCHEMA_READONLY');
   });
+
+  it('returns 403 SCHEMA_READONLY on PUT /api/content-types/[id]/fields/[fieldId]', async () => {
+    const cookie = await getSessionCookie();
+    const res = await fetch(
+      `/api/content-types/${seeded.id}/fields/${seeded.fieldId}`,
+      {
+        method: 'PUT',
+        headers: { cookie, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Renamed Title' }),
+      }
+    );
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { data?: { error?: string } };
+    expect(body.data?.error).toBe('SCHEMA_READONLY');
+  });
 });
