@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import draggable from 'vuedraggable';
 
+const schemaReadonly = useSchemaReadonly();
+if (import.meta.server && schemaReadonly.value) {
+  await navigateTo('/content-types', { redirectCode: 302 });
+}
+
 const toast = useToast();
 const isSaving = ref(false);
 const saveError = ref<string | null>(null);

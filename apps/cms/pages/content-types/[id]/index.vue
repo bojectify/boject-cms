@@ -4,6 +4,7 @@ import draggable from 'vuedraggable';
 const route = useRoute();
 const id = route.params.id as string;
 const toast = useToast();
+const schemaReadonly = useSchemaReadonly();
 
 // Content type data
 const {
@@ -330,11 +331,25 @@ async function onFieldReorder() {
               {{ contentType._count.entries }}
             </UBadge>
           </UButton>
-          <UButton :loading="isSaving" icon="i-lucide-save" @click="handleSave">
+          <UButton
+            v-if="!schemaReadonly"
+            :loading="isSaving"
+            icon="i-lucide-save"
+            @click="handleSave"
+          >
             Save
           </UButton>
         </div>
       </div>
+
+      <UAlert
+        v-if="schemaReadonly"
+        color="info"
+        icon="i-lucide-lock"
+        title="Schema is read-only on this environment"
+        description="Edit in dev and deploy via git."
+        class="mb-6"
+      />
 
       <UAlert
         v-if="saveError"
@@ -372,108 +387,110 @@ async function onFieldReorder() {
           <UTextarea v-model="formDescription" :rows="3" class="w-full" />
         </UFormField>
 
-        <div class="flex items-center gap-4">
-          <USeparator class="flex-1" />
-          <span class="text-sm font-medium text-muted shrink-0">Fields</span>
-          <UButton
-            size="xs"
-            variant="outline"
-            icon="i-lucide-plus"
-            @click="openAddFieldModal"
-          >
-            Add Field
-          </UButton>
-          <USeparator class="flex-1" />
-        </div>
-
-        <draggable
-          v-model="draggableFields"
-          item-key="id"
-          handle=".drag-handle"
-          animation="150"
-          class="space-y-3"
-          @end="onFieldReorder"
-        >
-          <template #item="{ element: field }">
-            <div class="border rounded-lg p-3">
-              <div class="flex items-center gap-2">
-                <UIcon
-                  name="i-lucide-grip-vertical"
-                  class="drag-handle cursor-grab active:cursor-grabbing text-muted shrink-0"
-                />
-                <div class="flex-1 min-w-0">
-                  <span class="font-medium">{{ field.name }}</span>
-                  <span class="text-sm text-muted ml-2"
-                    >({{ field.identifier }})</span
-                  >
-                  <UBadge class="ml-2" size="sm" variant="subtle">
-                    {{ field.type }}
-                  </UBadge>
-                  <UBadge
-                    v-if="field.required"
-                    color="warning"
-                    size="sm"
-                    variant="subtle"
-                    class="ml-1"
-                  >
-                    Required
-                  </UBadge>
-                  <UBadge
-                    v-if="field.unique"
-                    color="info"
-                    size="sm"
-                    variant="subtle"
-                    class="ml-1"
-                  >
-                    Unique
-                  </UBadge>
-                </div>
-                <UDropdownMenu :items="fieldMenuItems(field)">
-                  <UButton
-                    size="xs"
-                    variant="ghost"
-                    color="neutral"
-                    icon="i-lucide-ellipsis"
-                  />
-                </UDropdownMenu>
-              </div>
-            </div>
-          </template>
-        </draggable>
-
-        <div class="pt-8">
-          <USeparator color="error" />
-          <div class="flex items-center justify-between pt-4">
-            <div>
-              <p class="text-sm font-medium text-red-700 dark:text-red-400">
-                Delete this content type
-              </p>
-              <p class="text-xs text-muted">
-                {{
-                  (contentType?._count.entries ?? 0) > 0
-                    ? `Delete the ${contentType?._count.entries} entries first.`
-                    : 'Only content types with no entries can be deleted.'
-                }}
-              </p>
-            </div>
+        <template v-if="!schemaReadonly">
+          <div class="flex items-center gap-4">
+            <USeparator class="flex-1" />
+            <span class="text-sm font-medium text-muted shrink-0">Fields</span>
             <UButton
-              size="sm"
+              size="xs"
               variant="outline"
-              color="error"
-              icon="i-lucide-trash-2"
-              :loading="isDeleting"
-              :disabled="(contentType?._count.entries ?? 0) > 0"
-              @click="handleDeleteContentType"
+              icon="i-lucide-plus"
+              @click="openAddFieldModal"
             >
-              Delete
+              Add Field
             </UButton>
+            <USeparator class="flex-1" />
           </div>
-        </div>
+
+          <draggable
+            v-model="draggableFields"
+            item-key="id"
+            handle=".drag-handle"
+            animation="150"
+            class="space-y-3"
+            @end="onFieldReorder"
+          >
+            <template #item="{ element: field }">
+              <div class="border rounded-lg p-3">
+                <div class="flex items-center gap-2">
+                  <UIcon
+                    name="i-lucide-grip-vertical"
+                    class="drag-handle cursor-grab active:cursor-grabbing text-muted shrink-0"
+                  />
+                  <div class="flex-1 min-w-0">
+                    <span class="font-medium">{{ field.name }}</span>
+                    <span class="text-sm text-muted ml-2"
+                      >({{ field.identifier }})</span
+                    >
+                    <UBadge class="ml-2" size="sm" variant="subtle">
+                      {{ field.type }}
+                    </UBadge>
+                    <UBadge
+                      v-if="field.required"
+                      color="warning"
+                      size="sm"
+                      variant="subtle"
+                      class="ml-1"
+                    >
+                      Required
+                    </UBadge>
+                    <UBadge
+                      v-if="field.unique"
+                      color="info"
+                      size="sm"
+                      variant="subtle"
+                      class="ml-1"
+                    >
+                      Unique
+                    </UBadge>
+                  </div>
+                  <UDropdownMenu :items="fieldMenuItems(field)">
+                    <UButton
+                      size="xs"
+                      variant="ghost"
+                      color="neutral"
+                      icon="i-lucide-ellipsis"
+                    />
+                  </UDropdownMenu>
+                </div>
+              </div>
+            </template>
+          </draggable>
+
+          <div class="pt-8">
+            <USeparator color="error" />
+            <div class="flex items-center justify-between pt-4">
+              <div>
+                <p class="text-sm font-medium text-red-700 dark:text-red-400">
+                  Delete this content type
+                </p>
+                <p class="text-xs text-muted">
+                  {{
+                    (contentType?._count.entries ?? 0) > 0
+                      ? `Delete the ${contentType?._count.entries} entries first.`
+                      : 'Only content types with no entries can be deleted.'
+                  }}
+                </p>
+              </div>
+              <UButton
+                size="sm"
+                variant="outline"
+                color="error"
+                icon="i-lucide-trash-2"
+                :loading="isDeleting"
+                :disabled="(contentType?._count.entries ?? 0) > 0"
+                @click="handleDeleteContentType"
+              >
+                Delete
+              </UButton>
+            </div>
+          </div>
+        </template>
       </div>
     </div>
 
     <FieldModal
-      :open="fieldModalOpen"
+      :open="fieldModalOpen && !schemaReadonly"
       :mode="fieldModalMode"
       :field="fieldModalField"
       :field-type-options="fieldTypeOptions"

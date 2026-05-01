@@ -1,10 +1,12 @@
 import { assertUuid, assertNonNegativeInt } from '../../../../utils/validation';
 import { withPrismaErrors } from '../../../../utils/prismaErrors';
 import { enforceMutationRateLimit } from '../../../../utils/rateLimitEndpoint';
+import { assertSchemaEditable } from '../../../../utils/schemaReadOnly';
 
 const MAX_REORDER_ITEMS = 500;
 
 export default defineEventHandler(async (event) => {
+  assertSchemaEditable(event);
   enforceMutationRateLimit(event, 'content-type-fields.reorder');
   const contentTypeId = assertUuid(getRouterParam(event, 'id'), 'id');
   const body = await readBody<{ fields?: unknown }>(event);
