@@ -2123,4 +2123,154 @@ describe('planSchema', () => {
       expect(plan.warnings[0]!.path).toBe('fields.Article.oldField');
     });
   });
+
+  describe('options equality edge cases', () => {
+    it('treats {} on the bundle side and null on the DB side as equivalent (no spurious diff or warning)', () => {
+      const bundle: Bundle = {
+        version: 2,
+        exportedAt: '2026-05-01T00:00:00.000Z',
+        portable: true,
+        contentTypes: [
+          {
+            id: null,
+            identifier: 'Article',
+            name: 'Article',
+            description: null,
+            fields: [
+              {
+                id: null,
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                required: true,
+                order: 0,
+                options: null,
+              },
+              {
+                id: null,
+                identifier: 'tagline',
+                name: 'Tagline',
+                type: 'TEXT',
+                required: false,
+                order: 1,
+                options: {},
+              },
+            ],
+          },
+        ],
+      };
+      const snapshot: CurrentSchemaSnapshot = {
+        contentTypes: [
+          {
+            id: 'ct-1',
+            identifier: 'Article',
+            name: 'Article',
+            description: null,
+            fields: [
+              {
+                id: 'f-1',
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                required: true,
+                unique: true,
+                order: 0,
+                options: null,
+              },
+              {
+                id: 'f-2',
+                identifier: 'tagline',
+                name: 'Tagline',
+                type: 'TEXT',
+                required: false,
+                unique: false,
+                order: 1,
+                options: null,
+              },
+            ],
+            entryCount: 0,
+          },
+        ],
+        fieldUsage: new Map(),
+      };
+      const plan = planSchema(bundle, snapshot);
+      expect(plan.fields.update).toEqual([]);
+      expect(plan.warnings).toEqual([]);
+      expect(plan.blockers).toEqual([]);
+    });
+
+    it('treats null on the bundle side and {} on the DB side as equivalent (symmetric)', () => {
+      const bundle: Bundle = {
+        version: 2,
+        exportedAt: '2026-05-01T00:00:00.000Z',
+        portable: true,
+        contentTypes: [
+          {
+            id: null,
+            identifier: 'Article',
+            name: 'Article',
+            description: null,
+            fields: [
+              {
+                id: null,
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                required: true,
+                order: 0,
+                options: null,
+              },
+              {
+                id: null,
+                identifier: 'tagline',
+                name: 'Tagline',
+                type: 'TEXT',
+                required: false,
+                order: 1,
+                options: null,
+              },
+            ],
+          },
+        ],
+      };
+      const snapshot: CurrentSchemaSnapshot = {
+        contentTypes: [
+          {
+            id: 'ct-1',
+            identifier: 'Article',
+            name: 'Article',
+            description: null,
+            fields: [
+              {
+                id: 'f-1',
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                required: true,
+                unique: true,
+                order: 0,
+                options: null,
+              },
+              {
+                id: 'f-2',
+                identifier: 'tagline',
+                name: 'Tagline',
+                type: 'TEXT',
+                required: false,
+                unique: false,
+                order: 1,
+                options: {},
+              },
+            ],
+            entryCount: 0,
+          },
+        ],
+        fieldUsage: new Map(),
+      };
+      const plan = planSchema(bundle, snapshot);
+      expect(plan.fields.update).toEqual([]);
+      expect(plan.warnings).toEqual([]);
+      expect(plan.blockers).toEqual([]);
+    });
+  });
 });
