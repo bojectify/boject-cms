@@ -47,4 +47,30 @@ describe('applySchema', () => {
       expect(result.plan.blockers).toEqual([]);
     });
   });
+
+  describe('validateBundle integration', () => {
+    it('throws SchemaApplyValidationError on a malformed bundle, no transaction opened', async () => {
+      const malformedBundle = {
+        version: 2,
+        exportedAt: '2026-05-01T00:00:00.000Z',
+        portable: true,
+        contentTypes: [
+          {
+            id: null,
+            identifier: 'Article',
+            name: 'Article',
+            description: null,
+            // No fields array → validateBundle rejects "fields must be an array"
+          },
+        ],
+      } as unknown as Bundle;
+
+      await expect(applySchema(prisma, malformedBundle)).rejects.toThrow(
+        /Bundle validation failed/
+      );
+      await expect(applySchema(prisma, malformedBundle)).rejects.toMatchObject({
+        code: 'BUNDLE_INVALID',
+      });
+    });
+  });
 });

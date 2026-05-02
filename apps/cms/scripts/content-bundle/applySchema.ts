@@ -13,6 +13,8 @@
 import type { PrismaClient } from '#prisma';
 import type { Bundle } from './types';
 import type { SchemaPlan } from './schemaPlan.types';
+import { validateBundle } from './validate';
+import { SchemaApplyValidationError } from './applySchemaErrors';
 
 export interface ApplySchemaOptions {
   allowDestructive?: boolean;
@@ -43,9 +45,14 @@ const ZERO_APPLIED: ApplySchemaResult['applied'] = {
 
 export async function applySchema(
   _prisma: PrismaClient,
-  _bundle: Bundle,
+  bundle: Bundle,
   _options: ApplySchemaOptions = {}
 ): Promise<ApplySchemaResult> {
+  const validation = validateBundle(bundle);
+  if (!validation.ok) {
+    throw new SchemaApplyValidationError(validation.errors);
+  }
+
   const plan: SchemaPlan = {
     contentTypes: { create: [], update: [], remove: [] },
     fields: { create: [], update: [], remove: [] },
