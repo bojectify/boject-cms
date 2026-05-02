@@ -23,7 +23,28 @@ import {
 import { snapshotCurrentSchema } from './snapshotCurrentSchema';
 import { planSchema } from './planSchema';
 import { plansEqual } from './plansEqual';
-import { invalidateSchema } from '../../server/graphql/schema';
+// invalidateSchema is loaded lazily — the docker entrypoint runs this
+// applier from a tsx process where the apps/cms/server/ tree isn't on
+// disk (Nuxt hasn't booted, so there's no cached schema to clear anyway).
+// In Nuxt-context callers (CLI `pnpm content:import`, future Spec 5 HTTP),
+// the dynamic import resolves to the same module record as a static
+// import would, so existing test spies on `schemaModule.invalidateSchema`
+// still intercept the call.
+async function invalidateSchemaIfAvailable(): Promise<void> {
+  try {
+    const mod = await import('../../server/graphql/schema');
+    mod.invalidateSchema();
+  } catch (err) {
+    if (
+      typeof err === 'object' &&
+      err !== null &&
+      (err as { code?: string }).code === 'ERR_MODULE_NOT_FOUND'
+    ) {
+      return;
+    }
+    throw err;
+  }
+}
 
 export interface ApplySchemaOptions {
   allowDestructive?: boolean;
@@ -181,7 +202,7 @@ export async function applySchema(
   // against the freshly mutated content types. Skip on no-op applies —
   // the entrypoint runs apply on every boot and most boots are no-ops.
   if (txResult.changed) {
-    invalidateSchema();
+    await invalidateSchemaIfAvailable();
   }
   return txResult;
 }
