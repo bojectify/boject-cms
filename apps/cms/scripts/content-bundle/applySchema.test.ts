@@ -73,4 +73,118 @@ describe('applySchema', () => {
       });
     });
   });
+
+  describe('blocker handling — refuses before mutating', () => {
+    it('throws SchemaApplyBlockedError on a blocker, DB unchanged', async () => {
+      // Seed a content type with an entry. An empty bundle would try to
+      // remove it, which is blocked even with allowDestructive.
+      const ct = await prisma.contentType.create({
+        data: {
+          identifier: 'Locked',
+          name: 'Locked',
+          fields: {
+            create: [
+              {
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                required: true,
+                unique: true,
+                order: 0,
+              },
+            ],
+          },
+        },
+      });
+      await prisma.contentEntry.create({
+        data: {
+          contentTypeId: ct.id,
+          entryTitle: 'X',
+          slug: 'x',
+          versions: {
+            create: {
+              data: { title: 'X' },
+              entryTitle: 'X',
+              status: 'PUBLISHED',
+            },
+          },
+        },
+      });
+
+      const bundle: Bundle = {
+        version: 2,
+        exportedAt: '2026-05-01T00:00:00.000Z',
+        portable: true,
+        contentTypes: [],
+      };
+
+      await expect(
+        applySchema(prisma, bundle, { allowDestructive: true })
+      ).rejects.toMatchObject({
+        code: 'SCHEMA_APPLY_BLOCKED',
+      });
+
+      // DB unchanged — content type still exists.
+      const stillThere = await prisma.contentType.findUnique({
+        where: { identifier: 'Locked' },
+      });
+      expect(stillThere).not.toBeNull();
+    });
+
+    it('blocker error carries the blockers array and the plan', async () => {
+      await prisma.contentType.create({
+        data: {
+          identifier: 'WithEntries',
+          name: 'WithEntries',
+          fields: {
+            create: [
+              {
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                required: true,
+                unique: true,
+                order: 0,
+              },
+            ],
+          },
+        },
+      });
+      await prisma.contentEntry.create({
+        data: {
+          contentTypeId: (
+            await prisma.contentType.findUniqueOrThrow({
+              where: { identifier: 'WithEntries' },
+            })
+          ).id,
+          entryTitle: 'X',
+          slug: 'x',
+          versions: {
+            create: {
+              data: { title: 'X' },
+              entryTitle: 'X',
+              status: 'PUBLISHED',
+            },
+          },
+        },
+      });
+
+      const bundle: Bundle = {
+        version: 2,
+        exportedAt: '2026-05-01T00:00:00.000Z',
+        portable: true,
+        contentTypes: [],
+      };
+
+      try {
+        await applySchema(prisma, bundle);
+        throw new Error('expected applySchema to throw');
+      } catch (e) {
+        const err = e as { code: string; blockers: unknown[]; plan: unknown };
+        expect(err.code).toBe('SCHEMA_APPLY_BLOCKED');
+        expect(err.blockers.length).toBeGreaterThan(0);
+        expect(err.plan).toBeDefined();
+      }
+    });
+  });
 });

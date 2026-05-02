@@ -14,7 +14,12 @@ import type { PrismaClient } from '#prisma';
 import type { Bundle } from './types';
 import type { SchemaPlan } from './schemaPlan.types';
 import { validateBundle } from './validate';
-import { SchemaApplyValidationError } from './applySchemaErrors';
+import {
+  SchemaApplyBlockedError,
+  SchemaApplyValidationError,
+} from './applySchemaErrors';
+import { snapshotCurrentSchema } from './snapshotCurrentSchema';
+import { planSchema } from './planSchema';
 
 export interface ApplySchemaOptions {
   allowDestructive?: boolean;
@@ -44,20 +49,30 @@ const ZERO_APPLIED: ApplySchemaResult['applied'] = {
 };
 
 export async function applySchema(
-  _prisma: PrismaClient,
+  prisma: PrismaClient,
   bundle: Bundle,
-  _options: ApplySchemaOptions = {}
+  options: ApplySchemaOptions = {}
 ): Promise<ApplySchemaResult> {
   const validation = validateBundle(bundle);
   if (!validation.ok) {
     throw new SchemaApplyValidationError(validation.errors);
   }
 
-  const plan: SchemaPlan = {
-    contentTypes: { create: [], update: [], remove: [] },
-    fields: { create: [], update: [], remove: [] },
-    warnings: [],
-    blockers: [],
-  };
-  return { changed: false, plan, applied: { ...ZERO_APPLIED } };
+  return prisma.$transaction(async (tx) => {
+    // The transaction client is structurally compatible with the
+    // PrismaClient methods snapshotCurrentSchema calls (findMany,
+    // groupBy). Cast is justified — the runtime contract holds.
+    const snapshot = await snapshotCurrentSchema(tx as PrismaClient);
+    const plan: SchemaPlan = planSchema(bundle, snapshot, {
+      allowDestructive: options.allowDestructive,
+    });
+
+    if (plan.blockers.length > 0) {
+      throw new SchemaApplyBlockedError(plan.blockers, plan);
+    }
+
+    // Mutation walks land in subsequent tasks. For now still report
+    // changed: false because nothing has been applied.
+    return { changed: false, plan, applied: { ...ZERO_APPLIED } };
+  });
 }
