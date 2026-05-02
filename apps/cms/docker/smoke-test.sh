@@ -103,7 +103,10 @@ fi
 # so apply-schema is a no-op against the just-imported state.
 if ! grep -q "\\[apply-schema\\] done — 1 file applied, 0 total changes" <<<"$logs"; then
   echo "[smoke-test] FAIL: expected first-boot apply-schema no-op"
-  echo "$logs" | tail -50
+  echo "[smoke-test] --- apply-schema log lines ---"
+  grep -E "\\[apply-schema\\]" <<<"$logs" || echo "(no apply-schema lines found)"
+  echo "[smoke-test] --- last 80 lines of full log ---"
+  echo "$logs" | tail -80
   exit 1
 fi
 

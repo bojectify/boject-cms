@@ -116,18 +116,53 @@ export async function applySchema(
 
     const applied: ApplySchemaResult['applied'] = { ...ZERO_APPLIED };
 
+    // Build identifier → typeId map from the current snapshot. New
+    // types are added to this map as Pass 1 creates them so cross-type
+    // references resolve in a single transaction (mirrors import.ts).
+    const identifierToTypeId = new Map<string, string>();
+    for (const ct of snapshot.contentTypes) {
+      identifierToTypeId.set(ct.identifier, ct.id);
+    }
+
+    // Fields whose RELATION/MULTIRELATION targets couldn't be resolved
+    // at write time (because the target type was being created in this
+    // same apply). Resolved in a Pass 2.5 once every type exists.
+    const pendingFieldTargets: Array<{
+      fieldId: string;
+      identifiers: string[];
+      otherOptions: Record<string, unknown>;
+    }> = [];
+
     // Pass 1: content-type creates (with fields embedded).
     for (const bt of plan.contentTypes.create) {
-      await tx.contentType.create({
+      const created = await tx.contentType.create({
         data: {
           identifier: bt.identifier,
           name: bt.name,
           description: bt.description ?? undefined,
           fields: {
-            create: bt.fields.map(toFieldCreatePayload),
+            create: bt.fields.map((f) =>
+              toFieldCreatePayload(f, identifierToTypeId)
+            ),
           },
         },
+        include: { fields: true },
       });
+      identifierToTypeId.set(created.identifier, created.id);
+      // Queue any field whose targets included an as-yet-unknown type.
+      for (const bf of bt.fields) {
+        const pending = extractPendingTargets(bf, identifierToTypeId);
+        if (!pending) continue;
+        const dbField = created.fields.find(
+          (f) => f.identifier === bf.identifier
+        );
+        if (!dbField) continue;
+        pendingFieldTargets.push({
+          fieldId: dbField.id,
+          identifiers: pending.identifiers,
+          otherOptions: pending.otherOptions,
+        });
+      }
       applied.contentTypesCreated += 1;
     }
 
@@ -152,12 +187,20 @@ export async function applySchema(
 
     // Pass 2: field creates on existing types.
     for (const create of plan.fields.create) {
-      await tx.contentTypeField.create({
+      const dbField = await tx.contentTypeField.create({
         data: {
           contentTypeId: create.contentTypeId,
-          ...toFieldCreatePayload(create.field),
+          ...toFieldCreatePayload(create.field, identifierToTypeId),
         },
       });
+      const pending = extractPendingTargets(create.field, identifierToTypeId);
+      if (pending) {
+        pendingFieldTargets.push({
+          fieldId: dbField.id,
+          identifiers: pending.identifiers,
+          otherOptions: pending.otherOptions,
+        });
+      }
       applied.fieldsCreated += 1;
     }
 
@@ -173,10 +216,36 @@ export async function applySchema(
       if (update.changes.unique !== undefined)
         data.unique = update.changes.unique;
       if (update.changes.options !== undefined) {
-        data.options = update.changes.options as Prisma.InputJsonValue;
+        data.options = resolveOptionsForStorage(
+          update.changes.options as Record<string, unknown>,
+          identifierToTypeId
+        ) as Prisma.InputJsonValue;
       }
       await tx.contentTypeField.update({ where: { id: update.id }, data });
       applied.fieldsUpdated += 1;
+    }
+
+    // Pass 2.5: backfill RELATION/MULTIRELATION target IDs for fields
+    // whose target types didn't exist at field-create time.
+    for (const pending of pendingFieldTargets) {
+      const resolved = pending.identifiers.map((ident) => {
+        const id = identifierToTypeId.get(ident);
+        if (!id) {
+          throw new Error(
+            `RELATION field references unknown content type "${ident}" after apply`
+          );
+        }
+        return id;
+      });
+      await tx.contentTypeField.update({
+        where: { id: pending.fieldId },
+        data: {
+          options: {
+            ...pending.otherOptions,
+            targetContentTypeIds: resolved,
+          } as Prisma.InputJsonValue,
+        },
+      });
     }
 
     // Pass 2: field removes. Skip any field whose owning content type was
@@ -207,7 +276,10 @@ export async function applySchema(
   return txResult;
 }
 
-function toFieldCreatePayload(f: BundleField) {
+function toFieldCreatePayload(
+  f: BundleField,
+  identifierToTypeId: Map<string, string>
+) {
   return {
     identifier: f.identifier,
     name: f.name,
@@ -215,7 +287,78 @@ function toFieldCreatePayload(f: BundleField) {
     required: f.required,
     unique: effectiveBundleUnique(f),
     order: f.order,
-    options: (f.options ?? undefined) as Prisma.InputJsonValue | undefined,
+    options: (resolveOptionsForStorage(f.options ?? null, identifierToTypeId) ??
+      undefined) as Prisma.InputJsonValue | undefined,
+  };
+}
+
+/**
+ * Convert bundle-form field options (identifiers in
+ * `targetContentTypeIdentifiers`) into DB-form options (UUIDs in
+ * `targetContentTypeIds`). The Nuxt runtime (GraphQL, validation)
+ * reads `targetContentTypeIds`, so applySchema must store UUIDs the
+ * same way importBundle does — otherwise the entrypoint applier
+ * corrupts the runtime state.
+ *
+ * If any identifier doesn't resolve in the supplied map (e.g. its
+ * target type is being created later in the same apply), the
+ * unresolved entries get a placeholder ID of empty-string slot and
+ * the caller should detect this via `extractPendingTargets`. We don't
+ * silently drop unresolved targets here; we just keep what we can and
+ * the caller does a Pass 2.5 update.
+ */
+function resolveOptionsForStorage(
+  options: Record<string, unknown> | null,
+  identifierToTypeId: Map<string, string>
+): Record<string, unknown> | null {
+  if (!options) return null;
+  const idents = options.targetContentTypeIdentifiers;
+  if (!Array.isArray(idents)) return options;
+
+  const resolved: string[] = [];
+  for (const ident of idents) {
+    if (typeof ident !== 'string') continue;
+    const id = identifierToTypeId.get(ident);
+    if (id) resolved.push(id);
+  }
+  const {
+    targetContentTypeIdentifiers: _omitIdents,
+    targetContentTypeIds: _omitIds,
+    ...rest
+  } = options;
+  void _omitIdents;
+  void _omitIds;
+  return { ...rest, targetContentTypeIds: resolved };
+}
+
+/**
+ * If any of `targetContentTypeIdentifiers` doesn't yet resolve in the
+ * supplied map, return the full set so the caller can defer to Pass 2.5.
+ * Returns null when every identifier resolves (or when there are no
+ * relation targets at all).
+ */
+function extractPendingTargets(
+  f: BundleField,
+  identifierToTypeId: Map<string, string>
+): { identifiers: string[]; otherOptions: Record<string, unknown> } | null {
+  const opts = f.options;
+  if (!opts) return null;
+  const idents = opts.targetContentTypeIdentifiers;
+  if (!Array.isArray(idents) || idents.length === 0) return null;
+  const allResolve = idents.every(
+    (i) => typeof i === 'string' && identifierToTypeId.has(i)
+  );
+  if (allResolve) return null;
+  const {
+    targetContentTypeIdentifiers: _omitIdents,
+    targetContentTypeIds: _omitIds,
+    ...otherOptions
+  } = opts;
+  void _omitIdents;
+  void _omitIds;
+  return {
+    identifiers: idents.filter((i): i is string => typeof i === 'string'),
+    otherOptions,
   };
 }
 
