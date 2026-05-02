@@ -140,3 +140,48 @@ function sumApplied(applied: ApplySchemaResult['applied']): number {
     applied.fieldsRemoved
   );
 }
+
+// CLI entry — only runs when this file is invoked directly (e.g. from
+// the docker entrypoint via `tsx scripts/docker-entrypoint/apply-schema.ts`).
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const dirPath = process.env.BOJECT_SCHEMA_DIR;
+  const allowDestructive =
+    process.env.BOJECT_ALLOW_DESTRUCTIVE_SCHEMA === 'true' ||
+    process.env.BOJECT_ALLOW_DESTRUCTIVE_SCHEMA === '1';
+
+  const { PrismaClient } = await import('../../generated/prisma/client');
+  const { PrismaPg } = await import('@prisma/adapter-pg');
+  const { applySchema } = await import('../content-bundle/applySchema');
+  const { readdir, readFile } = await import('node:fs/promises');
+
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    console.error('[apply-schema] DATABASE_URL must be set');
+    process.exit(1);
+  }
+  const adapter = new PrismaPg({ connectionString });
+  const prisma = new PrismaClient({ adapter });
+
+  try {
+    await applySchemaIfConfigured(prisma, {
+      dirPath,
+      allowDestructive,
+      applySchemaFn: applySchema,
+      readDir: (p) => readdir(p),
+      readFile: (p) => readFile(p, 'utf8'),
+      logger: {
+        info: (msg) => console.log(msg),
+        error: (msg) => console.error(msg),
+      },
+    });
+  } catch (err) {
+    // Per-file blocker / error details were already logged by
+    // applySchemaIfConfigured. Just exit non-zero so the shell
+    // entrypoint halts and the container restarts (or the deploy
+    // pipeline rolls back).
+    if (!(err instanceof Error)) console.error(String(err));
+    process.exit(1);
+  } finally {
+    await prisma.$disconnect();
+  }
+}
