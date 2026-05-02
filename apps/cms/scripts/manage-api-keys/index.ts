@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { createHash, randomBytes } from 'node:crypto';
+import { parseArgs } from 'node:util';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../../generated/prisma/client';
 
@@ -8,12 +9,15 @@ const PREFIX = 'boject_';
 const HELP = `manage-api-keys — create, list, and revoke API keys
 
 Usage:
-  pnpm apikey:create <name>    Create a new API key (prints raw key once)
-  pnpm apikey:list             List all API keys (prefix, name, status, last used)
-  pnpm apikey:revoke <prefix>  Revoke an API key by its prefix
+  pnpm apikey:create <name> [--scopes <csv>]   Create a new API key (prints raw key once)
+  pnpm apikey:list                             List all API keys (prefix, name, status, scopes, last used)
+  pnpm apikey:revoke <prefix>                  Revoke an API key by its prefix
 
 Flags:
-  --help, -h   Show this help message
+  --scopes <csv>   Comma-separated list of scopes for the new key.
+                   Recognised scopes: content:read, schema:read, schema:write.
+                   Default: content:read.
+  --help, -h       Show this help message.
 
 Notes:
   - Keys are SHA-256 hashed in the database; the raw key is only shown at
@@ -23,9 +27,33 @@ Notes:
 
 Examples:
   pnpm apikey:create "Mobile app backend"
+  pnpm apikey:create "CI runner" --scopes schema:read,schema:write
   pnpm apikey:list
   pnpm apikey:revoke boject_a1b
 `;
+
+const RECOGNISED_SCOPES = new Set([
+  'content:read',
+  'schema:read',
+  'schema:write',
+]);
+
+function parseScopes(input: string | undefined): string[] {
+  if (!input) return ['content:read'];
+  const parts = input
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  if (parts.length === 0) return ['content:read'];
+  for (const p of parts) {
+    if (!RECOGNISED_SCOPES.has(p)) {
+      throw new Error(
+        `Unknown scope "${p}". Recognised: ${[...RECOGNISED_SCOPES].join(', ')}.`
+      );
+    }
+  }
+  return parts;
+}
 
 function hashApiKey(key: string): string {
   return createHash('sha256').update(key).digest('hex');
@@ -45,15 +73,16 @@ function wantsHelp(values: string[]): boolean {
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
 const prisma = new PrismaClient({ adapter });
 
-async function create(name: string) {
+async function create(name: string, scopes: string[]) {
   const { raw, hash, prefix } = generateApiKey();
   await prisma.apiKey.create({
-    data: { name, keyHash: hash, keyPrefix: prefix },
+    data: { name, keyHash: hash, keyPrefix: prefix, scopes },
   });
 
   console.log('API key created successfully.\n');
   console.log(`  Name:   ${name}`);
   console.log(`  Prefix: ${prefix}`);
+  console.log(`  Scopes: ${scopes.join(', ')}`);
   console.log(`  Key:    ${raw}`);
   console.log('\nSave this key now — it cannot be retrieved again after this.');
 }
@@ -71,11 +100,12 @@ async function list() {
   console.log(
     'Prefix'.padEnd(14) +
       'Name'.padEnd(24) +
-      'Status'.padEnd(12) +
-      'Last Used'.padEnd(24) +
+      'Status'.padEnd(10) +
+      'Scopes'.padEnd(34) +
+      'Last Used'.padEnd(22) +
       'Created'
   );
-  console.log('-'.repeat(98));
+  console.log('-'.repeat(118));
 
   for (const key of keys) {
     const status = key.revokedAt ? 'REVOKED' : 'ACTIVE';
@@ -83,11 +113,13 @@ async function list() {
       ? key.lastUsedAt.toISOString().slice(0, 19)
       : 'Never';
     const created = key.createdAt.toISOString().slice(0, 19);
+    const scopes = (key.scopes ?? []).join(',') || '(none)';
     console.log(
       key.keyPrefix.padEnd(14) +
         key.name.padEnd(24) +
-        status.padEnd(12) +
-        lastUsed.padEnd(24) +
+        status.padEnd(10) +
+        scopes.padEnd(34) +
+        lastUsed.padEnd(22) +
         created
     );
   }
@@ -125,12 +157,23 @@ async function main() {
 
   switch (command) {
     case 'create': {
-      const name = args.join(' ');
-      if (!name) {
-        console.error('Usage: pnpm apikey:create <name>');
+      const { values, positionals } = parseArgs({
+        args,
+        allowPositionals: true,
+        options: {
+          scopes: { type: 'string' },
+          help: { type: 'boolean', short: 'h' },
+        },
+      });
+      if (values.help) {
+        console.log(HELP);
+        return;
+      }
+      if (positionals.length !== 1) {
+        console.error('Usage: pnpm apikey:create <name> [--scopes <csv>]');
         process.exit(1);
       }
-      await create(name);
+      await create(positionals[0]!, parseScopes(values.scopes));
       break;
     }
     case 'list':
