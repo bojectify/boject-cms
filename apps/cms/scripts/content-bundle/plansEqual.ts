@@ -6,7 +6,7 @@
 // changed something, plansEqual returns false and the applier
 // rolls back with SchemaChangedDuringApplyError.
 //
-// Pure module — no DB, no Prisma.
+// Pure module — no Prisma client, no DB calls.
 
 import type { SchemaPlan } from './schemaPlan.types';
 
@@ -15,7 +15,7 @@ export function plansEqual(a: SchemaPlan, b: SchemaPlan): boolean {
 }
 
 function canonicalise(plan: SchemaPlan): string {
-  return JSON.stringify({
+  return stableStringify({
     contentTypes: {
       create: [...plan.contentTypes.create].sort((x, y) =>
         x.identifier.localeCompare(y.identifier)
@@ -55,4 +55,20 @@ function canonicalise(plan: SchemaPlan): string {
 
 function fieldKey(typeIdentifier: string, fieldIdentifier: string): string {
   return `${typeIdentifier}:${fieldIdentifier}`;
+}
+
+// JSON.stringify is insertion-order-sensitive on object keys, so an
+// equivalent diff payload built with a different key order would
+// compare unequal. stableStringify sorts keys recursively so the
+// canonical form depends on content alone.
+function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) {
+    return `[${value.map(stableStringify).join(',')}]`;
+  }
+  const obj = value as Record<string, unknown>;
+  const keys = Object.keys(obj).sort();
+  return `{${keys
+    .map((k) => `${JSON.stringify(k)}:${stableStringify(obj[k])}`)
+    .join(',')}}`;
 }
