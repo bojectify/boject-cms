@@ -11,6 +11,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../../generated/prisma/client';
 import { applySchema } from './applySchema';
 import * as snapshotModule from './snapshotCurrentSchema';
+import * as schemaModule from '../../server/graphql/schema';
 import type { Bundle } from './types';
 
 const url = 'postgresql://boject:boject@localhost:5432/boject_test';
@@ -932,6 +933,50 @@ describe('applySchema', () => {
         where: { identifier: 'Article' },
       });
       expect(ct!.name).toBe('Article');
+    });
+  });
+
+  describe('invalidateSchema integration', () => {
+    it('does NOT call invalidateSchema on a no-op apply', async () => {
+      const spy = vi.spyOn(schemaModule, 'invalidateSchema');
+      spy.mockImplementation(() => {});
+
+      const result = await applySchema(prisma, emptyBundle);
+      expect(result.changed).toBe(false);
+      expect(spy).not.toHaveBeenCalled();
+    });
+
+    it('calls invalidateSchema once on a non-empty apply', async () => {
+      const spy = vi.spyOn(schemaModule, 'invalidateSchema');
+      spy.mockImplementation(() => {});
+
+      const bundle: Bundle = {
+        version: 2,
+        exportedAt: '2026-05-01T00:00:00.000Z',
+        portable: true,
+        contentTypes: [
+          {
+            id: null,
+            identifier: 'NewType',
+            name: 'NewType',
+            description: null,
+            fields: [
+              {
+                id: null,
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                required: true,
+                order: 0,
+                options: null,
+              },
+            ],
+          },
+        ],
+      };
+      const result = await applySchema(prisma, bundle);
+      expect(result.changed).toBe(true);
+      expect(spy).toHaveBeenCalledTimes(1);
     });
   });
 });

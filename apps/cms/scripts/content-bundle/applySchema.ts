@@ -23,6 +23,7 @@ import {
 import { snapshotCurrentSchema } from './snapshotCurrentSchema';
 import { planSchema } from './planSchema';
 import { plansEqual } from './plansEqual';
+import { invalidateSchema } from '../../server/graphql/schema';
 
 export interface ApplySchemaOptions {
   allowDestructive?: boolean;
@@ -61,7 +62,7 @@ export async function applySchema(
     throw new SchemaApplyValidationError(validation.errors);
   }
 
-  return prisma.$transaction(async (tx) => {
+  const txResult = await prisma.$transaction(async (tx) => {
     // The transaction client is structurally compatible with the
     // PrismaClient methods snapshotCurrentSchema calls (findMany,
     // groupBy). Cast is justified — the runtime contract holds.
@@ -175,6 +176,14 @@ export async function applySchema(
     const changed = isPlanNonEmpty(plan);
     return { changed, plan, applied };
   });
+
+  // Invalidate the cached GraphQL schema so the next request rebuilds
+  // against the freshly mutated content types. Skip on no-op applies —
+  // the entrypoint runs apply on every boot and most boots are no-ops.
+  if (txResult.changed) {
+    invalidateSchema();
+  }
+  return txResult;
 }
 
 function toFieldCreatePayload(f: BundleField) {
