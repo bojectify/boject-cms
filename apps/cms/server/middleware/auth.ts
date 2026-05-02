@@ -34,16 +34,22 @@ export default defineEventHandler(async (event) => {
     return;
   }
 
-  // Fall back to API key auth (read-only access)
+  // Fall back to API key auth (read-only access by default)
   const result = await validateApiKey(event);
   if (result.valid) {
     event.context.authMethod = 'apikey';
+    event.context.apiKeyScopes = result.scopes;
     const method = getMethod(event);
     if (method !== 'GET' && method !== 'HEAD') {
-      throw createError({
-        statusCode: 403,
-        message: 'API keys have read-only access',
-      });
+      // Allow non-GET on the schema apply endpoint specifically; the
+      // endpoint asserts `schema:write` itself. Other endpoints stay
+      // read-only for API keys.
+      if (path !== '/api/schema/apply') {
+        throw createError({
+          statusCode: 403,
+          message: 'API keys have read-only access',
+        });
+      }
     }
     return;
   }

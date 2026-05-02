@@ -4,7 +4,12 @@ import { prisma } from './prisma';
 import { hashApiKey } from './apiKey';
 
 export type ValidateApiKeyResult =
-  | { valid: true; apiKeyId: string; keyPrefix: string }
+  | {
+      valid: true;
+      apiKeyId: string;
+      keyPrefix: string;
+      scopes: string[];
+    }
   | { valid: false; message: string };
 
 /**
@@ -17,6 +22,7 @@ export type ApiKeyClient = {
       id: string;
       keyPrefix: string;
       revokedAt: Date | null;
+      scopes: string[];
     } | null>;
     update: (args: {
       where: { id: string };
@@ -54,7 +60,12 @@ export async function resolveApiKey(
     .update({ where: { id: apiKey.id }, data: { lastUsedAt: new Date() } })
     .catch(() => {});
 
-  return { valid: true, apiKeyId: apiKey.id, keyPrefix: apiKey.keyPrefix };
+  return {
+    valid: true,
+    apiKeyId: apiKey.id,
+    keyPrefix: apiKey.keyPrefix,
+    scopes: apiKey.scopes ?? [],
+  };
 }
 
 export async function validateApiKey(

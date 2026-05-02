@@ -84,4 +84,15 @@ describe('renderEnvFile', () => {
     // The comment block above the line should explain when to enable it.
     expect(out).toMatch(/destructive|removal/i);
   });
+
+  it('includes a commented BOJECT_API_KEY line', () => {
+    const env = renderEnvFile({ ...baseParams, starter: 'base' });
+    expect(env).toMatch(/^# BOJECT_API_KEY=/m);
+    expect(env).toMatch(/CLI|boject schema/i);
+  });
+
+  it('does not enable BOJECT_API_KEY by default', () => {
+    const env = renderEnvFile({ ...baseParams, starter: 'base' });
+    expect(env).not.toMatch(/^BOJECT_API_KEY=/m);
+  });
 });

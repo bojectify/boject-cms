@@ -7,6 +7,7 @@ type ApiKeyRow = {
   id: string;
   keyPrefix: string;
   revokedAt: Date | null;
+  scopes: string[];
 } | null;
 
 function makePrisma(row: ApiKeyRow): ApiKeyClient {
@@ -57,6 +58,7 @@ describe('resolveApiKey', () => {
       id: 'key-1',
       keyPrefix: 'boject_test',
       revokedAt: new Date('2026-04-01'),
+      scopes: [],
     });
     const result = await resolveApiKey(prisma, 'Bearer boject_test_revoked');
     expect(result).toEqual({
@@ -70,16 +72,34 @@ describe('resolveApiKey', () => {
       id: 'key-1',
       keyPrefix: 'boject_test',
       revokedAt: null,
+      scopes: [],
     });
     const result = await resolveApiKey(prisma, 'Bearer boject_test_active');
     expect(result).toEqual({
       valid: true,
       apiKeyId: 'key-1',
       keyPrefix: 'boject_test',
+      scopes: [],
     });
     expect(prisma.apiKey.update).toHaveBeenCalledWith({
       where: { id: 'key-1' },
       data: { lastUsedAt: expect.any(Date) },
+    });
+  });
+
+  it('propagates non-empty scopes through the success path', async () => {
+    const prisma = makePrisma({
+      id: 'key-1',
+      keyPrefix: 'boject_test',
+      revokedAt: null,
+      scopes: ['schema:write'],
+    });
+    const result = await resolveApiKey(prisma, 'Bearer boject_test_active');
+    expect(result).toEqual({
+      valid: true,
+      apiKeyId: 'key-1',
+      keyPrefix: 'boject_test',
+      scopes: ['schema:write'],
     });
   });
 
@@ -88,6 +108,7 @@ describe('resolveApiKey', () => {
       id: 'key-1',
       keyPrefix: 'boject_test',
       revokedAt: null,
+      scopes: [],
     });
     vi.mocked(prisma.apiKey.update).mockRejectedValueOnce(new Error('db down'));
     await expect(

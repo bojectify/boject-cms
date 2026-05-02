@@ -44,6 +44,7 @@ describe('create-boject-cms E2E', () => {
     const files = await readdir(target);
     expect(files.sort()).toEqual(
       [
+        '.boject.config.json',
         '.env',
         '.gitignore',
         'README.md',
