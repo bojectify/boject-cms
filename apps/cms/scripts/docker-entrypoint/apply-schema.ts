@@ -52,7 +52,7 @@ export interface ApplySchemaIfConfiguredResult {
 }
 
 export async function applySchemaIfConfigured(
-  _prisma: PrismaClient,
+  prisma: PrismaClient,
   input: ApplySchemaIfConfiguredInput
 ): Promise<ApplySchemaIfConfiguredResult> {
   if (!input.dirPath) {
@@ -65,11 +65,32 @@ export async function applySchemaIfConfigured(
   if (bundles.length === 0) {
     return { applied: false, reason: 'no-bundles', files: 0, totalChanges: 0 };
   }
-  // Apply walk lands in Task 2.
+
+  let totalChanges = 0;
+  for (const name of bundles) {
+    const fullPath = `${input.dirPath}/${name}`;
+    const raw = await input.readFile(fullPath);
+    const bundle = JSON.parse(raw) as Bundle;
+    const result = await input.applySchemaFn(prisma, bundle, {
+      allowDestructive: input.allowDestructive,
+    });
+    totalChanges += sumApplied(result.applied);
+  }
   return {
     applied: true,
     reason: 'applied',
     files: bundles.length,
-    totalChanges: 0,
+    totalChanges,
   };
+}
+
+function sumApplied(applied: ApplySchemaResult['applied']): number {
+  return (
+    applied.contentTypesCreated +
+    applied.contentTypesUpdated +
+    applied.contentTypesRemoved +
+    applied.fieldsCreated +
+    applied.fieldsUpdated +
+    applied.fieldsRemoved
+  );
 }

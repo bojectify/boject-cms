@@ -82,4 +82,112 @@ describe('applySchemaIfConfigured', () => {
       totalChanges: 0,
     });
   });
+
+  const ZERO_APPLIED = {
+    contentTypesCreated: 0,
+    contentTypesUpdated: 0,
+    contentTypesRemoved: 0,
+    fieldsCreated: 0,
+    fieldsUpdated: 0,
+    fieldsRemoved: 0,
+  };
+
+  const EMPTY_PLAN = {
+    contentTypes: { create: [], update: [], remove: [] },
+    fields: { create: [], update: [], remove: [] },
+    warnings: [],
+    blockers: [],
+  };
+
+  const SAMPLE_BUNDLE_JSON = JSON.stringify({
+    version: 2,
+    exportedAt: '2026-05-01T00:00:00.000Z',
+    portable: true,
+    contentTypes: [],
+  });
+
+  it('reads files in alphabetical order and calls applySchema once per file', async () => {
+    const callOrder: string[] = [];
+    const applySchemaFn = vi.fn().mockImplementation(async () => {
+      return { changed: false, plan: EMPTY_PLAN, applied: { ...ZERO_APPLIED } };
+    });
+    const readDir = vi
+      .fn()
+      .mockResolvedValue([
+        'b.boject.json',
+        'a.boject.json',
+        'README.md',
+        'c.boject.json',
+      ]);
+    const readFile = vi.fn().mockImplementation(async (p: string) => {
+      callOrder.push(p);
+      return SAMPLE_BUNDLE_JSON;
+    });
+
+    const result = await applySchemaIfConfigured(
+      {} as Parameters<typeof applySchemaIfConfigured>[0],
+      {
+        dirPath: '/app/content-types',
+        allowDestructive: false,
+        applySchemaFn,
+        readDir,
+        readFile,
+        logger: NOOP_LOGGER,
+      }
+    );
+
+    expect(callOrder).toEqual([
+      '/app/content-types/a.boject.json',
+      '/app/content-types/b.boject.json',
+      '/app/content-types/c.boject.json',
+    ]);
+    expect(applySchemaFn).toHaveBeenCalledTimes(3);
+    expect(result).toEqual({
+      applied: true,
+      reason: 'applied',
+      files: 3,
+      totalChanges: 0,
+    });
+  });
+
+  it('aggregates totalChanges across all files', async () => {
+    const applySchemaFn = vi
+      .fn()
+      .mockResolvedValueOnce({
+        changed: true,
+        plan: EMPTY_PLAN,
+        applied: {
+          ...ZERO_APPLIED,
+          contentTypesCreated: 1,
+          fieldsCreated: 2,
+        },
+      })
+      .mockResolvedValueOnce({
+        changed: true,
+        plan: EMPTY_PLAN,
+        applied: {
+          ...ZERO_APPLIED,
+          fieldsUpdated: 3,
+        },
+      });
+    const readDir = vi
+      .fn()
+      .mockResolvedValue(['a.boject.json', 'b.boject.json']);
+    const readFile = vi.fn().mockResolvedValue(SAMPLE_BUNDLE_JSON);
+
+    const result = await applySchemaIfConfigured(
+      {} as Parameters<typeof applySchemaIfConfigured>[0],
+      {
+        dirPath: '/app/content-types',
+        allowDestructive: false,
+        applySchemaFn,
+        readDir,
+        readFile,
+        logger: NOOP_LOGGER,
+      }
+    );
+
+    expect(result.totalChanges).toBe(6); // 1 + 2 + 3
+    expect(result.files).toBe(2);
+  });
 });
