@@ -622,4 +622,70 @@ describe('applySchema', () => {
       expect(f!.required).toBe(true);
     });
   });
+
+  describe('happy path — pass 2 (field removes)', () => {
+    it('removes a field with allowDestructive', async () => {
+      await prisma.contentType.create({
+        data: {
+          identifier: 'Article',
+          name: 'Article',
+          fields: {
+            create: [
+              {
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                required: true,
+                unique: true,
+                order: 0,
+              },
+              {
+                identifier: 'oldField',
+                name: 'Old',
+                type: 'TEXT',
+                required: false,
+                unique: false,
+                order: 1,
+              },
+            ],
+          },
+        },
+      });
+
+      const bundle: Bundle = {
+        version: 2,
+        exportedAt: '2026-05-01T00:00:00.000Z',
+        portable: true,
+        contentTypes: [
+          {
+            id: null,
+            identifier: 'Article',
+            name: 'Article',
+            description: null,
+            fields: [
+              {
+                id: null,
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                required: true,
+                order: 0,
+                options: null,
+              },
+            ],
+          },
+        ],
+      };
+      const result = await applySchema(prisma, bundle, {
+        allowDestructive: true,
+      });
+      expect(result.changed).toBe(true);
+      expect(result.applied.fieldsRemoved).toBe(1);
+
+      const gone = await prisma.contentTypeField.findFirst({
+        where: { identifier: 'oldField' },
+      });
+      expect(gone).toBeNull();
+    });
+  });
 });

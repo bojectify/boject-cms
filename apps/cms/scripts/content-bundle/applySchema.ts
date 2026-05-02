@@ -137,6 +137,21 @@ export async function applySchema(
       applied.fieldsUpdated += 1;
     }
 
+    // Pass 2: field removes. Skip any field whose owning content type was
+    // just removed in pass 1 — Prisma's cascade already deleted those.
+    for (const removal of plan.fields.remove) {
+      const ownerWasRemoved =
+        removedTypeIds.size > 0 &&
+        snapshot.contentTypes.some(
+          (c) =>
+            removedTypeIds.has(c.id) &&
+            c.fields.some((f) => f.id === removal.id)
+        );
+      if (ownerWasRemoved) continue;
+      await tx.contentTypeField.delete({ where: { id: removal.id } });
+      applied.fieldsRemoved += 1;
+    }
+
     const changed = isPlanNonEmpty(plan);
     return { changed, plan, applied };
   });
