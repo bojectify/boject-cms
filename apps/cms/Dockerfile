@@ -64,6 +64,7 @@ COPY --from=build --chown=cms:cms /workspace/apps/cms/generated ./apps/cms/gener
 COPY --from=build --chown=cms:cms /workspace/apps/cms/prisma ./apps/cms/prisma
 COPY --from=build --chown=cms:cms /workspace/apps/cms/prisma.config.ts ./apps/cms/prisma.config.ts
 COPY --from=build --chown=cms:cms /workspace/apps/cms/scripts ./apps/cms/scripts
+COPY --from=build --chown=cms:cms /workspace/apps/cms/utils ./apps/cms/utils
 COPY --from=build --chown=cms:cms /workspace/apps/cms/docker ./apps/cms/docker
 
 # Trigger engine download as root (cms user can't write to /app/node_modules),
