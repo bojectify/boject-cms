@@ -31,4 +31,10 @@ describe('renderReadme', () => {
     const md = renderReadme({ starter: 'none', adminEmail: 'admin@local' });
     expect(md.toLowerCase()).not.toContain('starter will be imported');
   });
+
+  it('includes a Content types section explaining schema-as-code', () => {
+    const out = renderReadme({ starter: 'base', adminEmail: 'admin@local' });
+    expect(out).toContain('## Content types');
+    expect(out).toContain('content-types/schema.boject.json');
+  });
 });

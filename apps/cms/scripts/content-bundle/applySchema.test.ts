@@ -786,9 +786,17 @@ describe('applySchema', () => {
       });
       expect(authorField).not.toBeNull();
       const opts = authorField!.options as {
+        targetContentTypeIds?: string[];
         targetContentTypeIdentifiers?: string[];
       };
-      expect(opts.targetContentTypeIdentifiers).toEqual(['Author']);
+      // DB stores UUIDs, not identifiers — runtime (GraphQL, validation)
+      // reads targetContentTypeIds. Identifiers belong only in bundles.
+      expect(opts.targetContentTypeIdentifiers).toBeUndefined();
+      expect(opts.targetContentTypeIds).toHaveLength(1);
+      const authorType = await prisma.contentType.findUniqueOrThrow({
+        where: { identifier: 'Author' },
+      });
+      expect(opts.targetContentTypeIds).toEqual([authorType.id]);
     });
 
     it('creates two content types that mutually relate in one apply', async () => {
@@ -847,6 +855,137 @@ describe('applySchema', () => {
       // Both types created with their fields embedded (no separate
       // pass 2 entries — both rode along with pass 1).
       expect(result.applied.fieldsCreated).toBe(0);
+    });
+
+    it('is a no-op when the DB was seeded by importBundle and apply-schema runs against the same portable bundle', async () => {
+      // Mirrors the smoke-test scenario: import-starter writes the
+      // bundle (resolves identifiers → UUIDs), then apply-schema runs
+      // against the same bundle. The second pass must not re-update
+      // RELATION fields just because the DB stores UUIDs and the
+      // bundle has identifiers.
+      const { importBundle } = await import('./import');
+      const bundle: Bundle = {
+        version: 2,
+        exportedAt: '2026-05-01T00:00:00.000Z',
+        portable: true,
+        contentTypes: [
+          {
+            id: null,
+            identifier: 'Author',
+            name: 'Author',
+            description: null,
+            fields: [
+              {
+                id: null,
+                identifier: 'name',
+                name: 'Name',
+                type: 'ENTRY_TITLE',
+                required: true,
+                order: 0,
+                options: null,
+              },
+            ],
+          },
+          {
+            id: null,
+            identifier: 'Article',
+            name: 'Article',
+            description: null,
+            fields: [
+              {
+                id: null,
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                required: true,
+                order: 0,
+                options: null,
+              },
+              {
+                id: null,
+                identifier: 'author',
+                name: 'Author',
+                type: 'RELATION',
+                required: false,
+                order: 1,
+                options: {
+                  targetContentTypeIds: [null],
+                  targetContentTypeIdentifiers: ['Author'],
+                },
+              },
+            ],
+          },
+        ],
+      };
+
+      await importBundle(prisma, bundle, { mode: 'all', author: 'system' });
+
+      const result = await applySchema(prisma, bundle);
+      expect(result.changed).toBe(false);
+      expect(result.applied.fieldsUpdated).toBe(0);
+    });
+
+    it('is a no-op on second apply of the same portable bundle (RELATION targets resolve identically)', async () => {
+      const bundle: Bundle = {
+        version: 2,
+        exportedAt: '2026-05-01T00:00:00.000Z',
+        portable: true,
+        contentTypes: [
+          {
+            id: null,
+            identifier: 'Tag',
+            name: 'Tag',
+            description: null,
+            fields: [
+              {
+                id: null,
+                identifier: 'name',
+                name: 'Name',
+                type: 'ENTRY_TITLE',
+                required: true,
+                order: 0,
+                options: null,
+              },
+            ],
+          },
+          {
+            id: null,
+            identifier: 'Article',
+            name: 'Article',
+            description: null,
+            fields: [
+              {
+                id: null,
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                required: true,
+                order: 0,
+                options: null,
+              },
+              {
+                id: null,
+                identifier: 'tags',
+                name: 'Tags',
+                type: 'MULTIRELATION',
+                required: false,
+                order: 1,
+                options: {
+                  targetContentTypeIds: [null],
+                  targetContentTypeIdentifiers: ['Tag'],
+                },
+              },
+            ],
+          },
+        ],
+      };
+
+      const first = await applySchema(prisma, bundle);
+      expect(first.changed).toBe(true);
+
+      const second = await applySchema(prisma, bundle);
+      expect(second.changed).toBe(false);
+      expect(second.applied.fieldsUpdated).toBe(0);
     });
   });
 

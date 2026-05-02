@@ -47,6 +47,7 @@ describe('create-boject-cms E2E', () => {
         '.env',
         '.gitignore',
         'README.md',
+        'content-types',
         'docker-compose.yml',
         'package.json',
         'starters',

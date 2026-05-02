@@ -50,4 +50,14 @@ describe('renderDockerCompose', () => {
     const yml = renderDockerCompose({ imageTag: 'x', starter: 'base' });
     expect(yml.endsWith('\n')).toBe(true);
   });
+
+  it('always includes the content-types bind mount', () => {
+    for (const starter of ['base', 'sport', 'rugby', 'none'] as const) {
+      const out = renderDockerCompose({
+        imageTag: 'boject/cms:dev',
+        starter,
+      });
+      expect(out).toContain('./content-types:/app/content-types:ro');
+    }
+  });
 });

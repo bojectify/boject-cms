@@ -29,6 +29,14 @@ pnpm content:import ./starters/base.boject.json
 
 The CLI fails fast if any identifier, slug, or entry title collides with existing data — apply to an empty instance.
 
+## Use as schema-as-code source
+
+The same JSON files in this directory are valid `BOJECT_SCHEMA_DIR` content
+(see [the entrypoint design](../docs/superpowers/specs/2026-05-01-schema-as-code-entrypoint-design.md)).
+When you scaffold a project with `create-boject-cms`, the chosen starter is
+copied byte-for-byte into `<project>/content-types/schema.boject.json` and
+becomes the source of truth for the project's schema going forward.
+
 ## Conventions
 
 - **SiteSettings is a singleton.** The starter creates exactly one entry. Consumers should query `siteSettings(first: 1) { edges { node { ... } } }` and use the first result. Do not create additional `SiteSettings` entries.
