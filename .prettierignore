@@ -13,3 +13,4 @@ public
 tsconfig.json
 pnpm-lock.yaml
 perf/scripts/render-report.fixtures
+perf/reports/**/raw*.json
