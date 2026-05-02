@@ -119,6 +119,24 @@ export async function applySchema(
       applied.fieldsCreated += 1;
     }
 
+    // Pass 2: field updates. Sparse changes object — only set
+    // properties that are present in the diff. Planner already
+    // validated each change is safe.
+    for (const update of plan.fields.update) {
+      const data: Prisma.ContentTypeFieldUpdateInput = {};
+      if (update.changes.name !== undefined) data.name = update.changes.name;
+      if (update.changes.order !== undefined) data.order = update.changes.order;
+      if (update.changes.required !== undefined)
+        data.required = update.changes.required;
+      if (update.changes.unique !== undefined)
+        data.unique = update.changes.unique;
+      if (update.changes.options !== undefined) {
+        data.options = update.changes.options as Prisma.InputJsonValue;
+      }
+      await tx.contentTypeField.update({ where: { id: update.id }, data });
+      applied.fieldsUpdated += 1;
+    }
+
     const changed = isPlanNonEmpty(plan);
     return { changed, plan, applied };
   });

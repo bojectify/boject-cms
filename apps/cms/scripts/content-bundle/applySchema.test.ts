@@ -405,4 +405,221 @@ describe('applySchema', () => {
       expect(tagline!.type).toBe('TEXT');
     });
   });
+
+  describe('happy path — pass 2 (field updates)', () => {
+    it('updates a field name and order', async () => {
+      await prisma.contentType.create({
+        data: {
+          identifier: 'Article',
+          name: 'Article',
+          fields: {
+            create: [
+              {
+                identifier: 'title',
+                name: 'Old Title',
+                type: 'ENTRY_TITLE',
+                required: true,
+                unique: true,
+                order: 5,
+              },
+            ],
+          },
+        },
+      });
+
+      const bundle: Bundle = {
+        version: 2,
+        exportedAt: '2026-05-01T00:00:00.000Z',
+        portable: true,
+        contentTypes: [
+          {
+            id: null,
+            identifier: 'Article',
+            name: 'Article',
+            description: null,
+            fields: [
+              {
+                id: null,
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                required: true,
+                order: 0,
+                options: null,
+              },
+            ],
+          },
+        ],
+      };
+      const result = await applySchema(prisma, bundle);
+      expect(result.changed).toBe(true);
+      expect(result.applied.fieldsUpdated).toBe(1);
+
+      const f = await prisma.contentTypeField.findFirst({
+        where: { identifier: 'title' },
+      });
+      expect(f!.name).toBe('Title');
+      expect(f!.order).toBe(0);
+    });
+
+    it('updates a SELECT field options when a choice is added', async () => {
+      await prisma.contentType.create({
+        data: {
+          identifier: 'Post',
+          name: 'Post',
+          fields: {
+            create: [
+              {
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                required: true,
+                unique: true,
+                order: 0,
+              },
+              {
+                identifier: 'category',
+                name: 'Category',
+                type: 'SELECT',
+                required: false,
+                unique: false,
+                order: 1,
+                options: { choices: ['news'] },
+              },
+            ],
+          },
+        },
+      });
+
+      const bundle: Bundle = {
+        version: 2,
+        exportedAt: '2026-05-01T00:00:00.000Z',
+        portable: true,
+        contentTypes: [
+          {
+            id: null,
+            identifier: 'Post',
+            name: 'Post',
+            description: null,
+            fields: [
+              {
+                id: null,
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                required: true,
+                order: 0,
+                options: null,
+              },
+              {
+                id: null,
+                identifier: 'category',
+                name: 'Category',
+                type: 'SELECT',
+                required: false,
+                order: 1,
+                options: { choices: ['news', 'opinion'] },
+              },
+            ],
+          },
+        ],
+      };
+      const result = await applySchema(prisma, bundle);
+      expect(result.changed).toBe(true);
+      expect(result.applied.fieldsUpdated).toBe(1);
+
+      const f = await prisma.contentTypeField.findFirst({
+        where: { identifier: 'category' },
+      });
+      expect((f!.options as { choices: string[] }).choices).toEqual([
+        'news',
+        'opinion',
+      ]);
+    });
+
+    it('updates required false → true when no entries have null', async () => {
+      const ct = await prisma.contentType.create({
+        data: {
+          identifier: 'Article',
+          name: 'Article',
+          fields: {
+            create: [
+              {
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                required: true,
+                unique: true,
+                order: 0,
+              },
+              {
+                identifier: 'tagline',
+                name: 'Tagline',
+                type: 'TEXT',
+                required: false,
+                unique: false,
+                order: 1,
+              },
+            ],
+          },
+        },
+      });
+      // Seed an entry whose tagline is set, so required: true is safe.
+      await prisma.contentEntry.create({
+        data: {
+          contentTypeId: ct.id,
+          entryTitle: 'A',
+          slug: 'a',
+          versions: {
+            create: {
+              data: { title: 'A', tagline: 'Hello' },
+              entryTitle: 'A',
+              status: 'PUBLISHED',
+            },
+          },
+        },
+      });
+
+      const bundle: Bundle = {
+        version: 2,
+        exportedAt: '2026-05-01T00:00:00.000Z',
+        portable: true,
+        contentTypes: [
+          {
+            id: null,
+            identifier: 'Article',
+            name: 'Article',
+            description: null,
+            fields: [
+              {
+                id: null,
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                required: true,
+                order: 0,
+                options: null,
+              },
+              {
+                id: null,
+                identifier: 'tagline',
+                name: 'Tagline',
+                type: 'TEXT',
+                required: true,
+                order: 1,
+                options: null,
+              },
+            ],
+          },
+        ],
+      };
+      const result = await applySchema(prisma, bundle);
+      expect(result.applied.fieldsUpdated).toBe(1);
+
+      const f = await prisma.contentTypeField.findFirst({
+        where: { identifier: 'tagline' },
+      });
+      expect(f!.required).toBe(true);
+    });
+  });
 });
