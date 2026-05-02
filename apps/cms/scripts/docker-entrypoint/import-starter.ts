@@ -1,3 +1,12 @@
+// apps/cms/scripts/docker-entrypoint/import-starter.ts
+//
+// FIRST-BOOT seed. Imports BOJECT_INITIAL_STARTER (a single bundle file
+// path) into an empty CMS — both schema and entries (e.g. SiteSettings).
+// Gated by "ContentType table is empty"; on every subsequent boot this
+// script is a no-op and apply-schema.ts (every-boot, schema-only,
+// idempotent) takes over. See `apply-schema.ts` for the long-lived
+// schema-as-code lifecycle.
+
 import type { PrismaClient } from '../../generated/prisma/client';
 import type { Bundle, ImportResult } from '../content-bundle/types';
 

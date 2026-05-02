@@ -39,6 +39,7 @@ describe('writeProject', () => {
         '.env',
         '.gitignore',
         'README.md',
+        'content-types',
         'docker-compose.yml',
         'package.json',
         'starters',
@@ -114,5 +115,38 @@ describe('writeProject', () => {
         force: false,
       })
     ).rejects.toThrow(/sport.boject.json/);
+  });
+
+  it('writes content-types/schema.boject.json copying the chosen starter', async () => {
+    const target = join(workDir, 'site');
+    await writeProject({
+      ...baseArgs,
+      targetDir: target,
+      starter: 'base',
+      force: false,
+    });
+    const written = await readFile(
+      join(target, 'content-types', 'schema.boject.json'),
+      'utf8'
+    );
+    const expected = await readFile(join(FIXTURES, 'base.boject.json'), 'utf8');
+    expect(written).toBe(expected);
+  });
+
+  it('writes the empty-bundle stub for the "none" starter', async () => {
+    const target = join(workDir, 'site');
+    await writeProject({
+      ...baseArgs,
+      targetDir: target,
+      starter: 'none',
+      force: false,
+    });
+    const written = await readFile(
+      join(target, 'content-types', 'schema.boject.json'),
+      'utf8'
+    );
+    const parsed = JSON.parse(written);
+    expect(parsed.version).toBe(2);
+    expect(parsed.contentTypes).toEqual([]);
   });
 });

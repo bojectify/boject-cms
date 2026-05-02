@@ -2,6 +2,7 @@ import { copyFile, mkdir, readdir, writeFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import {
   GITIGNORE,
+  renderContentTypesBundle,
   renderDockerCompose,
   renderEnvFile,
   renderPackageJson,
@@ -68,6 +69,22 @@ export async function writeProject({
     const source = join(startersSourceDir, `${starter}.boject.json`);
     const dest = join(startersTarget, `${starter}.boject.json`);
     await copyFile(source, dest);
+  }
+
+  // Always create content-types/ for BOJECT_SCHEMA_DIR (Spec 4).
+  const contentTypesTarget = join(targetDir, 'content-types');
+  await mkdir(contentTypesTarget, { recursive: true });
+  const bundleResult = renderContentTypesBundle({ starter });
+  if (bundleResult.kind === 'content') {
+    await writeFile(
+      join(contentTypesTarget, 'schema.boject.json'),
+      bundleResult.content
+    );
+  } else {
+    await copyFile(
+      join(startersSourceDir, bundleResult.sourceFilename),
+      join(contentTypesTarget, 'schema.boject.json')
+    );
   }
 
   return { adminEmail, adminPassword };

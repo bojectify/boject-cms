@@ -140,12 +140,46 @@ export async function snapshotCurrentSchema(
         required: f.required,
         unique: f.unique,
         order: f.order,
-        options: f.options as Record<string, unknown> | null,
+        options: snapshotOptionsForPlanner(
+          f.type,
+          f.options as Record<string, unknown> | null,
+          typeIdToIdentifier
+        ),
       })),
       entryCount: entryCountByTypeId.get(ct.id) ?? 0,
     })),
     fieldUsage,
   };
+}
+
+/**
+ * Convert DB-form field options (UUIDs in `targetContentTypeIds`) into
+ * planner-form options (identifiers in `targetContentTypeIdentifiers`),
+ * so the planner — which compares against bundle options that already
+ * use identifiers — can diff cleanly. Without this, every RELATION /
+ * MULTIRELATION field looks like it just gained all of its targets on
+ * every apply.
+ */
+function snapshotOptionsForPlanner(
+  type: string,
+  options: Record<string, unknown> | null,
+  typeIdToIdentifier: Map<string, string>
+): Record<string, unknown> | null {
+  if (!options) return null;
+  if (type !== 'RELATION' && type !== 'MULTIRELATION') return options;
+  const ids = options.targetContentTypeIds;
+  if (!Array.isArray(ids)) return options;
+  const identifiers: string[] = [];
+  for (const id of ids) {
+    if (typeof id !== 'string') continue;
+    const ident = typeIdToIdentifier.get(id);
+    if (ident) identifiers.push(ident);
+  }
+  // Drop targetContentTypeIds from the planner-facing snapshot so the
+  // generic options comparator (used for unhandled keys) doesn't see a
+  // UUID array on one side and a null/identifier array on the other.
+  const { targetContentTypeIds: _omitIds, ...rest } = options;
+  return { ...rest, targetContentTypeIdentifiers: identifiers };
 }
 
 type Version = {
