@@ -62,4 +62,26 @@ describe('renderEnvFile', () => {
     // form is allowed and asserted above.
     expect(env).not.toMatch(/^BOJECT_SCHEMA_READONLY=/m);
   });
+
+  it('always includes BOJECT_SCHEMA_DIR=/app/content-types', () => {
+    for (const starter of ['base', 'sport', 'rugby', 'none'] as const) {
+      const out = renderEnvFile({
+        sessionPassword: 'pw1',
+        adminPassword: 'pw2',
+        starter,
+      });
+      expect(out).toContain('BOJECT_SCHEMA_DIR=/app/content-types');
+    }
+  });
+
+  it('includes the commented BOJECT_ALLOW_DESTRUCTIVE_SCHEMA line with a comment', () => {
+    const out = renderEnvFile({
+      sessionPassword: 'pw1',
+      adminPassword: 'pw2',
+      starter: 'base',
+    });
+    expect(out).toContain('# BOJECT_ALLOW_DESTRUCTIVE_SCHEMA=true');
+    // The comment block above the line should explain when to enable it.
+    expect(out).toMatch(/destructive|removal/i);
+  });
 });
