@@ -688,4 +688,151 @@ describe('applySchema', () => {
       expect(gone).toBeNull();
     });
   });
+
+  describe('two-pass ordering', () => {
+    it('creates a content type and a RELATION field targeting it in one apply', async () => {
+      // Article exists; Author is brand new; Article gets a RELATION field
+      // targeting Author, all in one bundle.
+      await prisma.contentType.create({
+        data: {
+          identifier: 'Article',
+          name: 'Article',
+          fields: {
+            create: [
+              {
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                required: true,
+                unique: true,
+                order: 0,
+              },
+            ],
+          },
+        },
+      });
+
+      const bundle: Bundle = {
+        version: 2,
+        exportedAt: '2026-05-01T00:00:00.000Z',
+        portable: true,
+        contentTypes: [
+          {
+            id: null,
+            identifier: 'Author',
+            name: 'Author',
+            description: null,
+            fields: [
+              {
+                id: null,
+                identifier: 'name',
+                name: 'Name',
+                type: 'ENTRY_TITLE',
+                required: true,
+                order: 0,
+                options: null,
+              },
+            ],
+          },
+          {
+            id: null,
+            identifier: 'Article',
+            name: 'Article',
+            description: null,
+            fields: [
+              {
+                id: null,
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                required: true,
+                order: 0,
+                options: null,
+              },
+              {
+                id: null,
+                identifier: 'author',
+                name: 'Author',
+                type: 'RELATION',
+                required: false,
+                order: 1,
+                options: { targetContentTypeIdentifiers: ['Author'] },
+              },
+            ],
+          },
+        ],
+      };
+      const result = await applySchema(prisma, bundle);
+      expect(result.changed).toBe(true);
+      expect(result.applied.contentTypesCreated).toBe(1);
+      expect(result.applied.fieldsCreated).toBe(1);
+
+      const authorField = await prisma.contentTypeField.findFirst({
+        where: { identifier: 'author' },
+      });
+      expect(authorField).not.toBeNull();
+      const opts = authorField!.options as {
+        targetContentTypeIdentifiers?: string[];
+      };
+      expect(opts.targetContentTypeIdentifiers).toEqual(['Author']);
+    });
+
+    it('creates two content types that mutually relate in one apply', async () => {
+      const bundle: Bundle = {
+        version: 2,
+        exportedAt: '2026-05-01T00:00:00.000Z',
+        portable: true,
+        contentTypes: [
+          {
+            id: null,
+            identifier: 'Author',
+            name: 'Author',
+            description: null,
+            fields: [
+              {
+                id: null,
+                identifier: 'name',
+                name: 'Name',
+                type: 'ENTRY_TITLE',
+                required: true,
+                order: 0,
+                options: null,
+              },
+            ],
+          },
+          {
+            id: null,
+            identifier: 'Article',
+            name: 'Article',
+            description: null,
+            fields: [
+              {
+                id: null,
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                required: true,
+                order: 0,
+                options: null,
+              },
+              {
+                id: null,
+                identifier: 'author',
+                name: 'Author',
+                type: 'RELATION',
+                required: false,
+                order: 1,
+                options: { targetContentTypeIdentifiers: ['Author'] },
+              },
+            ],
+          },
+        ],
+      };
+      const result = await applySchema(prisma, bundle);
+      expect(result.applied.contentTypesCreated).toBe(2);
+      // Both types created with their fields embedded (no separate
+      // pass 2 entries — both rode along with pass 1).
+      expect(result.applied.fieldsCreated).toBe(0);
+    });
+  });
 });
