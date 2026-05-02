@@ -1,4 +1,12 @@
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  afterAll,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../../generated/prisma/client';
 import { applySchema } from './applySchema';
@@ -25,6 +33,10 @@ const emptyBundle: Bundle = {
 describe('applySchema', () => {
   beforeEach(async () => {
     await reset();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   afterAll(async () => {
