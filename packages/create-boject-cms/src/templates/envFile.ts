@@ -32,7 +32,11 @@ export function renderEnvFile({
     '# during the every-boot apply. Default off — only additive changes apply',
     '# automatically. Flip this on for environments where bundle removals are',
     '# expected to take effect.',
-    '# BOJECT_ALLOW_DESTRUCTIVE_SCHEMA=true'
+    '# BOJECT_ALLOW_DESTRUCTIVE_SCHEMA=true',
+    '',
+    '# Set when using the boject CLI (`boject schema pull/apply/check`).',
+    '# Create one with: pnpm apikey:create cli --scopes schema:read,schema:write',
+    '# BOJECT_API_KEY='
   );
   return lines.join('\n') + '\n';
 }
