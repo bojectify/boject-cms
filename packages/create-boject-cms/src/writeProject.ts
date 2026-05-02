@@ -2,6 +2,7 @@ import { copyFile, mkdir, readdir, writeFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import {
   GITIGNORE,
+  renderBojectConfig,
   renderContentTypesBundle,
   renderDockerCompose,
   renderEnvFile,
@@ -86,6 +87,10 @@ export async function writeProject({
       join(contentTypesTarget, 'schema.boject.json')
     );
   }
+
+  // Always write .boject.config.json so the @boject/cli commands work
+  // out of the box from the project root.
+  await writeFile(join(targetDir, '.boject.config.json'), renderBojectConfig());
 
   return { adminEmail, adminPassword };
 }

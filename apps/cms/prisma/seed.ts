@@ -68,11 +68,12 @@ async function main() {
   const keyPrefix = rawKey.slice(0, 11);
   await prisma.apiKey.upsert({
     where: { keyHash },
-    update: { revokedAt: null },
+    update: { revokedAt: null, scopes: ['content:read'] },
     create: {
       name: 'Integration tests',
       keyHash,
       keyPrefix,
+      scopes: ['content:read'],
     },
   });
 
@@ -84,8 +85,13 @@ async function main() {
     const keyPrefix = PERF_KEY_RAW.slice(0, 11);
     await prisma.apiKey.upsert({
       where: { keyHash },
-      update: { revokedAt: null },
-      create: { name: '@boject/perf load test key', keyHash, keyPrefix },
+      update: { revokedAt: null, scopes: ['content:read'] },
+      create: {
+        name: '@boject/perf load test key',
+        keyHash,
+        keyPrefix,
+        scopes: ['content:read'],
+      },
     });
     console.log('[seed] perf load-test API key present');
   }

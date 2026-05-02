@@ -1,0 +1,106 @@
+// VENDORED from apps/cms/scripts/content-bundle/types.ts.
+// The CLI is published standalone and cannot import from apps/cms/.
+// Keep this file in sync when the canonical version changes.
+
+export type FieldType =
+  | 'ENTRY_TITLE'
+  | 'SLUG'
+  | 'TEXT'
+  | 'TEXTAREA'
+  | 'NUMBER'
+  | 'BOOLEAN'
+  | 'DATETIME'
+  | 'SELECT'
+  | 'RICHTEXT'
+  | 'RELATION'
+  | 'MULTIRELATION'
+  | 'IMAGE';
+
+export type ContentStatus = 'DRAFT' | 'PUBLISHED' | 'CHANGED' | 'ARCHIVED';
+
+export const BUNDLE_VERSION = 2;
+
+export type BundleFieldOptions = {
+  choices?: string[];
+  targetContentTypeIds?: string[] | null[];
+  targetContentTypeIdentifiers?: string[];
+  [key: string]: unknown;
+};
+
+export interface BundleField {
+  id: string | null;
+  identifier: string;
+  name: string;
+  type: FieldType;
+  required: boolean;
+  unique?: boolean;
+  order: number;
+  options: BundleFieldOptions | null;
+}
+
+export interface BundleContentType {
+  id: string | null;
+  identifier: string;
+  name: string;
+  description: string | null;
+  fields: BundleField[];
+}
+
+export interface BundleEntryVersion {
+  status: ContentStatus;
+  data: Record<string, unknown>;
+  publishedAt: string | null;
+}
+
+export interface BundleEntry {
+  id: string | null;
+  contentTypeId: string | null;
+  contentTypeIdentifier: string;
+  entryTitle: string;
+  slug: string | null;
+  // V1 flat fields (kept for backward compat on import)
+  status?: ContentStatus;
+  publishedAt?: string | null;
+  data?: Record<string, unknown>;
+  // V2 versioned
+  versions?: BundleEntryVersion[];
+}
+
+export interface Bundle {
+  version: number;
+  exportedAt: string;
+  portable: boolean;
+  contentTypes?: BundleContentType[];
+  entries?: BundleEntry[];
+}
+
+export type BundleMode = 'schema' | 'entries' | 'all';
+
+export interface ValidationError {
+  path: string;
+  message: string;
+}
+
+export type ConflictErrorKind =
+  | 'contentType.identifier'
+  | 'contentType.id'
+  | 'field.id'
+  | 'entry.id'
+  | 'entry.slug'
+  | 'entry.entryTitle';
+
+export interface ConflictError {
+  kind: ConflictErrorKind;
+  identifier: string;
+  existingId?: string;
+}
+
+export interface ValidationResult {
+  ok: boolean;
+  errors: ValidationError[];
+}
+
+export interface ImportResult {
+  contentTypesCreated: number;
+  entriesCreated: number;
+}

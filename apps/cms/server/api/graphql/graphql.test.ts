@@ -180,6 +180,42 @@ describe('GraphQL API', async () => {
       const { data } = await gql<{ __typename: string }>('{ __typename }');
       expect(data.__typename).toBe('Query');
     });
+
+    it('rejects api keys without content:read scope', async () => {
+      const { PrismaPg } = await import('@prisma/adapter-pg');
+      const { PrismaClient } = await import('../../../generated/prisma/client');
+      const { generateApiKey } = await import('../../utils/apiKey');
+      const prismaUrl = 'postgresql://boject:boject@localhost:5432/boject_test';
+      const adapter = new PrismaPg({ connectionString: prismaUrl });
+      const prisma = new PrismaClient({ adapter });
+      const { raw, hash, prefix } = generateApiKey();
+      try {
+        await prisma.apiKey.create({
+          data: {
+            name: 'test-no-scope',
+            keyHash: hash,
+            keyPrefix: prefix,
+            scopes: [],
+          },
+        });
+        const res = await fetch('/api/graphql', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${raw}`,
+          },
+          body: JSON.stringify({ query: '{ __typename }' }),
+        });
+        expect(res.status).toBe(403);
+        const body = (await res.json()) as { error?: string };
+        expect(body.error).toBe('INSUFFICIENT_SCOPE');
+      } finally {
+        await prisma.apiKey
+          .deleteMany({ where: { keyHash: hash } })
+          .catch(() => {});
+        await prisma.$disconnect().catch(() => {});
+      }
+    });
   });
 
   describe('Dynamic content type queries', () => {

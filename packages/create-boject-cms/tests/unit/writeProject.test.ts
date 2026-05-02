@@ -36,6 +36,7 @@ describe('writeProject', () => {
     const files = await readdir(target);
     expect(files.sort()).toEqual(
       [
+        '.boject.config.json',
         '.env',
         '.gitignore',
         'README.md',

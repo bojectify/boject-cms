@@ -48,6 +48,22 @@ async function invalidateSchemaIfAvailable(): Promise<void> {
 
 export interface ApplySchemaOptions {
   allowDestructive?: boolean;
+  /**
+   * If true, run the planner + every mutation inside the transaction
+   * but throw a sentinel before the transaction commits so the caller
+   * gets back a fully-populated result without changing DB state.
+   * Used by Spec 5's HTTP apply endpoint to power `boject schema apply --dry-run`.
+   */
+  dryRun?: boolean;
+}
+
+/**
+ * Sentinel error used to roll back the apply transaction when
+ * `options.dryRun` is set. Caught at the post-transaction boundary —
+ * the captured result is still returned to the caller.
+ */
+class DryRunRollback extends Error {
+  readonly code = 'DRY_RUN_ROLLBACK' as const;
 }
 
 export interface ApplySchemaResult {
@@ -83,194 +99,217 @@ export async function applySchema(
     throw new SchemaApplyValidationError(validation.errors);
   }
 
-  const txResult = await prisma.$transaction(async (tx) => {
-    // The transaction client is structurally compatible with the
-    // PrismaClient methods snapshotCurrentSchema calls (findMany,
-    // groupBy). Cast is justified — the runtime contract holds.
-    const snapshot = await snapshotCurrentSchema(tx as PrismaClient);
-    const plan: SchemaPlan = planSchema(bundle, snapshot, {
-      allowDestructive: options.allowDestructive,
-    });
+  let captured: ApplySchemaResult | null = null;
+  try {
+    await prisma.$transaction(async (tx) => {
+      // The transaction client is structurally compatible with the
+      // PrismaClient methods snapshotCurrentSchema calls (findMany,
+      // groupBy). Cast is justified — the runtime contract holds.
+      const snapshot = await snapshotCurrentSchema(tx as PrismaClient);
+      const plan: SchemaPlan = planSchema(bundle, snapshot, {
+        allowDestructive: options.allowDestructive,
+      });
 
-    if (plan.blockers.length > 0) {
-      throw new SchemaApplyBlockedError(plan.blockers, plan);
-    }
+      if (plan.blockers.length > 0) {
+        throw new SchemaApplyBlockedError(plan.blockers, plan);
+      }
 
-    // Skip the re-plan + mutation walk if the plan is empty — nothing
-    // to apply, nothing to race against.
-    if (!isPlanNonEmpty(plan)) {
-      return { changed: false, plan, applied: { ...ZERO_APPLIED } };
-    }
+      // Skip the re-plan + mutation walk if the plan is empty — nothing
+      // to apply, nothing to race against.
+      if (!isPlanNonEmpty(plan)) {
+        captured = { changed: false, plan, applied: { ...ZERO_APPLIED } };
+        return captured;
+      }
 
-    // Re-snapshot inside the same transaction and recompute the plan.
-    // If anything diverges, a concurrent writer mutated the schema
-    // between the two reads — abort and roll back so the caller can
-    // re-run against the now-current state.
-    const snapshot2 = await snapshotCurrentSchema(tx as PrismaClient);
-    const plan2 = planSchema(bundle, snapshot2, {
-      allowDestructive: options.allowDestructive,
-    });
-    if (!plansEqual(plan, plan2)) {
-      throw new SchemaChangedDuringApplyError();
-    }
+      // Re-snapshot inside the same transaction and recompute the plan.
+      // If anything diverges, a concurrent writer mutated the schema
+      // between the two reads — abort and roll back so the caller can
+      // re-run against the now-current state.
+      const snapshot2 = await snapshotCurrentSchema(tx as PrismaClient);
+      const plan2 = planSchema(bundle, snapshot2, {
+        allowDestructive: options.allowDestructive,
+      });
+      if (!plansEqual(plan, plan2)) {
+        throw new SchemaChangedDuringApplyError();
+      }
 
-    const applied: ApplySchemaResult['applied'] = { ...ZERO_APPLIED };
+      const applied: ApplySchemaResult['applied'] = { ...ZERO_APPLIED };
 
-    // Build identifier → typeId map from the current snapshot. New
-    // types are added to this map as Pass 1 creates them so cross-type
-    // references resolve in a single transaction (mirrors import.ts).
-    const identifierToTypeId = new Map<string, string>();
-    for (const ct of snapshot.contentTypes) {
-      identifierToTypeId.set(ct.identifier, ct.id);
-    }
+      // Build identifier → typeId map from the current snapshot. New
+      // types are added to this map as Pass 1 creates them so cross-type
+      // references resolve in a single transaction (mirrors import.ts).
+      const identifierToTypeId = new Map<string, string>();
+      for (const ct of snapshot.contentTypes) {
+        identifierToTypeId.set(ct.identifier, ct.id);
+      }
 
-    // Fields whose RELATION/MULTIRELATION targets couldn't be resolved
-    // at write time (because the target type was being created in this
-    // same apply). Resolved in a Pass 2.5 once every type exists.
-    const pendingFieldTargets: Array<{
-      fieldId: string;
-      identifiers: string[];
-      otherOptions: Record<string, unknown>;
-    }> = [];
+      // Fields whose RELATION/MULTIRELATION targets couldn't be resolved
+      // at write time (because the target type was being created in this
+      // same apply). Resolved in a Pass 2.5 once every type exists.
+      const pendingFieldTargets: Array<{
+        fieldId: string;
+        identifiers: string[];
+        otherOptions: Record<string, unknown>;
+      }> = [];
 
-    // Pass 1: content-type creates (with fields embedded).
-    for (const bt of plan.contentTypes.create) {
-      const created = await tx.contentType.create({
-        data: {
-          identifier: bt.identifier,
-          name: bt.name,
-          description: bt.description ?? undefined,
-          fields: {
-            create: bt.fields.map((f) =>
-              toFieldCreatePayload(f, identifierToTypeId)
-            ),
+      // Pass 1: content-type creates (with fields embedded).
+      for (const bt of plan.contentTypes.create) {
+        const created = await tx.contentType.create({
+          data: {
+            identifier: bt.identifier,
+            name: bt.name,
+            description: bt.description ?? undefined,
+            fields: {
+              create: bt.fields.map((f) =>
+                toFieldCreatePayload(f, identifierToTypeId)
+              ),
+            },
           },
-        },
-        include: { fields: true },
-      });
-      identifierToTypeId.set(created.identifier, created.id);
-      // Queue any field whose targets included an as-yet-unknown type.
-      for (const bf of bt.fields) {
-        const pending = extractPendingTargets(bf, identifierToTypeId);
-        if (!pending) continue;
-        const dbField = created.fields.find(
-          (f) => f.identifier === bf.identifier
-        );
-        if (!dbField) continue;
-        pendingFieldTargets.push({
-          fieldId: dbField.id,
-          identifiers: pending.identifiers,
-          otherOptions: pending.otherOptions,
+          include: { fields: true },
         });
-      }
-      applied.contentTypesCreated += 1;
-    }
-
-    // Pass 1: content-type updates (name + description only — identifier
-    // is immutable, planner already enforced).
-    for (const update of plan.contentTypes.update) {
-      await tx.contentType.update({
-        where: { id: update.id },
-        data: update.changes,
-      });
-      applied.contentTypesUpdated += 1;
-    }
-
-    // Pass 1: content-type removes. Prisma's onDelete: Cascade cleans up
-    // fields — no need to walk fields.remove for these types.
-    const removedTypeIds = new Set<string>();
-    for (const removal of plan.contentTypes.remove) {
-      await tx.contentType.delete({ where: { id: removal.id } });
-      applied.contentTypesRemoved += 1;
-      removedTypeIds.add(removal.id);
-    }
-
-    // Pass 2: field creates on existing types.
-    for (const create of plan.fields.create) {
-      const dbField = await tx.contentTypeField.create({
-        data: {
-          contentTypeId: create.contentTypeId,
-          ...toFieldCreatePayload(create.field, identifierToTypeId),
-        },
-      });
-      const pending = extractPendingTargets(create.field, identifierToTypeId);
-      if (pending) {
-        pendingFieldTargets.push({
-          fieldId: dbField.id,
-          identifiers: pending.identifiers,
-          otherOptions: pending.otherOptions,
-        });
-      }
-      applied.fieldsCreated += 1;
-    }
-
-    // Pass 2: field updates. Sparse changes object — only set
-    // properties that are present in the diff. Planner already
-    // validated each change is safe.
-    for (const update of plan.fields.update) {
-      const data: Prisma.ContentTypeFieldUpdateInput = {};
-      if (update.changes.name !== undefined) data.name = update.changes.name;
-      if (update.changes.order !== undefined) data.order = update.changes.order;
-      if (update.changes.required !== undefined)
-        data.required = update.changes.required;
-      if (update.changes.unique !== undefined)
-        data.unique = update.changes.unique;
-      if (update.changes.options !== undefined) {
-        data.options = resolveOptionsForStorage(
-          update.changes.options as Record<string, unknown>,
-          identifierToTypeId
-        ) as Prisma.InputJsonValue;
-      }
-      await tx.contentTypeField.update({ where: { id: update.id }, data });
-      applied.fieldsUpdated += 1;
-    }
-
-    // Pass 2.5: backfill RELATION/MULTIRELATION target IDs for fields
-    // whose target types didn't exist at field-create time.
-    for (const pending of pendingFieldTargets) {
-      const resolved = pending.identifiers.map((ident) => {
-        const id = identifierToTypeId.get(ident);
-        if (!id) {
-          throw new Error(
-            `RELATION field references unknown content type "${ident}" after apply`
+        identifierToTypeId.set(created.identifier, created.id);
+        // Queue any field whose targets included an as-yet-unknown type.
+        for (const bf of bt.fields) {
+          const pending = extractPendingTargets(bf, identifierToTypeId);
+          if (!pending) continue;
+          const dbField = created.fields.find(
+            (f) => f.identifier === bf.identifier
           );
+          if (!dbField) continue;
+          pendingFieldTargets.push({
+            fieldId: dbField.id,
+            identifiers: pending.identifiers,
+            otherOptions: pending.otherOptions,
+          });
         }
-        return id;
-      });
-      await tx.contentTypeField.update({
-        where: { id: pending.fieldId },
-        data: {
-          options: {
-            ...pending.otherOptions,
-            targetContentTypeIds: resolved,
-          } as Prisma.InputJsonValue,
-        },
-      });
-    }
+        applied.contentTypesCreated += 1;
+      }
 
-    // Pass 2: field removes. Skip any field whose owning content type was
-    // just removed in pass 1 — Prisma's cascade already deleted those.
-    for (const removal of plan.fields.remove) {
-      const ownerWasRemoved =
-        removedTypeIds.size > 0 &&
-        snapshot.contentTypes.some(
-          (c) =>
-            removedTypeIds.has(c.id) &&
-            c.fields.some((f) => f.id === removal.id)
-        );
-      if (ownerWasRemoved) continue;
-      await tx.contentTypeField.delete({ where: { id: removal.id } });
-      applied.fieldsRemoved += 1;
-    }
+      // Pass 1: content-type updates (name + description only — identifier
+      // is immutable, planner already enforced).
+      for (const update of plan.contentTypes.update) {
+        await tx.contentType.update({
+          where: { id: update.id },
+          data: update.changes,
+        });
+        applied.contentTypesUpdated += 1;
+      }
 
-    const changed = isPlanNonEmpty(plan);
-    return { changed, plan, applied };
-  });
+      // Pass 1: content-type removes. Prisma's onDelete: Cascade cleans up
+      // fields — no need to walk fields.remove for these types.
+      const removedTypeIds = new Set<string>();
+      for (const removal of plan.contentTypes.remove) {
+        await tx.contentType.delete({ where: { id: removal.id } });
+        applied.contentTypesRemoved += 1;
+        removedTypeIds.add(removal.id);
+      }
+
+      // Pass 2: field creates on existing types.
+      for (const create of plan.fields.create) {
+        const dbField = await tx.contentTypeField.create({
+          data: {
+            contentTypeId: create.contentTypeId,
+            ...toFieldCreatePayload(create.field, identifierToTypeId),
+          },
+        });
+        const pending = extractPendingTargets(create.field, identifierToTypeId);
+        if (pending) {
+          pendingFieldTargets.push({
+            fieldId: dbField.id,
+            identifiers: pending.identifiers,
+            otherOptions: pending.otherOptions,
+          });
+        }
+        applied.fieldsCreated += 1;
+      }
+
+      // Pass 2: field updates. Sparse changes object — only set
+      // properties that are present in the diff. Planner already
+      // validated each change is safe.
+      for (const update of plan.fields.update) {
+        const data: Prisma.ContentTypeFieldUpdateInput = {};
+        if (update.changes.name !== undefined) data.name = update.changes.name;
+        if (update.changes.order !== undefined)
+          data.order = update.changes.order;
+        if (update.changes.required !== undefined)
+          data.required = update.changes.required;
+        if (update.changes.unique !== undefined)
+          data.unique = update.changes.unique;
+        if (update.changes.options !== undefined) {
+          data.options = resolveOptionsForStorage(
+            update.changes.options as Record<string, unknown>,
+            identifierToTypeId
+          ) as Prisma.InputJsonValue;
+        }
+        await tx.contentTypeField.update({ where: { id: update.id }, data });
+        applied.fieldsUpdated += 1;
+      }
+
+      // Pass 2.5: backfill RELATION/MULTIRELATION target IDs for fields
+      // whose target types didn't exist at field-create time.
+      for (const pending of pendingFieldTargets) {
+        const resolved = pending.identifiers.map((ident) => {
+          const id = identifierToTypeId.get(ident);
+          if (!id) {
+            throw new Error(
+              `RELATION field references unknown content type "${ident}" after apply`
+            );
+          }
+          return id;
+        });
+        await tx.contentTypeField.update({
+          where: { id: pending.fieldId },
+          data: {
+            options: {
+              ...pending.otherOptions,
+              targetContentTypeIds: resolved,
+            } as Prisma.InputJsonValue,
+          },
+        });
+      }
+
+      // Pass 2: field removes. Skip any field whose owning content type was
+      // just removed in pass 1 — Prisma's cascade already deleted those.
+      for (const removal of plan.fields.remove) {
+        const ownerWasRemoved =
+          removedTypeIds.size > 0 &&
+          snapshot.contentTypes.some(
+            (c) =>
+              removedTypeIds.has(c.id) &&
+              c.fields.some((f) => f.id === removal.id)
+          );
+        if (ownerWasRemoved) continue;
+        await tx.contentTypeField.delete({ where: { id: removal.id } });
+        applied.fieldsRemoved += 1;
+      }
+
+      const changed = isPlanNonEmpty(plan);
+      const result: ApplySchemaResult = { changed, plan, applied };
+      captured = result;
+      // Roll the transaction back when caller asked for a dry run —
+      // the captured result is still returned via the catch below.
+      if (options.dryRun) throw new DryRunRollback();
+      return result;
+    });
+  } catch (err) {
+    if (err instanceof DryRunRollback) {
+      // captured is set; fall through to the post-transaction return.
+    } else {
+      throw err;
+    }
+  }
+
+  // captured is always set here:
+  // - happy path (commit): the transaction body assigned it before returning.
+  // - dryRun path: assigned before throwing DryRunRollback.
+  // - no-op early return: assigned before returning.
+  const txResult = captured!;
 
   // Invalidate the cached GraphQL schema so the next request rebuilds
   // against the freshly mutated content types. Skip on no-op applies —
   // the entrypoint runs apply on every boot and most boots are no-ops.
-  if (txResult.changed) {
+  // Also skip on dryRun: nothing changed in the DB, nothing to invalidate.
+  if (txResult.changed && !options.dryRun) {
     await invalidateSchemaIfAvailable();
   }
   return txResult;

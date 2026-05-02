@@ -1118,4 +1118,111 @@ describe('applySchema', () => {
       expect(spy).toHaveBeenCalledTimes(1);
     });
   });
+
+  describe('dryRun', () => {
+    it('returns the plan and applied counts but rolls back the transaction', async () => {
+      const bundle: Bundle = {
+        version: 2,
+        exportedAt: '2026-05-01T00:00:00.000Z',
+        portable: true,
+        contentTypes: [
+          {
+            id: null,
+            identifier: 'DryRunArticle',
+            name: 'DryRunArticle',
+            description: null,
+            fields: [
+              {
+                id: null,
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                required: true,
+                order: 0,
+                options: null,
+              },
+            ],
+          },
+        ],
+      };
+
+      const result = await applySchema(prisma, bundle, { dryRun: true });
+
+      expect(result.changed).toBe(true);
+      expect(result.applied.contentTypesCreated).toBe(1);
+      // Fields embedded in a new content type ride along with the
+      // pass 1 create — they don't get counted under fieldsCreated
+      // (which only tracks fields added to *existing* types in pass 2).
+      expect(result.applied.fieldsCreated).toBe(0);
+
+      const inDb = await prisma.contentType.findUnique({
+        where: { identifier: 'DryRunArticle' },
+      });
+      expect(inDb).toBeNull(); // Transaction rolled back.
+    });
+
+    it('returns changed=false on a no-op without throwing', async () => {
+      const result = await applySchema(prisma, emptyBundle, { dryRun: true });
+      expect(result.changed).toBe(false);
+    });
+
+    it('still surfaces blockers in dryRun mode (no rollback needed because tx never started mutating)', async () => {
+      // Apply once to seed.
+      await applySchema(prisma, {
+        version: 2,
+        exportedAt: '2026-05-01T00:00:00.000Z',
+        portable: true,
+        contentTypes: [
+          {
+            id: null,
+            identifier: 'BlockedDryRun',
+            name: 'BlockedDryRun',
+            description: null,
+            fields: [
+              {
+                id: null,
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                required: true,
+                order: 0,
+                options: null,
+              },
+            ],
+          },
+        ],
+      });
+      // Seed an entry so removal is a destructive blocker.
+      const ct = await prisma.contentType.findUniqueOrThrow({
+        where: { identifier: 'BlockedDryRun' },
+      });
+      await prisma.contentEntry.create({
+        data: {
+          contentTypeId: ct.id,
+          entryTitle: 'X',
+          slug: 'x',
+          versions: {
+            create: {
+              data: { title: 'X' },
+              entryTitle: 'X',
+              status: 'PUBLISHED',
+            },
+          },
+        },
+      });
+
+      await expect(
+        applySchema(
+          prisma,
+          {
+            version: 2,
+            exportedAt: '2026-05-01T00:00:00.000Z',
+            portable: true,
+            contentTypes: [],
+          },
+          { dryRun: true }
+        )
+      ).rejects.toMatchObject({ code: 'SCHEMA_APPLY_BLOCKED' });
+    });
+  });
 });
