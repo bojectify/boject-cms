@@ -79,6 +79,8 @@ The app runs at http://localhost:4000. The GraphQL playground (GraphiQL) is avai
 | `pnpm starters:build`   | Build overlay-based starter bundles           |
 | `pnpm starters:check`   | Verify committed starter outputs are current  |
 
+For end-user CLI commands run from inside a scaffolded project (schema pull / apply / check / drift detection, image upgrades), see [`@boject/cli`](packages/boject-cli/README.md).
+
 ## Project Structure
 
 ```
@@ -229,13 +231,24 @@ A single batched query returns the body plus everything it references — no N+1
 
 ### Authentication
 
-In production, all `/api/graphql` requests require an `Authorization: Bearer boject_...` header with a valid API key. In development, all requests are unauthenticated so the GraphiQL playground can introspect and query freely. Manage keys via:
+In production, all `/api/graphql` requests require an `Authorization: Bearer boject_...` header with a valid API key carrying the `content:read` scope. In development, requests with no Authorization header pass through (so GraphiQL can introspect freely); a request that presents a Bearer header always validates. Manage keys via:
 
 ```bash
-pnpm apikey:create "My integration"   # prints the raw key once
-pnpm apikey:list
+pnpm apikey:create "Mobile app backend"                       # default scopes: content:read
+pnpm apikey:create "CI runner" --scopes schema:read,schema:write
+pnpm apikey:list                                              # shows scopes column
 pnpm apikey:revoke <prefix>
 ```
+
+API keys carry a `scopes: string[]`. Recognised scopes:
+
+| Scope          | Grants                                                    |
+| -------------- | --------------------------------------------------------- |
+| `content:read` | Query content via `/api/graphql`.                         |
+| `schema:read`  | `GET /api/schema/export` (used by `boject schema pull`).  |
+| `schema:write` | `POST /api/schema/apply` (used by `boject schema apply`). |
+
+Existing keys (created before scopes shipped) were migrated to `["content:read"]`, so GraphQL access is preserved unchanged. New keys are gated by the explicit `--scopes` flag.
 
 ## Database
 
@@ -262,6 +275,30 @@ User-configurable uniqueness: `ContentTypeField.unique` is auto-enabled for `ENT
 pnpm prisma:migrate           # Apply migrations (interactive)
 pnpx prisma migrate deploy    # Apply migrations (non-interactive / CI)
 ```
+
+## Schema-as-Code
+
+Content type schema can be authored as a committed JSON bundle (`content-types/schema.boject.json`) and applied by the container on every boot. The intended loop:
+
+1. **Edit** content types in the CMS UI in development.
+2. **Pull** the live schema into the project: `boject schema pull` (from [`@boject/cli`](packages/boject-cli/README.md)).
+3. **Review** with `git diff content-types/schema.boject.json` and commit.
+4. **Deploy.** The container's entrypoint runs the applier on boot — no manual step.
+
+CI catches drift between the committed file and the dev CMS:
+
+```bash
+boject schema check    # exits 0 if in sync, 1 with a drift report otherwise
+```
+
+Two HTTP endpoints back the CLI:
+
+- `GET /api/schema/export` — returns the current schema as a portable bundle. Session OR API key with `schema:read`.
+- `POST /api/schema/apply` — wraps the applier; honours `BOJECT_SCHEMA_READONLY`. Session OR API key with `schema:write`. Body: `{ bundle, allowDestructive?, dryRun? }`.
+
+Destructive changes (removing types or fields) are blocked by default. Set `BOJECT_ALLOW_DESTRUCTIVE_SCHEMA=true` to allow them.
+
+The applier is also available as a script: `pnpm content:import path/to/schema.boject.json --schema --apply`.
 
 ## Testing
 
@@ -316,10 +353,14 @@ pnpm format:fix    # Auto-fix formatting
 
 ## Environment Variables
 
-| Variable                | Description                               | Default                                            |
-| ----------------------- | ----------------------------------------- | -------------------------------------------------- |
-| `DATABASE_URL`          | PostgreSQL connection string              | `postgresql://boject:boject@localhost:5432/boject` |
-| `NUXT_SESSION_PASSWORD` | Session encryption key (required in prod) | Auto-generated in dev                              |
+| Variable                          | Description                                                                                  | Default                                            |
+| --------------------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| `DATABASE_URL`                    | PostgreSQL connection string                                                                 | `postgresql://boject:boject@localhost:5432/boject` |
+| `NUXT_SESSION_PASSWORD`           | Session encryption key (required in prod)                                                    | Auto-generated in dev                              |
+| `BOJECT_SCHEMA_DIR`               | Directory of `*.boject.json` files applied on every container boot.                          | unset (skips the step)                             |
+| `BOJECT_SCHEMA_READONLY`          | Set to `true` to disable schema-editing endpoints + UI affordances.                          | unset                                              |
+| `BOJECT_ALLOW_DESTRUCTIVE_SCHEMA` | Set to `true` to let the entrypoint applier remove content types / fields on bundle changes. | unset                                              |
+| `BOJECT_API_KEY`                  | Used by [`@boject/cli`](packages/boject-cli/README.md). Not consumed by the running CMS.     | unset                                              |
 
 Create a `.env` file in the project root. Nuxt loads it automatically in development.
 
