@@ -190,4 +190,32 @@ describe('applySchemaIfConfigured', () => {
     expect(result.totalChanges).toBe(6); // 1 + 2 + 3
     expect(result.files).toBe(2);
   });
+
+  it('forwards allowDestructive into every per-file applySchema call', async () => {
+    const applySchemaFn = vi.fn().mockResolvedValue({
+      changed: false,
+      plan: EMPTY_PLAN,
+      applied: { ...ZERO_APPLIED },
+    });
+    const readDir = vi
+      .fn()
+      .mockResolvedValue(['a.boject.json', 'b.boject.json']);
+    const readFile = vi.fn().mockResolvedValue(SAMPLE_BUNDLE_JSON);
+
+    await applySchemaIfConfigured(
+      {} as Parameters<typeof applySchemaIfConfigured>[0],
+      {
+        dirPath: '/app/content-types',
+        allowDestructive: true,
+        applySchemaFn,
+        readDir,
+        readFile,
+        logger: NOOP_LOGGER,
+      }
+    );
+
+    expect(applySchemaFn).toHaveBeenCalledTimes(2);
+    expect(applySchemaFn.mock.calls[0]![2]).toEqual({ allowDestructive: true });
+    expect(applySchemaFn.mock.calls[1]![2]).toEqual({ allowDestructive: true });
+  });
 });
