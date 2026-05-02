@@ -187,4 +187,116 @@ describe('applySchema', () => {
       }
     });
   });
+
+  describe('happy path — pass 1 (types)', () => {
+    it('creates a new content type from an empty DB, with its fields embedded', async () => {
+      const bundle: Bundle = {
+        version: 2,
+        exportedAt: '2026-05-01T00:00:00.000Z',
+        portable: true,
+        contentTypes: [
+          {
+            id: null,
+            identifier: 'Article',
+            name: 'Article',
+            description: 'Blog article',
+            fields: [
+              {
+                id: null,
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                required: true,
+                order: 0,
+                options: null,
+              },
+              {
+                id: null,
+                identifier: 'slug',
+                name: 'Slug',
+                type: 'SLUG',
+                required: false,
+                order: 1,
+                options: null,
+              },
+            ],
+          },
+        ],
+      };
+      const result = await applySchema(prisma, bundle);
+      expect(result.changed).toBe(true);
+      expect(result.applied.contentTypesCreated).toBe(1);
+
+      const ct = await prisma.contentType.findUnique({
+        where: { identifier: 'Article' },
+        include: { fields: true },
+      });
+      expect(ct).not.toBeNull();
+      expect(ct!.name).toBe('Article');
+      expect(ct!.description).toBe('Blog article');
+      expect(ct!.fields).toHaveLength(2);
+      expect(ct!.fields.find((f) => f.identifier === 'title')!.unique).toBe(
+        true
+      );
+      expect(ct!.fields.find((f) => f.identifier === 'slug')!.unique).toBe(
+        true
+      );
+    });
+
+    it('updates a content type display name (identifier unchanged)', async () => {
+      await prisma.contentType.create({
+        data: {
+          identifier: 'Article',
+          name: 'Old Name',
+          description: null,
+          fields: {
+            create: [
+              {
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                required: true,
+                unique: true,
+                order: 0,
+              },
+            ],
+          },
+        },
+      });
+
+      const bundle: Bundle = {
+        version: 2,
+        exportedAt: '2026-05-01T00:00:00.000Z',
+        portable: true,
+        contentTypes: [
+          {
+            id: null,
+            identifier: 'Article',
+            name: 'New Name',
+            description: 'Renamed',
+            fields: [
+              {
+                id: null,
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                required: true,
+                order: 0,
+                options: null,
+              },
+            ],
+          },
+        ],
+      };
+      const result = await applySchema(prisma, bundle);
+      expect(result.changed).toBe(true);
+      expect(result.applied.contentTypesUpdated).toBe(1);
+
+      const ct = await prisma.contentType.findUnique({
+        where: { identifier: 'Article' },
+      });
+      expect(ct!.name).toBe('New Name');
+      expect(ct!.description).toBe('Renamed');
+    });
+  });
 });

@@ -10,9 +10,10 @@
 // - SchemaChangedDuringApplyError — schema changed between two snapshots
 //   inside the transaction. Caller should re-run.
 
-import type { PrismaClient } from '#prisma';
-import type { Bundle } from './types';
+import type { Prisma, PrismaClient } from '#prisma';
+import type { Bundle, BundleField } from './types';
 import type { SchemaPlan } from './schemaPlan.types';
+import { effectiveBundleUnique } from './schemaPlan.types';
 import { validateBundle } from './validate';
 import {
   SchemaApplyBlockedError,
@@ -71,8 +72,61 @@ export async function applySchema(
       throw new SchemaApplyBlockedError(plan.blockers, plan);
     }
 
-    // Mutation walks land in subsequent tasks. For now still report
-    // changed: false because nothing has been applied.
-    return { changed: false, plan, applied: { ...ZERO_APPLIED } };
+    const applied: ApplySchemaResult['applied'] = { ...ZERO_APPLIED };
+
+    // Pass 1: content-type creates (with fields embedded).
+    for (const bt of plan.contentTypes.create) {
+      await tx.contentType.create({
+        data: {
+          identifier: bt.identifier,
+          name: bt.name,
+          description: bt.description ?? undefined,
+          fields: {
+            create: bt.fields.map(toFieldCreatePayload),
+          },
+        },
+      });
+      applied.contentTypesCreated += 1;
+    }
+
+    // Pass 1: content-type updates (name + description only — identifier
+    // is immutable, planner already enforced).
+    for (const update of plan.contentTypes.update) {
+      await tx.contentType.update({
+        where: { id: update.id },
+        data: update.changes,
+      });
+      applied.contentTypesUpdated += 1;
+    }
+
+    // Pass 1: content-type removes — Task 7.
+
+    // Pass 2: fields — Tasks 8-11.
+
+    const changed = isPlanNonEmpty(plan);
+    return { changed, plan, applied };
   });
+}
+
+function toFieldCreatePayload(f: BundleField) {
+  return {
+    identifier: f.identifier,
+    name: f.name,
+    type: f.type,
+    required: f.required,
+    unique: effectiveBundleUnique(f),
+    order: f.order,
+    options: (f.options ?? undefined) as Prisma.InputJsonValue | undefined,
+  };
+}
+
+function isPlanNonEmpty(plan: SchemaPlan): boolean {
+  return (
+    plan.contentTypes.create.length > 0 ||
+    plan.contentTypes.update.length > 0 ||
+    plan.contentTypes.remove.length > 0 ||
+    plan.fields.create.length > 0 ||
+    plan.fields.update.length > 0 ||
+    plan.fields.remove.length > 0
+  );
 }
