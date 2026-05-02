@@ -339,4 +339,70 @@ describe('applySchema', () => {
       expect(gone).toBeNull();
     });
   });
+
+  describe('happy path — pass 2 (field creates)', () => {
+    it('adds a field to an existing content type', async () => {
+      await prisma.contentType.create({
+        data: {
+          identifier: 'Article',
+          name: 'Article',
+          fields: {
+            create: [
+              {
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                required: true,
+                unique: true,
+                order: 0,
+              },
+            ],
+          },
+        },
+      });
+
+      const bundle: Bundle = {
+        version: 2,
+        exportedAt: '2026-05-01T00:00:00.000Z',
+        portable: true,
+        contentTypes: [
+          {
+            id: null,
+            identifier: 'Article',
+            name: 'Article',
+            description: null,
+            fields: [
+              {
+                id: null,
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                required: true,
+                order: 0,
+                options: null,
+              },
+              {
+                id: null,
+                identifier: 'tagline',
+                name: 'Tagline',
+                type: 'TEXT',
+                required: false,
+                order: 1,
+                options: null,
+              },
+            ],
+          },
+        ],
+      };
+      const result = await applySchema(prisma, bundle);
+      expect(result.changed).toBe(true);
+      expect(result.applied.fieldsCreated).toBe(1);
+
+      const tagline = await prisma.contentTypeField.findFirst({
+        where: { identifier: 'tagline' },
+      });
+      expect(tagline).not.toBeNull();
+      expect(tagline!.type).toBe('TEXT');
+    });
+  });
 });

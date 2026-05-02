@@ -108,7 +108,16 @@ export async function applySchema(
       removedTypeIds.add(removal.id);
     }
 
-    // Pass 2: fields — Tasks 8-11.
+    // Pass 2: field creates on existing types.
+    for (const create of plan.fields.create) {
+      await tx.contentTypeField.create({
+        data: {
+          contentTypeId: create.contentTypeId,
+          ...toFieldCreatePayload(create.field),
+        },
+      });
+      applied.fieldsCreated += 1;
+    }
 
     const changed = isPlanNonEmpty(plan);
     return { changed, plan, applied };
