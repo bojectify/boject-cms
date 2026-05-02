@@ -56,15 +56,27 @@ export async function applySchemaIfConfigured(
   input: ApplySchemaIfConfiguredInput
 ): Promise<ApplySchemaIfConfiguredResult> {
   if (!input.dirPath) {
+    input.logger.info('[apply-schema] BOJECT_SCHEMA_DIR not set — skipping');
     return { applied: false, reason: 'no-dir', files: 0, totalChanges: 0 };
   }
+
+  input.logger.info(`[apply-schema] BOJECT_SCHEMA_DIR=${input.dirPath}`);
+
   const entries = await input.readDir(input.dirPath);
   const bundles = entries
     .filter((name) => name.endsWith('.boject.json'))
     .sort();
+
   if (bundles.length === 0) {
+    input.logger.info(
+      `[apply-schema] no .boject.json files in ${input.dirPath} — skipping`
+    );
     return { applied: false, reason: 'no-bundles', files: 0, totalChanges: 0 };
   }
+
+  input.logger.info(
+    `[apply-schema] reading ${bundles.length} ${bundles.length === 1 ? 'file' : 'files'}: ${bundles.join(', ')}`
+  );
 
   let totalChanges = 0;
   for (const name of bundles) {
@@ -75,7 +87,25 @@ export async function applySchemaIfConfigured(
       allowDestructive: input.allowDestructive,
     });
     totalChanges += sumApplied(result.applied);
+    if (result.changed) {
+      const created =
+        result.applied.contentTypesCreated + result.applied.fieldsCreated;
+      const updated =
+        result.applied.contentTypesUpdated + result.applied.fieldsUpdated;
+      const removed =
+        result.applied.contentTypesRemoved + result.applied.fieldsRemoved;
+      input.logger.info(
+        `[apply-schema] ${name}: ${created} created, ${updated} updated, ${removed} removed`
+      );
+    } else {
+      input.logger.info(`[apply-schema] ${name}: (no-op)`);
+    }
   }
+
+  input.logger.info(
+    `[apply-schema] done — ${bundles.length} ${bundles.length === 1 ? 'file' : 'files'} applied, ${totalChanges} total changes`
+  );
+
   return {
     applied: true,
     reason: 'applied',

@@ -218,4 +218,122 @@ describe('applySchemaIfConfigured', () => {
     expect(applySchemaFn.mock.calls[0]![2]).toEqual({ allowDestructive: true });
     expect(applySchemaFn.mock.calls[1]![2]).toEqual({ allowDestructive: true });
   });
+
+  it('logs entry banner, per-file summaries, and grand total', async () => {
+    const logger = { info: vi.fn(), error: vi.fn() };
+    const applySchemaFn = vi
+      .fn()
+      .mockResolvedValueOnce({
+        changed: true,
+        plan: EMPTY_PLAN,
+        applied: {
+          ...ZERO_APPLIED,
+          contentTypesCreated: 1,
+          contentTypesUpdated: 2,
+        },
+      })
+      .mockResolvedValueOnce({
+        changed: false,
+        plan: EMPTY_PLAN,
+        applied: { ...ZERO_APPLIED },
+      });
+    const readDir = vi
+      .fn()
+      .mockResolvedValue(['a.boject.json', 'b.boject.json']);
+    const readFile = vi.fn().mockResolvedValue(SAMPLE_BUNDLE_JSON);
+
+    await applySchemaIfConfigured(
+      {} as Parameters<typeof applySchemaIfConfigured>[0],
+      {
+        dirPath: '/app/content-types',
+        allowDestructive: false,
+        applySchemaFn,
+        readDir,
+        readFile,
+        logger,
+      }
+    );
+
+    const lines = logger.info.mock.calls.map((c) => c[0] as string);
+    expect(lines).toContain(
+      '[apply-schema] BOJECT_SCHEMA_DIR=/app/content-types'
+    );
+    expect(lines).toContain(
+      '[apply-schema] reading 2 files: a.boject.json, b.boject.json'
+    );
+    expect(lines).toContain(
+      '[apply-schema] a.boject.json: 1 created, 2 updated, 0 removed'
+    );
+    expect(lines).toContain('[apply-schema] b.boject.json: (no-op)');
+    expect(lines).toContain(
+      '[apply-schema] done — 2 files applied, 3 total changes'
+    );
+  });
+
+  it('logs the singular form for one file', async () => {
+    const logger = { info: vi.fn(), error: vi.fn() };
+    const applySchemaFn = vi.fn().mockResolvedValue({
+      changed: false,
+      plan: EMPTY_PLAN,
+      applied: { ...ZERO_APPLIED },
+    });
+    const readDir = vi.fn().mockResolvedValue(['schema.boject.json']);
+    const readFile = vi.fn().mockResolvedValue(SAMPLE_BUNDLE_JSON);
+
+    await applySchemaIfConfigured(
+      {} as Parameters<typeof applySchemaIfConfigured>[0],
+      {
+        dirPath: '/app/content-types',
+        allowDestructive: false,
+        applySchemaFn,
+        readDir,
+        readFile,
+        logger,
+      }
+    );
+
+    const lines = logger.info.mock.calls.map((c) => c[0] as string);
+    expect(lines).toContain(
+      '[apply-schema] reading 1 file: schema.boject.json'
+    );
+    expect(lines).toContain(
+      '[apply-schema] done — 1 file applied, 0 total changes'
+    );
+  });
+
+  it('logs a skip line when no dir is configured', async () => {
+    const logger = { info: vi.fn(), error: vi.fn() };
+    await applySchemaIfConfigured(
+      {} as Parameters<typeof applySchemaIfConfigured>[0],
+      {
+        dirPath: undefined,
+        allowDestructive: false,
+        applySchemaFn: vi.fn(),
+        readDir: vi.fn(),
+        readFile: vi.fn(),
+        logger,
+      }
+    );
+    expect(logger.info).toHaveBeenCalledWith(
+      '[apply-schema] BOJECT_SCHEMA_DIR not set — skipping'
+    );
+  });
+
+  it('logs a skip line when the dir has no bundles', async () => {
+    const logger = { info: vi.fn(), error: vi.fn() };
+    await applySchemaIfConfigured(
+      {} as Parameters<typeof applySchemaIfConfigured>[0],
+      {
+        dirPath: '/app/content-types',
+        allowDestructive: false,
+        applySchemaFn: vi.fn(),
+        readDir: vi.fn().mockResolvedValue(['README.md']),
+        readFile: vi.fn(),
+        logger,
+      }
+    );
+    expect(logger.info).toHaveBeenCalledWith(
+      '[apply-schema] no .boject.json files in /app/content-types — skipping'
+    );
+  });
 });
