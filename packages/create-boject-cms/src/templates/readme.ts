@@ -26,6 +26,14 @@ ${starterLine}Once the container is healthy, log in at http://localhost:4000/log
 - Email: \`${adminEmail}\`
 - Password: see \`BOJECT_ADMIN_PASSWORD\` in \`.env\`
 
+## Content types
+
+Your content type schema lives in \`content-types/schema.boject.json\` and is
+applied to the database on every container boot. Edit it via the CMS UI in
+development; commit the file alongside your code so production deploys converge
+to the same schema. Destructive changes (removing types or fields) are blocked
+by default — set \`BOJECT_ALLOW_DESTRUCTIVE_SCHEMA=true\` in \`.env\` to allow them.
+
 ## Stop the CMS
 
 \`\`\`bash
