@@ -18,9 +18,11 @@ import { validateBundle } from './validate';
 import {
   SchemaApplyBlockedError,
   SchemaApplyValidationError,
+  SchemaChangedDuringApplyError,
 } from './applySchemaErrors';
 import { snapshotCurrentSchema } from './snapshotCurrentSchema';
 import { planSchema } from './planSchema';
+import { plansEqual } from './plansEqual';
 
 export interface ApplySchemaOptions {
   allowDestructive?: boolean;
@@ -70,6 +72,24 @@ export async function applySchema(
 
     if (plan.blockers.length > 0) {
       throw new SchemaApplyBlockedError(plan.blockers, plan);
+    }
+
+    // Skip the re-plan + mutation walk if the plan is empty — nothing
+    // to apply, nothing to race against.
+    if (!isPlanNonEmpty(plan)) {
+      return { changed: false, plan, applied: { ...ZERO_APPLIED } };
+    }
+
+    // Re-snapshot inside the same transaction and recompute the plan.
+    // If anything diverges, a concurrent writer mutated the schema
+    // between the two reads — abort and roll back so the caller can
+    // re-run against the now-current state.
+    const snapshot2 = await snapshotCurrentSchema(tx as PrismaClient);
+    const plan2 = planSchema(bundle, snapshot2, {
+      allowDestructive: options.allowDestructive,
+    });
+    if (!plansEqual(plan, plan2)) {
+      throw new SchemaChangedDuringApplyError();
     }
 
     const applied: ApplySchemaResult['applied'] = { ...ZERO_APPLIED };

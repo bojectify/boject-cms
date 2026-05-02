@@ -1,7 +1,8 @@
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../../generated/prisma/client';
 import { applySchema } from './applySchema';
+import * as snapshotModule from './snapshotCurrentSchema';
 import type { Bundle } from './types';
 
 const url = 'postgresql://boject:boject@localhost:5432/boject_test';
@@ -833,6 +834,92 @@ describe('applySchema', () => {
       // Both types created with their fields embedded (no separate
       // pass 2 entries — both rode along with pass 1).
       expect(result.applied.fieldsCreated).toBe(0);
+    });
+  });
+
+  describe('concurrency — re-plan equality check', () => {
+    it('throws SchemaChangedDuringApplyError when the snapshot changes between reads', async () => {
+      await prisma.contentType.create({
+        data: {
+          identifier: 'Article',
+          name: 'Article',
+          fields: {
+            create: [
+              {
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                required: true,
+                unique: true,
+                order: 0,
+              },
+            ],
+          },
+        },
+      });
+
+      let callCount = 0;
+      const realSnapshot = snapshotModule.snapshotCurrentSchema;
+      const spy = vi.spyOn(snapshotModule, 'snapshotCurrentSchema');
+      spy.mockImplementation(async (tx) => {
+        callCount += 1;
+        // Real snapshot for both calls — but inject a synthetic content
+        // type into the second call's result so plansEqual returns false.
+        const real = await realSnapshot(tx);
+        if (callCount >= 2) {
+          return {
+            ...real,
+            contentTypes: [
+              ...real.contentTypes,
+              {
+                id: 'synthetic-id',
+                identifier: 'InjectedType',
+                name: 'Injected',
+                description: null,
+                fields: [],
+                entryCount: 0,
+              },
+            ],
+          };
+        }
+        return real;
+      });
+
+      const bundle: Bundle = {
+        version: 2,
+        exportedAt: '2026-05-01T00:00:00.000Z',
+        portable: true,
+        contentTypes: [
+          {
+            id: null,
+            identifier: 'Article',
+            name: 'Renamed',
+            description: null,
+            fields: [
+              {
+                id: null,
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                required: true,
+                order: 0,
+                options: null,
+              },
+            ],
+          },
+        ],
+      };
+      await expect(
+        applySchema(prisma, bundle, { allowDestructive: true })
+      ).rejects.toMatchObject({ code: 'SCHEMA_CHANGED_DURING_APPLY' });
+
+      spy.mockRestore();
+
+      // DB unchanged — name should still be Article (the rename rolled back).
+      const ct = await prisma.contentType.findUnique({
+        where: { identifier: 'Article' },
+      });
+      expect(ct!.name).toBe('Article');
     });
   });
 });
