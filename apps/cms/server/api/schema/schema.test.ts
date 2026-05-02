@@ -106,3 +106,213 @@ describe('GET /api/schema/export', () => {
     expect(res.status).toBe(200);
   });
 });
+
+describe('POST /api/schema/apply', () => {
+  beforeEach(async () => {
+    await prisma.contentEntry.deleteMany();
+    await prisma.contentTypeField.deleteMany();
+    await prisma.contentType.deleteMany();
+  });
+
+  afterEach(async () => {
+    await prisma.apiKey.deleteMany({
+      where: { name: { startsWith: 'test-' } },
+    });
+  });
+
+  const SAMPLE: { bundle: unknown } = {
+    bundle: {
+      version: 2,
+      exportedAt: '2026-05-01T00:00:00.000Z',
+      portable: true,
+      contentTypes: [
+        {
+          id: null,
+          identifier: 'ApiApplyArticle',
+          name: 'ApiApplyArticle',
+          description: null,
+          fields: [
+            {
+              id: null,
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+              order: 0,
+              options: null,
+            },
+          ],
+        },
+      ],
+    },
+  };
+
+  it('returns 401 without auth', async () => {
+    const res = await fetch('/api/schema/apply', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(SAMPLE),
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it('returns 403 INSUFFICIENT_SCOPE for a key without schema:write', async () => {
+    const key = await makeKey(['schema:read']);
+    const res = await fetch('/api/schema/apply', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${key}`,
+      },
+      body: JSON.stringify(SAMPLE),
+    });
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { data?: { error?: string } };
+    expect(body.data?.error).toBe('INSUFFICIENT_SCOPE');
+  });
+
+  it('returns 200 with apply result on success (api key)', async () => {
+    const key = await makeKey(['schema:write']);
+    const res = await fetch('/api/schema/apply', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${key}`,
+      },
+      body: JSON.stringify(SAMPLE),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      changed: boolean;
+      applied: { contentTypesCreated: number };
+    };
+    expect(body.changed).toBe(true);
+    expect(body.applied.contentTypesCreated).toBe(1);
+    const inDb = await prisma.contentType.findUnique({
+      where: { identifier: 'ApiApplyArticle' },
+    });
+    expect(inDb).not.toBeNull();
+  });
+
+  it('returns 400 BUNDLE_INVALID for a malformed bundle', async () => {
+    const key = await makeKey(['schema:write']);
+    const res = await fetch('/api/schema/apply', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${key}`,
+      },
+      body: JSON.stringify({
+        bundle: {
+          version: 2,
+          exportedAt: 'x',
+          portable: true,
+          contentTypes: [{ identifier: 'X' }],
+        },
+      }),
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as {
+      data?: { error?: string; errors?: unknown };
+    };
+    expect(body.data?.error).toBe('BUNDLE_INVALID');
+    expect(Array.isArray(body.data?.errors)).toBe(true);
+  });
+
+  it('returns 400 SCHEMA_APPLY_BLOCKED with blockers and plan', async () => {
+    // Seed a type + entry, then send an empty bundle without
+    // allowDestructive — the planner blocks the removal.
+    await prisma.contentType.create({
+      data: {
+        identifier: 'BlockedType',
+        name: 'BlockedType',
+        fields: {
+          create: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+              order: 0,
+            },
+          ],
+        },
+      },
+    });
+    const ct = await prisma.contentType.findUniqueOrThrow({
+      where: { identifier: 'BlockedType' },
+    });
+    await prisma.contentEntry.create({
+      data: {
+        contentTypeId: ct.id,
+        entryTitle: 'X',
+        slug: 'x',
+        versions: {
+          create: {
+            data: { title: 'X' },
+            entryTitle: 'X',
+            status: 'PUBLISHED',
+          },
+        },
+      },
+    });
+    const key = await makeKey(['schema:write']);
+    const res = await fetch('/api/schema/apply', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${key}`,
+      },
+      body: JSON.stringify({
+        bundle: {
+          version: 2,
+          exportedAt: '2026-05-01T00:00:00.000Z',
+          portable: true,
+          contentTypes: [],
+        },
+      }),
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as {
+      data?: {
+        error?: string;
+        blockers?: Array<{ code: string }>;
+        plan?: unknown;
+      };
+    };
+    expect(body.data?.error).toBe('SCHEMA_APPLY_BLOCKED');
+    expect(Array.isArray(body.data?.blockers)).toBe(true);
+    expect(body.data?.blockers?.[0]?.code).toBe(
+      'CONTENT_TYPE_REMOVAL_WITH_ENTRIES'
+    );
+  });
+
+  it('honours dryRun in the body — returns success without mutating', async () => {
+    const key = await makeKey(['schema:write']);
+    const res = await fetch('/api/schema/apply', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${key}`,
+      },
+      body: JSON.stringify({ ...SAMPLE, dryRun: true }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      changed: boolean;
+      applied: { contentTypesCreated: number };
+    };
+    expect(body.changed).toBe(true);
+    expect(body.applied.contentTypesCreated).toBe(1);
+    const inDb = await prisma.contentType.findUnique({
+      where: { identifier: 'ApiApplyArticle' },
+    });
+    expect(inDb).toBeNull();
+  });
+
+  // The SCHEMA_READONLY test for /api/schema/apply lives in
+  // `apply-readonly.test.ts` — `useRuntimeConfig` snapshots
+  // `BOJECT_SCHEMA_READONLY` at Nitro boot, so the env var must be set
+  // before `setup()` runs. Mirrors the pattern used by
+  // `content-types-readonly.test.ts`.
+});
