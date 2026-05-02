@@ -24,6 +24,7 @@ export function renderDockerCompose({
       - db
     volumes:
       - storage:/app/storage
+      - ./content-types:/app/content-types:ro
 ${starterMount}  db:
     image: postgres:17
     restart: unless-stopped
