@@ -99,7 +99,14 @@ export async function applySchema(
       applied.contentTypesUpdated += 1;
     }
 
-    // Pass 1: content-type removes — Task 7.
+    // Pass 1: content-type removes. Prisma's onDelete: Cascade cleans up
+    // fields — no need to walk fields.remove for these types.
+    const removedTypeIds = new Set<string>();
+    for (const removal of plan.contentTypes.remove) {
+      await tx.contentType.delete({ where: { id: removal.id } });
+      applied.contentTypesRemoved += 1;
+      removedTypeIds.add(removal.id);
+    }
 
     // Pass 2: fields — Tasks 8-11.
 

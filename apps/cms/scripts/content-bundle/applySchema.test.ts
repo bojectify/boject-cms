@@ -299,4 +299,44 @@ describe('applySchema', () => {
       expect(ct!.description).toBe('Renamed');
     });
   });
+
+  describe('happy path — pass 1 removes', () => {
+    it('removes an empty content type with allowDestructive', async () => {
+      await prisma.contentType.create({
+        data: {
+          identifier: 'Stale',
+          name: 'Stale',
+          fields: {
+            create: [
+              {
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                required: true,
+                unique: true,
+                order: 0,
+              },
+            ],
+          },
+        },
+      });
+
+      const bundle: Bundle = {
+        version: 2,
+        exportedAt: '2026-05-01T00:00:00.000Z',
+        portable: true,
+        contentTypes: [],
+      };
+      const result = await applySchema(prisma, bundle, {
+        allowDestructive: true,
+      });
+      expect(result.changed).toBe(true);
+      expect(result.applied.contentTypesRemoved).toBe(1);
+
+      const gone = await prisma.contentType.findUnique({
+        where: { identifier: 'Stale' },
+      });
+      expect(gone).toBeNull();
+    });
+  });
 });
