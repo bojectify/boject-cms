@@ -1,4 +1,4 @@
-/* eslint-disable import/first */
+/* eslint-disable import/first -- vi.mock calls must precede the imports they intercept */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('./import', () => ({

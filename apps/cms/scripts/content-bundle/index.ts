@@ -70,12 +70,15 @@ function writeBundle(out: string, bundle: unknown) {
   writeFileSync(abs, JSON.stringify(bundle, null, 2));
 }
 
+// Each branch follows process.exit() with `return` so tests that mock
+// process.exit don't fall through to the next branch.
 export async function runCli(argv: string[]): Promise<void> {
   const [command, ...args] = argv;
 
   if (!command || command === 'help' || wantsHelp([command ?? ''])) {
     console.log(HELP);
     process.exit(0);
+    return;
   }
 
   const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
@@ -86,6 +89,7 @@ export async function runCli(argv: string[]): Promise<void> {
       if (wantsHelp(args)) {
         console.log(HELP);
         process.exit(0);
+        return;
       }
       const mode = parseMode(args, 'schema');
       const portable = args.includes('--portable');
@@ -97,12 +101,14 @@ export async function runCli(argv: string[]): Promise<void> {
       writeBundle(out, bundle);
       console.log(`Wrote bundle to ${out}`);
       process.exit(0);
+      return;
     }
 
     if (command === 'import') {
       if (wantsHelp(args)) {
         console.log(HELP);
         process.exit(0);
+        return;
       }
       const path = args[0];
       if (!path) throw new Error('Usage: content-bundle import <path>');
@@ -148,12 +154,14 @@ export async function runCli(argv: string[]): Promise<void> {
         `Imported ${result.contentTypesCreated} content type(s) and ${result.entriesCreated} entry/entries`
       );
       process.exit(0);
+      return;
     }
 
     if (command === 'validate') {
       if (wantsHelp(args)) {
         console.log(HELP);
         process.exit(0);
+        return;
       }
       const path = args[0];
       if (!path) throw new Error('Usage: content-bundle validate <path>');
@@ -163,21 +171,25 @@ export async function runCli(argv: string[]): Promise<void> {
       if (result.ok) {
         console.log('Bundle is valid');
         process.exit(0);
+        return;
       }
       console.error('Bundle failed validation:');
       for (const err of result.errors) {
         console.error(`  ${err.path}: ${err.message}`);
       }
       process.exit(1);
+      return;
     }
 
     console.error(
       `Unknown command "${command}". Run with --help to see usage.`
     );
     process.exit(1);
+    return;
   } catch (err) {
     console.error(err instanceof Error ? err.message : String(err));
     process.exit(1);
+    return;
   } finally {
     await prisma.$disconnect();
   }
