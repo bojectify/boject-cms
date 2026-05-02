@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { applySchemaIfConfigured } from './apply-schema';
+import { SchemaApplyBlockedError } from '../content-bundle/applySchemaErrors';
 
 const NOOP_LOGGER = { info: vi.fn(), error: vi.fn() };
 
@@ -334,6 +335,88 @@ describe('applySchemaIfConfigured', () => {
     );
     expect(logger.info).toHaveBeenCalledWith(
       '[apply-schema] no .boject.json files in /app/content-types — skipping'
+    );
+  });
+
+  it('throws on the first failing file and does not continue', async () => {
+    const applySchemaFn = vi
+      .fn()
+      .mockResolvedValueOnce({
+        changed: true,
+        plan: EMPTY_PLAN,
+        applied: {
+          ...ZERO_APPLIED,
+          contentTypesCreated: 1,
+        },
+      })
+      .mockRejectedValueOnce(new Error('boom'));
+    const readDir = vi
+      .fn()
+      .mockResolvedValue(['a.boject.json', 'b.boject.json', 'c.boject.json']);
+    const readFile = vi.fn().mockResolvedValue(SAMPLE_BUNDLE_JSON);
+
+    await expect(
+      applySchemaIfConfigured(
+        {} as Parameters<typeof applySchemaIfConfigured>[0],
+        {
+          dirPath: '/app/content-types',
+          allowDestructive: false,
+          applySchemaFn,
+          readDir,
+          readFile,
+          logger: NOOP_LOGGER,
+        }
+      )
+    ).rejects.toThrow('boom');
+
+    // a applied, b failed, c never attempted.
+    expect(applySchemaFn).toHaveBeenCalledTimes(2);
+  });
+
+  it('logs each blocker on a SchemaApplyBlockedError before rethrowing', async () => {
+    const blockers = [
+      {
+        code: 'CONTENT_TYPE_REMOVAL_WITH_ENTRIES' as const,
+        message: 'Tag has 4 entries',
+        path: 'contentTypes.Tag',
+      },
+      {
+        code: 'FIELD_TYPE_CHANGE' as const,
+        message: 'cannot change DATETIME to TEXT',
+        path: 'contentTypes.Article.fields.publishDate',
+      },
+    ];
+    const blockedPlan = { ...EMPTY_PLAN, blockers };
+    const applySchemaFn = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new SchemaApplyBlockedError(blockers, blockedPlan)
+      );
+    const readDir = vi.fn().mockResolvedValue(['schema.boject.json']);
+    const readFile = vi.fn().mockResolvedValue(SAMPLE_BUNDLE_JSON);
+    const logger = { info: vi.fn(), error: vi.fn() };
+
+    await expect(
+      applySchemaIfConfigured(
+        {} as Parameters<typeof applySchemaIfConfigured>[0],
+        {
+          dirPath: '/app/content-types',
+          allowDestructive: false,
+          applySchemaFn,
+          readDir,
+          readFile,
+          logger,
+        }
+      )
+    ).rejects.toBeInstanceOf(SchemaApplyBlockedError);
+
+    const errLines = logger.error.mock.calls.map((c) => c[0] as string);
+    expect(errLines).toContain('[apply-schema] schema.boject.json: BLOCKED');
+    expect(errLines).toContain(
+      '  - CONTENT_TYPE_REMOVAL_WITH_ENTRIES at contentTypes.Tag: Tag has 4 entries'
+    );
+    expect(errLines).toContain(
+      '  - FIELD_TYPE_CHANGE at contentTypes.Article.fields.publishDate: cannot change DATETIME to TEXT'
     );
   });
 });

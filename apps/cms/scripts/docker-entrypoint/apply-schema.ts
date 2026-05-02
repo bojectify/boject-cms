@@ -16,6 +16,7 @@ import type {
   ApplySchemaOptions,
   ApplySchemaResult,
 } from '../content-bundle/applySchema';
+import { SchemaApplyBlockedError } from '../content-bundle/applySchemaErrors';
 import type { Bundle } from '../content-bundle/types';
 
 export type ApplySchemaFn = (
@@ -83,9 +84,24 @@ export async function applySchemaIfConfigured(
     const fullPath = `${input.dirPath}/${name}`;
     const raw = await input.readFile(fullPath);
     const bundle = JSON.parse(raw) as Bundle;
-    const result = await input.applySchemaFn(prisma, bundle, {
-      allowDestructive: input.allowDestructive,
-    });
+    let result: ApplySchemaResult;
+    try {
+      result = await input.applySchemaFn(prisma, bundle, {
+        allowDestructive: input.allowDestructive,
+      });
+    } catch (err) {
+      if (err instanceof SchemaApplyBlockedError) {
+        input.logger.error(`[apply-schema] ${name}: BLOCKED`);
+        for (const b of err.blockers) {
+          input.logger.error(`  - ${b.code} at ${b.path}: ${b.message}`);
+        }
+      } else {
+        input.logger.error(
+          `[apply-schema] ${name}: ${err instanceof Error ? err.message : String(err)}`
+        );
+      }
+      throw err;
+    }
     totalChanges += sumApplied(result.applied);
     if (result.changed) {
       const created =
