@@ -75,7 +75,8 @@ RUN cd apps/cms \
 # Storage dir + entrypoint perms
 RUN chmod +x ./apps/cms/docker/entrypoint.sh \
  && mkdir -p /app/storage/images/originals /app/storage/images/transforms \
- && chown -R cms:cms /app/storage
+ && mkdir -p /app/content-types \
+ && chown -R cms:cms /app/storage /app/content-types
 
 USER cms
 
