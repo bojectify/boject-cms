@@ -16,6 +16,7 @@ model ApiKey {
   keyPrefix  String
   revokedAt  DateTime?
   lastUsedAt DateTime?
+  scopes     String[]  @default([])
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 }
