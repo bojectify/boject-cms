@@ -3,6 +3,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../../generated/prisma/client';
+import { applySchema } from './applySchema';
 import { exportBundle } from './export';
 import { importBundle } from './import';
 import { validateBundle } from './validate';
@@ -14,7 +15,7 @@ const HELP = `content-bundle — dynamic content types & entries as JSON bundles
 
 Usage:
   pnpm content:export   [--schema|--entries|--all] [--portable] [--out <path>]
-  pnpm content:import   <path> [--schema|--entries|--all] [--author <string>]
+  pnpm content:import   <path> [--schema|--entries|--all] [--author <string>] [--apply [--allow-destructive]]
   pnpm content:validate <path>
 
 Commands:
@@ -30,6 +31,9 @@ Flags:
   --portable     Rewrite UUID references to identifier/slug keys (export only)
   --out <path>   Write export to a custom path
   --author <s>   Attribute imported entries to this user (import only)
+  --apply        Apply schema diff idempotently via applySchema (import --schema only)
+  --allow-destructive
+                 With --apply, allow content-type and field removals
   --help, -h     Show this help message
 
 Examples:
@@ -66,12 +70,15 @@ function writeBundle(out: string, bundle: unknown) {
   writeFileSync(abs, JSON.stringify(bundle, null, 2));
 }
 
-async function main() {
-  const [command, ...args] = process.argv.slice(2);
+// Each branch follows process.exit() with `return` so tests that mock
+// process.exit don't fall through to the next branch.
+export async function runCli(argv: string[]): Promise<void> {
+  const [command, ...args] = argv;
 
   if (!command || command === 'help' || wantsHelp([command ?? ''])) {
     console.log(HELP);
     process.exit(0);
+    return;
   }
 
   const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
@@ -82,6 +89,7 @@ async function main() {
       if (wantsHelp(args)) {
         console.log(HELP);
         process.exit(0);
+        return;
       }
       const mode = parseMode(args, 'schema');
       const portable = args.includes('--portable');
@@ -93,12 +101,14 @@ async function main() {
       writeBundle(out, bundle);
       console.log(`Wrote bundle to ${out}`);
       process.exit(0);
+      return;
     }
 
     if (command === 'import') {
       if (wantsHelp(args)) {
         console.log(HELP);
         process.exit(0);
+        return;
       }
       const path = args[0];
       if (!path) throw new Error('Usage: content-bundle import <path>');
@@ -111,18 +121,47 @@ async function main() {
             ? 'entries'
             : 'schema';
       const mode = parseMode(args.slice(1), defaultMode);
+      const apply = args.includes('--apply');
+
+      if (apply && mode !== 'schema') {
+        console.error(`--apply is only valid with --schema. Got mode=${mode}.`);
+        process.exit(2);
+        return;
+      }
+
+      if (apply) {
+        const allowDestructive = args.includes('--allow-destructive');
+        const result = await applySchema(prisma, bundle, { allowDestructive });
+        if (result.changed) {
+          console.log(
+            `Applied: ${result.applied.contentTypesCreated} type(s) created, ` +
+              `${result.applied.contentTypesUpdated} updated, ` +
+              `${result.applied.contentTypesRemoved} removed; ` +
+              `${result.applied.fieldsCreated} field(s) created, ` +
+              `${result.applied.fieldsUpdated} updated, ` +
+              `${result.applied.fieldsRemoved} removed.`
+          );
+        } else {
+          console.log('No-op (schema already matches bundle).');
+        }
+        process.exit(0);
+        return;
+      }
+
       const author = flagValue(args, '--author');
       const result = await importBundle(prisma, bundle, { mode, author });
       console.log(
         `Imported ${result.contentTypesCreated} content type(s) and ${result.entriesCreated} entry/entries`
       );
       process.exit(0);
+      return;
     }
 
     if (command === 'validate') {
       if (wantsHelp(args)) {
         console.log(HELP);
         process.exit(0);
+        return;
       }
       const path = args[0];
       if (!path) throw new Error('Usage: content-bundle validate <path>');
@@ -132,24 +171,37 @@ async function main() {
       if (result.ok) {
         console.log('Bundle is valid');
         process.exit(0);
+        return;
       }
       console.error('Bundle failed validation:');
       for (const err of result.errors) {
         console.error(`  ${err.path}: ${err.message}`);
       }
       process.exit(1);
+      return;
     }
 
     console.error(
       `Unknown command "${command}". Run with --help to see usage.`
     );
     process.exit(1);
+    return;
   } catch (err) {
     console.error(err instanceof Error ? err.message : String(err));
     process.exit(1);
+    return;
   } finally {
     await prisma.$disconnect();
   }
 }
 
-main();
+async function main() {
+  await runCli(process.argv.slice(2));
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
+}
