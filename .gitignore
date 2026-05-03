@@ -63,6 +63,7 @@ apps/cms/storybook-static/
 .claude/*.lock
 .claude/settings.local.json
 .claude/worktrees/
+CLAUDE.local.md
 
 # Git worktrees
 .worktrees/
