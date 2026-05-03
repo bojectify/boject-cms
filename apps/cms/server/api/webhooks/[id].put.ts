@@ -24,7 +24,7 @@ export default defineEventHandler(async (event) => {
     data.name = assertStringLength(body.name, 'name', 200);
   }
   if ('url' in body) {
-    assertWebhookUrl(typeof body.url === 'string' ? body.url : '');
+    await assertWebhookUrl(typeof body.url === 'string' ? body.url : '');
     data.url = body.url as string;
   }
   if ('enabled' in body) {

@@ -22,7 +22,7 @@ export default defineEventHandler(async (event) => {
   const body = await readBody<Record<string, unknown>>(event);
 
   const name = assertStringLength(body.name, 'name', 200);
-  assertWebhookUrl(typeof body.url === 'string' ? body.url : '');
+  await assertWebhookUrl(typeof body.url === 'string' ? body.url : '');
   const url = body.url as string;
 
   if (!Array.isArray(body.events) || body.events.length === 0) {
