@@ -16,9 +16,14 @@ export default defineNitroPlugin((nitroApp) => {
     return;
   }
 
+  const allowPrivate =
+    process.env.NODE_ENV !== 'production' ||
+    process.env.WEBHOOK_ALLOW_PRIVATE_URLS === 'true';
+
   startWorker({
     prisma: prisma as never,
     fetch: (url, init) => fetch(url, init as RequestInit),
+    allowPrivate,
   });
 
   nitroApp.hooks.hookOnce('close', () => {
