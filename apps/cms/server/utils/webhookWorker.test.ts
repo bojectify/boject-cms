@@ -1,5 +1,18 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { resolvePublicHost } from './resolvePublicHost';
 import { runWorkerTick } from './webhookWorker';
+
+vi.mock('./resolvePublicHost', async (importOriginal) => {
+  const original = await importOriginal<typeof import('./resolvePublicHost')>();
+  return {
+    ...original,
+    resolvePublicHost: vi
+      .fn()
+      .mockResolvedValue({ addresses: ['203.0.113.5'] }),
+  };
+});
+
+const mockResolve = resolvePublicHost as unknown as ReturnType<typeof vi.fn>;
 
 type DeliveryRow = {
   id: string;
@@ -167,5 +180,131 @@ describe('runWorkerTick', () => {
     expect(deliveries[0]!.lastError).toBe('Webhook no longer exists');
     expect(deliveries[0]!.completedAt).toBeInstanceOf(Date);
     expect(fetchCalled.value).toBe(false); // Never attempted the POST
+  });
+});
+
+describe('runWorkerTick — DNS resolution + IP pinning', () => {
+  let deliveries: DeliveryRow[];
+  let webhooks: WebhookRow[];
+
+  beforeEach(() => {
+    deliveries = [{ ...baseDelivery }];
+    webhooks = [{ id: 'w1', url: 'https://example.com/hook', secret: 'sek' }];
+    mockResolve.mockReset();
+    mockResolve.mockResolvedValue({ addresses: ['203.0.113.5'] });
+  });
+
+  it('skips DNS resolution and dispatcher when allowPrivate=true', async () => {
+    const fetchImpl = vi.fn(async () => new Response('ok', { status: 200 }));
+    const prisma = makeFakePrisma(deliveries, webhooks);
+    await runWorkerTick({
+      prisma,
+      fetch: fetchImpl as never,
+      now: () => new Date(),
+      allowPrivate: true,
+    });
+
+    expect(mockResolve).not.toHaveBeenCalled();
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    const init = (
+      fetchImpl.mock.calls[0] as unknown as [string, { dispatcher?: unknown }]
+    )[1];
+    expect(init.dispatcher).toBeUndefined();
+    expect(deliveries[0]!.status).toBe('SUCCESS');
+  });
+
+  it('skips DNS resolution when URL hostname is an IP literal', async () => {
+    webhooks = [{ id: 'w1', url: 'https://203.0.113.5/hook', secret: 'sek' }];
+    const fetchImpl = vi.fn(async () => new Response('ok', { status: 200 }));
+    const prisma = makeFakePrisma(deliveries, webhooks);
+    await runWorkerTick({
+      prisma,
+      fetch: fetchImpl as never,
+      now: () => new Date(),
+      allowPrivate: false,
+    });
+
+    expect(mockResolve).not.toHaveBeenCalled();
+    expect(deliveries[0]!.status).toBe('SUCCESS');
+  });
+
+  it('resolves the hostname and passes a dispatcher to fetch in production', async () => {
+    const fetchImpl = vi.fn(async () => new Response('ok', { status: 200 }));
+    const prisma = makeFakePrisma(deliveries, webhooks);
+    await runWorkerTick({
+      prisma,
+      fetch: fetchImpl as never,
+      now: () => new Date(),
+      allowPrivate: false,
+    });
+
+    expect(mockResolve).toHaveBeenCalledWith('example.com');
+    const init = (
+      fetchImpl.mock.calls[0] as unknown as [string, { dispatcher?: unknown }]
+    )[1];
+    expect(init.dispatcher).toBeDefined();
+    expect(deliveries[0]!.status).toBe('SUCCESS');
+  });
+
+  it('marks delivery FAILED with no fetch when resolver detects rebinding (PRIVATE_IP)', async () => {
+    const { WebhookDnsError } = await import('./resolvePublicHost');
+    mockResolve.mockRejectedValueOnce(
+      new WebhookDnsError('PRIVATE_IP', 'example.com', '127.0.0.1')
+    );
+    const fetchImpl = vi.fn(async () => new Response('ok', { status: 200 }));
+    const prisma = makeFakePrisma(deliveries, webhooks);
+    await runWorkerTick({
+      prisma,
+      fetch: fetchImpl as never,
+      now: () => new Date(),
+      allowPrivate: false,
+    });
+
+    expect(fetchImpl).not.toHaveBeenCalled();
+    const row = deliveries[0]!;
+    expect(row.status).toBe('FAILED');
+    expect(row.attempts).toBe(1);
+    expect(row.lastError).toMatch(/private/i);
+    expect(row.completedAt).toBeInstanceOf(Date);
+    expect(row.nextAttemptAt).toBeNull();
+    expect(row.lastResponseCode).toBeNull();
+  });
+
+  it('marks delivery FAILED on dispatch-time NXDOMAIN', async () => {
+    const { WebhookDnsError } = await import('./resolvePublicHost');
+    mockResolve.mockRejectedValueOnce(
+      new WebhookDnsError('NXDOMAIN', 'example.com')
+    );
+    const fetchImpl = vi.fn(async () => new Response('ok', { status: 200 }));
+    const prisma = makeFakePrisma(deliveries, webhooks);
+    await runWorkerTick({
+      prisma,
+      fetch: fetchImpl as never,
+      now: () => new Date(),
+      allowPrivate: false,
+    });
+
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(deliveries[0]!.status).toBe('FAILED');
+    expect(deliveries[0]!.lastError).toMatch(/could not be resolved/i);
+  });
+
+  it('marks delivery FAILED on dispatch-time TIMEOUT', async () => {
+    const { WebhookDnsError } = await import('./resolvePublicHost');
+    mockResolve.mockRejectedValueOnce(
+      new WebhookDnsError('TIMEOUT', 'example.com')
+    );
+    const fetchImpl = vi.fn(async () => new Response('ok', { status: 200 }));
+    const prisma = makeFakePrisma(deliveries, webhooks);
+    await runWorkerTick({
+      prisma,
+      fetch: fetchImpl as never,
+      now: () => new Date(),
+      allowPrivate: false,
+    });
+
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(deliveries[0]!.status).toBe('FAILED');
+    expect(deliveries[0]!.lastError).toMatch(/timed out/i);
   });
 });

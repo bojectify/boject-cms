@@ -1,4 +1,7 @@
 import type { DeliveryStatus, Prisma, WebhookEvent } from '#prisma';
+import { Agent } from 'undici';
+import { isIP } from 'node:net';
+import { resolvePublicHost, WebhookDnsError } from './resolvePublicHost';
 import { signPayload } from './signPayload';
 import { backoffMs, MAX_ATTEMPTS } from './webhookBackoff';
 
@@ -39,10 +42,16 @@ export interface RunWorkerTickDeps {
   prisma: WorkerPrisma;
   fetch: (
     url: string,
-    init: RequestInit & { signal?: AbortSignal }
+    init: RequestInit & { signal?: AbortSignal; dispatcher?: Agent }
   ) => Promise<Response>;
   now: () => Date;
   batchSize?: number;
+  /**
+   * When true, skip DNS resolution and IP pinning entirely. Production callers
+   * pass `false`; dev / tests / `WEBHOOK_ALLOW_PRIVATE_URLS=true` pass `true`.
+   * Default is `true` so existing tests with no flag behave like dev.
+   */
+  allowPrivate?: boolean;
 }
 
 const DEFAULT_BATCH = 10;
@@ -113,6 +122,35 @@ async function dispatch(
 
   const attempts = row.attempts + 1;
   const now = deps.now();
+
+  // Dispatch-time DNS guard: re-resolve the hostname and pin the verified IP
+  // into the outbound connection. Defeats DNS rebinding between validate-time
+  // and dispatch-time. See spec 2026-05-03-webhook-ssrf-dns-rebinding.
+  let dispatcher: Agent | undefined;
+  const allowPrivate = deps.allowPrivate ?? true;
+  if (!allowPrivate) {
+    try {
+      dispatcher = await resolveAndBuildDispatcher(webhook.url);
+    } catch (err) {
+      if (err instanceof WebhookDnsError) {
+        await deps.prisma.webhookDelivery.update({
+          where: { id: row.id },
+          data: {
+            status: 'FAILED',
+            attempts,
+            lastError: dispatchErrorMessage(err),
+            lastResponseCode: null,
+            lastResponseBody: null,
+            completedAt: now,
+            nextAttemptAt: null,
+          },
+        });
+        return;
+      }
+      throw err;
+    }
+  }
+
   const body = JSON.stringify(row.payload);
   const tsSeconds = Math.floor(now.getTime() / 1000);
   const signature = signPayload(webhook.secret, tsSeconds, body);
@@ -139,6 +177,7 @@ async function dispatch(
       headers: requestHeaders,
       body,
       signal: controller.signal,
+      ...(dispatcher ? { dispatcher } : {}),
     });
     responseCode = res.status;
     const text = await res.text();
@@ -148,6 +187,7 @@ async function dispatch(
     transportError = msg.slice(0, 500);
   } finally {
     clearTimeout(timer);
+    await dispatcher?.close();
   }
 
   const succeeded =
@@ -203,6 +243,38 @@ async function dispatch(
         nextAttemptAt: new Date(now.getTime() + delay),
       },
     });
+  }
+}
+
+/**
+ * Resolve the URL's hostname and build a per-delivery undici Agent that pins
+ * outbound connections to the verified IP. Skips DNS for IP-literal hosts.
+ */
+async function resolveAndBuildDispatcher(
+  rawUrl: string
+): Promise<Agent | undefined> {
+  const url = new URL(rawUrl);
+  if (isIP(url.hostname) > 0) {
+    return undefined;
+  }
+  const { addresses } = await resolvePublicHost(url.hostname);
+  const pinned = addresses[0]!;
+  const family = isIP(pinned) as 4 | 6;
+  return new Agent({
+    connect: {
+      lookup: (_h, _opts, cb) => cb(null, pinned, family),
+    },
+  });
+}
+
+function dispatchErrorMessage(err: WebhookDnsError): string {
+  switch (err.reason) {
+    case 'PRIVATE_IP':
+      return 'Webhook URL resolved to a private IP at dispatch time (possible DNS rebinding)';
+    case 'NXDOMAIN':
+      return 'Webhook URL hostname could not be resolved at dispatch time';
+    case 'TIMEOUT':
+      return 'Webhook URL hostname resolution timed out at dispatch time';
   }
 }
 
