@@ -7,6 +7,13 @@ import { prisma } from '../../utils/prisma';
 import { resetRateLimitStore } from '../../utils/rateLimit';
 import { runWorkerTick } from '../../utils/webhookWorker';
 
+// This test relies on the symmetric escape hatch from issue #103: when
+// `NODE_ENV !== 'production'` (or `WEBHOOK_ALLOW_PRIVATE_URLS=true`), both
+// the validate-time DNS resolution and the dispatch-time IP pinning are
+// skipped, allowing the 127.0.0.1 stub server below to receive deliveries.
+// If you tighten the bypass logic in webhookUrl.ts / webhookWorker.ts, this
+// suite will start failing — that's the intended signal, not a flake.
+
 let _sessionCookie: string | null = null;
 async function getSessionCookie(): Promise<string> {
   if (_sessionCookie) return _sessionCookie;

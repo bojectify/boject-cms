@@ -16,9 +16,19 @@ export default defineNitroPlugin((nitroApp) => {
     return;
   }
 
+  const allowPrivate =
+    process.env.NODE_ENV !== 'production' ||
+    process.env.WEBHOOK_ALLOW_PRIVATE_URLS === 'true';
+
   startWorker({
     prisma: prisma as never,
-    fetch: (url, init) => fetch(url, init as RequestInit),
+    // The `dispatcher` field is preserved by the cast — Node's global `fetch`
+    // is undici under the hood and honours it, even though the standard DOM
+    // `RequestInit` type doesn't list it. Don't simplify this to a destructure
+    // that drops the field.
+    fetch: (url, init) =>
+      fetch(url, init as RequestInit & { dispatcher?: unknown }),
+    allowPrivate,
   });
 
   nitroApp.hooks.hookOnce('close', () => {
