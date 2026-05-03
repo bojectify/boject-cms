@@ -19,7 +19,7 @@ afterEach(async () => {
 });
 
 const baseArgs = {
-  imageTag: 'ghcr.io/boject/cms:latest',
+  imageTag: 'ghcr.io/bojectify/cms:latest',
   startersSourceDir: FIXTURES,
 };
 

@@ -4,10 +4,10 @@ import { renderDockerCompose } from '../../src/templates/dockerCompose.js';
 describe('renderDockerCompose', () => {
   it('pins cms.image to the supplied tag', () => {
     const yml = renderDockerCompose({
-      imageTag: 'ghcr.io/boject/cms:1.2.3',
+      imageTag: 'ghcr.io/bojectify/cms:1.2.3',
       starter: 'base',
     });
-    expect(yml).toContain('image: ghcr.io/boject/cms:1.2.3');
+    expect(yml).toContain('image: ghcr.io/bojectify/cms:1.2.3');
   });
 
   it('wires the db service as postgres:17 with boject credentials', () => {
