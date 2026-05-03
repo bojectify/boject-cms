@@ -43,55 +43,60 @@ const draggableItems = computed({
       >
         <template #item="{ element: item, index: idx }">
           <div
-            class="flex items-center h-14 px-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 gap-2"
+            class="flex items-center h-14 pl-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 focus-within:ring-2 focus-within:ring-primary-500"
           >
             <UIcon
               name="i-lucide-grip-vertical"
-              class="drag-handle cursor-grab active:cursor-grabbing text-muted shrink-0 size-3.5"
+              class="drag-handle cursor-grab active:cursor-grabbing text-muted shrink-0 size-3.5 mr-2"
+              aria-hidden="true"
             />
-            <div
-              class="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-900/30 shrink-0 cursor-pointer"
+            <button
+              type="button"
+              class="flex-1 flex items-center min-w-0 h-full gap-2 cursor-pointer text-left focus:outline-none"
               @click="emit('edit', idx)"
             >
-              <span
-                class="text-xs font-semibold text-blue-700 dark:text-blue-300"
+              <div
+                class="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-900/30 shrink-0"
               >
-                {{ item.contentTypeName.charAt(0).toUpperCase() }}
-              </span>
-            </div>
-            <div
-              class="flex-1 min-w-0 cursor-pointer"
-              @click="emit('edit', idx)"
-            >
-              <p
-                class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate"
-              >
-                {{ item.entryTitle || 'Untitled' }}
-              </p>
-              <p class="text-xs text-muted">{{ item.contentTypeName }}</p>
-            </div>
+                <span
+                  class="text-xs font-semibold text-blue-700 dark:text-blue-300"
+                >
+                  {{ item.contentTypeName.charAt(0).toUpperCase() }}
+                </span>
+              </div>
+              <div class="flex-1 min-w-0">
+                <p
+                  class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate"
+                >
+                  {{ item.entryTitle || 'Untitled' }}
+                </p>
+                <p class="text-xs text-muted">{{ item.contentTypeName }}</p>
+              </div>
+            </button>
             <UButton
               size="xs"
               variant="ghost"
               icon="i-lucide-x"
-              class="shrink-0 opacity-50 hover:opacity-100"
-              @click.stop="emit('remove', idx)"
+              aria-label="Remove entry"
+              class="shrink-0 opacity-50 hover:opacity-100 focus-visible:opacity-100"
+              @click="emit('remove', idx)"
             />
             <UIcon
               name="i-lucide-chevron-right"
-              class="size-4 text-muted shrink-0 cursor-pointer"
-              @click="emit('edit', idx)"
+              class="size-4 text-muted shrink-0 mr-2 pointer-events-none"
+              aria-hidden="true"
             />
           </div>
         </template>
       </draggable>
-      <div
-        class="flex items-center justify-center h-12 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 gap-2 cursor-pointer hover:border-gray-400 transition-colors"
+      <button
+        type="button"
+        class="w-full flex items-center justify-center h-12 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 gap-2 cursor-pointer hover:border-gray-400 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
         @click="emit('add')"
       >
         <UIcon name="i-lucide-plus" class="size-3.5 text-muted" />
         <span class="text-sm font-medium text-muted">Add entry</span>
-      </div>
+      </button>
     </div>
   </div>
 </template>

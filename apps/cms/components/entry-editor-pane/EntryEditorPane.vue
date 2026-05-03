@@ -8,7 +8,10 @@ import { QA_ENTRY_EDITOR_PANE } from './entryEditorPane.config';
 
 const props = withDefaults(defineProps<EntryEditorPaneProps>(), {
   testId: QA_ENTRY_EDITOR_PANE.COMPONENT,
+  isTopmost: true,
 });
+
+const titleId = useId();
 
 const orchestrator = inject(paneOrchestratorKey);
 if (!orchestrator) {
@@ -283,14 +286,30 @@ async function handleAction(action: EntryAction) {
 }
 
 defineExpose({ isDirty, applyFieldUpdate, purgeReference });
+
+const { contentRef } = useDialogA11y({
+  active: () => props.open && props.isTopmost,
+  onEscape: () => emit('close'),
+});
 </script>
 
 <template>
   <Transition name="slide-pane">
-    <div v-if="open" class="absolute inset-0 z-30 flex" :data-testid="testId">
+    <div
+      v-if="open"
+      ref="contentRef"
+      role="dialog"
+      aria-modal="true"
+      :aria-labelledby="titleId"
+      tabindex="-1"
+      class="absolute inset-0 z-30 flex focus:outline-none"
+      :data-testid="testId"
+    >
       <!-- Backdrop / sliver -->
-      <div
-        class="w-10 shrink-0 bg-gray-200/50 dark:bg-gray-900/50 backdrop-blur-sm cursor-pointer"
+      <button
+        type="button"
+        aria-label="Close pane"
+        class="w-10 shrink-0 bg-gray-200/50 dark:bg-gray-900/50 backdrop-blur-sm cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-inset"
         @click="emit('close')"
       />
       <!-- Pane -->
@@ -305,6 +324,7 @@ defineExpose({ isDirty, applyFieldUpdate, purgeReference });
             variant="ghost"
             icon="i-lucide-arrow-left"
             size="sm"
+            aria-label="Close pane"
             @click="emit('close')"
           />
           <USeparator orientation="vertical" class="h-4" />
@@ -317,7 +337,9 @@ defineExpose({ isDirty, applyFieldUpdate, purgeReference });
             <UIcon name="i-lucide-external-link" class="size-3" />
           </NuxtLink>
           <div class="flex-1" />
-          <span class="text-sm font-semibold">{{ pageTitle }}</span>
+          <span :id="titleId" class="text-sm font-semibold">{{
+            pageTitle
+          }}</span>
           <div class="flex-1" />
         </div>
         <!-- Body: editor + sidebar -->

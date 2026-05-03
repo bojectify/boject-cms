@@ -72,6 +72,77 @@ export const EditExisting: Story = {
   },
 };
 
+export const A11yDialogSemantics: Story = {
+  args: {
+    open: true,
+    entryId: 'e1',
+    depth: 1,
+  },
+  play: async ({ canvasElement }) => {
+    const screen = within(canvasElement);
+    // Wait until the form has loaded so focusable inputs exist.
+    await waitFor(() => screen.getByLabelText(/title/i), { timeout: 3000 });
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    expect(dialog).toHaveAttribute('aria-labelledby');
+
+    const labelledBy = dialog.getAttribute('aria-labelledby')!;
+    const titleEl = canvasElement.ownerDocument.getElementById(labelledBy);
+    expect(titleEl).not.toBeNull();
+    expect(titleEl!.textContent).toMatch(/Ada Lovelace|Author/);
+
+    // Sliver backdrop is a real button with an accessible name and lives
+    // INSIDE the dialog so it falls within the focus trap.
+    const closeButtons = screen.getAllByRole('button', { name: /close pane/i });
+    expect(closeButtons.length).toBeGreaterThanOrEqual(2);
+    const sliverButton = closeButtons.find((b) =>
+      b.className.includes('backdrop-blur-sm')
+    );
+    expect(sliverButton).toBeTruthy();
+    expect(dialog.contains(sliverButton!)).toBe(true);
+    sliverButton!.focus();
+    expect(canvasElement.ownerDocument.activeElement).toBe(sliverButton);
+  },
+};
+
+export const EscapeClosesPane: Story = {
+  render: (args) => ({
+    components: { EntryEditorPane },
+    setup() {
+      const onClose = fn();
+      (window as unknown as { __close__: ReturnType<typeof fn> }).__close__ =
+        onClose;
+      return () => h(EntryEditorPane, { ...args, onClose });
+    },
+  }),
+  args: {
+    open: true,
+    entryId: 'e1',
+    depth: 1,
+  },
+  play: async ({ canvasElement }) => {
+    const screen = within(canvasElement);
+    const titleInput = await waitFor(
+      () => screen.getByLabelText(/title/i) as HTMLInputElement,
+      { timeout: 3000 }
+    );
+    titleInput.focus();
+    await waitFor(() =>
+      expect(canvasElement.ownerDocument.activeElement).toBe(titleInput)
+    );
+    titleInput.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: 'Escape',
+        bubbles: true,
+        cancelable: true,
+      })
+    );
+    const close = (window as unknown as { __close__: ReturnType<typeof fn> })
+      .__close__;
+    await waitFor(() => expect(close).toHaveBeenCalled(), { timeout: 1000 });
+  },
+};
+
 export const OpensRelationAtDepth: Story = {
   decorators: [
     (story) => ({
