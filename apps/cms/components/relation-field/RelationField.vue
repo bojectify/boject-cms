@@ -32,11 +32,11 @@ const emit = defineEmits<{
     </button>
     <div
       v-else
-      class="flex items-center h-14 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors"
+      class="flex items-center h-14 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors focus-within:ring-2 focus-within:ring-primary-500"
     >
       <button
         type="button"
-        class="flex-1 flex items-center min-w-0 h-full gap-3 px-4 cursor-pointer text-left rounded-l-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500"
+        class="flex-1 flex items-center min-w-0 h-full gap-3 px-4 cursor-pointer text-left focus:outline-none"
         @click="emit('edit')"
       >
         <div
@@ -62,7 +62,7 @@ const emit = defineEmits<{
         variant="ghost"
         icon="i-lucide-x"
         aria-label="Remove entry"
-        class="shrink-0 opacity-50 hover:opacity-100 mr-1"
+        class="shrink-0 opacity-50 hover:opacity-100 focus-visible:opacity-100 mr-1"
         @click="emit('remove')"
       />
       <UIcon

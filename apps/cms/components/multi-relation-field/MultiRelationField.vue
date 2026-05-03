@@ -43,7 +43,7 @@ const draggableItems = computed({
       >
         <template #item="{ element: item, index: idx }">
           <div
-            class="flex items-center h-14 pl-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+            class="flex items-center h-14 pl-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 focus-within:ring-2 focus-within:ring-primary-500"
           >
             <UIcon
               name="i-lucide-grip-vertical"
@@ -52,7 +52,7 @@ const draggableItems = computed({
             />
             <button
               type="button"
-              class="flex-1 flex items-center min-w-0 h-full gap-2 cursor-pointer text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 rounded"
+              class="flex-1 flex items-center min-w-0 h-full gap-2 cursor-pointer text-left focus:outline-none"
               @click="emit('edit', idx)"
             >
               <div
@@ -78,7 +78,7 @@ const draggableItems = computed({
               variant="ghost"
               icon="i-lucide-x"
               aria-label="Remove entry"
-              class="shrink-0 opacity-50 hover:opacity-100"
+              class="shrink-0 opacity-50 hover:opacity-100 focus-visible:opacity-100"
               @click="emit('remove', idx)"
             />
             <UIcon
