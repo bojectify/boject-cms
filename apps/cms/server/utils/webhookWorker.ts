@@ -249,6 +249,15 @@ async function dispatch(
 /**
  * Resolve the URL's hostname and build a per-delivery undici Agent that pins
  * outbound connections to the verified IP. Skips DNS for IP-literal hosts.
+ *
+ * SNI and the `Host` header still derive from the URL's hostname (undici uses
+ * the URL, not the resolved IP, for those). Only the TCP connect target is
+ * pinned, so HTTPS certificate validation remains correct.
+ *
+ * Single-IP pinning is intentional: `addresses[0]` becomes the only target.
+ * If that address is unreachable, the delivery fails and the existing retry/
+ * backoff handles it. Iterating over fallback IPs would re-introduce the
+ * rebinding gap we are closing.
  */
 async function resolveAndBuildDispatcher(
   rawUrl: string

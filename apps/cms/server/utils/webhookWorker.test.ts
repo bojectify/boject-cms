@@ -225,6 +225,10 @@ describe('runWorkerTick — DNS resolution + IP pinning', () => {
     });
 
     expect(mockResolve).not.toHaveBeenCalled();
+    const init = (
+      fetchImpl.mock.calls[0]! as unknown as [string, { dispatcher?: unknown }]
+    )[1];
+    expect(init.dispatcher).toBeUndefined();
     expect(deliveries[0]!.status).toBe('SUCCESS');
   });
 
@@ -286,6 +290,7 @@ describe('runWorkerTick — DNS resolution + IP pinning', () => {
 
     expect(fetchImpl).not.toHaveBeenCalled();
     expect(deliveries[0]!.status).toBe('FAILED');
+    expect(deliveries[0]!.attempts).toBe(1);
     expect(deliveries[0]!.lastError).toMatch(/could not be resolved/i);
   });
 
@@ -305,6 +310,7 @@ describe('runWorkerTick — DNS resolution + IP pinning', () => {
 
     expect(fetchImpl).not.toHaveBeenCalled();
     expect(deliveries[0]!.status).toBe('FAILED');
+    expect(deliveries[0]!.attempts).toBe(1);
     expect(deliveries[0]!.lastError).toMatch(/timed out/i);
   });
 });
