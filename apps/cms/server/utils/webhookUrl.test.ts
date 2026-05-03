@@ -1,5 +1,17 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { assertWebhookUrl, isPrivateHost } from './webhookUrl';
+import { WebhookDnsError } from './resolvePublicHost';
+
+vi.mock('./resolvePublicHost', async (importOriginal) => {
+  const original = await importOriginal<typeof import('./resolvePublicHost')>();
+  return {
+    ...original,
+    resolvePublicHost: vi.fn(),
+  };
+});
+
+const { resolvePublicHost } = await import('./resolvePublicHost');
+const mockResolve = resolvePublicHost as unknown as ReturnType<typeof vi.fn>;
 
 const ORIGINAL_NODE_ENV = process.env.NODE_ENV;
 const ORIGINAL_ALLOW = process.env.WEBHOOK_ALLOW_PRIVATE_URLS;
@@ -7,6 +19,9 @@ const ORIGINAL_ALLOW = process.env.WEBHOOK_ALLOW_PRIVATE_URLS;
 beforeEach(() => {
   process.env.NODE_ENV = 'production';
   delete process.env.WEBHOOK_ALLOW_PRIVATE_URLS;
+  mockResolve.mockReset();
+  // Default: hostname resolves to a public address
+  mockResolve.mockResolvedValue({ addresses: ['203.0.113.5'] });
 });
 
 afterEach(() => {
@@ -42,64 +57,128 @@ describe('isPrivateHost', () => {
 });
 
 describe('assertWebhookUrl', () => {
-  it('accepts a public https URL', () => {
-    expect(() => assertWebhookUrl('https://example.com/hook')).not.toThrow();
+  it('accepts a public https URL', async () => {
+    await expect(
+      assertWebhookUrl('https://example.com/hook')
+    ).resolves.toBeInstanceOf(URL);
   });
 
-  it('accepts a public http URL', () => {
-    expect(() => assertWebhookUrl('http://example.com/hook')).not.toThrow();
+  it('accepts a public http URL', async () => {
+    await expect(
+      assertWebhookUrl('http://example.com/hook')
+    ).resolves.toBeInstanceOf(URL);
   });
 
-  it('rejects non-http schemes', () => {
-    expect(() => assertWebhookUrl('file:///etc/passwd')).toThrow(/http\(s\)/);
-    expect(() => assertWebhookUrl('javascript:alert(1)')).toThrow(/http\(s\)/);
-  });
-
-  it('rejects garbage input', () => {
-    expect(() => assertWebhookUrl('not a url')).toThrow(/valid URL/);
-    expect(() => assertWebhookUrl('')).toThrow(/valid URL/);
-  });
-
-  it('rejects localhost in production', () => {
-    expect(() => assertWebhookUrl('http://localhost:3000/x')).toThrow(
-      /private/
+  it('rejects non-http schemes', async () => {
+    await expect(assertWebhookUrl('file:///etc/passwd')).rejects.toThrow(
+      /http\(s\)/
+    );
+    await expect(assertWebhookUrl('javascript:alert(1)')).rejects.toThrow(
+      /http\(s\)/
     );
   });
 
-  it('rejects RFC1918 ranges in production', () => {
-    expect(() => assertWebhookUrl('http://10.0.0.1/x')).toThrow(/private/);
-    expect(() => assertWebhookUrl('http://192.168.1.1/x')).toThrow(/private/);
+  it('rejects garbage input', async () => {
+    await expect(assertWebhookUrl('not a url')).rejects.toThrow(/valid URL/);
+    await expect(assertWebhookUrl('')).rejects.toThrow(/valid URL/);
   });
 
-  it('allows localhost in development', () => {
+  it('rejects localhost in production via the literal check (no DNS call)', async () => {
+    await expect(assertWebhookUrl('http://localhost:3000/x')).rejects.toThrow(
+      /private/
+    );
+    expect(mockResolve).not.toHaveBeenCalled();
+  });
+
+  it('rejects RFC1918 ranges in production via the literal check (no DNS call)', async () => {
+    await expect(assertWebhookUrl('http://10.0.0.1/x')).rejects.toThrow(
+      /private/
+    );
+    await expect(assertWebhookUrl('http://192.168.1.1/x')).rejects.toThrow(
+      /private/
+    );
+    expect(mockResolve).not.toHaveBeenCalled();
+  });
+
+  it('allows localhost in development without calling DNS', async () => {
     process.env.NODE_ENV = 'development';
-    expect(() => assertWebhookUrl('http://localhost:3000/x')).not.toThrow();
+    await expect(
+      assertWebhookUrl('http://localhost:3000/x')
+    ).resolves.toBeInstanceOf(URL);
+    expect(mockResolve).not.toHaveBeenCalled();
   });
 
-  it('allows private hosts when WEBHOOK_ALLOW_PRIVATE_URLS=true', () => {
+  it('allows private hosts when WEBHOOK_ALLOW_PRIVATE_URLS=true (no DNS call)', async () => {
     process.env.WEBHOOK_ALLOW_PRIVATE_URLS = 'true';
-    expect(() => assertWebhookUrl('http://10.0.0.1/x')).not.toThrow();
+    await expect(assertWebhookUrl('http://10.0.0.1/x')).resolves.toBeInstanceOf(
+      URL
+    );
+    expect(mockResolve).not.toHaveBeenCalled();
   });
 
-  it('rejects IPv4-mapped IPv6 of a private v4', () => {
-    expect(() => assertWebhookUrl('http://[::ffff:127.0.0.1]/x')).toThrow(
+  it('rejects IPv4-mapped IPv6 of a private v4 (literal check, no DNS)', async () => {
+    await expect(
+      assertWebhookUrl('http://[::ffff:127.0.0.1]/x')
+    ).rejects.toThrow(/private/);
+    expect(mockResolve).not.toHaveBeenCalled();
+  });
+
+  it('rejects decimal IPv4 literal that resolves to a private address', async () => {
+    await expect(assertWebhookUrl('http://2130706433/x')).rejects.toThrow(
       /private/
     );
   });
 
-  it('rejects decimal IPv4 literal that resolves to a private address', () => {
-    expect(() => assertWebhookUrl('http://2130706433/x')).toThrow(/private/);
-  });
-
-  it('does not treat WEBHOOK_ALLOW_PRIVATE_URLS="false" as an override', () => {
+  it('does not treat WEBHOOK_ALLOW_PRIVATE_URLS="false" as an override', async () => {
     process.env.WEBHOOK_ALLOW_PRIVATE_URLS = 'false';
-    expect(() => assertWebhookUrl('http://10.0.0.1/x')).toThrow(/private/);
+    await expect(assertWebhookUrl('http://10.0.0.1/x')).rejects.toThrow(
+      /private/
+    );
   });
 
-  it('returns the parsed URL object on success', () => {
-    const url = assertWebhookUrl('https://example.com/hook');
+  it('returns the parsed URL object on success', async () => {
+    const url = await assertWebhookUrl('https://example.com/hook');
     expect(url).toBeInstanceOf(URL);
     expect(url.hostname).toBe('example.com');
     expect(url.pathname).toBe('/hook');
+  });
+
+  it('calls resolvePublicHost in production for non-IP hostnames', async () => {
+    await assertWebhookUrl('https://example.com/hook');
+    expect(mockResolve).toHaveBeenCalledWith('example.com');
+  });
+
+  it('rejects 400 with PRIVATE_IP wording when resolver finds a private IP', async () => {
+    mockResolve.mockRejectedValue(
+      new WebhookDnsError('PRIVATE_IP', 'localtest.me', '127.0.0.1')
+    );
+    await expect(assertWebhookUrl('https://localtest.me/x')).rejects.toThrow(
+      /private/
+    );
+  });
+
+  it('rejects 400 with NXDOMAIN wording when resolver cannot resolve', async () => {
+    mockResolve.mockRejectedValue(
+      new WebhookDnsError('NXDOMAIN', 'nope.example')
+    );
+    await expect(assertWebhookUrl('https://nope.example/x')).rejects.toThrow(
+      /could not be resolved/
+    );
+  });
+
+  it('rejects 400 with TIMEOUT wording when resolver times out', async () => {
+    mockResolve.mockRejectedValue(
+      new WebhookDnsError('TIMEOUT', 'slow.example')
+    );
+    await expect(assertWebhookUrl('https://slow.example/x')).rejects.toThrow(
+      /timed out/
+    );
+  });
+
+  it('skips resolver for IP literal URLs (already covered by literal check)', async () => {
+    await expect(
+      assertWebhookUrl('https://203.0.113.5/x')
+    ).resolves.toBeInstanceOf(URL);
+    expect(mockResolve).not.toHaveBeenCalled();
   });
 });
