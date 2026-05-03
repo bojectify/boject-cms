@@ -4,8 +4,7 @@
 // current DB state and produces a SchemaPlan. No side effects, no
 // Prisma. The applier (Spec 3) consumes the plan inside a transaction.
 //
-// The diff matrix is documented in
-// docs/superpowers/specs/2026-05-01-schema-as-code-planner-design.md.
+// The diff matrix is documented in ********.
 // Each row maps to a small predicate inside this file.
 
 import type { BundleContentType, BundleField } from './types';
