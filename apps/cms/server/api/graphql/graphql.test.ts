@@ -2282,4 +2282,226 @@ describe('GraphQL API', async () => {
       }
     });
   });
+
+  describe('IMAGE field exposure', () => {
+    let imageTypeId: string;
+    let imageEntryId: string;
+    let imagelessEntryId: string;
+
+    it('sets up image test data', async () => {
+      const cookie = await getSessionCookie();
+
+      const existing = await $fetch<{
+        items: Array<{ id: string; identifier: string }>;
+      }>('/api/content-types?perPage=200', { headers: { cookie } }).catch(
+        () => ({ items: [] })
+      );
+      const prior = existing.items?.find?.((c) => c.identifier === 'TestPhoto');
+      if (prior) {
+        const entries = await $fetch<{ items: Array<{ id: string }> }>(
+          `/api/content-entries?contentTypeId=${prior.id}&perPage=200`,
+          { headers: { cookie } }
+        ).catch(() => ({ items: [] }));
+        for (const e of entries.items ?? []) {
+          await $fetch<unknown>(`/api/content-entries/${e.id}`, {
+            method: 'DELETE',
+            headers: { cookie },
+          }).catch(() => {});
+        }
+        await $fetch<unknown>(`/api/content-types/${prior.id}`, {
+          method: 'DELETE',
+          headers: { cookie },
+        }).catch(() => {});
+      }
+
+      const type = await $fetch<{ id: string }>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: 'Test Photo',
+          identifier: 'TestPhoto',
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+            {
+              identifier: 'photo',
+              name: 'Photo',
+              type: 'IMAGE',
+              required: true,
+            },
+            {
+              identifier: 'cover',
+              name: 'Cover',
+              type: 'IMAGE',
+              required: false,
+            },
+          ],
+        },
+      });
+      imageTypeId = type.id;
+
+      const withImage = await $fetch<{ id: string }>('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: imageTypeId,
+          data: {
+            title: 'Hero shot',
+            photo: {
+              storageKey: 'abc-123.jpeg',
+              mimeType: 'image/jpeg',
+              width: 1920,
+              height: 1080,
+              fileSize: 234567,
+              originalName: 'hero.jpg',
+              focalPointX: 0.25,
+              focalPointY: 0.75,
+            },
+          },
+          status: 'PUBLISHED',
+        },
+      });
+      imageEntryId = withImage.id;
+
+      // Entry with the optional 'cover' IMAGE field omitted, to check
+      // null handling on optional IMAGE fields.
+      const withoutCover = await $fetch<{ id: string }>(
+        '/api/content-entries',
+        {
+          method: 'POST',
+          headers: { cookie },
+          body: {
+            contentTypeId: imageTypeId,
+            data: {
+              title: 'Plain entry',
+              photo: {
+                storageKey: 'def-456.png',
+                mimeType: 'image/png',
+                width: 800,
+                height: 600,
+                fileSize: 12345,
+                originalName: null,
+                focalPointX: 0.5,
+                focalPointY: 0.5,
+              },
+            },
+            status: 'PUBLISHED',
+          },
+        }
+      );
+      imagelessEntryId = withoutCover.id;
+
+      expect(imageTypeId).toBeTruthy();
+      expect(imageEntryId).toBeTruthy();
+      expect(imagelessEntryId).toBeTruthy();
+    });
+
+    it('exposes all eight JSONB properties on a required IMAGE field', async () => {
+      const res = await gql<{
+        testPhoto: {
+          id: string;
+          title: string;
+          photo: {
+            storageKey: string;
+            mimeType: string;
+            width: number;
+            height: number;
+            fileSize: number;
+            originalName: string | null;
+            focalPointX: number;
+            focalPointY: number;
+            url: string;
+          };
+        };
+      }>(`
+        query {
+          testPhoto(id: "${imageEntryId}") {
+            id
+            title
+            photo {
+              storageKey
+              mimeType
+              width
+              height
+              fileSize
+              originalName
+              focalPointX
+              focalPointY
+              url
+            }
+          }
+        }
+      `);
+
+      expect(res.errors).toBeUndefined();
+      expect(res.data.testPhoto.title).toBe('Hero shot');
+      expect(res.data.testPhoto.photo).toEqual({
+        storageKey: 'abc-123.jpeg',
+        mimeType: 'image/jpeg',
+        width: 1920,
+        height: 1080,
+        fileSize: 234567,
+        originalName: 'hero.jpg',
+        focalPointX: 0.25,
+        focalPointY: 0.75,
+        url: '/api/files/abc-123.jpeg/transform',
+      });
+    });
+
+    it('returns null for an optional IMAGE field that has no value', async () => {
+      const res = await gql<{
+        testPhoto: {
+          photo: { storageKey: string };
+          cover: { storageKey: string } | null;
+        };
+      }>(`
+        query {
+          testPhoto(id: "${imagelessEntryId}") {
+            photo { storageKey }
+            cover { storageKey }
+          }
+        }
+      `);
+
+      expect(res.errors).toBeUndefined();
+      expect(res.data.testPhoto.photo.storageKey).toBe('def-456.png');
+      expect(res.data.testPhoto.cover).toBeNull();
+    });
+
+    it('exposes IMAGE fields on the list query', async () => {
+      const res = await gql<{
+        testPhotoList: {
+          edges: Array<{
+            node: {
+              id: string;
+              photo: { url: string; storageKey: string };
+            };
+          }>;
+        };
+      }>(`
+        query {
+          testPhotoList {
+            edges {
+              node {
+                id
+                photo { url storageKey }
+              }
+            }
+          }
+        }
+      `);
+
+      expect(res.errors).toBeUndefined();
+      const node = res.data.testPhotoList.edges.find(
+        (e) => e.node.id === imageEntryId
+      )?.node;
+      expect(node).toBeTruthy();
+      expect(node!.photo.url).toBe('/api/files/abc-123.jpeg/transform');
+      expect(node!.photo.storageKey).toBe('abc-123.jpeg');
+    });
+  });
 });

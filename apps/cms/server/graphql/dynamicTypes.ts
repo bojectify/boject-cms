@@ -131,6 +131,81 @@ export function registerDynamicTypes(
         typeIdToIdentifier.get(entry.contentTypeId) ?? 'ContentEntry',
     });
 
+  interface ImageFileShape {
+    storageKey: string;
+    mimeType: string;
+    width: number;
+    height: number;
+    fileSize: number;
+    originalName: string | null;
+    focalPointX: number;
+    focalPointY: number;
+  }
+
+  // Shared object type for IMAGE field values. The wrapping content type
+  // (e.g. the starter `Image`) carries metadata (alt, credit, caption)
+  // around an `ImageFile`-typed field. Naming kept distinct from any
+  // user-defined `Image` content type.
+  const ImageFileRef = builder
+    .objectRef<ImageFileShape>('ImageFile')
+    .implement({
+      fields: (t) => ({
+        storageKey: t.exposeString('storageKey'),
+        mimeType: t.exposeString('mimeType'),
+        width: t.exposeInt('width'),
+        height: t.exposeInt('height'),
+        fileSize: t.exposeInt('fileSize'),
+        originalName: t.exposeString('originalName', { nullable: true }),
+        focalPointX: t.exposeFloat('focalPointX'),
+        focalPointY: t.exposeFloat('focalPointY'),
+        url: t.string({
+          resolve: (img) => `/api/files/${img.storageKey}/transform`,
+        }),
+      }),
+    });
+
+  function readImageField(
+    entry: ContentEntryShape,
+    identifier: string
+  ): ImageFileShape | null {
+    const data =
+      typeof entry.data === 'string'
+        ? (JSON.parse(entry.data) as Record<string, unknown>)
+        : (entry.data as Record<string, unknown> | null);
+    const raw = data?.[identifier];
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+    const obj = raw as Record<string, unknown>;
+    if (typeof obj.storageKey !== 'string' || !obj.storageKey) return null;
+    const mimeType = typeof obj.mimeType === 'string' ? obj.mimeType : '';
+    const width = typeof obj.width === 'number' ? obj.width : 0;
+    const height = typeof obj.height === 'number' ? obj.height : 0;
+    const fileSize = typeof obj.fileSize === 'number' ? obj.fileSize : 0;
+    const originalName =
+      typeof obj.originalName === 'string' ? obj.originalName : null;
+    const focalPointX =
+      typeof obj.focalPointX === 'number' &&
+      obj.focalPointX >= 0 &&
+      obj.focalPointX <= 1
+        ? obj.focalPointX
+        : 0.5;
+    const focalPointY =
+      typeof obj.focalPointY === 'number' &&
+      obj.focalPointY >= 0 &&
+      obj.focalPointY <= 1
+        ? obj.focalPointY
+        : 0.5;
+    return {
+      storageKey: obj.storageKey,
+      mimeType,
+      width,
+      height,
+      fileSize,
+      originalName,
+      focalPointX,
+      focalPointY,
+    };
+  }
+
   interface RichTextShape {
     json: unknown;
   }
@@ -327,6 +402,17 @@ export function registerDynamicTypes(
               if (json == null) return null;
               return { json };
             },
+          }) as never;
+        }
+
+        // IMAGE fields (object type with file metadata + derived url)
+        const imageFields = ct.fields.filter((f) => f.type === 'IMAGE');
+        for (const field of imageFields) {
+          fields[field.identifier] = t.field({
+            type: ImageFileRef,
+            nullable: !field.required,
+            resolve: (entry: ContentEntryShape) =>
+              readImageField(entry, field.identifier),
           }) as never;
         }
 
