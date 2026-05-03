@@ -2,10 +2,13 @@ import { promises as dnsPromises } from 'node:dns';
 import { isIP } from 'node:net';
 import { isPrivateHost } from './webhookUrl';
 
-const DEFAULT_TIMEOUT_MS = Math.min(
-  Math.max(Number(process.env.WEBHOOK_DNS_TIMEOUT_MS) || 3000, 100),
-  30_000
-);
+export function clampTimeoutMs(raw: string | number | undefined): number {
+  const parsed = typeof raw === 'number' ? raw : Number(raw);
+  const base = Number.isFinite(parsed) && parsed > 0 ? parsed : 3000;
+  return Math.min(Math.max(base, 100), 30_000);
+}
+
+const DEFAULT_TIMEOUT_MS = clampTimeoutMs(process.env.WEBHOOK_DNS_TIMEOUT_MS);
 
 export type DnsResolver = {
   resolve4: (hostname: string) => Promise<string[]>;

@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { resolvePublicHost, WebhookDnsError } from './resolvePublicHost';
+import {
+  clampTimeoutMs,
+  resolvePublicHost,
+  WebhookDnsError,
+} from './resolvePublicHost';
 
 type DnsLike = {
   resolve4: (hostname: string) => Promise<string[]>;
@@ -42,6 +46,36 @@ function fakeDns(
     },
   };
 }
+
+describe('clampTimeoutMs', () => {
+  it('returns 3000 when raw is undefined', () => {
+    expect(clampTimeoutMs(undefined)).toBe(3000);
+  });
+
+  it('returns 3000 when raw is empty string', () => {
+    expect(clampTimeoutMs('')).toBe(3000);
+  });
+
+  it('returns 3000 when raw is non-numeric string (NaN fallback)', () => {
+    expect(clampTimeoutMs('abc')).toBe(3000);
+  });
+
+  it('floors values below 100 to 100', () => {
+    expect(clampTimeoutMs('50')).toBe(100);
+  });
+
+  it('caps values above 30000 to 30000', () => {
+    expect(clampTimeoutMs('99999')).toBe(30000);
+  });
+
+  it('passes through in-range values', () => {
+    expect(clampTimeoutMs('1500')).toBe(1500);
+  });
+
+  it('treats zero as unset (defaults to 3000)', () => {
+    expect(clampTimeoutMs(0)).toBe(3000);
+  });
+});
 
 describe('resolvePublicHost', () => {
   it('short-circuits IPv4 literal without calling DNS', async () => {
@@ -102,6 +136,8 @@ describe('resolvePublicHost', () => {
     const dns = fakeDns({
       'evil.com': { v4: ['203.0.113.5', '127.0.0.1'] },
     });
+    // The `offending` value also pins iteration order: if a future refactor
+    // switches to Promise.any / .find / random selection, this test fails.
     await expect(resolvePublicHost('evil.com', { dns })).rejects.toMatchObject({
       reason: 'PRIVATE_IP',
       hostname: 'evil.com',
@@ -147,6 +183,17 @@ describe('resolvePublicHost', () => {
     });
     const result = await resolvePublicHost('half.example', { dns });
     expect(result.addresses).toEqual(['203.0.113.5']);
+  });
+
+  it('returns AAAA-only when v4 rejects but v6 resolves', async () => {
+    const dns = fakeDns({
+      'v6only.example': {
+        v4err: Object.assign(new Error('ENODATA'), { code: 'ENODATA' }),
+        v6: ['2606:4700::1'],
+      },
+    });
+    const result = await resolvePublicHost('v6only.example', { dns });
+    expect(result.addresses).toEqual(['2606:4700::1']);
   });
 
   it('throws TIMEOUT when resolution exceeds timeoutMs', async () => {
