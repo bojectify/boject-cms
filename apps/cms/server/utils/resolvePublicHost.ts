@@ -8,8 +8,6 @@ export function clampTimeoutMs(raw: string | number | undefined): number {
   return Math.min(Math.max(base, 100), 30_000);
 }
 
-const DEFAULT_TIMEOUT_MS = clampTimeoutMs(process.env.WEBHOOK_DNS_TIMEOUT_MS);
-
 export type DnsResolver = {
   resolve4: (hostname: string) => Promise<string[]>;
   resolve6: (hostname: string) => Promise<string[]>;
@@ -55,7 +53,8 @@ export async function resolvePublicHost(
   }
 
   const dns = opts?.dns ?? dnsPromises;
-  const timeoutMs = opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const timeoutMs =
+    opts?.timeoutMs ?? clampTimeoutMs(process.env.WEBHOOK_DNS_TIMEOUT_MS);
 
   let timeoutHandle: NodeJS.Timeout | undefined;
   const timeoutPromise = new Promise<never>((_, reject) => {
