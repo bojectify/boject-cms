@@ -5,6 +5,7 @@
   "type": "module",
   "packageManager": "pnpm@10.33.1",
   "scripts": {
+    "prepare": "lefthook install",
     "dev": "pnpm --filter cms dev",
     "build": "pnpm --filter cms build",
     "preview": "pnpm --filter cms preview",
