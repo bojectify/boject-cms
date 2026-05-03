@@ -7,7 +7,7 @@ import { readComposeImage, writeComposeImage } from '../../src/compose.js';
 const FIXTURE = `services:
   # This is the CMS container — managed by \`boject upgrade\`.
   cms:
-    image: ghcr.io/boject/cms:1.2.3
+    image: ghcr.io/bojectify/cms:1.2.3
     restart: unless-stopped
     ports:
       - '4000:3000'
@@ -43,7 +43,7 @@ describe('readComposeImage', () => {
   it('extracts services.cms.image', async () => {
     const path = join(workDir, 'docker-compose.yml');
     await writeFile(path, FIXTURE);
-    expect(await readComposeImage(path)).toBe('ghcr.io/boject/cms:1.2.3');
+    expect(await readComposeImage(path)).toBe('ghcr.io/bojectify/cms:1.2.3');
   });
 
   it('throws when services.cms.image is missing', async () => {
@@ -64,9 +64,9 @@ describe('writeComposeImage', () => {
   it('rewrites services.cms.image and preserves comments + other services', async () => {
     const path = join(workDir, 'docker-compose.yml');
     await writeFile(path, FIXTURE);
-    await writeComposeImage(path, 'ghcr.io/boject/cms:1.3.0');
+    await writeComposeImage(path, 'ghcr.io/bojectify/cms:1.3.0');
     const out = await readFile(path, 'utf8');
-    expect(out).toContain('image: ghcr.io/boject/cms:1.3.0');
+    expect(out).toContain('image: ghcr.io/bojectify/cms:1.3.0');
     expect(out).toContain(
       '# This is the CMS container — managed by `boject upgrade`.'
     );
@@ -77,11 +77,11 @@ describe('writeComposeImage', () => {
   it('leaves the db image untouched', async () => {
     const path = join(workDir, 'docker-compose.yml');
     await writeFile(path, FIXTURE);
-    await writeComposeImage(path, 'ghcr.io/boject/cms:2.0.0');
+    await writeComposeImage(path, 'ghcr.io/bojectify/cms:2.0.0');
     const out = await readFile(path, 'utf8');
-    expect(out).toContain('image: ghcr.io/boject/cms:2.0.0');
+    expect(out).toContain('image: ghcr.io/bojectify/cms:2.0.0');
     expect(out).toContain('image: postgres:17');
-    expect(out).not.toContain('ghcr.io/boject/cms:1.2.3');
+    expect(out).not.toContain('ghcr.io/bojectify/cms:1.2.3');
   });
 
   it('preserves unrelated formatting exactly', async () => {

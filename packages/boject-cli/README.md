@@ -1,6 +1,6 @@
 # @boject/cli
 
-Maintenance and schema-as-code CLI for [boject-cms](https://github.com/ness-EE/boject-cms) projects.
+Maintenance and schema-as-code CLI for [boject-cms](https://github.com/bojectify/boject-cms) projects.
 
 ## Install
 
@@ -181,5 +181,5 @@ process.exit(result.exitCode);
 
 ## See also
 
-- The CMS itself: [`boject-cms`](https://github.com/ness-EE/boject-cms)
+- The CMS itself: [`boject-cms`](https://github.com/bojectify/boject-cms)
 - Project scaffolder: [`create-boject-cms`](https://www.npmjs.com/package/create-boject-cms)

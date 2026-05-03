@@ -1,6 +1,6 @@
 # create-boject-cms
 
-Scaffold a new [boject-cms](https://github.com/ness-EE/boject-cms) project — a Docker Compose project pinned to a specific CMS image, with a starter content schema, scaffolded `.env`, and the `.boject.config.json` for the [@boject/cli](https://www.npmjs.com/package/@boject/cli) commands.
+Scaffold a new [boject-cms](https://github.com/bojectify/boject-cms) project — a Docker Compose project pinned to a specific CMS image, with a starter content schema, scaffolded `.env`, and the `.boject.config.json` for the [@boject/cli](https://www.npmjs.com/package/@boject/cli) commands.
 
 ## Usage
 
@@ -23,7 +23,7 @@ Non-interactive use:
 
 ```bash
 pnpm create boject-cms my-site --starter base
-pnpm create boject-cms my-site --starter base --image ghcr.io/boject/cms:1.4.2
+pnpm create boject-cms my-site --starter base --image ghcr.io/bojectify/cms:1.4.2
 pnpm create boject-cms my-site --force            # scaffold into a non-empty directory
 ```
 
@@ -115,6 +115,6 @@ pnpm exec boject upgrade --to 1.4.2    # specific version
 
 ## See also
 
-- The CMS itself: [`boject-cms`](https://github.com/ness-EE/boject-cms)
+- The CMS itself: [`boject-cms`](https://github.com/bojectify/boject-cms)
 - The CLI: [`@boject/cli`](https://www.npmjs.com/package/@boject/cli)
-- Starter bundles: [`starters/`](https://github.com/ness-EE/boject-cms/tree/main/starters)
+- Starter bundles: [`starters/`](https://github.com/bojectify/boject-cms/tree/main/starters)

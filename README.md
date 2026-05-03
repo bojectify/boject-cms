@@ -390,7 +390,7 @@ docker run --rm -p 4000:3000 \
 
 The server starts on port 3000 inside the container (mapped to 4000 above). Log in at `http://localhost:4000/login` with the credentials you set.
 
-`BOJECT_ADMIN_PASSWORD` is validated at first-boot: must be ≥12 characters, not on a weak-password blocklist (`password`, `admin`, `changeme`, …), and not match the email local-part. Weak values cause the container to exit non-zero. The seeded password is the credential indefinitely — there is no in-app password change yet (tracked in [#130](https://github.com/ness-EE/boject-cms/issues/130)).
+`BOJECT_ADMIN_PASSWORD` is validated at first-boot: must be ≥12 characters, not on a weak-password blocklist (`password`, `admin`, `changeme`, …), and not match the email local-part. Weak values cause the container to exit non-zero. The seeded password is the credential indefinitely — there is no in-app password change yet (tracked in [#130](https://github.com/bojectify/boject-cms/issues/130)).
 
 **Import a starter bundle on first boot:**
 

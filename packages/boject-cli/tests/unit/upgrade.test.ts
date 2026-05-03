@@ -23,7 +23,7 @@ import { pollHealth } from '../../src/health.js';
 
 const FIXTURE = `services:
   cms:
-    image: ghcr.io/boject/cms:1.0.0
+    image: ghcr.io/bojectify/cms:1.0.0
   db:
     image: postgres:17
 `;
@@ -63,7 +63,7 @@ describe('runUpgrade', () => {
     expect(exitCode).toBe(0);
     expect(message).toContain('Upgraded 1.0.0 → 1.1.0');
     const out = await readFile(join(workDir, 'docker-compose.yml'), 'utf8');
-    expect(out).toContain('image: ghcr.io/boject/cms:1.1.0');
+    expect(out).toContain('image: ghcr.io/bojectify/cms:1.1.0');
     expect(calls).toEqual([
       { cmd: 'docker', args: ['compose', 'pull', 'cms'] },
       { cmd: 'docker', args: ['compose', 'up', '-d'] },
@@ -94,10 +94,10 @@ describe('runUpgrade', () => {
       stderr: () => {},
     });
     expect(exitCode).toBe(0);
-    expect(message).toContain('- image: boject/cms:1.0.0');
-    expect(message).toContain('+ image: boject/cms:1.2.0');
+    expect(message).toContain('- image: bojectify/cms:1.0.0');
+    expect(message).toContain('+ image: bojectify/cms:1.2.0');
     const out = await readFile(join(workDir, 'docker-compose.yml'), 'utf8');
-    expect(out).toContain('image: ghcr.io/boject/cms:1.0.0');
+    expect(out).toContain('image: ghcr.io/bojectify/cms:1.0.0');
     expect(runner.run).not.toHaveBeenCalled();
   });
 

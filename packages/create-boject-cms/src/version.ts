@@ -1,1 +1,1 @@
-export const IMAGE_TAG = 'ghcr.io/boject/cms:latest';
+export const IMAGE_TAG = 'ghcr.io/bojectify/cms:latest';
