@@ -30,6 +30,21 @@ export const Empty: Story = {
   },
 };
 
+export const KeyboardAddEntry: Story = {
+  args: {
+    label: 'Tags',
+    items: [],
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const addBtn = await canvas.findByRole('button', { name: /add entry/i });
+    addBtn.focus();
+    expect(canvasElement.ownerDocument.activeElement).toBe(addBtn);
+    await userEvent.keyboard('{Enter}');
+    expect(args.onAdd).toHaveBeenCalledTimes(1);
+  },
+};
+
 export const WithItems: Story = {
   args: {
     label: 'Tags',

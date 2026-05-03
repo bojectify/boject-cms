@@ -2,7 +2,6 @@ import {
   onBeforeUnmount,
   onMounted,
   ref,
-  watch,
   type MaybeRefOrGetter,
   type Ref,
 } from 'vue';
@@ -138,14 +137,13 @@ export function useDialogA11y(opts: UseDialogA11yOptions): {
     if (isActive()) captureFocus();
   });
 
-  // React to active toggling at runtime (e.g. a sibling pane mounting).
-  watch(
-    () => isActive(),
-    (active, wasActive) => {
-      if (active && !wasActive) captureFocus();
-      else if (!active && wasActive) restoreFocus();
-    }
-  );
+  // We deliberately don't react to active toggling at runtime:
+  // - Going inactive (child pane mounts on top): the child's captureFocus
+  //   has already moved focus. Doing nothing leaves it there.
+  // - Becoming active again (child pane closes): the child's restoreFocus
+  //   has already returned focus to the card that opened it. Re-capturing
+  //   here would steal that focus to our first focusable instead.
+  // Restoration happens only on unmount (the dialog actually closing).
 
   onBeforeUnmount(() => {
     detachListener();

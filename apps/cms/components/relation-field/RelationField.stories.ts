@@ -47,3 +47,42 @@ export const Filled: Story = {
     expect(args.onEdit).toHaveBeenCalledTimes(1);
   },
 };
+
+export const KeyboardActivation: Story = {
+  args: {
+    label: 'Author',
+    required: false,
+    value: { contentTypeId: 'ct-author', entryId: 'a1' },
+    entryTitle: 'Ada Lovelace',
+    contentTypeName: 'Author',
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    // The card body is a real <button> — focusable and keyboard-activatable.
+    const card = await canvas.findByRole('button', { name: /Ada Lovelace/i });
+    card.focus();
+    expect(canvasElement.ownerDocument.activeElement).toBe(card);
+    await userEvent.keyboard('{Enter}');
+    expect(args.onEdit).toHaveBeenCalledTimes(1);
+    await userEvent.keyboard(' ');
+    expect(args.onEdit).toHaveBeenCalledTimes(2);
+  },
+};
+
+export const EmptyKeyboardActivation: Story = {
+  args: {
+    label: 'Author',
+    required: false,
+    value: null,
+    entryTitle: null,
+    contentTypeName: null,
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const addBtn = await canvas.findByRole('button', { name: /add entry/i });
+    addBtn.focus();
+    expect(canvasElement.ownerDocument.activeElement).toBe(addBtn);
+    await userEvent.keyboard('{Enter}');
+    expect(args.onAdd).toHaveBeenCalledTimes(1);
+  },
+};

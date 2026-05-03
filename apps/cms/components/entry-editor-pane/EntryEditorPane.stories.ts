@@ -91,9 +91,17 @@ export const A11yDialogSemantics: Story = {
     expect(titleEl).not.toBeNull();
     expect(titleEl!.textContent).toMatch(/Ada Lovelace|Author/);
 
-    // Sliver backdrop is a real button with an accessible name.
+    // Sliver backdrop is a real button with an accessible name and lives
+    // INSIDE the dialog so it falls within the focus trap.
     const closeButtons = screen.getAllByRole('button', { name: /close pane/i });
     expect(closeButtons.length).toBeGreaterThanOrEqual(2);
+    const sliverButton = closeButtons.find((b) =>
+      b.className.includes('backdrop-blur-sm')
+    );
+    expect(sliverButton).toBeTruthy();
+    expect(dialog.contains(sliverButton!)).toBe(true);
+    sliverButton!.focus();
+    expect(canvasElement.ownerDocument.activeElement).toBe(sliverButton);
   },
 };
 

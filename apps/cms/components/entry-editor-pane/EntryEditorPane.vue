@@ -295,7 +295,16 @@ const { contentRef } = useDialogA11y({
 
 <template>
   <Transition name="slide-pane">
-    <div v-if="open" class="absolute inset-0 z-30 flex" :data-testid="testId">
+    <div
+      v-if="open"
+      ref="contentRef"
+      role="dialog"
+      aria-modal="true"
+      :aria-labelledby="titleId"
+      tabindex="-1"
+      class="absolute inset-0 z-30 flex focus:outline-none"
+      :data-testid="testId"
+    >
       <!-- Backdrop / sliver -->
       <button
         type="button"
@@ -305,12 +314,7 @@ const { contentRef } = useDialogA11y({
       />
       <!-- Pane -->
       <div
-        ref="contentRef"
-        role="dialog"
-        aria-modal="true"
-        :aria-labelledby="titleId"
-        tabindex="-1"
-        class="flex-1 flex flex-col bg-white dark:bg-gray-900 shadow-2xl overflow-hidden focus:outline-none"
+        class="flex-1 flex flex-col bg-white dark:bg-gray-900 shadow-2xl overflow-hidden"
       >
         <!-- Header -->
         <div
