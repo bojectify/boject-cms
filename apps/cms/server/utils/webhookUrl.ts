@@ -1,6 +1,10 @@
 import { createError } from 'h3';
 import { isIP } from 'node:net';
-import { resolvePublicHost, WebhookDnsError } from './resolvePublicHost';
+import {
+  resolvePublicHost,
+  WebhookDnsError,
+  type DnsErrorReason,
+} from './resolvePublicHost';
 
 const PRIVATE_V4_PREFIXES: number[] = [10, 127, 192];
 
@@ -110,9 +114,7 @@ export async function assertWebhookUrl(input: string): Promise<URL> {
   return url;
 }
 
-function messageForDnsError(
-  reason: 'PRIVATE_IP' | 'NXDOMAIN' | 'TIMEOUT'
-): string {
+function messageForDnsError(reason: DnsErrorReason): string {
   switch (reason) {
     case 'PRIVATE_IP':
       return 'url must not resolve to a private network host';

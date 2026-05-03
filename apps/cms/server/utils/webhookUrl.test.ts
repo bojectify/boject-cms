@@ -175,6 +175,13 @@ describe('assertWebhookUrl', () => {
     );
   });
 
+  it('rethrows non-WebhookDnsError errors unchanged (not wrapped as 400)', async () => {
+    mockResolve.mockRejectedValue(new Error('unexpected boom'));
+    await expect(assertWebhookUrl('https://example.com/x')).rejects.toThrow(
+      /unexpected boom/
+    );
+  });
+
   it('skips resolver for IP literal URLs (already covered by literal check)', async () => {
     await expect(
       assertWebhookUrl('https://203.0.113.5/x')
