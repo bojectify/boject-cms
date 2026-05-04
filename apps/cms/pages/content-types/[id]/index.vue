@@ -411,7 +411,7 @@ async function onFieldReorder() {
             @end="onFieldReorder"
           >
             <template #item="{ element: field }">
-              <div class="border rounded-lg p-3">
+              <div class="border border-default bg-elevated rounded-lg p-3">
                 <div class="flex items-center gap-2">
                   <UIcon
                     name="i-lucide-grip-vertical"

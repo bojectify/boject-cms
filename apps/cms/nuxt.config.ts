@@ -77,7 +77,7 @@ export default defineNuxtConfig({
 
   components: [{ path: '~/components', pathPrefix: false }],
 
-  modules: ['@nuxt/ui', 'nuxt-auth-utils', '@nuxt/eslint'],
+  modules: ['@nuxt/ui', '@nuxt/fonts', 'nuxt-auth-utils', '@nuxt/eslint'],
 
   css: ['~/assets/css/main.css'],
 

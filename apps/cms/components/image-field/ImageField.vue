@@ -79,19 +79,14 @@ function formatBytes(bytes: number): string {
 </script>
 
 <template>
-  <div class="space-y-2" :data-testid="testId">
-    <label class="block text-sm font-medium">
-      {{ field.label }}
-      <span v-if="field.required" class="text-red-500">*</span>
-    </label>
-
+  <div :data-testid="testId">
     <div v-if="modelValue" class="flex items-start gap-4">
       <img
         :src="`/api/files/${modelValue.storageKey}/transform?w=400`"
         :alt="modelValue.originalName ?? ''"
         class="max-w-[200px] rounded border"
       />
-      <div class="text-sm text-gray-600 space-y-1">
+      <div class="text-sm text-toned space-y-1">
         <div>{{ modelValue.width }} × {{ modelValue.height }}</div>
         <div>{{ formatBytes(modelValue.fileSize) }}</div>
         <div v-if="modelValue.originalName">{{ modelValue.originalName }}</div>
@@ -108,7 +103,7 @@ function formatBytes(bytes: number): string {
         :disabled="uploading"
         @change="onFileChange"
       />
-      <p v-if="uploading" class="text-sm text-gray-500 mt-1">Uploading…</p>
+      <p v-if="uploading" class="text-sm text-muted mt-1">Uploading…</p>
     </div>
 
     <p v-if="errorMessage" class="text-sm text-red-600">{{ errorMessage }}</p>

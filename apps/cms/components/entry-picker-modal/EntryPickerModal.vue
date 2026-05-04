@@ -248,16 +248,14 @@ function handleCreate(contentTypeId: string) {
             :class="
               entry.id === highlightedEntryId
                 ? 'bg-primary-50 dark:bg-primary-950 ring-1 ring-primary ring-inset'
-                : 'hover:bg-gray-50 dark:hover:bg-gray-800'
+                : 'hover:bg-elevated'
             "
             @click="highlight(entry)"
           >
             <div
-              class="flex items-center justify-center w-7 h-7 rounded-md bg-gray-100 dark:bg-gray-700 shrink-0"
+              class="flex items-center justify-center w-7 h-7 rounded-md bg-accented shrink-0"
             >
-              <span
-                class="text-xs font-semibold text-gray-600 dark:text-gray-300"
-              >
+              <span class="text-xs font-semibold text-toned">
                 {{ entry.contentTypeName.charAt(0).toUpperCase() }}
               </span>
             </div>
@@ -298,7 +296,7 @@ function handleCreate(contentTypeId: string) {
           <div class="relative">
             <div
               v-if="createPopoverOpen && targetTypes.length > 1"
-              class="absolute bottom-full right-0 mb-2 w-52 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg overflow-hidden z-10"
+              class="absolute bottom-full right-0 mb-2 w-52 rounded-lg border border-default bg-elevated shadow-lg overflow-hidden z-10"
             >
               <div class="px-3 pt-2 pb-1">
                 <span
@@ -310,15 +308,13 @@ function handleCreate(contentTypeId: string) {
               <div
                 v-for="t in targetTypes"
                 :key="t.value"
-                class="flex items-center h-10 px-3 gap-2.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                class="flex items-center h-10 px-3 gap-2.5 cursor-pointer hover:bg-accented transition-colors"
                 @click="handleCreate(t.value)"
               >
                 <div
-                  class="flex items-center justify-center w-6 h-6 rounded-md bg-gray-100 dark:bg-gray-700 shrink-0"
+                  class="flex items-center justify-center w-6 h-6 rounded-md bg-accented shrink-0"
                 >
-                  <span
-                    class="text-xs font-semibold text-gray-600 dark:text-gray-300"
-                  >
+                  <span class="text-xs font-semibold text-toned">
                     {{ t.label.charAt(0).toUpperCase() }}
                   </span>
                 </div>

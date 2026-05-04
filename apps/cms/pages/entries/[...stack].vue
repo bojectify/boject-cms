@@ -531,7 +531,7 @@ function handlePaneSaved(
   <div class="relative flex flex-col h-full overflow-hidden">
     <!-- Nav header -->
     <div
-      class="flex items-center gap-4 px-6 py-3 border-b border-gray-200 dark:border-gray-700 shrink-0"
+      class="flex items-center gap-4 px-6 py-3 border-b border-default shrink-0"
     >
       <UButton
         variant="ghost"
@@ -543,7 +543,7 @@ function handlePaneSaved(
       <NuxtLink
         v-if="contentType"
         :to="`/content-types/${contentType.id}`"
-        class="flex items-center gap-1.5 text-xs text-muted hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+        class="flex items-center gap-1.5 text-xs text-muted hover:text-toned transition-colors"
       >
         {{ contentType.name }}
         <UIcon name="i-lucide-external-link" class="size-3" />
@@ -563,65 +563,75 @@ function handlePaneSaved(
           :field-errors="fieldErrors"
         >
           <template #field="{ field, value, update }">
-            <RelationField
+            <UFormField
               v-if="field.type === 'dynamic-relation'"
               :label="field.label"
+              :name="field.key"
               :required="field.required"
-              :value="getRelationValue(value)"
-              :entry-title="resolvedRelations[field.key]?.entryTitle ?? null"
-              :content-type-name="
-                resolvedRelations[field.key]?.contentTypeName ?? null
-              "
-              @add="
-                orchestrator.openPicker(
-                  field.key,
-                  getTargetContentTypeIds(field),
-                  0
-                )
-              "
-              @edit="handleRelationEdit(value, field.key)"
-              @remove="update(null)"
-            />
-            <MultiRelationField
+              size="xl"
+            >
+              <RelationField
+                :value="getRelationValue(value)"
+                :entry-title="resolvedRelations[field.key]?.entryTitle ?? null"
+                :content-type-name="
+                  resolvedRelations[field.key]?.contentTypeName ?? null
+                "
+                @add="
+                  orchestrator.openPicker(
+                    field.key,
+                    getTargetContentTypeIds(field),
+                    0
+                  )
+                "
+                @edit="handleRelationEdit(value, field.key)"
+                @remove="update(null)"
+              />
+            </UFormField>
+            <UFormField
               v-else-if="field.type === 'dynamic-multirelation'"
               :label="field.label"
-              :items="resolvedMultiRelations[field.key] ?? []"
-              @add="
-                orchestrator.openPicker(
-                  field.key,
-                  getTargetContentTypeIds(field),
-                  0
-                )
-              "
-              @edit="
-                (idx: number) => {
-                  const refs = getMultiRelationValue(value);
-                  const r = refs[idx];
-                  if (r) {
-                    orchestrator.openPane(
-                      r.contentTypeId,
-                      r.entryId,
-                      field.key,
-                      0
-                    );
+              :name="field.key"
+              size="xl"
+            >
+              <MultiRelationField
+                :items="resolvedMultiRelations[field.key] ?? []"
+                @add="
+                  orchestrator.openPicker(
+                    field.key,
+                    getTargetContentTypeIds(field),
+                    0
+                  )
+                "
+                @edit="
+                  (idx: number) => {
+                    const refs = getMultiRelationValue(value);
+                    const r = refs[idx];
+                    if (r) {
+                      orchestrator.openPane(
+                        r.contentTypeId,
+                        r.entryId,
+                        field.key,
+                        0
+                      );
+                    }
                   }
-                }
-              "
-              @remove="
-                (idx: number) => {
-                  const refs = [...getMultiRelationValue(value)];
-                  refs.splice(idx, 1);
-                  update(refs);
-                }
-              "
-              @reorder="(items) => update(items)"
-            />
+                "
+                @remove="
+                  (idx: number) => {
+                    const refs = [...getMultiRelationValue(value)];
+                    refs.splice(idx, 1);
+                    update(refs);
+                  }
+                "
+                @reorder="(items) => update(items)"
+              />
+            </UFormField>
           </template>
         </ContentEditor>
       </div>
 
       <EntrySidebar
-        class="w-80 shrink-0 border-l border-gray-200 dark:border-gray-700 overflow-y-auto"
+        class="w-80 shrink-0 border-l border-default overflow-y-auto"
         :status="status"
         :is-dirty="isDirty"
         :saving="isSaving"

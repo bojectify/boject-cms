@@ -163,7 +163,7 @@ const canDelete = computed(() => {
         <!-- Info bar (edit mode only) -->
         <div
           v-if="mode === 'edit'"
-          class="flex items-center gap-4 text-sm rounded-lg bg-gray-50 dark:bg-gray-900 p-3 -mt-1"
+          class="flex items-center gap-4 text-sm rounded-lg bg-muted p-3 -mt-1"
         >
           <div class="flex items-center gap-1.5">
             <span class="text-muted">Identifier:</span>

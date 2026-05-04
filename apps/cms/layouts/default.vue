@@ -83,10 +83,6 @@ const userMenuItems = computed<DropdownMenuItem[][]>(() => [
     >
       <template #header>
         <UDashboardNavbar>
-          <template #leading>
-            <UDashboardSidebarCollapse />
-          </template>
-
           <template #right>
             <UDropdownMenu :items="userMenuItems" size="xl">
               <UAvatar :alt="fullName" size="xl" />

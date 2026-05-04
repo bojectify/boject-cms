@@ -29,10 +29,7 @@ const draggableItems = computed({
 </script>
 
 <template>
-  <div class="space-y-2" :data-testid="testId">
-    <span class="text-sm font-medium text-gray-700 dark:text-gray-200">
-      {{ label }}
-    </span>
+  <div :data-testid="testId">
     <div class="space-y-1.5">
       <draggable
         v-model="draggableItems"
@@ -43,7 +40,7 @@ const draggableItems = computed({
       >
         <template #item="{ element: item, index: idx }">
           <div
-            class="flex items-center h-14 pl-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 focus-within:ring-2 focus-within:ring-primary-500"
+            class="flex items-center h-14 pl-2 rounded-lg border border-default bg-elevated focus-within:ring-2 focus-within:ring-primary-500"
           >
             <UIcon
               name="i-lucide-grip-vertical"
@@ -65,9 +62,7 @@ const draggableItems = computed({
                 </span>
               </div>
               <div class="flex-1 min-w-0">
-                <p
-                  class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate"
-                >
+                <p class="text-sm font-medium text-highlighted truncate">
                   {{ item.entryTitle || 'Untitled' }}
                 </p>
                 <p class="text-xs text-muted">{{ item.contentTypeName }}</p>
@@ -91,7 +86,7 @@ const draggableItems = computed({
       </draggable>
       <button
         type="button"
-        class="w-full flex items-center justify-center h-12 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 gap-2 cursor-pointer hover:border-gray-400 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+        class="w-full flex items-center justify-center h-12 rounded-lg border-2 border-dashed border-accented bg-muted gap-2 cursor-pointer hover:border-accented transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
         @click="emit('add')"
       >
         <UIcon name="i-lucide-plus" class="size-3.5 text-muted" />
