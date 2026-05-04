@@ -18,8 +18,40 @@
   --color-mulberry-800: #9900d9;
   --color-mulberry-900: #6b0099;
   --color-mulberry-950: #3d0059;
-}
 
-.dark {
-  --ui-bg: #1a1a2e;
+  --color-cobalt-50: #e5f2ff;
+  --color-cobalt-100: #cce5ff;
+  --color-cobalt-200: #99ccff;
+  --color-cobalt-300: #66ccff;
+  --color-cobalt-400: #33ccff;
+  --color-cobalt-500: #1a98ff;
+  --color-cobalt-600: #3366cc;
+  --color-cobalt-700: #336699;
+  --color-cobalt-800: #33558c;
+  --color-cobalt-900: #334c7f;
+  --color-cobalt-950: #333366;
+
+  --color-shamrock-50: #e5ffe5;
+  --color-shamrock-100: #ccffcc;
+  --color-shamrock-200: #99ff99;
+  --color-shamrock-300: #66ff99;
+  --color-shamrock-400: #4de680;
+  --color-shamrock-500: #33cc66;
+  --color-shamrock-600: #1ab34d;
+  --color-shamrock-700: #009933;
+  --color-shamrock-800: #008033;
+  --color-shamrock-900: #006633;
+  --color-shamrock-950: #003319;
+
+  --color-dusk-50: #ffffff;
+  --color-dusk-100: #ededed;
+  --color-dusk-200: #bed2ff;
+  --color-dusk-300: #abb5e5;
+  --color-dusk-400: #9999cc;
+  --color-dusk-500: #7f7fb2;
+  --color-dusk-600: #666699;
+  --color-dusk-700: #494977;
+  --color-dusk-800: #2d2d56;
+  --color-dusk-900: #1a1a2e;
+  --color-dusk-950: #171717;
 }
