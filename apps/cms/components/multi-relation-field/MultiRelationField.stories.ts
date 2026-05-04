@@ -19,7 +19,6 @@ type Story = StoryObj<typeof MultiRelationField>;
 
 export const Empty: Story = {
   args: {
-    label: 'Tags',
     items: [],
   },
   play: async ({ canvasElement, args }) => {
@@ -32,7 +31,6 @@ export const Empty: Story = {
 
 export const KeyboardAddEntry: Story = {
   args: {
-    label: 'Tags',
     items: [],
   },
   play: async ({ canvasElement, args }) => {
@@ -47,7 +45,6 @@ export const KeyboardAddEntry: Story = {
 
 export const WithItems: Story = {
   args: {
-    label: 'Tags',
     items: [
       {
         contentTypeId: 'ct-tag',

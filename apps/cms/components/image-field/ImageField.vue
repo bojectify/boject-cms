@@ -79,12 +79,7 @@ function formatBytes(bytes: number): string {
 </script>
 
 <template>
-  <div class="space-y-2" :data-testid="testId">
-    <label class="block text-sm font-medium">
-      {{ field.label }}
-      <span v-if="field.required" class="text-red-500">*</span>
-    </label>
-
+  <div :data-testid="testId">
     <div v-if="modelValue" class="flex items-start gap-4">
       <img
         :src="`/api/files/${modelValue.storageKey}/transform?w=400`"

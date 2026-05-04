@@ -270,7 +270,13 @@ defineExpose({ validate: runValidation });
             />
           </UFormField>
 
-          <template v-else-if="field.type === 'image'">
+          <UFormField
+            v-else-if="field.type === 'image'"
+            :label="field.label"
+            :name="field.key"
+            :required="field.required"
+            size="xl"
+          >
             <ImageField
               :field="field"
               :model-value="
@@ -278,7 +284,7 @@ defineExpose({ validate: runValidation });
               "
               @update:model-value="state[field.key] = $event"
             />
-          </template>
+          </UFormField>
         </slot>
       </template>
 

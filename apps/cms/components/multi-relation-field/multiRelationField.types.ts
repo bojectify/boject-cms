@@ -8,6 +8,5 @@ export interface RelationItem {
 }
 
 export type MultiRelationFieldProps = BasicComponentProps & {
-  label: string;
   items: RelationItem[];
 };

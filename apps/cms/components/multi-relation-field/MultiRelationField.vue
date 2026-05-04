@@ -29,10 +29,7 @@ const draggableItems = computed({
 </script>
 
 <template>
-  <div class="space-y-2" :data-testid="testId">
-    <span class="text-sm font-medium text-default">
-      {{ label }}
-    </span>
+  <div :data-testid="testId">
     <div class="space-y-1.5">
       <draggable
         v-model="draggableItems"

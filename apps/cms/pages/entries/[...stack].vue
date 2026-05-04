@@ -563,59 +563,69 @@ function handlePaneSaved(
           :field-errors="fieldErrors"
         >
           <template #field="{ field, value, update }">
-            <RelationField
+            <UFormField
               v-if="field.type === 'dynamic-relation'"
               :label="field.label"
+              :name="field.key"
               :required="field.required"
-              :value="getRelationValue(value)"
-              :entry-title="resolvedRelations[field.key]?.entryTitle ?? null"
-              :content-type-name="
-                resolvedRelations[field.key]?.contentTypeName ?? null
-              "
-              @add="
-                orchestrator.openPicker(
-                  field.key,
-                  getTargetContentTypeIds(field),
-                  0
-                )
-              "
-              @edit="handleRelationEdit(value, field.key)"
-              @remove="update(null)"
-            />
-            <MultiRelationField
+              size="xl"
+            >
+              <RelationField
+                :value="getRelationValue(value)"
+                :entry-title="resolvedRelations[field.key]?.entryTitle ?? null"
+                :content-type-name="
+                  resolvedRelations[field.key]?.contentTypeName ?? null
+                "
+                @add="
+                  orchestrator.openPicker(
+                    field.key,
+                    getTargetContentTypeIds(field),
+                    0
+                  )
+                "
+                @edit="handleRelationEdit(value, field.key)"
+                @remove="update(null)"
+              />
+            </UFormField>
+            <UFormField
               v-else-if="field.type === 'dynamic-multirelation'"
               :label="field.label"
-              :items="resolvedMultiRelations[field.key] ?? []"
-              @add="
-                orchestrator.openPicker(
-                  field.key,
-                  getTargetContentTypeIds(field),
-                  0
-                )
-              "
-              @edit="
-                (idx: number) => {
-                  const refs = getMultiRelationValue(value);
-                  const r = refs[idx];
-                  if (r) {
-                    orchestrator.openPane(
-                      r.contentTypeId,
-                      r.entryId,
-                      field.key,
-                      0
-                    );
+              :name="field.key"
+              size="xl"
+            >
+              <MultiRelationField
+                :items="resolvedMultiRelations[field.key] ?? []"
+                @add="
+                  orchestrator.openPicker(
+                    field.key,
+                    getTargetContentTypeIds(field),
+                    0
+                  )
+                "
+                @edit="
+                  (idx: number) => {
+                    const refs = getMultiRelationValue(value);
+                    const r = refs[idx];
+                    if (r) {
+                      orchestrator.openPane(
+                        r.contentTypeId,
+                        r.entryId,
+                        field.key,
+                        0
+                      );
+                    }
                   }
-                }
-              "
-              @remove="
-                (idx: number) => {
-                  const refs = [...getMultiRelationValue(value)];
-                  refs.splice(idx, 1);
-                  update(refs);
-                }
-              "
-              @reorder="(items) => update(items)"
-            />
+                "
+                @remove="
+                  (idx: number) => {
+                    const refs = [...getMultiRelationValue(value)];
+                    refs.splice(idx, 1);
+                    update(refs);
+                  }
+                "
+                @reorder="(items) => update(items)"
+              />
+            </UFormField>
           </template>
         </ContentEditor>
       </div>

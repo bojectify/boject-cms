@@ -18,8 +18,6 @@ type Story = StoryObj<typeof RelationField>;
 
 export const Empty: Story = {
   args: {
-    label: 'Author',
-    required: false,
     value: null,
     entryTitle: null,
     contentTypeName: null,
@@ -34,8 +32,6 @@ export const Empty: Story = {
 
 export const Filled: Story = {
   args: {
-    label: 'Author',
-    required: false,
     value: { contentTypeId: 'ct-author', entryId: 'a1' },
     entryTitle: 'Ada Lovelace',
     contentTypeName: 'Author',
@@ -50,8 +46,6 @@ export const Filled: Story = {
 
 export const KeyboardActivation: Story = {
   args: {
-    label: 'Author',
-    required: false,
     value: { contentTypeId: 'ct-author', entryId: 'a1' },
     entryTitle: 'Ada Lovelace',
     contentTypeName: 'Author',
@@ -71,8 +65,6 @@ export const KeyboardActivation: Story = {
 
 export const EmptyKeyboardActivation: Story = {
   args: {
-    label: 'Author',
-    required: false,
     value: null,
     entryTitle: null,
     contentTypeName: null,

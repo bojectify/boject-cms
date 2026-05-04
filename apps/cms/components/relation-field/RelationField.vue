@@ -14,13 +14,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div class="space-y-2" :data-testid="testId">
-    <div class="flex items-center gap-1">
-      <span class="text-sm font-medium text-default">
-        {{ label }}
-      </span>
-      <span v-if="required" class="text-sm text-red-500">*</span>
-    </div>
+  <div :data-testid="testId">
     <button
       v-if="!value"
       type="button"
