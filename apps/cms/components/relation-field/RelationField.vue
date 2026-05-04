@@ -16,7 +16,7 @@ const emit = defineEmits<{
 <template>
   <div class="space-y-2" :data-testid="testId">
     <div class="flex items-center gap-1">
-      <span class="text-sm font-medium text-gray-700 dark:text-gray-200">
+      <span class="text-sm font-medium text-default">
         {{ label }}
       </span>
       <span v-if="required" class="text-sm text-red-500">*</span>
@@ -24,7 +24,7 @@ const emit = defineEmits<{
     <button
       v-if="!value"
       type="button"
-      class="w-full flex items-center justify-center h-16 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 gap-2 cursor-pointer hover:border-gray-400 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+      class="w-full flex items-center justify-center h-16 rounded-lg border-2 border-dashed border-accented bg-muted gap-2 cursor-pointer hover:border-accented transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
       @click="emit('add')"
     >
       <UIcon name="i-lucide-plus" class="size-4 text-muted" />
@@ -32,7 +32,7 @@ const emit = defineEmits<{
     </button>
     <div
       v-else
-      class="flex items-center h-14 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors focus-within:ring-2 focus-within:ring-primary-500"
+      class="flex items-center h-14 rounded-lg border border-default bg-elevated hover:bg-accented transition-colors focus-within:ring-2 focus-within:ring-primary-500"
     >
       <button
         type="button"
@@ -47,9 +47,7 @@ const emit = defineEmits<{
           </span>
         </div>
         <div class="flex-1 min-w-0">
-          <p
-            class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate"
-          >
+          <p class="text-sm font-medium text-highlighted truncate">
             {{ entryTitle ?? 'Untitled' }}
           </p>
           <p class="text-xs text-muted">

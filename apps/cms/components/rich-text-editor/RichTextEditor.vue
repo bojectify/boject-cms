@@ -288,12 +288,12 @@ onBeforeUnmount(() => {
 
 <template>
   <div
-    class="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden"
+    class="border border-default rounded-lg overflow-hidden"
     :data-testid="testId"
   >
     <div
       v-if="editor"
-      class="flex flex-wrap gap-1 p-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900"
+      class="flex flex-wrap gap-1 p-2 border-b border-default bg-muted"
     >
       <UButton
         variant="ghost"
@@ -469,22 +469,22 @@ onBeforeUnmount(() => {
   @apply list-decimal pl-6 my-2;
 }
 .rich-text-editor__content :deep(blockquote) {
-  @apply border-l-4 border-gray-300 dark:border-gray-700 pl-4 my-2 text-gray-600 dark:text-gray-400 italic;
+  @apply border-l-4 border-accented pl-4 my-2 text-toned italic;
 }
 .rich-text-editor__content :deep(code) {
-  @apply font-mono text-sm bg-gray-100 dark:bg-gray-800 px-1 rounded;
+  @apply font-mono text-sm bg-elevated px-1 rounded;
 }
 .rich-text-editor__content :deep(pre) {
-  @apply font-mono text-sm bg-gray-100 dark:bg-gray-800 p-3 rounded my-2 overflow-x-auto;
+  @apply font-mono text-sm bg-elevated p-3 rounded my-2 overflow-x-auto;
 }
 .rich-text-editor__content :deep(pre code) {
   @apply bg-transparent p-0;
 }
 .rich-text-editor__content :deep(.rich-text-editor__chip) {
-  @apply inline-flex items-center gap-1 px-1.5 py-0.5 mx-0.5 rounded-md text-sm cursor-pointer transition-colors align-baseline border bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700;
+  @apply inline-flex items-center gap-1 px-1.5 py-0.5 mx-0.5 rounded-md text-sm cursor-pointer transition-colors align-baseline border bg-elevated border-default;
 }
 .rich-text-editor__content :deep(.rich-text-editor__chip:hover) {
-  @apply bg-gray-200 dark:bg-gray-700;
+  @apply bg-accented;
 }
 .rich-text-editor__content :deep(.rich-text-editor__chip--selected) {
   @apply ring-2 ring-primary ring-offset-1;

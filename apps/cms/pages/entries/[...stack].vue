@@ -531,7 +531,7 @@ function handlePaneSaved(
   <div class="relative flex flex-col h-full overflow-hidden">
     <!-- Nav header -->
     <div
-      class="flex items-center gap-4 px-6 py-3 border-b border-gray-200 dark:border-gray-700 shrink-0"
+      class="flex items-center gap-4 px-6 py-3 border-b border-default shrink-0"
     >
       <UButton
         variant="ghost"
@@ -543,7 +543,7 @@ function handlePaneSaved(
       <NuxtLink
         v-if="contentType"
         :to="`/content-types/${contentType.id}`"
-        class="flex items-center gap-1.5 text-xs text-muted hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+        class="flex items-center gap-1.5 text-xs text-muted hover:text-toned transition-colors"
       >
         {{ contentType.name }}
         <UIcon name="i-lucide-external-link" class="size-3" />
@@ -621,7 +621,7 @@ function handlePaneSaved(
       </div>
 
       <EntrySidebar
-        class="w-80 shrink-0 border-l border-gray-200 dark:border-gray-700 overflow-y-auto"
+        class="w-80 shrink-0 border-l border-default overflow-y-auto"
         :status="status"
         :is-dirty="isDirty"
         :saving="isSaving"
