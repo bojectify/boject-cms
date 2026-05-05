@@ -1,7 +1,4 @@
-import {
-  API_KEY_SCOPES,
-  isApiKeyScope,
-} from '../../../../../apps/cms/utils/apiKeyScopes.js';
+import { API_KEY_SCOPES, isApiKeyScope } from '../../vendor/apiKeyScopes.js';
 import { createApiKey, HttpError } from '../../api.js';
 import { loadProjectConfig } from '../../config.js';
 
