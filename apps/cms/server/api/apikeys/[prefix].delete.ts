@@ -33,7 +33,7 @@ export default defineEventHandler(async (event) => {
       statusCode: 404,
       data: {
         error: 'APIKEY_NOT_FOUND',
-        message: `No active API key found with prefix "${prefix}".`,
+        message: 'No active API key found.',
       },
     });
   }

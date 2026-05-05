@@ -34,7 +34,7 @@ function parseCreateBody(body: unknown): CreateBody {
   if (typeof name !== 'string' || name.trim().length === 0) {
     throwBad('`name` is required and must be a non-empty string.');
   }
-  if ((name as string).length > 80) {
+  if (name.length > 80) {
     throwBad('`name` must be 80 characters or fewer.');
   }
   if (!Array.isArray(scopes) || scopes.length === 0) {
@@ -54,7 +54,7 @@ function parseCreateBody(body: unknown): CreateBody {
   }
 
   return {
-    name: (name as string).trim(),
+    name: name.trim(),
     scopes: scopes as ApiKeyScope[],
   };
 }
