@@ -231,24 +231,60 @@ A single batched query returns the body plus everything it references — no N+1
 
 ### Authentication
 
-In production, all `/api/graphql` requests require an `Authorization: Bearer boject_...` header with a valid API key carrying the `content:read` scope. In development, requests with no Authorization header pass through (so GraphiQL can introspect freely); a request that presents a Bearer header always validates. Manage keys via:
+In production, all `/api/graphql` requests require an `Authorization: Bearer boject_...` header with a valid API key carrying the `content:read` scope. In development, requests with no Authorization header pass through (so GraphiQL can introspect freely); a request that presents a Bearer header always validates.
+
+Key creation, listing, revocation, and the full scope catalogue are documented in [API key management](#api-key-management) below.
+
+## API key management
+
+The CMS supports API keys with scoped access for external consumers (GraphQL clients, schema-management CLIs, etc.).
+
+### Scopes
+
+| Scope          | Grants                      |
+| -------------- | --------------------------- |
+| `content:read` | Read content via GraphQL.   |
+| `schema:read`  | Export the schema bundle.   |
+| `schema:write` | Apply schema changes.       |
+| `apikey:read`  | List API keys.              |
+| `apikey:write` | Create and revoke API keys. |
+
+### Bootstrap (first key)
+
+Until the admin UI lands (tracked in #166), mint your first API key by exec'ing into the CMS container:
 
 ```bash
-pnpm apikey:create "Mobile app backend"                       # default scopes: content:read
-pnpm apikey:create "CI runner" --scopes schema:read,schema:write
-pnpm apikey:list                                              # shows scopes column
-pnpm apikey:revoke <prefix>
+docker compose exec cms tsx scripts/manage-api-keys/index.ts create "first-key" --scopes apikey:write
 ```
 
-API keys carry a `scopes: string[]`. Recognised scopes:
+The raw key is printed once — save it. Set it as `BOJECT_API_KEY` on the machine you'll run the CLI from.
 
-| Scope          | Grants                                                    |
-| -------------- | --------------------------------------------------------- |
-| `content:read` | Query content via `/api/graphql`.                         |
-| `schema:read`  | `GET /api/schema/export` (used by `boject schema pull`).  |
-| `schema:write` | `POST /api/schema/apply` (used by `boject schema apply`). |
+### Day-to-day (`@boject/cli`)
 
-Existing keys (created before scopes shipped) were migrated to `["content:read"]`, so GraphQL access is preserved unchanged. New keys are gated by the explicit `--scopes` flag.
+Once you have a key with `apikey:write`, use the CLI:
+
+```bash
+boject apikey create --name "CI runner" --scopes content:read
+boject apikey list
+boject apikey list --json | jq '.items[] | select(.revokedAt == null)'
+boject apikey revoke boject_a1b2
+```
+
+The CLI reads `.boject.config.json` for the CMS URL and `BOJECT_API_KEY` from env (same as `boject schema *`).
+
+### The (i) constraint
+
+Minting a key with the `apikey:write` scope requires session authentication — i.e. the CMS UI or the bootstrap script above. API-key callers cannot self-replicate the most privileged scope. This caps the blast radius if a CLI key ever leaks.
+
+### Recovery / break-glass
+
+If you lose access to all `apikey:write` keys (every admin user is locked out, sessions invalidated, no CLI key on hand), use the bootstrap script to mint a fresh one:
+
+```bash
+docker compose exec cms tsx scripts/manage-api-keys/index.ts create "recovery" --scopes apikey:write
+```
+
+Keep this option in your runbook even after the admin UI lands.
 
 ## Database
 
