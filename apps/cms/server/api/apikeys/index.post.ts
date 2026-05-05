@@ -6,6 +6,7 @@ import {
 } from 'h3';
 import { assertApiKeyScope } from '../../utils/assertApiKeyScope';
 import { generateApiKey } from '../../utils/apiKey';
+import { enforceMutationRateLimit } from '../../utils/rateLimitEndpoint';
 import {
   API_KEY_SCOPES,
   isApiKeyScope,
@@ -60,6 +61,7 @@ function parseCreateBody(body: unknown): CreateBody {
 
 export default defineEventHandler(async (event) => {
   assertApiKeyScope(event, 'apikey:write');
+  enforceMutationRateLimit(event, 'apikey-create');
 
   const raw = await readBody(event);
   const body = parseCreateBody(raw);

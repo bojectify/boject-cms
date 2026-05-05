@@ -262,4 +262,25 @@ describe('POST /api/apikeys', () => {
       expect(body.scopes).toEqual(['apikey:write']);
     });
   });
+
+  describe('rate limit', () => {
+    it('returns 429 after 50 mutations from the same IP within 60s', async () => {
+      const cookie = await loginAsAdmin();
+      // 50 successful calls, then 51st should be rate-limited.
+      let lastStatus = 0;
+      for (let i = 0; i < 51; i++) {
+        const res = await fetch('/api/apikeys', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', cookie },
+          body: JSON.stringify({
+            name: `test-rl-${i}`,
+            scopes: ['content:read'],
+          }),
+        });
+        lastStatus = res.status;
+        if (res.status === 429) break;
+      }
+      expect(lastStatus).toBe(429);
+    });
+  });
 });
