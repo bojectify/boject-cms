@@ -61,7 +61,7 @@ function parseCreateBody(body: unknown): CreateBody {
 
 export default defineEventHandler(async (event) => {
   assertApiKeyScope(event, 'apikey:write');
-  enforceMutationRateLimit(event, 'apikey-create');
+  enforceMutationRateLimit(event, 'apikeys.post');
 
   const raw = await readBody(event);
   const body = parseCreateBody(raw);

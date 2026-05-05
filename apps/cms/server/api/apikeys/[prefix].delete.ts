@@ -11,7 +11,7 @@ const PREFIX_PATTERN = /^boject_[a-f0-9]{4}$/;
 
 export default defineEventHandler(async (event) => {
   assertApiKeyScope(event, 'apikey:write');
-  enforceMutationRateLimit(event, 'apikey-revoke');
+  enforceMutationRateLimit(event, 'apikeys.delete');
 
   const prefix = getRouterParam(event, 'prefix');
   if (!prefix || !PREFIX_PATTERN.test(prefix)) {
