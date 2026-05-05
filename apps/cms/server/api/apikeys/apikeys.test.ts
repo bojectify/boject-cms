@@ -3,7 +3,7 @@ import { setup, fetch } from '@nuxt/test-utils/e2e';
 import { afterEach, describe, expect, it } from 'vitest';
 import { TEST_USERNAME, TEST_PASSWORD } from '../../test/credentials';
 import { prisma } from '../../utils/prisma';
-import { generateApiKey } from '../../utils/apiKey';
+import { generateApiKey, hashApiKey } from '../../utils/apiKey';
 
 await setup({
   rootDir: fileURLToPath(new URL('../../..', import.meta.url)),
@@ -23,13 +23,16 @@ async function makeKey(scopes: string[]): Promise<string> {
   return raw;
 }
 
+let cachedCookie: string | null = null;
 async function loginAsAdmin(): Promise<string> {
+  if (cachedCookie) return cachedCookie;
   const res = await fetch('/api/auth/login', {
     method: 'POST',
     body: JSON.stringify({ email: TEST_USERNAME, password: TEST_PASSWORD }),
     headers: { 'Content-Type': 'application/json' },
   });
-  return res.headers.getSetCookie().join('; ');
+  cachedCookie = res.headers.getSetCookie().join('; ');
+  return cachedCookie;
 }
 
 afterEach(async () => {
@@ -282,5 +285,91 @@ describe('POST /api/apikeys', () => {
       }
       expect(lastStatus).toBe(429);
     });
+  });
+});
+
+describe('GET /api/apikeys', () => {
+  it('returns 401 without auth', async () => {
+    const res = await fetch('/api/apikeys');
+    expect(res.status).toBe(401);
+  });
+
+  it('returns 403 INSUFFICIENT_SCOPE for an api key without apikey:read', async () => {
+    const key = await makeKey(['content:read']);
+    const res = await fetch('/api/apikeys', {
+      headers: { Authorization: `Bearer ${key}` },
+    });
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { data?: { error?: string } };
+    expect(body.data?.error).toBe('INSUFFICIENT_SCOPE');
+  });
+
+  it('returns the list with apikey:read', async () => {
+    await makeKey(['content:read']);
+    await makeKey(['schema:read']);
+    const reader = await makeKey(['apikey:read']);
+    const res = await fetch('/api/apikeys', {
+      headers: { Authorization: `Bearer ${reader}` },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      items: Array<Record<string, unknown>>;
+    };
+    expect(Array.isArray(body.items)).toBe(true);
+    expect(body.items.length).toBeGreaterThanOrEqual(3);
+    for (const item of body.items) {
+      expect(item).not.toHaveProperty('keyHash');
+      expect(item).not.toHaveProperty('rawKey');
+      expect(item).toHaveProperty('id');
+      expect(item).toHaveProperty('name');
+      expect(item).toHaveProperty('prefix');
+      expect(item).toHaveProperty('scopes');
+      expect(item).toHaveProperty('createdAt');
+    }
+  });
+
+  it('returns the list under session auth', async () => {
+    const cookie = await loginAsAdmin();
+    const res = await fetch('/api/apikeys', { headers: { cookie } });
+    expect(res.status).toBe(200);
+  });
+
+  it('includes revoked keys with revokedAt populated', async () => {
+    const target = await makeKey(['content:read']);
+    const targetHash = hashApiKey(target);
+    const targetRow = await prisma.apiKey.findUnique({
+      where: { keyHash: targetHash },
+      select: { id: true, keyPrefix: true },
+    });
+    expect(targetRow).not.toBeNull();
+    await prisma.apiKey.update({
+      where: { id: targetRow!.id },
+      data: { revokedAt: new Date() },
+    });
+    const reader = await makeKey(['apikey:read']);
+    const res = await fetch('/api/apikeys', {
+      headers: { Authorization: `Bearer ${reader}` },
+    });
+    const body = (await res.json()) as {
+      items: Array<{ id: string; revokedAt: string | null }>;
+    };
+    const revoked = body.items.find((i) => i.id === targetRow!.id);
+    expect(revoked).toBeDefined();
+    expect(revoked!.revokedAt).not.toBeNull();
+  });
+
+  it('sorts by createdAt desc', async () => {
+    const reader = await makeKey(['apikey:read']);
+    const res = await fetch('/api/apikeys', {
+      headers: { Authorization: `Bearer ${reader}` },
+    });
+    const body = (await res.json()) as {
+      items: Array<{ createdAt: string }>;
+    };
+    for (let i = 1; i < body.items.length; i++) {
+      expect(body.items[i - 1]!.createdAt >= body.items[i]!.createdAt).toBe(
+        true
+      );
+    }
   });
 });
