@@ -3,7 +3,11 @@ import { createHash, randomBytes } from 'node:crypto';
 import { parseArgs } from 'node:util';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../../generated/prisma/client';
-import { API_KEY_SCOPES, API_KEY_SCOPES_SET } from '../../utils/apiKeyScopes';
+import {
+  API_KEY_SCOPES,
+  API_KEY_SCOPES_SET,
+  type ApiKeyScope,
+} from '../../utils/apiKeyScopes';
 
 const PREFIX = 'boject_';
 
@@ -32,7 +36,7 @@ Examples:
   pnpm apikey:revoke boject_a1b
 `;
 
-function parseScopes(input: string | undefined): string[] {
+function parseScopes(input: string | undefined): ApiKeyScope[] {
   if (!input) {
     throw new Error(
       `--scopes is required. Recognised scopes: ${API_KEY_SCOPES.join(', ')}.`
@@ -54,7 +58,7 @@ function parseScopes(input: string | undefined): string[] {
       );
     }
   }
-  return parts;
+  return parts as ApiKeyScope[];
 }
 
 function hashApiKey(key: string): string {
@@ -75,7 +79,7 @@ function wantsHelp(values: string[]): boolean {
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
 const prisma = new PrismaClient({ adapter });
 
-async function create(name: string, scopes: string[]) {
+async function create(name: string, scopes: ApiKeyScope[]) {
   const { raw, hash, prefix } = generateApiKey();
   await prisma.apiKey.create({
     data: { name, keyHash: hash, keyPrefix: prefix, scopes },
