@@ -1,3 +1,13 @@
+const API_KEY_WRITABLE_PATHS = new Set(['/api/schema/apply', '/api/apikeys']);
+
+function isApiKeyWritablePath(path: string): boolean {
+  if (API_KEY_WRITABLE_PATHS.has(path)) return true;
+  for (const p of API_KEY_WRITABLE_PATHS) {
+    if (path.startsWith(`${p}/`)) return true;
+  }
+  return false;
+}
+
 export default defineEventHandler(async (event) => {
   const path = getRequestURL(event).pathname;
 
@@ -40,16 +50,11 @@ export default defineEventHandler(async (event) => {
     event.context.authMethod = 'apikey';
     event.context.apiKeyScopes = result.scopes;
     const method = getMethod(event);
-    if (method !== 'GET' && method !== 'HEAD') {
-      // Allow non-GET on the schema apply endpoint specifically; the
-      // endpoint asserts `schema:write` itself. Other endpoints stay
-      // read-only for API keys.
-      if (path !== '/api/schema/apply') {
-        throw createError({
-          statusCode: 403,
-          message: 'API keys have read-only access',
-        });
-      }
+    if (method !== 'GET' && method !== 'HEAD' && !isApiKeyWritablePath(path)) {
+      throw createError({
+        statusCode: 403,
+        message: 'API keys have read-only access',
+      });
     }
     return;
   }
