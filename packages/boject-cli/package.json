@@ -22,7 +22,7 @@
     "build": "tsup",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:unit": "vitest run tests/unit",
+    "test:unit": "vitest run --project unit",
     "test:e2e": "vitest run tests/e2e"
   },
   "dependencies": {
