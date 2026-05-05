@@ -380,3 +380,92 @@ describe('GET /api/apikeys', () => {
     }
   });
 });
+
+describe('DELETE /api/apikeys/:prefix', () => {
+  it('returns 401 without auth', async () => {
+    const res = await fetch('/api/apikeys/boject_a1b2', { method: 'DELETE' });
+    expect(res.status).toBe(401);
+  });
+
+  it('returns 403 INSUFFICIENT_SCOPE for an api key without apikey:write', async () => {
+    const key = await makeKey(['content:read']);
+    const res = await fetch('/api/apikeys/boject_a1b2', {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${key}` },
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('returns 400 INVALID_PREFIX for a malformed prefix', async () => {
+    const cookie = await loginAsAdmin();
+    const res = await fetch('/api/apikeys/not-a-prefix', {
+      method: 'DELETE',
+      headers: { cookie },
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { data?: { error?: string } };
+    expect(body.data?.error).toBe('INVALID_PREFIX');
+  });
+
+  it('returns 404 APIKEY_NOT_FOUND when no active key matches', async () => {
+    const cookie = await loginAsAdmin();
+    const res = await fetch('/api/apikeys/boject_dead', {
+      method: 'DELETE',
+      headers: { cookie },
+    });
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { data?: { error?: string } };
+    expect(body.data?.error).toBe('APIKEY_NOT_FOUND');
+  });
+
+  it('returns 404 when the key is already revoked', async () => {
+    const target = await makeKey(['content:read']);
+    const prefix = target.slice(0, 11);
+    // keyPrefix is not unique, so look up by keyHash to get the id, then update by id.
+    const targetRow = await prisma.apiKey.findUnique({
+      where: { keyHash: hashApiKey(target) },
+    });
+    await prisma.apiKey.update({
+      where: { id: targetRow!.id },
+      data: { revokedAt: new Date() },
+    });
+    const cookie = await loginAsAdmin();
+    const res = await fetch(`/api/apikeys/${prefix}`, {
+      method: 'DELETE',
+      headers: { cookie },
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it('soft-revokes an active key', async () => {
+    const target = await makeKey(['content:read']);
+    const prefix = target.slice(0, 11);
+    const cookie = await loginAsAdmin();
+    const res = await fetch(`/api/apikeys/${prefix}`, {
+      method: 'DELETE',
+      headers: { cookie },
+    });
+    expect(res.status).toBe(204);
+    const row = await prisma.apiKey.findUnique({
+      where: { keyHash: hashApiKey(target) },
+    });
+    expect(row).not.toBeNull();
+    expect(row!.revokedAt).not.toBeNull();
+  });
+
+  it('self-revoke succeeds and the next request with that token 401s', async () => {
+    const target = await makeKey(['apikey:write']);
+    const prefix = target.slice(0, 11);
+    // Use the key to revoke itself.
+    const revokeRes = await fetch(`/api/apikeys/${prefix}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${target}` },
+    });
+    expect(revokeRes.status).toBe(204);
+    // Next request with the same token must 401.
+    const followUp = await fetch('/api/apikeys', {
+      headers: { Authorization: `Bearer ${target}` },
+    });
+    expect(followUp.status).toBe(401);
+  });
+});
