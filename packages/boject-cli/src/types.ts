@@ -48,3 +48,22 @@ export interface BlockerLike {
   message: string;
   path: string;
 }
+
+export interface ApiKeyCreateResponse {
+  id: string;
+  name: string;
+  prefix: string;
+  scopes: string[];
+  rawKey: string;
+  createdAt: string;
+}
+
+export interface ApiKeyListItem {
+  id: string;
+  name: string;
+  prefix: string;
+  scopes: string[];
+  revokedAt: string | null;
+  lastUsedAt: string | null;
+  createdAt: string;
+}

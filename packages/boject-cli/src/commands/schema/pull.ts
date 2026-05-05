@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, resolve } from 'node:path';
-import { loadProjectConfig } from '../config.js';
-import { getSchemaBundle, HttpError } from '../api.js';
+import { loadProjectConfig } from '../../config.js';
+import { getSchemaBundle, HttpError } from '../../api.js';
 
 export interface SchemaPullFlags {
   out?: string;

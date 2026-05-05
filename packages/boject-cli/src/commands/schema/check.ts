@@ -1,8 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import { resolve, dirname, isAbsolute } from 'node:path';
-import { loadProjectConfig } from '../config.js';
-import { getSchemaBundle, HttpError } from '../api.js';
-import type { Bundle, BundleContentType, BundleField } from '../types.js';
+import { loadProjectConfig } from '../../config.js';
+import { getSchemaBundle, HttpError } from '../../api.js';
+import type { Bundle, BundleContentType, BundleField } from '../../types.js';
 
 export interface SchemaCheckParams {
   cwd: string;

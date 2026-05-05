@@ -1,4 +1,10 @@
-import type { ApplySchemaResultLike, BlockerLike, Bundle } from './types.js';
+import type {
+  ApiKeyCreateResponse,
+  ApiKeyListItem,
+  ApplySchemaResultLike,
+  BlockerLike,
+  Bundle,
+} from './types.js';
 
 export class HttpError extends Error {
   constructor(
@@ -32,7 +38,7 @@ export interface ApiContext {
  */
 async function callJson<T>(
   ctx: ApiContext,
-  method: 'GET' | 'POST',
+  method: 'GET' | 'POST' | 'DELETE',
   path: string,
   body?: unknown
 ): Promise<T> {
@@ -94,3 +100,23 @@ export function applySchemaRemote(
 }
 
 export type { Bundle, ApplySchemaResultLike, BlockerLike };
+
+export function createApiKey(
+  ctx: ApiContext,
+  args: { name: string; scopes: string[] }
+): Promise<ApiKeyCreateResponse> {
+  return callJson<ApiKeyCreateResponse>(ctx, 'POST', '/api/apikeys', args);
+}
+
+export function listApiKeys(
+  ctx: ApiContext
+): Promise<{ items: ApiKeyListItem[] }> {
+  return callJson<{ items: ApiKeyListItem[] }>(ctx, 'GET', '/api/apikeys');
+}
+
+export async function revokeApiKey(
+  ctx: ApiContext,
+  prefix: string
+): Promise<void> {
+  await callJson<null>(ctx, 'DELETE', `/api/apikeys/${prefix}`);
+}

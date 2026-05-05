@@ -3,20 +3,24 @@ import { createHash, randomBytes } from 'node:crypto';
 import { parseArgs } from 'node:util';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../../generated/prisma/client';
+import {
+  API_KEY_SCOPES,
+  API_KEY_SCOPES_SET,
+  type ApiKeyScope,
+} from '../../utils/apiKeyScopes';
 
 const PREFIX = 'boject_';
 
 const HELP = `manage-api-keys — create, list, and revoke API keys
 
 Usage:
-  pnpm apikey:create <name> [--scopes <csv>]   Create a new API key (prints raw key once)
+  pnpm apikey:create <name> --scopes <csv>     Create a new API key (prints raw key once)
   pnpm apikey:list                             List all API keys (prefix, name, status, scopes, last used)
   pnpm apikey:revoke <prefix>                  Revoke an API key by its prefix
 
 Flags:
-  --scopes <csv>   Comma-separated list of scopes for the new key.
-                   Recognised scopes: content:read, schema:read, schema:write.
-                   Default: content:read.
+  --scopes <csv>   Comma-separated list of scopes for the new key (REQUIRED).
+                   Recognised: ${API_KEY_SCOPES.join(', ')}.
   --help, -h       Show this help message.
 
 Notes:
@@ -26,33 +30,35 @@ Notes:
   - Requires DATABASE_URL in the environment (loaded via .env).
 
 Examples:
-  pnpm apikey:create "Mobile app backend"
+  pnpm apikey:create "Mobile app backend" --scopes content:read
   pnpm apikey:create "CI runner" --scopes schema:read,schema:write
   pnpm apikey:list
   pnpm apikey:revoke boject_a1b
 `;
 
-const RECOGNISED_SCOPES = new Set([
-  'content:read',
-  'schema:read',
-  'schema:write',
-]);
-
-function parseScopes(input: string | undefined): string[] {
-  if (!input) return ['content:read'];
+function parseScopes(input: string | undefined): ApiKeyScope[] {
+  if (!input) {
+    throw new Error(
+      `--scopes is required. Recognised scopes: ${API_KEY_SCOPES.join(', ')}.`
+    );
+  }
   const parts = input
     .split(',')
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
-  if (parts.length === 0) return ['content:read'];
+  if (parts.length === 0) {
+    throw new Error(
+      `--scopes is required. Recognised scopes: ${API_KEY_SCOPES.join(', ')}.`
+    );
+  }
   for (const p of parts) {
-    if (!RECOGNISED_SCOPES.has(p)) {
+    if (!API_KEY_SCOPES_SET.has(p)) {
       throw new Error(
-        `Unknown scope "${p}". Recognised: ${[...RECOGNISED_SCOPES].join(', ')}.`
+        `Unknown scope "${p}". Recognised: ${API_KEY_SCOPES.join(', ')}.`
       );
     }
   }
-  return parts;
+  return parts as ApiKeyScope[];
 }
 
 function hashApiKey(key: string): string {
@@ -73,7 +79,7 @@ function wantsHelp(values: string[]): boolean {
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
 const prisma = new PrismaClient({ adapter });
 
-async function create(name: string, scopes: string[]) {
+async function create(name: string, scopes: ApiKeyScope[]) {
   const { raw, hash, prefix } = generateApiKey();
   await prisma.apiKey.create({
     data: { name, keyHash: hash, keyPrefix: prefix, scopes },
@@ -170,7 +176,7 @@ async function main() {
         return;
       }
       if (positionals.length !== 1) {
-        console.error('Usage: pnpm apikey:create <name> [--scopes <csv>]');
+        console.error('Usage: pnpm apikey:create <name> --scopes <csv>');
         process.exit(1);
       }
       await create(positionals[0]!, parseScopes(values.scopes));

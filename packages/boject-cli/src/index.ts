@@ -1,9 +1,12 @@
 import { parseArgs } from 'node:util';
 import { runUpgrade, type CommandRunner } from './commands/upgrade.js';
-import { runSchemaPull } from './commands/schemaPull.js';
-import { runSchemaValidate } from './commands/schemaValidate.js';
-import { runSchemaApply } from './commands/schemaApply.js';
-import { runSchemaCheck } from './commands/schemaCheck.js';
+import { runSchemaPull } from './commands/schema/pull.js';
+import { runSchemaValidate } from './commands/schema/validate.js';
+import { runSchemaApply } from './commands/schema/apply.js';
+import { runSchemaCheck } from './commands/schema/check.js';
+import { runApikeyCreate } from './commands/apikey/create.js';
+import { runApikeyList } from './commands/apikey/list.js';
+import { runApikeyRevoke } from './commands/apikey/revoke.js';
 import { spawn } from 'node:child_process';
 import { CLI_VERSION } from './version.js';
 
@@ -16,6 +19,9 @@ Commands:
   schema validate    Validate a local bundle (no network).
   schema apply       Push a local bundle to a CMS via API.
   schema check       Compare local schema against the live CMS.
+  apikey create      Create a new API key.
+  apikey list        List API keys.
+  apikey revoke      Revoke an API key by prefix.
 
 Run \`boject <command> --help\` for command-specific flags.
 `;
@@ -43,6 +49,28 @@ const SCHEMA_CHECK_USAGE = `Usage: boject schema check
 
 Pulls the live schema and diffs it against the on-disk bundle. Exits 1
 on drift. Designed for CI.
+`;
+
+const APIKEY_CREATE_USAGE = `Usage: boject apikey create --name <n> --scopes <csv> [--url <url>]
+
+Mints a new API key. Requires BOJECT_API_KEY in env (must have apikey:write scope).
+The raw key is printed once; it cannot be retrieved later.
+
+Recognised scopes: content:read, schema:read, schema:write, apikey:read, apikey:write.
+
+Note: minting a key with apikey:write requires session auth (CMS UI). API-key callers
+cannot self-replicate.
+`;
+
+const APIKEY_LIST_USAGE = `Usage: boject apikey list [--json] [--url <url>]
+
+Lists API keys. Requires BOJECT_API_KEY in env (must have apikey:read scope).
+With --json, emits the raw response for piping to jq.
+`;
+
+const APIKEY_REVOKE_USAGE = `Usage: boject apikey revoke <prefix> [--url <url>]
+
+Soft-revokes an API key by its prefix. Requires BOJECT_API_KEY (apikey:write scope).
 `;
 
 const nodeRunner: CommandRunner = {
@@ -156,6 +184,94 @@ async function dispatchSchema(args: string[]): Promise<number> {
   }
 }
 
+async function dispatchApikey(args: string[]): Promise<number> {
+  const subcommand = args[0];
+  const rest = args.slice(1);
+  if (!subcommand || subcommand === '--help' || subcommand === '-h') {
+    process.stdout.write(USAGE);
+    return subcommand ? 0 : 1;
+  }
+
+  const apiKey = process.env.BOJECT_API_KEY;
+
+  switch (subcommand) {
+    case 'create': {
+      if (rest.includes('--help') || rest.includes('-h')) {
+        process.stdout.write(APIKEY_CREATE_USAGE);
+        return 0;
+      }
+      const { values } = parseArgs({
+        args: rest,
+        allowPositionals: false,
+        options: {
+          name: { type: 'string' },
+          scopes: { type: 'string' },
+          url: { type: 'string' },
+        },
+      });
+      const r = await runApikeyCreate({
+        cwd: process.cwd(),
+        apiKey,
+        flags: {
+          name: values.name,
+          scopes: values.scopes,
+          url: values.url,
+        },
+        stdout,
+        stderr,
+      });
+      return r.exitCode;
+    }
+    case 'list': {
+      if (rest.includes('--help') || rest.includes('-h')) {
+        process.stdout.write(APIKEY_LIST_USAGE);
+        return 0;
+      }
+      const { values } = parseArgs({
+        args: rest,
+        allowPositionals: false,
+        options: {
+          json: { type: 'boolean', default: false },
+          url: { type: 'string' },
+        },
+      });
+      const r = await runApikeyList({
+        cwd: process.cwd(),
+        apiKey,
+        flags: { json: values.json === true, url: values.url },
+        stdout,
+        stderr,
+      });
+      return r.exitCode;
+    }
+    case 'revoke': {
+      if (rest.includes('--help') || rest.includes('-h')) {
+        process.stdout.write(APIKEY_REVOKE_USAGE);
+        return 0;
+      }
+      const { values, positionals } = parseArgs({
+        args: rest,
+        allowPositionals: true,
+        options: {
+          url: { type: 'string' },
+        },
+      });
+      const r = await runApikeyRevoke({
+        cwd: process.cwd(),
+        apiKey,
+        flags: { prefix: positionals[0], url: values.url },
+        stdout,
+        stderr,
+      });
+      return r.exitCode;
+    }
+    default:
+      process.stderr.write(`Unknown apikey subcommand: ${subcommand}\n`);
+      process.stdout.write(USAGE);
+      return 1;
+  }
+}
+
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
 
@@ -172,6 +288,11 @@ async function main(): Promise<void> {
 
   if (command === 'schema') {
     const code = await dispatchSchema(rest);
+    process.exit(code);
+  }
+
+  if (command === 'apikey') {
+    const code = await dispatchApikey(rest);
     process.exit(code);
   }
 
