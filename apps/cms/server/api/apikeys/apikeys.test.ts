@@ -23,7 +23,7 @@ async function makeKey(scopes: string[]): Promise<string> {
   return raw;
 }
 
-async function _loginAsAdmin(): Promise<string> {
+async function loginAsAdmin(): Promise<string> {
   const res = await fetch('/api/auth/login', {
     method: 'POST',
     body: JSON.stringify({ email: TEST_USERNAME, password: TEST_PASSWORD }),
@@ -61,5 +61,98 @@ describe('POST /api/apikeys', () => {
     expect(res.status).toBe(403);
     const body = (await res.json()) as { data?: { error?: string } };
     expect(body.data?.error).toBe('INSUFFICIENT_SCOPE');
+  });
+
+  describe('body validation', () => {
+    it('returns 400 BAD_REQUEST when name is missing', async () => {
+      const cookie = await loginAsAdmin();
+      const res = await fetch('/api/apikeys', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', cookie },
+        body: JSON.stringify({ scopes: ['content:read'] }),
+      });
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { data?: { error?: string } };
+      expect(body.data?.error).toBe('BAD_REQUEST');
+    });
+
+    it('returns 400 when name is whitespace-only', async () => {
+      const cookie = await loginAsAdmin();
+      const res = await fetch('/api/apikeys', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', cookie },
+        body: JSON.stringify({ name: '   ', scopes: ['content:read'] }),
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 400 when name is longer than 80 chars', async () => {
+      const cookie = await loginAsAdmin();
+      const res = await fetch('/api/apikeys', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', cookie },
+        body: JSON.stringify({
+          name: 'x'.repeat(81),
+          scopes: ['content:read'],
+        }),
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 400 when scopes is missing', async () => {
+      const cookie = await loginAsAdmin();
+      const res = await fetch('/api/apikeys', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', cookie },
+        body: JSON.stringify({ name: 'ok' }),
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 400 when scopes is empty', async () => {
+      const cookie = await loginAsAdmin();
+      const res = await fetch('/api/apikeys', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', cookie },
+        body: JSON.stringify({ name: 'ok', scopes: [] }),
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 400 UNKNOWN_SCOPE when a scope is unrecognised', async () => {
+      const cookie = await loginAsAdmin();
+      const res = await fetch('/api/apikeys', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', cookie },
+        body: JSON.stringify({ name: 'ok', scopes: ['admin'] }),
+      });
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as {
+        data?: { error?: string; recognised?: string[] };
+      };
+      expect(body.data?.error).toBe('UNKNOWN_SCOPE');
+      expect(body.data?.recognised).toEqual([
+        'content:read',
+        'schema:read',
+        'schema:write',
+        'apikey:read',
+        'apikey:write',
+      ]);
+    });
+
+    it('returns 400 UNKNOWN_SCOPE when one of mixed scopes is invalid', async () => {
+      const cookie = await loginAsAdmin();
+      const res = await fetch('/api/apikeys', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', cookie },
+        body: JSON.stringify({
+          name: 'ok',
+          scopes: ['content:read', 'banana'],
+        }),
+      });
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { data?: { error?: string } };
+      expect(body.data?.error).toBe('UNKNOWN_SCOPE');
+    });
   });
 });
