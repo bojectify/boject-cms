@@ -64,7 +64,18 @@ export default defineEventHandler(async (event) => {
   const raw = await readBody(event);
   const body = parseCreateBody(raw);
 
-  // (i) rule and rate limit come in later slices.
+  if (
+    event.context.authMethod === 'apikey' &&
+    body.scopes.includes('apikey:write')
+  ) {
+    throw createError({
+      statusCode: 403,
+      data: {
+        error: 'APIKEY_WRITE_REQUIRES_SESSION',
+        message: 'Minting an apikey:write key requires session auth.',
+      },
+    });
+  }
 
   const { raw: rawKey, hash, prefix } = generateApiKey();
   const created = await prisma.apiKey.create({

@@ -209,4 +209,57 @@ describe('POST /api/apikeys', () => {
       expect(res.status).toBe(201);
     });
   });
+
+  describe('(i) rule: api-key callers cannot mint apikey:write keys', () => {
+    it('rejects api-key auth minting an apikey:write key', async () => {
+      const adminKey = await makeKey(['apikey:write']);
+      const res = await fetch('/api/apikeys', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminKey}`,
+        },
+        body: JSON.stringify({
+          name: 'test-i-rule-single',
+          scopes: ['apikey:write'],
+        }),
+      });
+      expect(res.status).toBe(403);
+      const body = (await res.json()) as { data?: { error?: string } };
+      expect(body.data?.error).toBe('APIKEY_WRITE_REQUIRES_SESSION');
+    });
+
+    it('rejects api-key auth minting a key with mixed scopes including apikey:write', async () => {
+      const adminKey = await makeKey(['apikey:write']);
+      const res = await fetch('/api/apikeys', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminKey}`,
+        },
+        body: JSON.stringify({
+          name: 'test-i-rule-mixed',
+          scopes: ['content:read', 'apikey:write'],
+        }),
+      });
+      expect(res.status).toBe(403);
+      const body = (await res.json()) as { data?: { error?: string } };
+      expect(body.data?.error).toBe('APIKEY_WRITE_REQUIRES_SESSION');
+    });
+
+    it('allows session auth to mint an apikey:write key', async () => {
+      const cookie = await loginAsAdmin();
+      const res = await fetch('/api/apikeys', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', cookie },
+        body: JSON.stringify({
+          name: 'test-session-mints-apikey-write',
+          scopes: ['apikey:write'],
+        }),
+      });
+      expect(res.status).toBe(201);
+      const body = (await res.json()) as { scopes: string[] };
+      expect(body.scopes).toEqual(['apikey:write']);
+    });
+  });
 });
