@@ -38,6 +38,12 @@ async function loginAsAdmin(): Promise<string> {
     body: JSON.stringify({ email: TEST_USERNAME, password: TEST_PASSWORD }),
     headers: { 'Content-Type': 'application/json' },
   });
+  if (!res.ok) {
+    throw new Error(
+      `loginAsAdmin: expected 200 from /api/auth/login, got ${res.status}. ` +
+        `Check seeded admin credentials in apps/cms/prisma/seed.ts.`
+    );
+  }
   cachedCookie = res.headers.getSetCookie().join('; ');
   return cachedCookie;
 }
@@ -435,6 +441,8 @@ describe('DELETE /api/apikeys/:prefix', () => {
       headers: { cookie },
     });
     expect(res.status).toBe(404);
+    const body = (await res.json()) as { data?: { error?: string } };
+    expect(body.data?.error).toBe('APIKEY_NOT_FOUND');
   });
 
   it('soft-revokes an active key', async () => {
