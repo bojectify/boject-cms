@@ -1,8 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import { resolve, dirname, isAbsolute } from 'node:path';
-import { loadProjectConfig } from '../config.js';
-import { applySchemaRemote, HttpError } from '../api.js';
-import type { Bundle, BlockerLike } from '../types.js';
+import { loadProjectConfig } from '../../config.js';
+import { applySchemaRemote, HttpError } from '../../api.js';
+import type { Bundle, BlockerLike } from '../../types.js';
 
 export interface SchemaApplyFlags {
   path?: string;

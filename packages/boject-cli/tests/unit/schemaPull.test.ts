@@ -11,7 +11,7 @@ import {
   expect,
   it,
 } from 'vitest';
-import { runSchemaPull } from '../../src/commands/schemaPull.js';
+import { runSchemaPull } from '../../src/commands/schema/pull.js';
 
 let server: Server;
 let port: number;

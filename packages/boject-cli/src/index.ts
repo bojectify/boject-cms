@@ -1,9 +1,9 @@
 import { parseArgs } from 'node:util';
 import { runUpgrade, type CommandRunner } from './commands/upgrade.js';
-import { runSchemaPull } from './commands/schemaPull.js';
-import { runSchemaValidate } from './commands/schemaValidate.js';
-import { runSchemaApply } from './commands/schemaApply.js';
-import { runSchemaCheck } from './commands/schemaCheck.js';
+import { runSchemaPull } from './commands/schema/pull.js';
+import { runSchemaValidate } from './commands/schema/validate.js';
+import { runSchemaApply } from './commands/schema/apply.js';
+import { runSchemaCheck } from './commands/schema/check.js';
 import { spawn } from 'node:child_process';
 import { CLI_VERSION } from './version.js';
 

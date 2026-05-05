@@ -11,7 +11,7 @@ import {
   expect,
   it,
 } from 'vitest';
-import { runSchemaApply } from '../../src/commands/schemaApply.js';
+import { runSchemaApply } from '../../src/commands/schema/apply.js';
 
 let server: Server;
 let port: number;

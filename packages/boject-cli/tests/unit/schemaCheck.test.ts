@@ -11,7 +11,7 @@ import {
   expect,
   it,
 } from 'vitest';
-import { runSchemaCheck } from '../../src/commands/schemaCheck.js';
+import { runSchemaCheck } from '../../src/commands/schema/check.js';
 
 let server: Server;
 let port: number;

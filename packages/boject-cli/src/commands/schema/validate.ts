@@ -1,10 +1,10 @@
 import { readFile } from 'node:fs/promises';
 import { resolve, dirname, isAbsolute } from 'node:path';
-import { loadProjectConfig } from '../config.js';
-import { validateBundle } from '../vendor/validateBundle.js';
-import { planSchema } from '../vendor/planSchema.js';
-import type { Bundle } from '../vendor/contentBundleTypes.js';
-import type { CurrentSchemaSnapshot } from '../vendor/schemaPlan.types.js';
+import { loadProjectConfig } from '../../config.js';
+import { validateBundle } from '../../vendor/validateBundle.js';
+import { planSchema } from '../../vendor/planSchema.js';
+import type { Bundle } from '../../vendor/contentBundleTypes.js';
+import type { CurrentSchemaSnapshot } from '../../vendor/schemaPlan.types.js';
 
 export interface SchemaValidateParams {
   cwd?: string;
