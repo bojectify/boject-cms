@@ -23,6 +23,13 @@ async function makeKey(scopes: string[]): Promise<string> {
   return raw;
 }
 
+// Cache the admin session cookie across the entire test process. The login
+// endpoint is rate-limited to 10/60s per IP and this file performs 11+ logins,
+// so calling it fresh every time would trip the limiter. Safe because no test
+// in this file rotates the admin password — i.e. nothing bumps
+// `User.passwordVersion`. If a future test calls `POST /api/account/password`
+// (or otherwise invalidates the admin session), this cache MUST be reset or
+// subsequent `loginAsAdmin()` calls will return a stale cookie that 401s.
 let cachedCookie: string | null = null;
 async function loginAsAdmin(): Promise<string> {
   if (cachedCookie) return cachedCookie;
