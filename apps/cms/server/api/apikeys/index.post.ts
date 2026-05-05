@@ -1,5 +1,11 @@
-import { createError, defineEventHandler, readBody } from 'h3';
+import {
+  createError,
+  defineEventHandler,
+  readBody,
+  setResponseStatus,
+} from 'h3';
 import { assertApiKeyScope } from '../../utils/assertApiKeyScope';
+import { generateApiKey } from '../../utils/apiKey';
 import {
   API_KEY_SCOPES,
   isApiKeyScope,
@@ -54,8 +60,36 @@ function parseCreateBody(body: unknown): CreateBody {
 
 export default defineEventHandler(async (event) => {
   assertApiKeyScope(event, 'apikey:write');
+
   const raw = await readBody(event);
-  const _body = parseCreateBody(raw);
-  // Happy path + (i) rule + rate limit come in later slices.
-  return { ok: true };
+  const body = parseCreateBody(raw);
+
+  // (i) rule and rate limit come in later slices.
+
+  const { raw: rawKey, hash, prefix } = generateApiKey();
+  const created = await prisma.apiKey.create({
+    data: {
+      name: body.name,
+      keyHash: hash,
+      keyPrefix: prefix,
+      scopes: body.scopes,
+    },
+    select: {
+      id: true,
+      name: true,
+      keyPrefix: true,
+      scopes: true,
+      createdAt: true,
+    },
+  });
+
+  setResponseStatus(event, 201);
+  return {
+    id: created.id,
+    name: created.name,
+    prefix: created.keyPrefix,
+    scopes: created.scopes,
+    rawKey,
+    createdAt: created.createdAt.toISOString(),
+  };
 });

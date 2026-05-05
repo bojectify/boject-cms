@@ -155,4 +155,58 @@ describe('POST /api/apikeys', () => {
       expect(body.data?.error).toBe('UNKNOWN_SCOPE');
     });
   });
+
+  describe('happy path', () => {
+    it('mints a content:read key under session auth', async () => {
+      const cookie = await loginAsAdmin();
+      const res = await fetch('/api/apikeys', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', cookie },
+        body: JSON.stringify({
+          name: 'test-session-content',
+          scopes: ['content:read'],
+        }),
+      });
+      expect(res.status).toBe(201);
+      const body = (await res.json()) as {
+        id: string;
+        name: string;
+        prefix: string;
+        scopes: string[];
+        rawKey: string;
+        createdAt: string;
+      };
+      expect(body.name).toBe('test-session-content');
+      expect(body.scopes).toEqual(['content:read']);
+      expect(body.rawKey).toMatch(/^boject_[a-f0-9]+$/);
+      expect(body.prefix).toBe(body.rawKey.slice(0, 11));
+
+      const dbRow = await prisma.apiKey.findUnique({ where: { id: body.id } });
+      expect(dbRow).not.toBeNull();
+      expect(dbRow!.keyPrefix).toBe(body.prefix);
+      expect(dbRow!.scopes).toEqual(['content:read']);
+      // keyHash should be sha256 hex of rawKey.
+      const { createHash } = await import('node:crypto');
+      const expectedHash = createHash('sha256')
+        .update(body.rawKey)
+        .digest('hex');
+      expect(dbRow!.keyHash).toBe(expectedHash);
+    });
+
+    it('mints a content:read key for an api-key caller with apikey:write', async () => {
+      const adminKey = await makeKey(['apikey:write']);
+      const res = await fetch('/api/apikeys', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminKey}`,
+        },
+        body: JSON.stringify({
+          name: 'test-apikey-mints-content',
+          scopes: ['content:read'],
+        }),
+      });
+      expect(res.status).toBe(201);
+    });
+  });
 });
