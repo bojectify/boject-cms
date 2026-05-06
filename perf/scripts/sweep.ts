@@ -121,6 +121,26 @@ export function parseSizeList(raw: string, name: string): number[] {
   return parsed;
 }
 
+// Builds the env passed to k6 for a single scenario step. Internal-fixture
+// field defaults are pinned here so the sweep stays byte-equivalent
+// regardless of any drift in the canonical scenario defaults. Per-step env
+// wins over the fixture defaults so future per-content-type sweeps can
+// override them.
+export function buildScenarioEnv(
+  parentEnv: NodeJS.ProcessEnv,
+  stepEnv: Record<string, string>,
+  baseUrl: string
+): Record<string, string> {
+  return {
+    ...(parentEnv as Record<string, string>),
+    PERF_LIST_FIELD: 'perfArticleList',
+    PERF_FILTER_FIELD: 'publishDate',
+    PERF_RELATION_FIELD: 'author',
+    ...stepEnv,
+    PERF_BASE_URL: baseUrl,
+  };
+}
+
 export function parsePositiveInt(raw: string, name: string): number {
   const n = Number(raw);
   if (!Number.isFinite(n) || n <= 0) {
@@ -215,7 +235,7 @@ if (
         ['run', '--out', `json=${rawPath}`, scenarioPath],
         {
           stdio: 'inherit',
-          env: { ...process.env, ...env, PERF_BASE_URL: cfg.baseUrl },
+          env: buildScenarioEnv(process.env, env, cfg.baseUrl),
         }
       );
       if (result.status !== 0) {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildScenarioEnv,
   parsePositiveInt,
   parseSizeList,
   planSweep,
@@ -118,6 +119,42 @@ describe('parsePositiveInt', () => {
   it('throws on zero or negative values', () => {
     expect(() => parsePositiveInt('0', 'PERF_CRUD_N')).toThrow();
     expect(() => parsePositiveInt('-1', 'PERF_CRUD_N')).toThrow();
+  });
+});
+
+describe('buildScenarioEnv', () => {
+  it('pins the internal-fixture list/filter/relation field defaults', () => {
+    const env = buildScenarioEnv({}, {}, 'http://localhost:4000');
+    expect(env).toMatchObject({
+      PERF_LIST_FIELD: 'perfArticleList',
+      PERF_FILTER_FIELD: 'publishDate',
+      PERF_RELATION_FIELD: 'author',
+    });
+  });
+
+  it('forwards process env, base URL, and per-step env', () => {
+    const env = buildScenarioEnv(
+      { PATH: '/usr/bin', HOME: '/root' },
+      { PERF_PAGE_SIZE: '500', PERF_VUS: '5' },
+      'http://localhost:4000'
+    );
+    expect(env.PATH).toBe('/usr/bin');
+    expect(env.HOME).toBe('/root');
+    expect(env.PERF_PAGE_SIZE).toBe('500');
+    expect(env.PERF_VUS).toBe('5');
+    expect(env.PERF_BASE_URL).toBe('http://localhost:4000');
+  });
+
+  it('lets per-step env override the fixture defaults', () => {
+    const env = buildScenarioEnv(
+      {},
+      { PERF_LIST_FIELD: 'customList' },
+      'http://localhost:4000'
+    );
+    expect(env.PERF_LIST_FIELD).toBe('customList');
+    // Other fixtures still pinned
+    expect(env.PERF_FILTER_FIELD).toBe('publishDate');
+    expect(env.PERF_RELATION_FIELD).toBe('author');
   });
 });
 
