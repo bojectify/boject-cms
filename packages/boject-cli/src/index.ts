@@ -8,6 +8,7 @@ import { runApikeyCreate } from './commands/apikey/create.js';
 import { runApikeyList } from './commands/apikey/list.js';
 import { runApikeyRevoke } from './commands/apikey/revoke.js';
 import { runPerfCheck } from './commands/perf/check.js';
+import { runPerfScenario } from './commands/perf/scenario.js';
 import { spawn } from 'node:child_process';
 import { CLI_VERSION } from './version.js';
 
@@ -44,6 +45,26 @@ const PERF_CHECK_USAGE = `Usage: boject perf check --content-type <id> [--url <u
 Verifies: k6 is on PATH, target reachable, API key valid with content:read scope,
 content type exists, and DATETIME / single-target RELATION fields can be selected.
 Exits 0 on success, 2 on environment problems, 3 on input problems.
+`;
+
+const PERF_SCENARIO_USAGE = `Usage: boject perf scenario <name> --content-type <id> [flags]
+
+Scenarios:
+  graphql-flat       RPS ramp 50→2000 over 3 minutes (heavy load).
+  graphql-sitemap    Cursor pagination drain at varied page sizes / VU levels.
+
+Common flags:
+  --url <url>             Target CMS base URL. Defaults to .boject.config.json.
+  --api-key <key>         Bearer token. Defaults to $BOJECT_API_KEY.
+  --filter-field <id>     Override DATETIME field for the "filtered" shape.
+  --relation-field <id>   Override single-target RELATION field for "relation" shape.
+  --out <dir>             Report output dir. Default ./perf-reports/.
+  --yes                   Skip the heavy-run confirm prompt (CI-friendly).
+
+graphql-flat power-user overrides:
+  --target-rps <n>        Override peak RPS.
+  --duration <s>          Override total duration.
+  --stages <csv>          Comma-separated RPS stages, e.g. 50,100,500,2000.
 `;
 
 const SCHEMA_PULL_USAGE = `Usage: boject schema pull [--out <path>] [--url <url>]
@@ -334,7 +355,53 @@ async function dispatchPerf(args: string[]): Promise<number> {
       });
       return r.exitCode;
     }
-    // scenario / sweep / report cases added in later tasks
+    case 'scenario': {
+      if (rest.includes('--help') || rest.includes('-h')) {
+        process.stdout.write(PERF_SCENARIO_USAGE);
+        return 0;
+      }
+      const { values, positionals } = parseArgs({
+        args: rest,
+        allowPositionals: true,
+        options: {
+          url: { type: 'string' },
+          'api-key': { type: 'string' },
+          'content-type': { type: 'string' },
+          'filter-field': { type: 'string' },
+          'relation-field': { type: 'string' },
+          out: { type: 'string' },
+          yes: { type: 'boolean', default: false },
+          'target-rps': { type: 'string' },
+          duration: { type: 'string' },
+          stages: { type: 'string' },
+        },
+      });
+      const r = await runPerfScenario({
+        cwd: process.cwd(),
+        apiKey,
+        flags: {
+          scenario: positionals[0],
+          url: values.url,
+          apiKey: values['api-key'],
+          contentType: values['content-type'],
+          filterField: values['filter-field'],
+          relationField: values['relation-field'],
+          out: values.out,
+          yes: values.yes === true,
+          targetRps: values['target-rps']
+            ? Number(values['target-rps'])
+            : undefined,
+          duration: values.duration,
+          stages: values.stages
+            ? values.stages.split(',').map((s) => Number(s.trim()))
+            : undefined,
+        },
+        stdout,
+        stderr,
+      });
+      return r.exitCode;
+    }
+    // sweep / report cases added in later tasks
     default:
       process.stderr.write(`Unknown perf subcommand: ${subcommand}\n`);
       process.stdout.write(PERF_USAGE);
