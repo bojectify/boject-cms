@@ -1,0 +1,241 @@
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { join } from 'node:path';
+
+export interface RunMetadata {
+  perfCalibratedAt: string;
+  cliVersion: string;
+  k6Version: string;
+  targetHost: string; // already sanitised — no userinfo
+  targetScheme: 'http' | 'https';
+  contentType: string;
+  fields: {
+    list: string;
+    filter: string | null;
+    relation: string | null;
+  };
+  scenarios: Array<{
+    name: 'graphql-flat' | 'graphql-sitemap';
+    outcome: 'completed' | 'partial' | 'skipped';
+    shapesRun?: string[];
+  }>;
+  intensity: { targetRps: number; duration: string; stages: number[] };
+  partial: boolean;
+}
+
+export interface RenderParams {
+  rawJsonPath: string;
+  outDir: string;
+  runMetadata: RunMetadata;
+}
+
+interface RawPoint {
+  type: string;
+  metric: string;
+  data: { time: string; value: number; tags: Record<string, string> };
+}
+
+interface ScenarioStats {
+  scenario: string;
+  pageSize: string;
+  shape: string;
+  count: number;
+  p50: number;
+  p95: number;
+  p99: number;
+  errorRate: number;
+}
+
+function percentile(sorted: number[], p: number): number {
+  if (sorted.length === 0) return 0;
+  const rank = Math.max(1, Math.ceil(p * sorted.length));
+  return sorted[Math.min(sorted.length - 1, rank - 1)]!;
+}
+
+function parseRawJson(raw: string): RawPoint[] {
+  return raw
+    .split('\n')
+    .filter((line) => line.trim().length > 0)
+    .map((line) => JSON.parse(line) as RawPoint)
+    .filter((p) => p.type === 'Point');
+}
+
+function compute(points: RawPoint[]): ScenarioStats[] {
+  const groups = new Map<string, number[]>();
+  const failGroups = new Map<string, { total: number; failed: number }>();
+  for (const p of points) {
+    const scenario = p.data.tags.scenario ?? 'unknown';
+    const pageSize = p.data.tags.page_size ?? '-';
+    const shape = p.data.tags.shape ?? '-';
+    const key = `${scenario}|${pageSize}|${shape}`;
+    if (p.metric === 'http_req_duration') {
+      let arr = groups.get(key);
+      if (!arr) {
+        arr = [];
+        groups.set(key, arr);
+      }
+      arr.push(p.data.value);
+    } else if (p.metric === 'http_req_failed') {
+      let g = failGroups.get(key);
+      if (!g) {
+        g = { total: 0, failed: 0 };
+        failGroups.set(key, g);
+      }
+      g.total++;
+      if (p.data.value === 1) g.failed++;
+    }
+  }
+  return Array.from(groups.entries()).map(([key, values]) => {
+    const [scenario, pageSize, shape] = key.split('|') as [
+      string,
+      string,
+      string,
+    ];
+    const sorted = [...values].sort((a, b) => a - b);
+    const fg = failGroups.get(key);
+    return {
+      scenario,
+      pageSize,
+      shape,
+      count: values.length,
+      p50: percentile(sorted, 0.5),
+      p95: percentile(sorted, 0.95),
+      p99: percentile(sorted, 0.99),
+      errorRate: fg && fg.total > 0 ? fg.failed / fg.total : 0,
+    };
+  });
+}
+
+function fmtMs(n: number): string {
+  return (Math.round(n * 10) / 10).toString();
+}
+
+function fmtPct(n: number): string {
+  return `${(n * 100).toFixed(2)}%`;
+}
+
+function flatTable(stats: ScenarioStats[]): string {
+  const rows = stats
+    .filter((s) => s.scenario === 'flat')
+    .map(
+      (s) =>
+        `| ${s.shape} | ${s.count} | ${fmtMs(s.p50)} | ${fmtMs(s.p95)} | ${fmtMs(s.p99)} | ${fmtPct(s.errorRate)} |`
+    );
+  if (rows.length === 0)
+    return '_No graphql-flat data captured (scenario skipped or partial)._';
+  return [
+    '| shape    | count | p50 (ms) | p95 (ms) | p99 (ms) | errors |',
+    '| -------- | ----- | -------- | -------- | -------- | ------ |',
+    ...rows,
+  ].join('\n');
+}
+
+function sitemapTable(stats: ScenarioStats[]): string {
+  const rows = stats
+    .filter((s) => s.scenario === 'sitemap')
+    .map(
+      (s) =>
+        `| ${s.pageSize} | ${s.count} | ${fmtMs(s.p50)} | ${fmtMs(s.p95)} | ${fmtMs(s.p99)} | ${fmtPct(s.errorRate)} |`
+    );
+  if (rows.length === 0)
+    return '_No graphql-sitemap data captured (scenario skipped or partial)._';
+  return [
+    '| page_size | count | p50 (ms) | p95 (ms) | p99 (ms) | errors |',
+    '| --------- | ----- | -------- | -------- | -------- | ------ |',
+    ...rows,
+  ].join('\n');
+}
+
+function toCsv(stats: ScenarioStats[]): string {
+  const header = 'scenario,page_size,shape,count,p50,p95,p99,error_rate';
+  const rows = stats.map(
+    (s) =>
+      `${s.scenario},${s.pageSize},${s.shape},${s.count},${fmtMs(s.p50)},${fmtMs(s.p95)},${fmtMs(s.p99)},${(s.errorRate * 100).toFixed(2)}%`
+  );
+  return [header, ...rows].join('\n');
+}
+
+function buildSummary(meta: RunMetadata, stats: ScenarioStats[]): string {
+  const flatScenario = meta.scenarios.find((s) => s.name === 'graphql-flat');
+  const heavyBanner = flatScenario
+    ? `**Heavy load run** — peak ${meta.intensity.targetRps} RPS sustained over ${meta.intensity.duration}. Target should be a perf-clone, not production.`
+    : '';
+
+  const skipFiltered = meta.fields.filter === null;
+  const skipRelation = meta.fields.relation === null;
+
+  const skipBanners: string[] = [];
+  if (skipFiltered)
+    skipBanners.push(
+      `_filtered shape skipped — no DATETIME field on ${meta.contentType}._`
+    );
+  if (skipRelation)
+    skipBanners.push(
+      `_relation shape skipped — no single-target RELATION field on ${meta.contentType}._`
+    );
+
+  const lines = [
+    `# Load test report — ${meta.contentType}`,
+    '',
+    `- perfCalibratedAt: ${meta.perfCalibratedAt}`,
+    `- target: ${meta.targetScheme}://${meta.targetHost}`,
+    `- CLI: @boject/cli ${meta.cliVersion} | k6 ${meta.k6Version}`,
+    meta.partial ? '- run status: **partial** (k6 exited mid-run)' : '',
+    '',
+    '## Multi-instance banner',
+    '',
+    "Read-only run — DB-side metrics unavailable. Check your CMS host's database dashboards for connection-pool and lock data.",
+    '',
+    heavyBanner ? `## Run shape\n\n${heavyBanner}\n` : '',
+    skipBanners.length > 0 ? `${skipBanners.join('\n')}\n` : '',
+    '## Scenario 1A — GraphQL cursor pagination',
+    '',
+    sitemapTable(stats),
+    '',
+    '## Scenario 1B — GraphQL flat RPS',
+    '',
+    flatTable(stats),
+    '',
+    '## Run notes',
+    '',
+    `- Content type: ${meta.contentType}`,
+    `- List field: ${meta.fields.list}`,
+    `- Filter field: ${meta.fields.filter ?? '(skipped)'}`,
+    `- Relation field: ${meta.fields.relation ?? '(skipped)'}`,
+    `- Datasets: external — operator-provided`,
+    `- See \`metrics.csv\` for the raw aggregate rows and \`metadata.json\` for machine-readable run context.`,
+    '',
+  ];
+  return lines.filter((line) => line !== undefined).join('\n');
+}
+
+function buildMetadata(meta: RunMetadata): object {
+  return {
+    perfCalibratedAt: meta.perfCalibratedAt,
+    cliVersion: meta.cliVersion,
+    k6Version: meta.k6Version,
+    target: { host: meta.targetHost, scheme: meta.targetScheme },
+    contentType: meta.contentType,
+    fields: meta.fields,
+    scenarios: meta.scenarios,
+    intensity: meta.intensity,
+    partial: meta.partial,
+  };
+}
+
+export async function renderReport(params: RenderParams): Promise<void> {
+  await mkdir(params.outDir, { recursive: true });
+  const raw = await readFile(params.rawJsonPath, 'utf8');
+  const points = parseRawJson(raw);
+  const stats = compute(points);
+
+  const summary = buildSummary(params.runMetadata, stats);
+  const metadata = buildMetadata(params.runMetadata);
+  const csv = toCsv(stats);
+
+  await writeFile(join(params.outDir, 'summary.md'), summary);
+  await writeFile(
+    join(params.outDir, 'metadata.json'),
+    JSON.stringify(metadata, null, 2)
+  );
+  await writeFile(join(params.outDir, 'metrics.csv'), csv);
+}
