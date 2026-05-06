@@ -1,9 +1,17 @@
 import { readFile, stat } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
+export interface ProjectPerfConfig {
+  contentType?: string;
+  filterField?: string;
+  relationField?: string;
+  out?: string;
+}
+
 export interface ProjectConfig {
   cms: { url: string };
   schema: { path: string };
+  perf?: ProjectPerfConfig;
 }
 
 export interface LoadResult {
@@ -82,5 +90,37 @@ function validateConfig(parsed: unknown, path: string): ProjectConfig {
   if (!schema || typeof schema.path !== 'string' || schema.path.length === 0) {
     throw new Error(`${path}: missing or invalid schema.path`);
   }
-  return { cms: { url: cms.url }, schema: { path: schema.path } };
+  const perf = validatePerf(obj.perf, path);
+  const config: ProjectConfig = {
+    cms: { url: cms.url },
+    schema: { path: schema.path },
+  };
+  if (perf !== undefined) config.perf = perf;
+  return config;
+}
+
+function validatePerf(
+  raw: unknown,
+  path: string
+): ProjectPerfConfig | undefined {
+  if (raw === undefined) return undefined;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new Error(`${path}: perf must be an object if present`);
+  }
+  const obj = raw as Record<string, unknown>;
+  const out: ProjectPerfConfig = {};
+  for (const key of [
+    'contentType',
+    'filterField',
+    'relationField',
+    'out',
+  ] as const) {
+    const v = obj[key];
+    if (v === undefined) continue;
+    if (typeof v !== 'string' || v.length === 0) {
+      throw new Error(`${path}: perf.${key} must be a non-empty string`);
+    }
+    out[key] = v;
+  }
+  return out;
 }
