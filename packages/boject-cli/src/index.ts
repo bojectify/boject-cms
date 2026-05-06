@@ -10,6 +10,7 @@ import { runApikeyRevoke } from './commands/apikey/revoke.js';
 import { runPerfCheck } from './commands/perf/check.js';
 import { runPerfScenario } from './commands/perf/scenario.js';
 import { runPerfSweep } from './commands/perf/sweep.js';
+import { runPerfReport } from './commands/perf/report.js';
 import { spawn } from 'node:child_process';
 import { CLI_VERSION } from './version.js';
 
@@ -89,6 +90,16 @@ graphql-flat power-user overrides:
   --target-rps <n>        Override peak RPS.
   --duration <s>          Override total duration.
   --stages <csv>          Comma-separated RPS stages, e.g. 50,100,500,2000.
+`;
+
+const PERF_REPORT_USAGE = `Usage: boject perf report [--from <dir>] [--out <dir>]
+
+Re-renders summary.md, metadata.json, and metrics.csv from an existing run.
+With no flags, picks the latest run in ./perf-reports/ (or perf.out from
+.boject.config.json).
+
+  --from <dir>    Re-render this specific run dir.
+  --out <dir>     Override the search root (default ./perf-reports/).
 `;
 
 const SCHEMA_PULL_USAGE = `Usage: boject schema pull [--out <path>] [--url <url>]
@@ -478,7 +489,27 @@ async function dispatchPerf(args: string[]): Promise<number> {
       });
       return r.exitCode;
     }
-    // report case added in later task
+    case 'report': {
+      if (rest.includes('--help') || rest.includes('-h')) {
+        process.stdout.write(PERF_REPORT_USAGE);
+        return 0;
+      }
+      const { values } = parseArgs({
+        args: rest,
+        allowPositionals: false,
+        options: {
+          from: { type: 'string' },
+          out: { type: 'string' },
+        },
+      });
+      const r = await runPerfReport({
+        cwd: process.cwd(),
+        flags: { from: values.from, out: values.out },
+        stdout,
+        stderr,
+      });
+      return r.exitCode;
+    }
     default:
       process.stderr.write(`Unknown perf subcommand: ${subcommand}\n`);
       process.stdout.write(PERF_USAGE);
