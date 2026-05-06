@@ -77,4 +77,32 @@ describe('runPerfCheck', () => {
     expect(stderr.join('\n')).toMatch(/k6 is not on PATH/);
     expect(stderr.join('\n')).toMatch(/Target unreachable/);
   });
+
+  it('surfaces a warning (not an error) when config is malformed', async () => {
+    const { writeFile, mkdtemp } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const dir = await mkdtemp(join(tmpdir(), 'boject-cli-config-'));
+    await writeFile(join(dir, '.boject.config.json'), '{ malformed json');
+
+    vi.spyOn(preflightModule, 'runPreflight').mockResolvedValue({
+      ok: true,
+      fields: {
+        listField: 'articleList',
+        filterField: 'publishDate',
+        relationField: 'author',
+      },
+      warnings: [],
+    });
+    const r = await runPerfCheck({
+      cwd: dir,
+      apiKey: 'k',
+      flags: { url: 'https://x.example.com', contentType: 'Article' },
+      stdout: recordOut,
+      stderr: recordErr,
+    });
+    expect(r.exitCode).toBe(0); // flags cover everything; warning isn't fatal
+    expect(stderr.join('\n')).toMatch(/Warning: ignoring config/);
+    expect(stderr.join('\n')).toMatch(/Failed to parse/);
+  });
 });

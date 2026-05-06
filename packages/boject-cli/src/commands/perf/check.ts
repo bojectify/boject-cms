@@ -1,5 +1,6 @@
 import { runPreflight } from '../../perf/preflight.js';
 import { loadProjectConfig } from '../../config.js';
+import { defaultK6Available, defaultFetchHealth } from '../../perf/runtime.js';
 
 export interface PerfCheckFlags {
   url?: string;
@@ -21,32 +22,6 @@ export interface PerfCheckResult {
   exitCode: 0 | 1 | 2 | 3;
 }
 
-async function defaultK6Available(): Promise<boolean> {
-  // `k6 version` returns 0 if the binary exists. Use a child-process spawn
-  // rather than a PATH walk so PATHEXT etc. on Windows is handled by the OS.
-  const { spawn } = await import('node:child_process');
-  return new Promise((res) => {
-    const child = spawn('k6', ['version'], { stdio: 'ignore' });
-    child.on('error', () => res(false));
-    child.on('close', (code) => res(code === 0));
-  });
-}
-
-async function defaultFetchHealth(
-  url: string
-): Promise<{ ok: true } | { ok: false; error: string }> {
-  try {
-    const res = await fetch(`${url.replace(/\/$/, '')}/api/health`, {
-      method: 'GET',
-    });
-    if (!res.ok)
-      return { ok: false, error: `HTTP ${res.status} from /api/health` };
-    return { ok: true };
-  } catch (err) {
-    return { ok: false, error: (err as Error).message };
-  }
-}
-
 export async function runPerfCheck(
   params: PerfCheckParams
 ): Promise<PerfCheckResult> {
@@ -63,8 +38,14 @@ export async function runPerfCheck(
     configContentType = c.config.perf?.contentType;
     configFilter = c.config.perf?.filterField;
     configRelation = c.config.perf?.relationField;
-  } catch {
-    // No config file is fine — flags can supply everything.
+  } catch (err) {
+    const message = (err as Error).message;
+    // "No .boject.config.json found ..." is fine — flags can supply everything.
+    // Anything else is a real config error and must be surfaced as a warning
+    // (we don't fail the command — flags may still cover all required values).
+    if (!message.startsWith('No .boject.config.json found')) {
+      params.stderr(`Warning: ignoring config: ${message}`);
+    }
   }
 
   const url = flags.url ?? configUrl;
