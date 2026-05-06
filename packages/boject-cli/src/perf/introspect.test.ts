@@ -119,4 +119,76 @@ describe('introspectContentType', () => {
     if (r.ok) return;
     expect(r.error).toMatch(/content:read/);
   });
+
+  it('reports a 500 response cleanly', async () => {
+    globalThis.fetch = vi.fn(
+      async () => new Response('Internal Server Error', { status: 500 })
+    ) as typeof fetch;
+
+    const r = await introspectContentType({
+      url: 'https://cms.example.com',
+      apiKey: 'boject_test',
+      contentTypeIdentifier: 'Article',
+    });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.error).toMatch(/HTTP 500/);
+  });
+
+  it('reports GraphQL errors in the response body', async () => {
+    globalThis.fetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            errors: [{ message: 'Field "__type" not allowed' }],
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        )
+    ) as typeof fetch;
+
+    const r = await introspectContentType({
+      url: 'https://cms.example.com',
+      apiKey: 'boject_test',
+      contentTypeIdentifier: 'Article',
+    });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.error).toMatch(/GraphQL errors/);
+    expect(r.error).toMatch(/Field "__type" not allowed/);
+  });
+
+  it('reports malformed JSON cleanly', async () => {
+    globalThis.fetch = vi.fn(
+      async () =>
+        new Response('not json', {
+          status: 200,
+          headers: { 'content-type': 'text/plain' },
+        })
+    ) as typeof fetch;
+
+    const r = await introspectContentType({
+      url: 'https://cms.example.com',
+      apiKey: 'boject_test',
+      contentTypeIdentifier: 'Article',
+    });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.error).toMatch(/not valid JSON/i);
+  });
+
+  it('reports network errors cleanly', async () => {
+    globalThis.fetch = vi.fn(async () => {
+      throw new TypeError('fetch failed');
+    }) as typeof fetch;
+
+    const r = await introspectContentType({
+      url: 'https://cms.example.com',
+      apiKey: 'boject_test',
+      contentTypeIdentifier: 'Article',
+    });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.error).toMatch(/Network error/);
+    expect(r.error).toMatch(/cms.example.com/);
+  });
 });

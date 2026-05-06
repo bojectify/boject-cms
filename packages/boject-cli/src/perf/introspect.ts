@@ -40,7 +40,15 @@ const QUERY = `
         type {
           kind
           name
-          ofType { kind name ofType { kind name } }
+          ofType {
+            kind
+            name
+            ofType {
+              kind
+              name
+              ofType { kind name }
+            }
+          }
         }
       }
     }
@@ -82,17 +90,25 @@ function isMultiValued(t: RawFieldType): boolean {
 export async function introspectContentType(
   params: IntrospectParams
 ): Promise<IntrospectResult> {
-  const res = await fetch(`${params.url.replace(/\/$/, '')}/api/graphql`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${params.apiKey}`,
-    },
-    body: JSON.stringify({
-      query: QUERY,
-      variables: { name: params.contentTypeIdentifier },
-    }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${params.url.replace(/\/$/, '')}/api/graphql`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${params.apiKey}`,
+      },
+      body: JSON.stringify({
+        query: QUERY,
+        variables: { name: params.contentTypeIdentifier },
+      }),
+    });
+  } catch (err) {
+    return {
+      ok: false,
+      error: `Network error reaching ${params.url}: ${(err as Error).message}`,
+    };
+  }
   if (res.status === 401) {
     return {
       ok: false,
@@ -113,7 +129,15 @@ export async function introspectContentType(
       error: `Introspection failed (HTTP ${res.status}): ${await res.text()}`,
     };
   }
-  const body = (await res.json()) as RawIntrospectResponse;
+  let body: RawIntrospectResponse;
+  try {
+    body = (await res.json()) as RawIntrospectResponse;
+  } catch (err) {
+    return {
+      ok: false,
+      error: `Introspection response was not valid JSON: ${(err as Error).message}`,
+    };
+  }
   if (body.errors?.length) {
     return {
       ok: false,
