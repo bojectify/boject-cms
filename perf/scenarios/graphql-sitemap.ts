@@ -69,7 +69,7 @@ export default function sitemap() {
       'has data': (r) => {
         try {
           const j = r.json() as {
-            data?: Record<string, { pageInfo?: unknown } | undefined>;
+            data?: Record<string, { pageInfo?: unknown }>;
           };
           return Boolean(j.data?.[LIST_FIELD]?.pageInfo);
         } catch {
@@ -79,14 +79,17 @@ export default function sitemap() {
     });
     if (!ok) fail(`GraphQL page request failed: ${res.status}`);
     drainLatency.add(res.timings.duration);
-    const page = (
-      res.json() as {
-        data: Record<
-          string,
-          { pageInfo: { endCursor: string | null; hasNextPage: boolean } }
-        >;
-      }
-    ).data[LIST_FIELD]!.pageInfo;
+    const body = res.json() as {
+      data?: Record<
+        string,
+        { pageInfo?: { endCursor: string | null; hasNextPage: boolean } }
+      >;
+    };
+    const list = body.data?.[LIST_FIELD];
+    if (!list?.pageInfo) {
+      fail(`GraphQL response missing pageInfo for ${LIST_FIELD}`);
+    }
+    const page = list.pageInfo;
     pages++;
     if (!page.hasNextPage) break;
     cursor = page.endCursor;
