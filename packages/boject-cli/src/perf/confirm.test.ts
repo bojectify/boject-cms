@@ -84,4 +84,26 @@ describe('confirmHeavyRun', () => {
     });
     expect(r).toBe(false);
   });
+
+  it('handles answers split across multiple chunks', async () => {
+    const r = await confirmHeavyRun({
+      summary,
+      input: Readable.from(['y', '\n']),
+      stdout: () => {},
+      yes: false,
+      isTty: true,
+    });
+    expect(r).toBe(true);
+  });
+
+  it('returns false when stream ends without a newline (Ctrl-D, default N)', async () => {
+    const r = await confirmHeavyRun({
+      summary,
+      input: Readable.from(['y']), // no trailing newline; stream ends immediately after
+      stdout: () => {},
+      yes: false,
+      isTty: true,
+    });
+    expect(r).toBe(false);
+  });
 });

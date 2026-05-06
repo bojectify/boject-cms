@@ -15,6 +15,23 @@ export interface ConfirmHeavyRunParams {
   isTty: boolean;
 }
 
+/**
+ * TTY-interactive heavy-run confirmation prompt.
+ *
+ * Three modes (in priority order):
+ *   1. `yes: true` — bypass entirely, no banner printed
+ *   2. `isTty: false` && `yes: false` — return false (CI safety: never let unattended runs hit prod)
+ *   3. TTY interactive — print banner, read one line from `input`, return true iff `y` / `yes`
+ *
+ * Default-N is enforced for empty input, EOF without newline, and any answer
+ * other than literal `y` / `yes` (case-insensitive after trim).
+ *
+ * **Caller owns the stdin lifecycle.** This helper does not pause/resume
+ * `process.stdin`, does not enable raw mode, and does not set encoding.
+ * In production the caller should pass `process.stdin` and consider
+ * pausing it after this resolves so subsequent k6 spawns don't steal
+ * keystrokes from the user.
+ */
 export async function confirmHeavyRun(
   params: ConfirmHeavyRunParams
 ): Promise<boolean> {
@@ -55,6 +72,7 @@ export async function confirmHeavyRun(
     const onEnd = (): void => {
       // Stream closed without a newline — treat as "N".
       params.input.off('data', onData);
+      params.input.off('end', onEnd);
       resolveResult(false);
     };
     params.input.on('data', onData);
