@@ -67,6 +67,8 @@ describe('runK6', () => {
     });
 
     const r = await promise;
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
     expect(r.exitCode).toBe(0);
     expect(r.rawJsonPath).toBe(join(dir, 'raw.json'));
 
@@ -111,6 +113,91 @@ describe('runK6', () => {
     });
 
     const r = await promise;
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
     expect(r.exitCode).toBe(99);
+  });
+
+  it('flushes trailing partial line on close (no terminating newline)', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'boject-runk6-'));
+    const child = new FakeChild();
+    spawnMock.mockImplementation(() => {
+      queueMicrotask(() => {
+        child.stdout.push('progress 100%'); // no newline
+        child.stdout.push(null);
+        child.stderr.push(null);
+        child.emit('close', 0);
+      });
+      return child as unknown as ChildProcess;
+    });
+
+    const stdoutLines: string[] = [];
+    const promise = runK6({
+      scenarioFile: '/tmp/x.ts',
+      env: {},
+      apiKey: '',
+      outDir: dir,
+      stdout: (l) => stdoutLines.push(l),
+      stderr: () => {},
+    });
+
+    const r = await promise;
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.exitCode).toBe(0);
+    expect(stdoutLines.join('\n')).toContain('[k6] progress 100%');
+  });
+
+  it('returns { ok: false } on child.error', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'boject-runk6-'));
+    const child = new FakeChild();
+    spawnMock.mockImplementation(() => {
+      queueMicrotask(() => {
+        child.emit('error', new Error('ENOENT: k6 not found'));
+      });
+      return child as unknown as ChildProcess;
+    });
+
+    const promise = runK6({
+      scenarioFile: '/tmp/x.ts',
+      env: {},
+      apiKey: '',
+      outDir: dir,
+      stdout: () => {},
+      stderr: () => {},
+    });
+
+    const r = await promise;
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.error).toMatch(/ENOENT/);
+  });
+
+  it('does not redact when apiKey is empty', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'boject-runk6-'));
+    const child = new FakeChild();
+    spawnMock.mockImplementation(() => {
+      queueMicrotask(() => {
+        child.stdout.push('boject_test_value\n');
+        child.stdout.push(null);
+        child.stderr.push(null);
+        child.emit('close', 0);
+      });
+      return child as unknown as ChildProcess;
+    });
+
+    const stdoutLines: string[] = [];
+    const promise = runK6({
+      scenarioFile: '/tmp/x.ts',
+      env: {},
+      apiKey: '',
+      outDir: dir,
+      stdout: (l) => stdoutLines.push(l),
+      stderr: () => {},
+    });
+
+    await promise;
+    // With apiKey='' the line should NOT be redacted
+    expect(stdoutLines.join('\n')).toContain('[k6] boject_test_value');
   });
 });
