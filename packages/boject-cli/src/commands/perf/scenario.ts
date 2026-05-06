@@ -1,13 +1,16 @@
-import { mkdir } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { spawn } from 'node:child_process';
 import { runPreflight } from '../../perf/preflight.js';
 import { runK6 } from '../../perf/runK6.js';
 import { renderReport, type RunMetadata } from '../../perf/render.js';
 import { confirmHeavyRun } from '../../perf/confirm.js';
 import { sanitiseUrl } from '../../perf/sanitise.js';
-import { defaultK6Available, defaultFetchHealth } from '../../perf/runtime.js';
+import {
+  defaultK6Available,
+  defaultK6Version,
+  defaultFetchHealth,
+} from '../../perf/runtime.js';
 import { loadProjectConfig } from '../../config.js';
 import { CLI_VERSION } from '../../version.js';
 
@@ -56,23 +59,6 @@ function resolveScenarioPath(name: PerfScenarioName): string {
   const here = fileURLToPath(import.meta.url);
   const distDir = dirname(here);
   return join(distDir, 'vendor', 'perf', 'scenarios', `${name}.ts`);
-}
-
-async function k6Version(): Promise<string> {
-  return new Promise((res) => {
-    const child = spawn('k6', ['version'], {
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    let buf = '';
-    child.stdout.on('data', (b: Buffer) => {
-      buf += b.toString();
-    });
-    child.on('error', () => res('unknown'));
-    child.on('close', () => {
-      const m = buf.match(/k6 v([\d.]+)/);
-      res(m ? m[1]! : 'unknown');
-    });
-  });
 }
 
 async function loadDefaults(
@@ -248,19 +234,28 @@ export async function runPerfScenario(
         })
       : ['-'];
 
-  const k6Ver = await k6Version();
+  const k6Ver = await defaultK6Version();
   let combinedExit: 0 | 1 = 0;
   let rawJsonPath = '';
+  let successfulShapes = 0;
 
   for (const shape of shapesToRun) {
     const env: Record<string, string> = { ...baseEnv };
     if (name === 'graphql-flat') env.PERF_QUERY_SHAPE = shape;
+
+    // For graphql-flat we invoke k6 once per shape against the same outDir,
+    // so each invocation must write to a distinct file or it overwrites the
+    // previous shape's data. graphql-sitemap is a single invocation — keep
+    // the default raw.json filename.
+    const rawFilename =
+      name === 'graphql-flat' ? `raw-${shape}.json` : 'raw.json';
 
     const r = await runK6({
       scenarioFile: scenarioPath,
       env,
       apiKey: resolved.apiKey,
       outDir,
+      rawFilename,
       stdout: params.stdout,
       stderr: params.stderr,
     });
@@ -270,7 +265,34 @@ export async function runPerfScenario(
       continue;
     }
     rawJsonPath = r.rawJsonPath;
-    if (r.exitCode !== 0) combinedExit = 1;
+    if (r.exitCode === 0) successfulShapes++;
+    else combinedExit = 1;
+  }
+
+  if (successfulShapes === 0) {
+    params.stderr('Error: all k6 runs failed — no data captured.');
+    return { exitCode: 1 };
+  }
+
+  // Concatenate per-shape NDJSON files into a single raw.json so the
+  // renderer (which expects one combined input) sees every shape's metrics.
+  // Sitemap already wrote to raw.json — skip the merge step there.
+  if (name === 'graphql-flat') {
+    const shapeFiles = shapesToRun.map((s) => join(outDir, `raw-${s}.json`));
+    const combined = await Promise.all(
+      shapeFiles.map(async (f) => {
+        try {
+          return await readFile(f, 'utf8');
+        } catch {
+          // A shape's k6 invocation may have failed before writing the
+          // file; skip silently and let the surviving shapes drive the
+          // report.
+          return '';
+        }
+      })
+    );
+    rawJsonPath = join(outDir, 'raw.json');
+    await writeFile(rawJsonPath, combined.filter(Boolean).join('\n'));
   }
 
   const targetUrl = new URL(resolved.url);

@@ -173,6 +173,44 @@ describe('runK6', () => {
     expect(r.error).toMatch(/ENOENT/);
   });
 
+  it('uses rawFilename for the --out json path when provided', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'boject-runk6-'));
+    const child = new FakeChild();
+    spawnMock.mockImplementation(() => {
+      queueMicrotask(() => {
+        child.stdout.push(null);
+        child.stderr.push(null);
+        child.emit('close', 0);
+      });
+      return child as unknown as ChildProcess;
+    });
+
+    const promise = runK6({
+      scenarioFile: '/tmp/x.ts',
+      env: {},
+      apiKey: '',
+      outDir: dir,
+      rawFilename: 'raw-bare.json',
+      stdout: () => {},
+      stderr: () => {},
+    });
+
+    const r = await promise;
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.rawJsonPath).toBe(join(dir, 'raw-bare.json'));
+    expect(spawnMock).toHaveBeenCalledWith(
+      'k6',
+      expect.arrayContaining([
+        'run',
+        '--out',
+        `json=${join(dir, 'raw-bare.json')}`,
+        '/tmp/x.ts',
+      ]),
+      expect.any(Object)
+    );
+  });
+
   it('does not redact when apiKey is empty', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'boject-runk6-'));
     const child = new FakeChild();

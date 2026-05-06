@@ -8,6 +8,13 @@ export interface RunK6Params {
   env: Record<string, string>;
   apiKey: string;
   outDir: string;
+  /**
+   * Filename for the k6 NDJSON output, written under `outDir`. Defaults to
+   * `'raw.json'`. Override when invoking k6 multiple times against the same
+   * `outDir` (e.g. one call per query shape) so each invocation writes to a
+   * distinct file instead of overwriting the previous run.
+   */
+  rawFilename?: string;
   stdout: (line: string) => void;
   stderr: (line: string) => void;
 }
@@ -18,7 +25,7 @@ export type RunK6Result =
 
 export async function runK6(params: RunK6Params): Promise<RunK6Result> {
   await mkdir(params.outDir, { recursive: true });
-  const rawJsonPath = join(params.outDir, 'raw.json');
+  const rawJsonPath = join(params.outDir, params.rawFilename ?? 'raw.json');
   const stderrLogPath = join(params.outDir, 'k6-stderr.log');
   // Note: the stderr log file is line-oriented UTF-8 (sanitised text), not a
   // byte-for-byte mirror of the child stderr stream. Sanitisation is applied

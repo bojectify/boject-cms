@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { defaultK6Available, defaultFetchHealth } from './runtime.js';
+import {
+  defaultK6Available,
+  defaultK6Version,
+  defaultFetchHealth,
+} from './runtime.js';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -11,6 +15,18 @@ describe('defaultK6Available', () => {
     try {
       const r = await defaultK6Available();
       expect(r).toBe(false);
+    } finally {
+      process.env.PATH = originalPath;
+    }
+  });
+});
+
+describe('defaultK6Version', () => {
+  it('returns "unknown" when k6 is not on PATH', async () => {
+    const originalPath = process.env.PATH;
+    process.env.PATH = '/nonexistent';
+    try {
+      expect(await defaultK6Version()).toBe('unknown');
     } finally {
       process.env.PATH = originalPath;
     }

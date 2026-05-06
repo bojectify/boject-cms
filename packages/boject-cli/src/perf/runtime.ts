@@ -27,6 +27,45 @@ export async function defaultK6Available(): Promise<boolean> {
 }
 
 /**
+ * Probe `k6 --version` and parse the semver. Spawns with the same 5-second
+ * timeout as `defaultK6Available`. Returns `'unknown'` on any failure
+ * (binary missing, timeout, parse miss) — never throws.
+ */
+export async function defaultK6Version(): Promise<string> {
+  return new Promise((resolveResult) => {
+    let child: ReturnType<typeof spawn>;
+    try {
+      child = spawn('k6', ['version'], {
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+    } catch {
+      resolveResult('unknown');
+      return;
+    }
+    let buf = '';
+    let resolved = false;
+    const done = (value: string) => {
+      if (resolved) return;
+      resolved = true;
+      clearTimeout(timer);
+      resolveResult(value);
+    };
+    const timer = setTimeout(() => {
+      child.kill();
+      done('unknown');
+    }, K6_VERSION_TIMEOUT_MS);
+    child.stdout?.on('data', (b: Buffer) => {
+      buf += b.toString();
+    });
+    child.on('error', () => done('unknown'));
+    child.on('close', () => {
+      const m = buf.match(/k6 v([\d.]+)/);
+      done(m ? m[1]! : 'unknown');
+    });
+  });
+}
+
+/**
  * Probe `<url>/api/health` with a 10-second timeout. Returns the
  * preflight error shape so it composes with `runPreflight`.
  */

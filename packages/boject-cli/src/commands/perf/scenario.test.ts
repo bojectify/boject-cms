@@ -51,12 +51,14 @@ describe('runPerfScenario', () => {
 
   it('runs graphql-flat across all three shapes', async () => {
     vi.spyOn(preflightModule, 'runPreflight').mockResolvedValue(okPreflight);
-    const runK6 = vi.spyOn(runK6Module, 'runK6').mockResolvedValue({
-      ok: true,
-      exitCode: 0,
-      rawJsonPath: '/tmp/raw.json',
-      stderrLogPath: '/tmp/stderr.log',
-    });
+    const runK6 = vi
+      .spyOn(runK6Module, 'runK6')
+      .mockImplementation(async (p) => ({
+        ok: true,
+        exitCode: 0,
+        rawJsonPath: `${p.outDir}/${p.rawFilename ?? 'raw.json'}`,
+        stderrLogPath: `${p.outDir}/k6-stderr.log`,
+      }));
     vi.spyOn(renderModule, 'renderReport').mockResolvedValue();
     vi.spyOn(confirmModule, 'confirmHeavyRun').mockResolvedValue(true);
 
@@ -71,6 +73,12 @@ describe('runPerfScenario', () => {
     expect(runK6).toHaveBeenCalledTimes(3);
     const shapes = runK6.mock.calls.map((c) => c[0].env.PERF_QUERY_SHAPE);
     expect(shapes).toEqual(['bare', 'filtered', 'relation']);
+    const rawFilenames = runK6.mock.calls.map((c) => c[0].rawFilename);
+    expect(rawFilenames).toEqual([
+      'raw-bare.json',
+      'raw-filtered.json',
+      'raw-relation.json',
+    ]);
   });
 
   it('skips filtered shape when introspection finds no DATETIME', async () => {
@@ -83,12 +91,14 @@ describe('runPerfScenario', () => {
       },
       warnings: ['filtered shape skipped — no DATETIME field on Article'],
     });
-    const runK6 = vi.spyOn(runK6Module, 'runK6').mockResolvedValue({
-      ok: true,
-      exitCode: 0,
-      rawJsonPath: '/tmp/raw.json',
-      stderrLogPath: '/tmp/stderr.log',
-    });
+    const runK6 = vi
+      .spyOn(runK6Module, 'runK6')
+      .mockImplementation(async (p) => ({
+        ok: true,
+        exitCode: 0,
+        rawJsonPath: `${p.outDir}/${p.rawFilename ?? 'raw.json'}`,
+        stderrLogPath: `${p.outDir}/k6-stderr.log`,
+      }));
     vi.spyOn(renderModule, 'renderReport').mockResolvedValue();
     vi.spyOn(confirmModule, 'confirmHeavyRun').mockResolvedValue(true);
 
@@ -118,19 +128,16 @@ describe('runPerfScenario', () => {
 
   it('returns 1 (partial) and renders when k6 fails mid-run', async () => {
     vi.spyOn(preflightModule, 'runPreflight').mockResolvedValue(okPreflight);
-    vi.spyOn(runK6Module, 'runK6')
-      .mockResolvedValueOnce({
+    let call = 0;
+    vi.spyOn(runK6Module, 'runK6').mockImplementation(async (p) => {
+      const exitCode = call++ === 1 ? 1 : 0;
+      return {
         ok: true,
-        exitCode: 0,
-        rawJsonPath: '/tmp/raw.json',
-        stderrLogPath: '/tmp/stderr.log',
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        exitCode: 1,
-        rawJsonPath: '/tmp/raw.json',
-        stderrLogPath: '/tmp/stderr.log',
-      });
+        exitCode,
+        rawJsonPath: `${p.outDir}/${p.rawFilename ?? 'raw.json'}`,
+        stderrLogPath: `${p.outDir}/k6-stderr.log`,
+      };
+    });
     const renderSpy = vi
       .spyOn(renderModule, 'renderReport')
       .mockResolvedValue();
@@ -147,5 +154,29 @@ describe('runPerfScenario', () => {
     expect(renderSpy).toHaveBeenCalled();
     const renderedMeta = renderSpy.mock.calls[0]?.[0].runMetadata;
     expect(renderedMeta?.partial).toBe(true);
+  });
+
+  it('returns 1 with explicit error when all shapes fail', async () => {
+    vi.spyOn(preflightModule, 'runPreflight').mockResolvedValue(okPreflight);
+    vi.spyOn(runK6Module, 'runK6').mockResolvedValue({
+      ok: false,
+      error: 'k6 process error: ENOENT',
+    });
+    vi.spyOn(confirmModule, 'confirmHeavyRun').mockResolvedValue(true);
+    const renderSpy = vi
+      .spyOn(renderModule, 'renderReport')
+      .mockResolvedValue();
+
+    const stderr: string[] = [];
+    const r = await runPerfScenario({
+      cwd: process.cwd(),
+      apiKey: 'k',
+      flags: { ...baseFlags, scenario: 'graphql-flat' },
+      stdout: () => {},
+      stderr: (l) => stderr.push(l),
+    });
+    expect(r.exitCode).toBe(1);
+    expect(stderr.join('\n')).toMatch(/no data captured/i);
+    expect(renderSpy).not.toHaveBeenCalled();
   });
 });
