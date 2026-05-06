@@ -60,10 +60,25 @@ pnpm perf:followups perf/reports/2026-04-21-abc1234
 
 ## Configuration (env vars)
 
+### Connection
+
 - `PERF_BASE_URL` — CMS URL. Default `http://localhost:4000`.
 - `PERF_API_KEY` — Bearer token for GraphQL scenarios.
 - `PERF_DATABASE_URL` — Prisma URL for seeding. Default `postgresql://boject:boject@localhost:5432/boject_perf`.
 - `PERF_ADMIN_EMAIL` / `PERF_ADMIN_PASSWORD` — used by REST CRUD cycle session login. Defaults match the seed.
+
+### Scenario shape (read by `perf/scenarios/*.ts`)
+
+- `PERF_LIST_FIELD` — root list query field name. Default `perfArticleList` (the internal `PerfArticle` fixture). Override when running against a different content type — the [`@boject/cli`](../packages/boject-cli/)'s `boject perf` flow sets this automatically from `--content-type`.
+- `PERF_FILTER_FIELD` — DATETIME field for the `graphql-flat` `filtered` query shape. Default `publishDate`.
+- `PERF_RELATION_FIELD` — single-target RELATION field for the `graphql-flat` `relation` query shape. Default `author`.
+- `PERF_QUERY_SHAPE` — `graphql-flat` query shape: `bare` / `filtered` / `relation`. Default `bare`.
+- `PERF_PAGE_SIZE` / `PERF_VUS` — `graphql-sitemap` page size and concurrent VUs. Default `100` / `1`.
+- `PERF_TARGET_RPS` — `graphql-flat` peak RPS. Default `2000`. The default 6-stage ramp (`[50, 100, 250, 500, 1000, 2000]`) scales proportionally — passing 4000 produces `[100, 200, 500, 1000, 2000, 4000]`.
+- `PERF_STAGES` — comma-separated RPS stage list, e.g. `50,100,500,2000`. Overrides the auto-scaled ramp wholesale.
+
+### Sweep / sampler
+
 - `PERF_SIZES`, `PERF_PAGE_SIZES`, `PERF_VUS_LEVELS` — override sweep parameters (comma-separated positive numbers; bad input fails fast).
 - `PERF_CRUD_N` — REST CRUD cycle size. Default 10000.
 - `PERF_SAMPLER_CONTAINER` — docker container name for the pg sampler. Default `boject-cms-db-1` (matches `docker compose up -d` in this repo).
@@ -72,16 +87,15 @@ pnpm perf:followups perf/reports/2026-04-21-abc1234
 
 ## Running against your own deployment
 
-Operators running boject-cms in production can point this suite at their staging instance:
+Operators benchmarking their own deployment should use the [`@boject/cli`](../packages/boject-cli/)'s `boject perf` commands rather than `pnpm perf:*`. The CLI's scenarios are content-type-agnostic (driven by `PERF_LIST_FIELD` / `PERF_FILTER_FIELD` / `PERF_RELATION_FIELD`) and don't assume the internal `PerfArticle` fixture.
 
 ```bash
-export PERF_BASE_URL=https://cms-staging.example.com
-export PERF_API_KEY=<key-from-cms-ui>
-export PERF_DATABASE_URL=postgresql://...@.../boject_staging
-pnpm perf:sweep
+export BOJECT_API_KEY=<key-from-cms-ui>
+boject perf check --url https://cms-staging.example.com --content-type Article
+boject perf sweep --url https://cms-staging.example.com --content-type Article
 ```
 
-The `PERF_DATABASE_URL` must point at a database you can safely truncate. Do **not** point the sweep at your production database — `reset.ts` refuses anything not ending in `/boject_perf`, but seeding assumes a disposable environment.
+The internal `pnpm perf:*` flow is for repo-internal benchmarking against `PerfArticle` / `PerfAuthor` and assumes a disposable `boject_perf` database — `reset.ts` refuses anything not ending in `/boject_perf`. Don't point it at production.
 
 ## Interpreting the report
 
