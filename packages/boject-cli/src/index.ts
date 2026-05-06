@@ -7,6 +7,7 @@ import { runSchemaCheck } from './commands/schema/check.js';
 import { runApikeyCreate } from './commands/apikey/create.js';
 import { runApikeyList } from './commands/apikey/list.js';
 import { runApikeyRevoke } from './commands/apikey/revoke.js';
+import { runPerfCheck } from './commands/perf/check.js';
 import { spawn } from 'node:child_process';
 import { CLI_VERSION } from './version.js';
 
@@ -22,8 +23,27 @@ Commands:
   apikey create      Create a new API key.
   apikey list        List API keys.
   apikey revoke      Revoke an API key by prefix.
+  perf <command>     Run perf scenarios / sweep / report / check.
 
 Run \`boject <command> --help\` for command-specific flags.
+`;
+
+const PERF_USAGE = `Usage: boject perf <command> [flags]
+
+Commands:
+  scenario <name>   Run one scenario (graphql-flat | graphql-sitemap).
+  sweep             Run all scenarios across the default sweep matrix.
+  report            Re-render a previous run.
+  check             Preflight verification (k6, target, key, content type, fields).
+
+Run \`boject perf <command> --help\` for command-specific flags.
+`;
+
+const PERF_CHECK_USAGE = `Usage: boject perf check --content-type <id> [--url <url>] [--filter-field <id>] [--relation-field <id>]
+
+Verifies: k6 is on PATH, target reachable, API key valid with content:read scope,
+content type exists, and DATETIME / single-target RELATION fields can be selected.
+Exits 0 on success, 2 on environment problems, 3 on input problems.
 `;
 
 const SCHEMA_PULL_USAGE = `Usage: boject schema pull [--out <path>] [--url <url>]
@@ -272,6 +292,56 @@ async function dispatchApikey(args: string[]): Promise<number> {
   }
 }
 
+async function dispatchPerf(args: string[]): Promise<number> {
+  const subcommand = args[0];
+  const rest = args.slice(1);
+  if (!subcommand || subcommand === '--help' || subcommand === '-h') {
+    process.stdout.write(PERF_USAGE);
+    return subcommand ? 0 : 1;
+  }
+
+  const apiKey = process.env.BOJECT_API_KEY;
+
+  switch (subcommand) {
+    case 'check': {
+      if (rest.includes('--help') || rest.includes('-h')) {
+        process.stdout.write(PERF_CHECK_USAGE);
+        return 0;
+      }
+      const { values } = parseArgs({
+        args: rest,
+        allowPositionals: false,
+        options: {
+          url: { type: 'string' },
+          'api-key': { type: 'string' },
+          'content-type': { type: 'string' },
+          'filter-field': { type: 'string' },
+          'relation-field': { type: 'string' },
+        },
+      });
+      const r = await runPerfCheck({
+        cwd: process.cwd(),
+        apiKey,
+        flags: {
+          url: values.url,
+          apiKey: values['api-key'],
+          contentType: values['content-type'],
+          filterField: values['filter-field'],
+          relationField: values['relation-field'],
+        },
+        stdout,
+        stderr,
+      });
+      return r.exitCode;
+    }
+    // scenario / sweep / report cases added in later tasks
+    default:
+      process.stderr.write(`Unknown perf subcommand: ${subcommand}\n`);
+      process.stdout.write(PERF_USAGE);
+      return 1;
+  }
+}
+
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
 
@@ -293,6 +363,11 @@ async function main(): Promise<void> {
 
   if (command === 'apikey') {
     const code = await dispatchApikey(rest);
+    process.exit(code);
+  }
+
+  if (command === 'perf') {
+    const code = await dispatchPerf(rest);
     process.exit(code);
   }
 
