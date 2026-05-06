@@ -9,6 +9,7 @@ import { runApikeyList } from './commands/apikey/list.js';
 import { runApikeyRevoke } from './commands/apikey/revoke.js';
 import { runPerfCheck } from './commands/perf/check.js';
 import { runPerfScenario } from './commands/perf/scenario.js';
+import { runPerfSweep } from './commands/perf/sweep.js';
 import { spawn } from 'node:child_process';
 import { CLI_VERSION } from './version.js';
 
@@ -60,6 +61,29 @@ Common flags:
   --relation-field <id>   Override single-target RELATION field for "relation" shape.
   --out <dir>             Report output dir. Default ./perf-reports/.
   --yes                   Skip the heavy-run confirm prompt (CI-friendly).
+
+graphql-flat power-user overrides:
+  --target-rps <n>        Override peak RPS.
+  --duration <s>          Override total duration.
+  --stages <csv>          Comma-separated RPS stages, e.g. 50,100,500,2000.
+`;
+
+const PERF_SWEEP_USAGE = `Usage: boject perf sweep --content-type <id> [flags]
+
+Runs both graphql-sitemap (across page sizes × VU levels) and graphql-flat
+(across all three query shapes) producing one combined report.
+
+Common flags:
+  --url <url>             Target CMS base URL.
+  --api-key <key>         Bearer token. Defaults to $BOJECT_API_KEY.
+  --filter-field <id>     Override DATETIME field for the "filtered" shape.
+  --relation-field <id>   Override single-target RELATION for "relation" shape.
+  --out <dir>             Report output dir. Default ./perf-reports/.
+  --yes                   Skip the heavy-run confirm prompt (CI-friendly).
+
+Sweep matrix:
+  --page-sizes <csv>      Default 100,500,1000.
+  --vus <csv>             Default 1,5,20.
 
 graphql-flat power-user overrides:
   --target-rps <n>        Override peak RPS.
@@ -401,7 +425,60 @@ async function dispatchPerf(args: string[]): Promise<number> {
       });
       return r.exitCode;
     }
-    // sweep / report cases added in later tasks
+    case 'sweep': {
+      if (rest.includes('--help') || rest.includes('-h')) {
+        process.stdout.write(PERF_SWEEP_USAGE);
+        return 0;
+      }
+      const { values } = parseArgs({
+        args: rest,
+        allowPositionals: false,
+        options: {
+          url: { type: 'string' },
+          'api-key': { type: 'string' },
+          'content-type': { type: 'string' },
+          'filter-field': { type: 'string' },
+          'relation-field': { type: 'string' },
+          out: { type: 'string' },
+          yes: { type: 'boolean', default: false },
+          'page-sizes': { type: 'string' },
+          vus: { type: 'string' },
+          'target-rps': { type: 'string' },
+          duration: { type: 'string' },
+          stages: { type: 'string' },
+        },
+      });
+      const r = await runPerfSweep({
+        cwd: process.cwd(),
+        apiKey,
+        flags: {
+          url: values.url,
+          apiKey: values['api-key'],
+          contentType: values['content-type'],
+          filterField: values['filter-field'],
+          relationField: values['relation-field'],
+          out: values.out,
+          yes: values.yes === true,
+          pageSizes: values['page-sizes']
+            ? values['page-sizes'].split(',').map((s) => Number(s.trim()))
+            : undefined,
+          vus: values.vus
+            ? values.vus.split(',').map((s) => Number(s.trim()))
+            : undefined,
+          targetRps: values['target-rps']
+            ? Number(values['target-rps'])
+            : undefined,
+          duration: values.duration,
+          stages: values.stages
+            ? values.stages.split(',').map((s) => Number(s.trim()))
+            : undefined,
+        },
+        stdout,
+        stderr,
+      });
+      return r.exitCode;
+    }
+    // report case added in later task
     default:
       process.stderr.write(`Unknown perf subcommand: ${subcommand}\n`);
       process.stdout.write(PERF_USAGE);
