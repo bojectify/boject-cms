@@ -1,11 +1,12 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { runPerfScenario } from './scenario.js';
 import * as preflightModule from '../../perf/preflight.js';
 import * as runK6Module from '../../perf/runK6.js';
 import * as renderModule from '../../perf/render.js';
 import * as confirmModule from '../../perf/confirm.js';
-
-afterEach(() => vi.restoreAllMocks());
 
 const baseFlags = {
   url: 'https://cms.example.com',
@@ -25,11 +26,22 @@ const okPreflight = {
 };
 
 describe('runPerfScenario', () => {
+  let outDir: string;
+
+  beforeEach(async () => {
+    outDir = await mkdtemp(join(tmpdir(), 'boject-perf-scenario-'));
+  });
+
+  afterEach(async () => {
+    await rm(outDir, { recursive: true, force: true });
+    vi.restoreAllMocks();
+  });
+
   it('errors when scenario name is missing', async () => {
     const r = await runPerfScenario({
       cwd: process.cwd(),
       apiKey: 'k',
-      flags: { ...baseFlags, scenario: undefined },
+      flags: { ...baseFlags, scenario: undefined, out: outDir },
       stdout: () => {},
       stderr: () => {},
     });
@@ -41,7 +53,7 @@ describe('runPerfScenario', () => {
     const r = await runPerfScenario({
       cwd: process.cwd(),
       apiKey: 'k',
-      flags: { ...baseFlags, scenario: 'rest-crud-cycle' },
+      flags: { ...baseFlags, scenario: 'rest-crud-cycle', out: outDir },
       stdout: () => {},
       stderr: (l) => stderr.push(l),
     });
@@ -65,7 +77,7 @@ describe('runPerfScenario', () => {
     const r = await runPerfScenario({
       cwd: process.cwd(),
       apiKey: 'k',
-      flags: { ...baseFlags, scenario: 'graphql-flat' },
+      flags: { ...baseFlags, scenario: 'graphql-flat', out: outDir },
       stdout: () => {},
       stderr: () => {},
     });
@@ -105,7 +117,7 @@ describe('runPerfScenario', () => {
     await runPerfScenario({
       cwd: process.cwd(),
       apiKey: 'k',
-      flags: { ...baseFlags, scenario: 'graphql-flat' },
+      flags: { ...baseFlags, scenario: 'graphql-flat', out: outDir },
       stdout: () => {},
       stderr: () => {},
     });
@@ -119,7 +131,12 @@ describe('runPerfScenario', () => {
     const r = await runPerfScenario({
       cwd: process.cwd(),
       apiKey: 'k',
-      flags: { ...baseFlags, scenario: 'graphql-flat', yes: false },
+      flags: {
+        ...baseFlags,
+        scenario: 'graphql-flat',
+        yes: false,
+        out: outDir,
+      },
       stdout: () => {},
       stderr: () => {},
     });
@@ -146,7 +163,7 @@ describe('runPerfScenario', () => {
     const r = await runPerfScenario({
       cwd: process.cwd(),
       apiKey: 'k',
-      flags: { ...baseFlags, scenario: 'graphql-flat' },
+      flags: { ...baseFlags, scenario: 'graphql-flat', out: outDir },
       stdout: () => {},
       stderr: () => {},
     });
@@ -171,7 +188,7 @@ describe('runPerfScenario', () => {
     const r = await runPerfScenario({
       cwd: process.cwd(),
       apiKey: 'k',
-      flags: { ...baseFlags, scenario: 'graphql-flat' },
+      flags: { ...baseFlags, scenario: 'graphql-flat', out: outDir },
       stdout: () => {},
       stderr: (l) => stderr.push(l),
     });
