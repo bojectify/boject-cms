@@ -63,6 +63,36 @@ describe('runPreflight', () => {
     expect(r.errors.join('\n')).toMatch(/publishDate, createdAt/);
   });
 
+  it('reports both override errors when both are invalid', async () => {
+    vi.spyOn(introspectModule, 'introspectContentType').mockResolvedValue(
+      okIntrospect
+    );
+    const r = await runPreflight({
+      ...baseParams,
+      filterFieldOverride: 'nope',
+      relationFieldOverride: 'alsoNope',
+    });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.errors).toHaveLength(2);
+    expect(r.errors.join('\n')).toMatch(/--filter-field/);
+    expect(r.errors.join('\n')).toMatch(/--relation-field/);
+  });
+
+  it('returns introspection error when introspect fails', async () => {
+    vi.spyOn(introspectModule, 'introspectContentType').mockResolvedValue({
+      ok: false,
+      error: 'Type "Bogus" not found',
+    });
+    const r = await runPreflight({
+      ...baseParams,
+      contentTypeIdentifier: 'Bogus',
+    });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.errors).toEqual(['Type "Bogus" not found']);
+  });
+
   it('returns null fields (skip-shape) when introspection has no datetime', async () => {
     vi.spyOn(introspectModule, 'introspectContentType').mockResolvedValue({
       ...okIntrospect,
