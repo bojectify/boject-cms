@@ -51,12 +51,24 @@ function percentile(sorted: number[], p: number): number {
   return sorted[Math.min(sorted.length - 1, rank - 1)]!;
 }
 
-function parseRawJson(raw: string): RawPoint[] {
-  return raw
-    .split('\n')
-    .filter((line) => line.trim().length > 0)
-    .map((line) => JSON.parse(line) as RawPoint)
-    .filter((p) => p.type === 'Point');
+interface ParseResult {
+  points: RawPoint[];
+  malformedCount: number;
+}
+
+function parseRawJson(raw: string): ParseResult {
+  const points: RawPoint[] = [];
+  let malformedCount = 0;
+  for (const line of raw.split('\n')) {
+    if (line.trim().length === 0) continue;
+    try {
+      const parsed = JSON.parse(line) as RawPoint;
+      if (parsed.type === 'Point') points.push(parsed);
+    } catch {
+      malformedCount++;
+    }
+  }
+  return { points, malformedCount };
 }
 
 function compute(points: RawPoint[]): ScenarioStats[] {
@@ -149,12 +161,16 @@ function toCsv(stats: ScenarioStats[]): string {
   const header = 'scenario,page_size,shape,count,p50,p95,p99,error_rate';
   const rows = stats.map(
     (s) =>
-      `${s.scenario},${s.pageSize},${s.shape},${s.count},${fmtMs(s.p50)},${fmtMs(s.p95)},${fmtMs(s.p99)},${(s.errorRate * 100).toFixed(2)}%`
+      `${s.scenario},${s.pageSize},${s.shape},${s.count},${fmtMs(s.p50)},${fmtMs(s.p95)},${fmtMs(s.p99)},${s.errorRate.toFixed(4)}`
   );
   return [header, ...rows].join('\n');
 }
 
-function buildSummary(meta: RunMetadata, stats: ScenarioStats[]): string {
+function buildSummary(
+  meta: RunMetadata,
+  stats: ScenarioStats[],
+  malformedCount: number
+): string {
   const flatScenario = meta.scenarios.find((s) => s.name === 'graphql-flat');
   const heavyBanner = flatScenario
     ? `**Heavy load run** — peak ${meta.intensity.targetRps} RPS sustained over ${meta.intensity.duration}. Target should be a perf-clone, not production.`
@@ -173,20 +189,23 @@ function buildSummary(meta: RunMetadata, stats: ScenarioStats[]): string {
       `_relation shape skipped — no single-target RELATION field on ${meta.contentType}._`
     );
 
-  const lines = [
+  const lines: Array<string | null> = [
     `# Load test report — ${meta.contentType}`,
     '',
     `- perfCalibratedAt: ${meta.perfCalibratedAt}`,
     `- target: ${meta.targetScheme}://${meta.targetHost}`,
     `- CLI: @boject/cli ${meta.cliVersion} | k6 ${meta.k6Version}`,
-    meta.partial ? '- run status: **partial** (k6 exited mid-run)' : '',
+    meta.partial ? '- run status: **partial** (k6 exited mid-run)' : null,
+    malformedCount > 0
+      ? `- raw.json had ${malformedCount} malformed line(s) (skipped)`
+      : null,
     '',
     '## Multi-instance banner',
     '',
     "Read-only run — DB-side metrics unavailable. Check your CMS host's database dashboards for connection-pool and lock data.",
     '',
-    heavyBanner ? `## Run shape\n\n${heavyBanner}\n` : '',
-    skipBanners.length > 0 ? `${skipBanners.join('\n')}\n` : '',
+    heavyBanner ? `## Run shape\n\n${heavyBanner}\n` : null,
+    skipBanners.length > 0 ? `${skipBanners.join('\n')}\n` : null,
     '## Scenario 1A — GraphQL cursor pagination',
     '',
     sitemapTable(stats),
@@ -205,11 +224,12 @@ function buildSummary(meta: RunMetadata, stats: ScenarioStats[]): string {
     `- See \`metrics.csv\` for the raw aggregate rows and \`metadata.json\` for machine-readable run context.`,
     '',
   ];
-  return lines.filter((line) => line !== undefined).join('\n');
+  return lines.filter((line) => line !== null).join('\n');
 }
 
 function buildMetadata(meta: RunMetadata): object {
   return {
+    schemaVersion: 1,
     perfCalibratedAt: meta.perfCalibratedAt,
     cliVersion: meta.cliVersion,
     k6Version: meta.k6Version,
@@ -225,10 +245,10 @@ function buildMetadata(meta: RunMetadata): object {
 export async function renderReport(params: RenderParams): Promise<void> {
   await mkdir(params.outDir, { recursive: true });
   const raw = await readFile(params.rawJsonPath, 'utf8');
-  const points = parseRawJson(raw);
+  const { points, malformedCount } = parseRawJson(raw);
   const stats = compute(points);
 
-  const summary = buildSummary(params.runMetadata, stats);
+  const summary = buildSummary(params.runMetadata, stats, malformedCount);
   const metadata = buildMetadata(params.runMetadata);
   const csv = toCsv(stats);
 
