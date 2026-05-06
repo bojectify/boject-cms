@@ -20,6 +20,35 @@ const LIST_FIELD = __ENV.PERF_LIST_FIELD ?? 'perfArticleList';
 const FILTER_FIELD = __ENV.PERF_FILTER_FIELD ?? 'publishDate';
 const RELATION_FIELD = __ENV.PERF_RELATION_FIELD ?? 'author';
 
+// Power-user intensity overrides. PERF_TARGET_RPS sets the peak; the
+// default 6-stage ramp scales proportionally from it. PERF_STAGES (a
+// CSV of integer RPS targets) overrides the ramp wholesale. With no
+// overrides the produced ramp is [50, 100, 250, 500, 1000, 2000] —
+// byte-equivalent to the previous hardcoded values.
+const TARGET_RPS = Number(__ENV.PERF_TARGET_RPS ?? '2000');
+const STAGE_DURATION = '30s';
+
+function parseStages(): Array<{ target: number; duration: string }> {
+  const raw = __ENV.PERF_STAGES;
+  if (raw) {
+    return raw.split(',').map((s) => ({
+      target: Number(s.trim()),
+      duration: STAGE_DURATION,
+    }));
+  }
+  const ramp = [
+    Math.round(TARGET_RPS * 0.025),
+    Math.round(TARGET_RPS * 0.05),
+    Math.round(TARGET_RPS * 0.125),
+    Math.round(TARGET_RPS * 0.25),
+    Math.round(TARGET_RPS * 0.5),
+    TARGET_RPS,
+  ];
+  return ramp.map((target) => ({ target, duration: STAGE_DURATION }));
+}
+
+const STAGES = parseStages();
+
 const QUERIES: Record<string, string> = {
   bare: `query Items { ${LIST_FIELD}(first: 100) { edges { node { id } } } }`,
   filtered: `query Items { ${LIST_FIELD}(first: 100, where: { ${FILTER_FIELD}: { gt: "2020-01-01T00:00:00Z" } }) { edges { node { id } } } }`,
@@ -30,18 +59,11 @@ export const options = {
   scenarios: {
     flat: {
       executor: 'ramping-arrival-rate',
-      startRate: 50,
+      startRate: STAGES[0]?.target ?? 50,
       timeUnit: '1s',
       preAllocatedVUs: 50,
       maxVUs: 500,
-      stages: [
-        { target: 50, duration: '30s' },
-        { target: 100, duration: '30s' },
-        { target: 250, duration: '30s' },
-        { target: 500, duration: '30s' },
-        { target: 1000, duration: '30s' },
-        { target: 2000, duration: '30s' },
-      ],
+      stages: STAGES,
     },
   },
   thresholds: {

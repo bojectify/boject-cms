@@ -29,8 +29,21 @@ export interface PerfSweepFlags {
   pageSizes?: number[];
   vus?: number[];
   targetRps?: number;
-  duration?: string;
   stages?: number[];
+}
+
+// Mirrors the ramp `parseStages()` builds in
+// perf/scenarios/graphql-flat.ts when PERF_STAGES is unset — used for
+// reporting metadata so the rendered report reflects what k6 actually ran.
+function scaleDefaultStages(targetRps: number): number[] {
+  return [
+    Math.round(targetRps * 0.025),
+    Math.round(targetRps * 0.05),
+    Math.round(targetRps * 0.125),
+    Math.round(targetRps * 0.25),
+    Math.round(targetRps * 0.5),
+    targetRps,
+  ];
 }
 
 export interface PerfSweepParams {
@@ -158,7 +171,14 @@ export async function runPerfSweep(
     flags.out ?? defaults.out ?? './perf-reports'
   );
   const outDir = join(outRoot, timestampDir());
-  await mkdir(outDir, { recursive: true });
+  try {
+    await mkdir(outDir, { recursive: true });
+  } catch (err) {
+    params.stderr(
+      `Error: cannot create output directory ${outDir}: ${(err as Error).message}. Try --out <writable-dir>.`
+    );
+    return { exitCode: 2 };
+  }
 
   const baseEnv: Record<string, string> = {
     PERF_BASE_URL: url,
@@ -170,18 +190,20 @@ export async function runPerfSweep(
   if (preflightResult.fields.relationField)
     baseEnv.PERF_RELATION_FIELD = preflightResult.fields.relationField;
   if (flags.targetRps) baseEnv.PERF_TARGET_RPS = String(flags.targetRps);
-  if (flags.duration) baseEnv.PERF_DURATION = flags.duration;
   if (flags.stages) baseEnv.PERF_STAGES = flags.stages.join(',');
 
   const pageSizes = flags.pageSizes ?? DEFAULT_PAGE_SIZES;
   const vusList = flags.vus ?? DEFAULT_VUS;
 
   const rawFiles: string[] = [];
-  let successfulRuns = 0;
+  let sitemapSuccessful = 0;
+  let sitemapTotal = 0;
+  let flatSuccessful = 0;
 
   // Sitemap matrix: page sizes × VU levels.
   for (const pageSize of pageSizes) {
     for (const vus of vusList) {
+      sitemapTotal++;
       const env: Record<string, string> = {
         ...baseEnv,
         PERF_PAGE_SIZE: String(pageSize),
@@ -201,7 +223,7 @@ export async function runPerfSweep(
         params.stderr(`Error: ${r.error}`);
         continue;
       }
-      if (r.exitCode === 0) successfulRuns++;
+      if (r.exitCode === 0) sitemapSuccessful++;
       rawFiles.push(r.rawJsonPath);
     }
   }
@@ -212,6 +234,7 @@ export async function runPerfSweep(
     if (s === 'relation') return Boolean(preflightResult.fields.relationField);
     return true;
   });
+  const flatTotal = shapesToRun.length;
   for (const shape of shapesToRun) {
     const env: Record<string, string> = {
       ...baseEnv,
@@ -231,10 +254,11 @@ export async function runPerfSweep(
       params.stderr(`Error: ${r.error}`);
       continue;
     }
-    if (r.exitCode === 0) successfulRuns++;
+    if (r.exitCode === 0) flatSuccessful++;
     rawFiles.push(r.rawJsonPath);
   }
 
+  const successfulRuns = sitemapSuccessful + flatSuccessful;
   if (successfulRuns === 0) {
     params.stderr('Error: all k6 runs failed — no data captured.');
     return { exitCode: 1 };
@@ -255,7 +279,7 @@ export async function runPerfSweep(
   const rawJsonPath = join(outDir, 'raw.json');
   await writeFile(rawJsonPath, combined.filter(Boolean).join('\n'));
 
-  const totalRuns = pageSizes.length * vusList.length + shapesToRun.length;
+  const totalRuns = sitemapTotal + flatTotal;
   const partial = successfulRuns < totalRuns;
 
   const k6Ver = await defaultK6Version();
@@ -274,18 +298,24 @@ export async function runPerfSweep(
     scenarios: [
       {
         name: 'graphql-sitemap',
-        outcome: partial ? 'partial' : 'completed',
+        outcome:
+          sitemapTotal > 0 && sitemapSuccessful === sitemapTotal
+            ? 'completed'
+            : 'partial',
       },
       {
         name: 'graphql-flat',
-        outcome: partial ? 'partial' : 'completed',
+        outcome:
+          flatTotal > 0 && flatSuccessful === flatTotal
+            ? 'completed'
+            : 'partial',
         shapesRun: [...shapesToRun],
       },
     ],
     intensity: {
       targetRps: flags.targetRps ?? 2000,
-      duration: flags.duration ?? '180s',
-      stages: flags.stages ?? [50, 100, 250, 500, 1000, 2000],
+      duration: '180s',
+      stages: flags.stages ?? scaleDefaultStages(flags.targetRps ?? 2000),
     },
     partial,
   };

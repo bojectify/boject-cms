@@ -68,12 +68,24 @@ describe('introspectContentType', () => {
     expect(r.singleTargetRelationFields).toEqual(['author']);
   });
 
-  it('reports a missing content type with 200 + null __type', async () => {
+  it('reports a missing content type with 200 + null __type and lists available types', async () => {
     globalThis.fetch = vi.fn(
       async () =>
         new Response(
           JSON.stringify({
-            data: { __type: null, __schema: { queryType: { fields: [] } } },
+            data: {
+              __type: null,
+              __schema: {
+                queryType: {
+                  fields: [
+                    { name: 'articleList' },
+                    { name: 'pageList' },
+                    { name: 'article' },
+                    { name: 'page' },
+                  ],
+                },
+              },
+            },
           }),
           { status: 200, headers: { 'content-type': 'application/json' } }
         )
@@ -88,6 +100,7 @@ describe('introspectContentType', () => {
     if (r.ok) return;
     expect(r.error).toMatch(/content type/i);
     expect(r.error).toMatch(/Nope/);
+    expect(r.error).toMatch(/Available: Article, Page/);
   });
 
   it('reports auth failure cleanly on 401', async () => {

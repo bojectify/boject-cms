@@ -27,8 +27,21 @@ export interface PerfScenarioFlags {
   out?: string;
   yes: boolean;
   targetRps?: number;
-  duration?: string;
   stages?: number[];
+}
+
+// Mirrors the ramp `parseStages()` builds in
+// perf/scenarios/graphql-flat.ts when PERF_STAGES is unset — used for
+// reporting metadata so the rendered report reflects what k6 actually ran.
+function scaleDefaultStages(targetRps: number): number[] {
+  return [
+    Math.round(targetRps * 0.025),
+    Math.round(targetRps * 0.05),
+    Math.round(targetRps * 0.125),
+    Math.round(targetRps * 0.25),
+    Math.round(targetRps * 0.5),
+    targetRps,
+  ];
 }
 
 export interface PerfScenarioParams {
@@ -209,7 +222,14 @@ export async function runPerfScenario(
   }
 
   const outDir = join(resolve(params.cwd, resolved.out), timestampDir());
-  await mkdir(outDir, { recursive: true });
+  try {
+    await mkdir(outDir, { recursive: true });
+  } catch (err) {
+    params.stderr(
+      `Error: cannot create output directory ${outDir}: ${(err as Error).message}. Try --out <writable-dir>.`
+    );
+    return { exitCode: 2 };
+  }
 
   const baseEnv: Record<string, string> = {
     PERF_BASE_URL: resolved.url,
@@ -221,7 +241,6 @@ export async function runPerfScenario(
   if (preflightResult.fields.relationField)
     baseEnv.PERF_RELATION_FIELD = preflightResult.fields.relationField;
   if (flags.targetRps) baseEnv.PERF_TARGET_RPS = String(flags.targetRps);
-  if (flags.duration) baseEnv.PERF_DURATION = flags.duration;
   if (flags.stages) baseEnv.PERF_STAGES = flags.stages.join(',');
 
   const scenarioPath = resolveScenarioPath(name);
@@ -317,8 +336,8 @@ export async function runPerfScenario(
     ],
     intensity: {
       targetRps: flags.targetRps ?? 2000,
-      duration: flags.duration ?? '180s',
-      stages: flags.stages ?? [50, 100, 250, 500, 1000, 2000],
+      duration: '180s',
+      stages: flags.stages ?? scaleDefaultStages(flags.targetRps ?? 2000),
     },
     partial: combinedExit !== 0,
   };

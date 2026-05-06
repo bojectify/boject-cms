@@ -173,6 +173,104 @@ describe('runPerfScenario', () => {
     expect(renderedMeta?.partial).toBe(true);
   });
 
+  it('forwards --target-rps via PERF_TARGET_RPS env and scales metadata stages', async () => {
+    vi.spyOn(preflightModule, 'runPreflight').mockResolvedValue(okPreflight);
+    const runK6 = vi
+      .spyOn(runK6Module, 'runK6')
+      .mockImplementation(async (p) => ({
+        ok: true,
+        exitCode: 0,
+        rawJsonPath: `${p.outDir}/${p.rawFilename ?? 'raw.json'}`,
+        stderrLogPath: `${p.outDir}/k6-stderr.log`,
+      }));
+    const renderSpy = vi
+      .spyOn(renderModule, 'renderReport')
+      .mockResolvedValue();
+    vi.spyOn(confirmModule, 'confirmHeavyRun').mockResolvedValue(true);
+
+    await runPerfScenario({
+      cwd: process.cwd(),
+      apiKey: 'k',
+      flags: {
+        ...baseFlags,
+        scenario: 'graphql-flat',
+        out: outDir,
+        targetRps: 4000,
+      },
+      stdout: () => {},
+      stderr: () => {},
+    });
+
+    // PERF_TARGET_RPS forwarded to k6 on every shape invocation.
+    for (const call of runK6.mock.calls) {
+      expect(call[0].env.PERF_TARGET_RPS).toBe('4000');
+    }
+    const renderedMeta = renderSpy.mock.calls[0]?.[0].runMetadata;
+    expect(renderedMeta?.intensity.targetRps).toBe(4000);
+    // Default ramp scaled from targetRps: [100, 200, 500, 1000, 2000, 4000].
+    expect(renderedMeta?.intensity.stages).toEqual([
+      100, 200, 500, 1000, 2000, 4000,
+    ]);
+  });
+
+  it('forwards --stages via PERF_STAGES env and reflects them in metadata', async () => {
+    vi.spyOn(preflightModule, 'runPreflight').mockResolvedValue(okPreflight);
+    const runK6 = vi
+      .spyOn(runK6Module, 'runK6')
+      .mockImplementation(async (p) => ({
+        ok: true,
+        exitCode: 0,
+        rawJsonPath: `${p.outDir}/${p.rawFilename ?? 'raw.json'}`,
+        stderrLogPath: `${p.outDir}/k6-stderr.log`,
+      }));
+    const renderSpy = vi
+      .spyOn(renderModule, 'renderReport')
+      .mockResolvedValue();
+    vi.spyOn(confirmModule, 'confirmHeavyRun').mockResolvedValue(true);
+
+    await runPerfScenario({
+      cwd: process.cwd(),
+      apiKey: 'k',
+      flags: {
+        ...baseFlags,
+        scenario: 'graphql-flat',
+        out: outDir,
+        stages: [10, 50, 100],
+      },
+      stdout: () => {},
+      stderr: () => {},
+    });
+
+    for (const call of runK6.mock.calls) {
+      expect(call[0].env.PERF_STAGES).toBe('10,50,100');
+    }
+    const renderedMeta = renderSpy.mock.calls[0]?.[0].runMetadata;
+    expect(renderedMeta?.intensity.stages).toEqual([10, 50, 100]);
+  });
+
+  it('returns 2 with hint when output dir cannot be created', async () => {
+    vi.spyOn(preflightModule, 'runPreflight').mockResolvedValue(okPreflight);
+    vi.spyOn(confirmModule, 'confirmHeavyRun').mockResolvedValue(true);
+
+    // /dev/null/no can never be created — mkdir fails with ENOTDIR /
+    // EEXIST depending on platform but always rejects.
+    const stderr: string[] = [];
+    const r = await runPerfScenario({
+      cwd: process.cwd(),
+      apiKey: 'k',
+      flags: {
+        ...baseFlags,
+        scenario: 'graphql-flat',
+        out: '/dev/null/no',
+      },
+      stdout: () => {},
+      stderr: (l) => stderr.push(l),
+    });
+    expect(r.exitCode).toBe(2);
+    expect(stderr.join('\n')).toMatch(/cannot create output directory/i);
+    expect(stderr.join('\n')).toMatch(/--out/);
+  });
+
   it('returns 1 with explicit error when all shapes fail', async () => {
     vi.spyOn(preflightModule, 'runPreflight').mockResolvedValue(okPreflight);
     vi.spyOn(runK6Module, 'runK6').mockResolvedValue({

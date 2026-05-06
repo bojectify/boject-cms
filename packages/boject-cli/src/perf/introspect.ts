@@ -146,9 +146,22 @@ export async function introspectContentType(
   }
   const t = body.data?.__type;
   if (!t) {
+    const queryFields = body.data?.__schema?.queryType.fields ?? [];
+    const availableTypes = queryFields
+      .filter((f) => f.name.endsWith('List'))
+      .map((f) => {
+        // articleList → Article. perfArticleList → PerfArticle.
+        const camel = f.name.slice(0, -'List'.length);
+        return camel.charAt(0).toUpperCase() + camel.slice(1);
+      })
+      .sort();
+    const availableMsg =
+      availableTypes.length > 0
+        ? ` Available: ${availableTypes.join(', ')}.`
+        : '';
     return {
       ok: false,
-      error: `Content type "${params.contentTypeIdentifier}" not found in schema. Check the identifier (PascalCase) or run \`boject schema pull\`.`,
+      error: `Content type "${params.contentTypeIdentifier}" not found in schema.${availableMsg} Check the identifier (PascalCase) or run \`boject schema pull\`.`,
     };
   }
   const expectedListField = `${camelCase(params.contentTypeIdentifier)}List`;

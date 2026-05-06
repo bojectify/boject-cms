@@ -183,6 +183,86 @@ describe('runPerfSweep', () => {
     expect(r3.exitCode).toBe(3);
   });
 
+  it('attributes partial outcome per-scenario when only flat fails', async () => {
+    vi.spyOn(preflightModule, 'runPreflight').mockResolvedValue({
+      ok: true,
+      fields: {
+        listField: 'articleList',
+        filterField: 'publishDate',
+        relationField: 'author',
+      },
+      warnings: [],
+    });
+    vi.spyOn(runK6Module, 'runK6').mockImplementation(async (p) => {
+      const exitCode = String(p.scenarioFile).endsWith('graphql-flat.ts')
+        ? 1
+        : 0;
+      return {
+        ok: true,
+        exitCode,
+        rawJsonPath: join(p.outDir, p.rawFilename ?? 'raw.json'),
+        stderrLogPath: join(p.outDir, 'k6-stderr.log'),
+      };
+    });
+    const renderSpy = vi
+      .spyOn(renderModule, 'renderReport')
+      .mockResolvedValue();
+    vi.spyOn(confirmModule, 'confirmHeavyRun').mockResolvedValue(true);
+
+    await runPerfSweep({
+      cwd: process.cwd(),
+      apiKey: 'k',
+      flags: {
+        url: 'https://x.example.com',
+        contentType: 'Article',
+        out: outDir,
+        yes: true,
+        pageSizes: [100],
+        vus: [1],
+      },
+      stdout: () => {},
+      stderr: () => {},
+    });
+
+    const renderedMeta = renderSpy.mock.calls[0]?.[0].runMetadata;
+    expect(renderedMeta?.scenarios[0]?.name).toBe('graphql-sitemap');
+    expect(renderedMeta?.scenarios[0]?.outcome).toBe('completed');
+    expect(renderedMeta?.scenarios[1]?.name).toBe('graphql-flat');
+    expect(renderedMeta?.scenarios[1]?.outcome).toBe('partial');
+    expect(renderedMeta?.partial).toBe(true);
+  });
+
+  it('returns 2 with hint when output dir cannot be created', async () => {
+    vi.spyOn(preflightModule, 'runPreflight').mockResolvedValue({
+      ok: true,
+      fields: {
+        listField: 'articleList',
+        filterField: 'publishDate',
+        relationField: 'author',
+      },
+      warnings: [],
+    });
+    vi.spyOn(confirmModule, 'confirmHeavyRun').mockResolvedValue(true);
+
+    // /dev/null/no can never be created — mkdir fails on POSIX.
+    const stderr: string[] = [];
+    const r = await runPerfSweep({
+      cwd: process.cwd(),
+      apiKey: 'k',
+      flags: {
+        url: 'https://x.example.com',
+        contentType: 'Article',
+        out: '/dev/null/no',
+        yes: true,
+      },
+      stdout: () => {},
+      stderr: (l) => stderr.push(l),
+    });
+    expect(r.exitCode).toBe(2);
+    expect(stderr.join('\n')).toMatch(/cannot create output directory/i);
+    expect(stderr.join('\n')).toMatch(/--out/);
+  });
+
   it('uses default matrix [100,500,1000] × [1,5,20] when flags omitted', async () => {
     vi.spyOn(preflightModule, 'runPreflight').mockResolvedValue({
       ok: true,

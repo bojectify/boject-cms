@@ -64,8 +64,7 @@ Common flags:
   --yes                   Skip the heavy-run confirm prompt (CI-friendly).
 
 graphql-flat power-user overrides:
-  --target-rps <n>        Override peak RPS.
-  --duration <s>          Override total duration.
+  --target-rps <n>        Override peak RPS (default 2000).
   --stages <csv>          Comma-separated RPS stages, e.g. 50,100,500,2000.
 `;
 
@@ -87,8 +86,7 @@ Sweep matrix:
   --vus <csv>             Default 1,5,20.
 
 graphql-flat power-user overrides:
-  --target-rps <n>        Override peak RPS.
-  --duration <s>          Override total duration.
+  --target-rps <n>        Override peak RPS (default 2000).
   --stages <csv>          Comma-separated RPS stages, e.g. 50,100,500,2000.
 `;
 
@@ -407,7 +405,6 @@ async function dispatchPerf(args: string[]): Promise<number> {
           out: { type: 'string' },
           yes: { type: 'boolean', default: false },
           'target-rps': { type: 'string' },
-          duration: { type: 'string' },
           stages: { type: 'string' },
         },
       });
@@ -426,7 +423,6 @@ async function dispatchPerf(args: string[]): Promise<number> {
           targetRps: values['target-rps']
             ? Number(values['target-rps'])
             : undefined,
-          duration: values.duration,
           stages: values.stages
             ? values.stages.split(',').map((s) => Number(s.trim()))
             : undefined,
@@ -455,7 +451,6 @@ async function dispatchPerf(args: string[]): Promise<number> {
           'page-sizes': { type: 'string' },
           vus: { type: 'string' },
           'target-rps': { type: 'string' },
-          duration: { type: 'string' },
           stages: { type: 'string' },
         },
       });
@@ -479,7 +474,6 @@ async function dispatchPerf(args: string[]): Promise<number> {
           targetRps: values['target-rps']
             ? Number(values['target-rps'])
             : undefined,
-          duration: values.duration,
           stages: values.stages
             ? values.stages.split(',').map((s) => Number(s.trim()))
             : undefined,
