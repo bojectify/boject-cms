@@ -1,8 +1,13 @@
 // Scenario 1A — GraphQL cursor-paginated sitemap drain.
-// Each VU drains every PerfArticle once via perfArticleList; PERF_VUS
-// scales concurrent read load, NOT parallel partitioning. Requires the
-// perf DB to be pre-seeded (`pnpm perf:seed --size=N`) and the perf API
-// key present (`SEED_PERF_KEY=1 pnpm prisma:seed` once per fresh DB).
+// Each VU drains every entry of the chosen content type via {camelName}List.
+// PERF_VUS scales concurrent read load, NOT parallel partitioning.
+// Requires the perf DB pre-seeded (`pnpm perf:seed --size=N`) and the
+// perf API key present (`SEED_PERF_KEY=1 pnpm prisma:seed` once per
+// fresh DB).
+//
+// PERF_LIST_FIELD overrides the list field name (default
+// `perfArticleList` keeps the internal harness unchanged). The CLI
+// (#126) sets this to the operator's content-type list field.
 import http, { type RefinedResponse, type ResponseType } from 'k6/http';
 import { check, fail } from 'k6';
 import { loadK6Config } from '../lib/config-k6.ts';
@@ -11,6 +16,7 @@ import { drainLatency, drainWallClock } from '../lib/metrics-k6.ts';
 
 const PAGE_SIZE = Number(__ENV.PERF_PAGE_SIZE ?? '100');
 const VUS = Number(__ENV.PERF_VUS ?? '1');
+const LIST_FIELD = __ENV.PERF_LIST_FIELD ?? 'perfArticleList';
 
 export const options = {
   scenarios: {
@@ -33,9 +39,9 @@ export const options = {
 };
 
 const QUERY = `
-  query Articles($first: Int!, $after: String) {
-    perfArticleList(first: $first, after: $after) {
-      edges { node { id slug updatedAt } cursor }
+  query Items($first: Int!, $after: String) {
+    ${LIST_FIELD}(first: $first, after: $after) {
+      edges { node { id } cursor }
       pageInfo { endCursor hasNextPage }
     }
   }
@@ -63,9 +69,9 @@ export default function sitemap() {
       'has data': (r) => {
         try {
           const j = r.json() as {
-            data?: { perfArticleList?: { pageInfo?: unknown } };
+            data?: Record<string, { pageInfo?: unknown } | undefined>;
           };
-          return Boolean(j.data?.perfArticleList?.pageInfo);
+          return Boolean(j.data?.[LIST_FIELD]?.pageInfo);
         } catch {
           return false;
         }
@@ -75,13 +81,12 @@ export default function sitemap() {
     drainLatency.add(res.timings.duration);
     const page = (
       res.json() as {
-        data: {
-          perfArticleList: {
-            pageInfo: { endCursor: string | null; hasNextPage: boolean };
-          };
-        };
+        data: Record<
+          string,
+          { pageInfo: { endCursor: string | null; hasNextPage: boolean } }
+        >;
       }
-    ).data.perfArticleList.pageInfo;
+    ).data[LIST_FIELD]!.pageInfo;
     pages++;
     if (!page.hasNextPage) break;
     cursor = page.endCursor;
