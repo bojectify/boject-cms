@@ -52,8 +52,11 @@ export async function runPerfReport(
       try {
         const c = await loadProjectConfig(params.cwd);
         outRoot = c.config.perf?.out;
-      } catch {
-        // optional
+      } catch (err) {
+        const m = (err as Error).message;
+        if (!m.startsWith('No .boject.config.json found')) {
+          params.stderr(`Warning: ignoring config: ${m}`);
+        }
       }
     }
     outRoot = resolve(params.cwd, outRoot ?? './perf-reports');
@@ -111,7 +114,12 @@ export async function runPerfReport(
     return { exitCode: 2 };
   }
 
-  await renderReport({ rawJsonPath, outDir: runDir, runMetadata: metadata });
+  try {
+    await renderReport({ rawJsonPath, outDir: runDir, runMetadata: metadata });
+  } catch (err) {
+    params.stderr(`Error re-rendering ${runDir}: ${(err as Error).message}`);
+    return { exitCode: 2 };
+  }
   params.stdout(`Re-rendered ${runDir}`);
   return { exitCode: 0 };
 }

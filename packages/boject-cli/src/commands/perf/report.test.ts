@@ -7,8 +7,8 @@ import * as renderModule from '../../perf/render.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-async function makeRun(parent: string): Promise<string> {
-  const dir = join(parent, '2026-05-06T14-32-11Z-abcd');
+async function makeRun(parent: string, suffix: string): Promise<string> {
+  const dir = join(parent, suffix);
   await mkdir(dir, { recursive: true });
   await writeFile(join(dir, 'raw.json'), '');
   const meta = {
@@ -29,8 +29,8 @@ async function makeRun(parent: string): Promise<string> {
 describe('runPerfReport', () => {
   it('re-renders the latest run when no --from is given', async () => {
     const root = await mkdtemp(join(tmpdir(), 'boject-report-'));
-    await makeRun(root);
-    await makeRun(root); // The mkdtemp parent will hold both
+    await makeRun(root, '2026-05-06T14-32-11Z-aaaa');
+    const latestDir = await makeRun(root, '2026-05-06T14-32-11Z-zzzz');
     const renderSpy = vi
       .spyOn(renderModule, 'renderReport')
       .mockResolvedValue();
@@ -42,10 +42,8 @@ describe('runPerfReport', () => {
     });
     expect(r.exitCode).toBe(0);
     expect(renderSpy).toHaveBeenCalledTimes(1);
-    // Both runs share the same timestamp prefix; readdir + sort picks one of them.
-    // The "latest" picks the alphabetically last entry.
-    const used = renderSpy.mock.calls[0]?.[0].outDir;
-    expect(used?.startsWith(root)).toBe(true);
+    // Lex-last (zzzz > aaaa) should be picked
+    expect(renderSpy.mock.calls[0]?.[0].outDir).toBe(latestDir);
   });
 
   it('errors when --from points at a missing dir', async () => {
@@ -87,5 +85,22 @@ describe('runPerfReport', () => {
     });
     expect(r.exitCode).toBe(2);
     expect(stderr.join('\n')).toMatch(/raw\.json/);
+  });
+
+  it('errors on malformed metadata.json', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'boject-report-'));
+    const dir = join(root, 'broken');
+    await mkdir(dir);
+    await writeFile(join(dir, 'raw.json'), '');
+    await writeFile(join(dir, 'metadata.json'), '{ malformed json');
+    const stderr: string[] = [];
+    const r = await runPerfReport({
+      cwd: process.cwd(),
+      flags: { from: dir },
+      stdout: () => {},
+      stderr: (l) => stderr.push(l),
+    });
+    expect(r.exitCode).toBe(2);
+    expect(stderr.join('\n')).toMatch(/Error parsing/);
   });
 });
