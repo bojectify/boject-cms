@@ -2,33 +2,31 @@
 // Drives the cms's GraphQL endpoint at increasing arrival rates to find
 // the failure point. PERF_QUERY_SHAPE selects a query template:
 //   - bare: small projection, no joins
-//   - filtered: with a publishDate filter (exercises JSONB index path)
-//   - relation: includes author RELATION (exercises sub-resolver)
+//   - filtered: with a DATETIME filter (exercises JSONB index path)
+//   - relation: includes a RELATION (exercises sub-resolver)
 // Requires the perf DB seeded and PERF_API_KEY exported.
+//
+// Content-type identifiers default to the internal PerfArticle/Author
+// fixture so `pnpm perf:sweep` keeps working unchanged. The CLI
+// (#126) overrides them via PERF_LIST_FIELD / PERF_FILTER_FIELD /
+// PERF_RELATION_FIELD when running against an operator's schema.
 import http from 'k6/http';
 import { check } from 'k6';
 import { loadK6Config } from '../lib/config-k6.ts';
 import { apiKeyHeaders } from '../lib/auth-k6.ts';
 
 const QUERY_SHAPE = __ENV.PERF_QUERY_SHAPE ?? 'bare';
+const LIST_FIELD = __ENV.PERF_LIST_FIELD ?? 'perfArticleList';
+const FILTER_FIELD = __ENV.PERF_FILTER_FIELD ?? 'publishDate';
+const RELATION_FIELD = __ENV.PERF_RELATION_FIELD ?? 'author';
 
 const QUERIES: Record<string, string> = {
-  bare: `
-    query Articles { perfArticleList(first: 100) { edges { node { id slug } } } }
-  `,
-  filtered: `
-    query Articles { perfArticleList(first: 100, where: { publishDate: { gt: "2020-01-01T00:00:00Z" } }) { edges { node { id slug } } } }
-  `,
-  relation: `
-    query Articles { perfArticleList(first: 100) { edges { node { id slug author { id name } } } } }
-  `,
+  bare: `query Items { ${LIST_FIELD}(first: 100) { edges { node { id } } } }`,
+  filtered: `query Items { ${LIST_FIELD}(first: 100, where: { ${FILTER_FIELD}: { gt: "2020-01-01T00:00:00Z" } }) { edges { node { id } } } }`,
+  relation: `query Items { ${LIST_FIELD}(first: 100) { edges { node { id ${RELATION_FIELD} { id } } } } }`,
 };
 
 export const options = {
-  // Scenario block name doubles as the `scenario` tag on every emitted
-  // metric — k6 stamps it from this key, NOT from `options.tags`. Keep it
-  // in sync with the renderer's `renderSummaryMd` filter (`s.scenario ===
-  // 'flat'`) so Scenario 1B isn't empty in the report.
   scenarios: {
     flat: {
       executor: 'ramping-arrival-rate',
@@ -49,8 +47,6 @@ export const options = {
   thresholds: {
     http_req_failed: ['rate<0.05'],
     http_req_duration: ['p(99)<5000'],
-    // The `relation` shape can saturate sooner than maxVUs accommodates;
-    // fail loudly rather than silently under-counting the tail.
     dropped_iterations: ['count<100'],
   },
   tags: { shape: QUERY_SHAPE },
@@ -62,7 +58,9 @@ export default function flat() {
   const query = QUERIES[QUERY_SHAPE];
   if (!query) {
     throw new Error(
-      `Unknown PERF_QUERY_SHAPE: ${QUERY_SHAPE}. Valid: ${Object.keys(QUERIES).join(', ')}`
+      `Unknown PERF_QUERY_SHAPE: ${QUERY_SHAPE}. Valid: ${Object.keys(
+        QUERIES
+      ).join(', ')}`
     );
   }
 
