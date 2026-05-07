@@ -3,7 +3,6 @@ import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Client } from 'pg';
-import { PrismaClient } from '../../apps/cms/generated/prisma/client';
 import { loadNodeConfig } from '../lib/config-node';
 import { resetPerfDb } from '../seed/reset';
 import { seedPerfData } from '../seed/bulk-insert';
@@ -210,14 +209,12 @@ if (
       }
     },
     seed: async (size) => {
-      // Prisma v7 with driver adapters requires PrismaPg (see CLAUDE.md).
-      const { PrismaPg } = await import('@prisma/adapter-pg');
-      const adapter = new PrismaPg({ connectionString: cfg.perfDatabaseUrl });
-      const prisma = new PrismaClient({ adapter });
+      const client = new Client({ connectionString: cfg.perfDatabaseUrl });
+      await client.connect();
       try {
-        await seedPerfData({ prisma, articleCount: size });
+        await seedPerfData({ client, articleCount: size });
       } finally {
-        await prisma.$disconnect();
+        await client.end();
       }
     },
     scenario: async (name, env) => {

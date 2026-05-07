@@ -3,7 +3,10 @@ import { cp, mkdir, rm } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 
 export default defineConfig({
-  entry: ['src/index.ts'],
+  entry: {
+    index: 'src/index.ts',
+    'perf/index': 'src/perf/index.ts',
+  },
   format: ['esm'],
   target: 'node24',
   clean: true,
