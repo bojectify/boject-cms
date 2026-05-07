@@ -564,6 +564,95 @@ describe('Content Entry endpoints', async () => {
     });
   });
 
+  describe('DELETE /api/content-entries/[id]/draft — content:write scope (#172)', () => {
+    // Helper: create entry, publish it, then make a CHANGED draft.
+    // discardDraft requires a PUBLISHED fallback to exist.
+    async function createWithDraft(ip: string): Promise<string> {
+      const cookie = await getSessionCookie();
+      const create = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': ip,
+        },
+        body: JSON.stringify({
+          contentTypeId: testContentType.id,
+          data: { title: 'Discard target' },
+        }),
+      });
+      const created = (await create.json()) as { id: string };
+      // Publish
+      await fetch(`/api/content-entries/${created.id}`, {
+        method: 'PUT',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': ip,
+        },
+        body: JSON.stringify({
+          data: { title: 'Discard target' },
+          status: 'PUBLISHED',
+        }),
+      });
+      // Update (creates a CHANGED draft)
+      await fetch(`/api/content-entries/${created.id}`, {
+        method: 'PUT',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': ip,
+        },
+        body: JSON.stringify({ data: { title: 'Edited' } }),
+      });
+      return created.id;
+    }
+
+    it('allows API keys with content:write scope', async () => {
+      const id = await createWithDraft('203.0.113.26');
+      const res = await fetch(`/api/content-entries/${id}/draft`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${TEST_API_KEY}`,
+          'X-Forwarded-For': '203.0.113.26',
+        },
+      });
+      expect(res.status).toBe(200);
+    });
+
+    it('rejects API keys without content:write scope', async () => {
+      const id = await createWithDraft('203.0.113.27');
+      const rawKey = `boject_test_readonly_${Date.now()}`;
+      const keyHash = createHash('sha256').update(rawKey).digest('hex');
+      const keyPrefix = rawKey.slice(0, 11);
+      await prisma.apiKey.create({
+        data: {
+          name: 'Readonly test key',
+          keyHash,
+          keyPrefix,
+          scopes: ['content:read'],
+        },
+      });
+      try {
+        const res = await fetch(`/api/content-entries/${id}/draft`, {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${rawKey}`,
+            'X-Forwarded-For': '203.0.113.27',
+          },
+        });
+        expect(res.status).toBe(403);
+        const body = (await res.json()) as { data?: { error?: string } };
+        expect(body.data?.error).toBe('INSUFFICIENT_SCOPE');
+      } finally {
+        await prisma.apiKey.delete({ where: { keyHash } });
+        // Clean up the PUBLISHED+CHANGED entry so it doesn't pollute the
+        // "filters by status=PUBLISHED" test in the GET describe below.
+        await prisma.contentEntry.delete({ where: { id } });
+      }
+    });
+  });
+
   describe('GET /api/content-entries', () => {
     it('lists entries with contentTypeId (session sees all)', async () => {
       const cookie = await getSessionCookie();
