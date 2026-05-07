@@ -1,0 +1,80 @@
+{
+  "version": 2,
+  "exportedAt": "2026-05-07T00:00:00.000Z",
+  "portable": false,
+  "contentTypes": [
+    {
+      "id": "ct-author",
+      "identifier": "Author",
+      "name": "Author",
+      "description": null,
+      "fields": [
+        {
+          "id": "fa1",
+          "identifier": "name",
+          "name": "Name",
+          "type": "ENTRY_TITLE",
+          "required": true,
+          "unique": true,
+          "order": 0,
+          "options": null
+        },
+        {
+          "id": "fa2",
+          "identifier": "bio",
+          "name": "Bio",
+          "type": "TEXTAREA",
+          "required": false,
+          "order": 1,
+          "options": null
+        }
+      ]
+    },
+    {
+      "id": "ct-article",
+      "identifier": "Article",
+      "name": "Article",
+      "description": null,
+      "fields": [
+        {
+          "id": "fr1",
+          "identifier": "title",
+          "name": "Title",
+          "type": "ENTRY_TITLE",
+          "required": true,
+          "unique": true,
+          "order": 0,
+          "options": null
+        },
+        {
+          "id": "fr2",
+          "identifier": "slug",
+          "name": "Slug",
+          "type": "SLUG",
+          "required": false,
+          "unique": true,
+          "order": 1,
+          "options": null
+        },
+        {
+          "id": "fr3",
+          "identifier": "author",
+          "name": "Author",
+          "type": "RELATION",
+          "required": true,
+          "order": 2,
+          "options": { "targetContentTypeIds": ["ct-author"] }
+        },
+        {
+          "id": "fr4",
+          "identifier": "tags",
+          "name": "Tags",
+          "type": "MULTIRELATION",
+          "required": false,
+          "order": 3,
+          "options": { "targetContentTypeIds": ["ct-author"] }
+        }
+      ]
+    }
+  ]
+}
