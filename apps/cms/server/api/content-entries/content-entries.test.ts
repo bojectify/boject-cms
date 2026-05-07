@@ -2850,19 +2850,82 @@ describe('Content Entry endpoints', async () => {
       const body = (await res.json()) as { status: string };
       expect(body.status).toBe('PUBLISHED');
     });
+  });
 
-    it('rejects API-key callers', async () => {
-      const res = await fetch(
-        '/api/content-entries/00000000-0000-0000-0000-000000000000/republish',
-        {
+  describe('POST /api/content-entries/[id]/republish — content:write scope (#172)', () => {
+    async function createPublished(ip: string): Promise<string> {
+      const cookie = await getSessionCookie();
+      const title = `Republish target ${Date.now()}-${Math.random()}`;
+      const create = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': ip,
+        },
+        body: JSON.stringify({
+          contentTypeId: testContentType.id,
+          data: { title },
+        }),
+      });
+      const created = (await create.json()) as { id: string };
+      await fetch(`/api/content-entries/${created.id}`, {
+        method: 'PUT',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': ip,
+        },
+        body: JSON.stringify({
+          data: { title },
+          status: 'PUBLISHED',
+        }),
+      });
+      return created.id;
+    }
+
+    it('allows API keys with content:write scope', async () => {
+      const id = await createPublished('203.0.113.34');
+      const res = await fetch(`/api/content-entries/${id}/republish`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${TEST_API_KEY}`,
+          'X-Forwarded-For': '203.0.113.34',
+        },
+      });
+      expect(res.status).toBe(200);
+    });
+
+    it('rejects API keys without content:write scope', async () => {
+      const id = await createPublished('203.0.113.35');
+      const rawKey = `boject_test_readonly_${Date.now()}`;
+      const keyHash = createHash('sha256').update(rawKey).digest('hex');
+      const keyPrefix = rawKey.slice(0, 11);
+      await prisma.apiKey.create({
+        data: {
+          name: 'Readonly test key',
+          keyHash,
+          keyPrefix,
+          scopes: ['content:read'],
+        },
+      });
+      try {
+        const res = await fetch(`/api/content-entries/${id}/republish`, {
           method: 'POST',
           headers: {
-            Authorization: `Bearer ${TEST_API_KEY}`,
-            'X-Forwarded-For': '203.0.113.53',
+            Authorization: `Bearer ${rawKey}`,
+            'X-Forwarded-For': '203.0.113.35',
           },
-        }
-      );
-      expect(res.status).toBe(403);
+        });
+        expect(res.status).toBe(403);
+        const body = (await res.json()) as { data?: { error?: string } };
+        expect(body.data?.error).toBe('INSUFFICIENT_SCOPE');
+      } finally {
+        // The rejected republish leaves the entry as PUBLISHED — clean up
+        // so it doesn't pollute downstream active-status-default-filter tests.
+        await prisma.contentEntry.delete({ where: { id } });
+        await prisma.apiKey.delete({ where: { keyHash } });
+      }
     });
   });
 

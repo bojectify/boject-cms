@@ -1,10 +1,10 @@
 import { assertUuid } from '../../../utils/validation';
 import {
-  isCmsRequest,
   flattenEntryWithVersion,
   getPublishedVersion,
 } from '../../../utils/resolveVersion';
 import { enforceMutationRateLimit } from '../../../utils/rateLimitEndpoint';
+import { assertApiKeyScope } from '../../../utils/assertApiKeyScope';
 import {
   planTransition,
   applyTransitionMutations,
@@ -12,10 +12,8 @@ import {
 import { enqueueWebhookDeliveries } from '../../../utils/webhooks';
 
 export default defineEventHandler(async (event) => {
-  if (!isCmsRequest(event)) {
-    throw createError({ statusCode: 403, statusMessage: 'Forbidden' });
-  }
   enforceMutationRateLimit(event, 'content-entries.republish');
+  assertApiKeyScope(event, 'content:write');
   const id = assertUuid(getRouterParam(event, 'id'), 'id');
 
   const entry = await prisma.contentEntry.findUnique({
