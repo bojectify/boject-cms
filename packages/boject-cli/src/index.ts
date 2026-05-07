@@ -12,6 +12,7 @@ import { runPerfScenario } from './commands/perf/scenario.js';
 import { runPerfSweep } from './commands/perf/sweep.js';
 import { runPerfReport } from './commands/perf/report.js';
 import { runPerfReset } from './commands/perf/reset.js';
+import { runPerfSeed } from './commands/perf/seed.js';
 import { spawn } from 'node:child_process';
 import { CLI_VERSION } from './version.js';
 
@@ -27,7 +28,7 @@ Commands:
   apikey create      Create a new API key.
   apikey list        List API keys.
   apikey revoke      Revoke an API key by prefix.
-  perf <command>     Run perf scenarios / sweep / report / check / reset.
+  perf <command>     Run perf scenarios / sweep / report / check / seed / reset.
 
 Run \`boject <command> --help\` for command-specific flags.
 `;
@@ -39,6 +40,7 @@ Commands:
   sweep             Run all scenarios across the default sweep matrix.
   report            Re-render a previous run.
   check             Preflight verification (k6, target, key, content type, fields).
+  seed              Generate + write perf entries (SQL or HTTP transport).
   reset             Truncate the perf content tables in a target DB.
 
 Run \`boject perf <command> --help\` for command-specific flags.
@@ -100,6 +102,29 @@ With no flags, picks the latest run in ./perf-reports/ (or perf.out from
 
   --from <dir>    Re-render this specific run dir.
   --out <dir>     Override the search root (default ./perf-reports/).
+`;
+
+const PERF_SEED_USAGE = `Usage: boject perf seed --content-type <id> [flags]
+
+Required:
+  --content-type <id>       Target content type (must exist in the bundle).
+
+Transport (exactly one):
+  --database-url <url>      Direct SQL via writeViaSql. URL must end /boject_perf.
+  --http-seed               REST via writeViaHttp. Uses --url + --api-key.
+
+Bundle source:
+  (default)                 GET /api/schema/export via --url + --api-key.
+  --bundle <path>           Read from local JSON file (validated).
+
+Common:
+  --size <n>                Entries to seed. Default 10000.
+  --seed <int>              PRNG seed for determinism. Default 1.
+  --concurrency <n>         HTTP only. Default 8.
+  --allow-non-perf-db       SQL only. Override the /boject_perf URL suffix lock.
+  --url <url>               CMS base URL.
+  --api-key <key>           Defaults to $BOJECT_API_KEY.
+  --yes                     Bypass TTY confirmation prompts.
 `;
 
 const PERF_RESET_USAGE = `Usage: boject perf reset --database-url <url> [flags]
@@ -518,6 +543,61 @@ async function dispatchPerf(args: string[]): Promise<number> {
         stderr,
       });
       return r.exitCode;
+    }
+    case 'seed': {
+      if (rest.includes('--help') || rest.includes('-h')) {
+        process.stdout.write(PERF_SEED_USAGE);
+        return 0;
+      }
+      const { values } = parseArgs({
+        args: rest,
+        allowPositionals: false,
+        options: {
+          'content-type': { type: 'string' },
+          'database-url': { type: 'string' },
+          'http-seed': { type: 'boolean', default: false },
+          bundle: { type: 'string' },
+          size: { type: 'string' },
+          seed: { type: 'string' },
+          concurrency: { type: 'string' },
+          'allow-non-perf-db': { type: 'boolean', default: false },
+          url: { type: 'string' },
+          'api-key': { type: 'string' },
+          yes: { type: 'boolean', default: false },
+        },
+      });
+      if (!values['content-type']) {
+        process.stderr.write('boject perf seed requires --content-type\n');
+        return 1;
+      }
+      const size = values.size ? Number(values.size) : 10000;
+      if (!Number.isFinite(size) || size < 1) {
+        process.stderr.write(`Invalid --size: ${values.size}\n`);
+        return 1;
+      }
+      const seed = values.seed ? Number(values.seed) : undefined;
+      const concurrency = values.concurrency
+        ? Number(values.concurrency)
+        : undefined;
+      try {
+        await runPerfSeed({
+          contentType: values['content-type'],
+          size,
+          seed,
+          databaseUrl: values['database-url'],
+          httpSeed: values['http-seed'],
+          bundle: values.bundle,
+          concurrency,
+          allowNonPerfDb: values['allow-non-perf-db'],
+          url: values.url ?? process.env.BOJECT_CMS_URL,
+          apiKey: values['api-key'] ?? process.env.BOJECT_API_KEY,
+          yes: values.yes === true,
+        });
+        return 0;
+      } catch (err) {
+        process.stderr.write(`${(err as Error).message}\n`);
+        return 1;
+      }
     }
     case 'reset': {
       if (rest.includes('--help') || rest.includes('-h')) {
