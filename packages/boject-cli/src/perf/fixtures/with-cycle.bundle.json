@@ -1,0 +1,34 @@
+{
+  "version": 2,
+  "exportedAt": "2026-05-07T00:00:00.000Z",
+  "portable": false,
+  "contentTypes": [
+    {
+      "id": "ct-page",
+      "identifier": "Page",
+      "name": "Page",
+      "description": null,
+      "fields": [
+        {
+          "id": "fp1",
+          "identifier": "title",
+          "name": "Title",
+          "type": "ENTRY_TITLE",
+          "required": true,
+          "unique": true,
+          "order": 0,
+          "options": null
+        },
+        {
+          "id": "fp2",
+          "identifier": "parent",
+          "name": "Parent",
+          "type": "RELATION",
+          "required": false,
+          "order": 1,
+          "options": { "targetContentTypeIds": ["ct-page"] }
+        }
+      ]
+    }
+  ]
+}

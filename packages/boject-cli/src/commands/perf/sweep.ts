@@ -30,6 +30,16 @@ export interface PerfSweepFlags {
   vus?: number[];
   targetRps?: number;
   stages?: number[];
+  // New (#159) — seed-then-run + read-only opt-in
+  readOnly?: boolean;
+  databaseUrl?: string;
+  httpSeed?: boolean;
+  bundle?: string;
+  size?: number;
+  seed?: number;
+  concurrency?: number;
+  reset?: boolean;
+  allowNonPerfDb?: boolean;
 }
 
 // Mirrors the ramp `parseStages()` builds in
@@ -84,6 +94,9 @@ async function loadDefaults(
   filterField?: string;
   relationField?: string;
   out?: string;
+  size?: number;
+  seed?: number;
+  perfDatabaseUrl?: string;
 }> {
   try {
     const c = await loadProjectConfig(cwd);
@@ -93,6 +106,9 @@ async function loadDefaults(
       filterField: c.config.perf?.filterField,
       relationField: c.config.perf?.relationField,
       out: c.config.perf?.out,
+      size: c.config.perf?.size,
+      seed: c.config.perf?.seed,
+      perfDatabaseUrl: c.config.perf?.perfDatabaseUrl,
     };
   } catch (err) {
     const message = (err as Error).message;
@@ -107,7 +123,60 @@ export async function runPerfSweep(
   params: PerfSweepParams
 ): Promise<PerfSweepResult> {
   const flags = params.flags;
+
   const defaults = await loadDefaults(params.cwd, params.stderr);
+  const effectiveDatabaseUrl = flags.databaseUrl ?? defaults.perfDatabaseUrl;
+
+  // #159: pre-flight requires either --read-only or a seed transport.
+  if (!flags.readOnly && !effectiveDatabaseUrl && !flags.httpSeed) {
+    params.stderr(
+      'boject perf sweep without --read-only must provide a seed transport ' +
+        '(--database-url for SQL or --http-seed for HTTP). ' +
+        'Read-only mode is now opt-in via --read-only.'
+    );
+    return { exitCode: 2 };
+  }
+
+  if (!flags.readOnly) {
+    if (flags.reset && effectiveDatabaseUrl) {
+      try {
+        const { runPerfReset } = await import('./reset.js');
+        await runPerfReset({
+          databaseUrl: effectiveDatabaseUrl,
+          yes: flags.yes,
+          allowNonPerfDb: flags.allowNonPerfDb,
+        });
+      } catch (err) {
+        params.stderr(`${(err as Error).message}\n`);
+        return { exitCode: 1 };
+      }
+    }
+    const seedContentType = flags.contentType ?? defaults.contentType;
+    if (!seedContentType) {
+      params.stderr('Seed-then-run requires --content-type');
+      return { exitCode: 2 };
+    }
+    try {
+      const { runPerfSeed } = await import('./seed.js');
+      await runPerfSeed({
+        contentType: seedContentType,
+        size: flags.size ?? defaults.size ?? 10000,
+        seed: flags.seed ?? defaults.seed,
+        databaseUrl: effectiveDatabaseUrl,
+        httpSeed: flags.httpSeed,
+        bundle: flags.bundle,
+        url: flags.url ?? defaults.url,
+        apiKey: flags.apiKey ?? params.apiKey,
+        concurrency: flags.concurrency,
+        allowNonPerfDb: flags.allowNonPerfDb,
+        yes: flags.yes,
+      });
+    } catch (err) {
+      params.stderr(`${(err as Error).message}\n`);
+      return { exitCode: 1 };
+    }
+  }
+
   const url = flags.url ?? defaults.url;
   const apiKey = flags.apiKey ?? params.apiKey;
   const contentType = flags.contentType ?? defaults.contentType;

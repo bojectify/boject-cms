@@ -3,7 +3,10 @@ import { cp, mkdir, rm } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 
 export default defineConfig({
-  entry: ['src/index.ts'],
+  entry: {
+    index: 'src/index.ts',
+    'perf/index': 'src/perf/index.ts',
+  },
   format: ['esm'],
   target: 'node24',
   clean: true,
@@ -27,5 +30,11 @@ export default defineConfig({
     await cp('src/vendor/perf/lib', 'dist/vendor/perf/lib', {
       recursive: true,
     });
+    // Also copy contentBundleTypes.ts so the workspace fixture and any
+    // downstream TypeScript consumer can import @boject/cli/vendor/contentBundleTypes.
+    await cp(
+      'src/vendor/contentBundleTypes.ts',
+      'dist/vendor/contentBundleTypes.ts'
+    );
   },
 });

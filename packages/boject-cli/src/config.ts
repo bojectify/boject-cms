@@ -6,6 +6,9 @@ export interface ProjectPerfConfig {
   filterField?: string;
   relationField?: string;
   out?: string;
+  size?: number;
+  seed?: number;
+  perfDatabaseUrl?: string;
 }
 
 export interface ProjectConfig {
@@ -114,6 +117,7 @@ function validatePerf(
     'filterField',
     'relationField',
     'out',
+    'perfDatabaseUrl',
   ] as const) {
     const v = obj[key];
     if (v === undefined) continue;
@@ -121,6 +125,22 @@ function validatePerf(
       throw new Error(`${path}: perf.${key} must be a non-empty string`);
     }
     out[key] = v;
+  }
+  if (obj.size !== undefined) {
+    if (
+      typeof obj.size !== 'number' ||
+      !Number.isInteger(obj.size) ||
+      obj.size < 1
+    ) {
+      throw new Error(`${path}: perf.size must be a positive integer`);
+    }
+    out.size = obj.size;
+  }
+  if (obj.seed !== undefined) {
+    if (typeof obj.seed !== 'number' || !Number.isInteger(obj.seed)) {
+      throw new Error(`${path}: perf.seed must be an integer`);
+    }
+    out.seed = obj.seed;
   }
   return out;
 }

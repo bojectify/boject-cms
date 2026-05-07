@@ -27,10 +27,21 @@ async function cmsReachable(): Promise<boolean> {
   }
 }
 
+async function perfApiKeyValid(): Promise<boolean> {
+  try {
+    const r = await fetch(`${URL_BASE}/api/schema/export`, {
+      headers: { Authorization: `Bearer ${API_KEY}` },
+    });
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+
 describe('boject perf — e2e', () => {
   let canRun = false;
   beforeAll(async () => {
-    canRun = k6OnPath() && (await cmsReachable());
+    canRun = k6OnPath() && (await cmsReachable()) && (await perfApiKeyValid());
   });
 
   it('check passes against a populated dev CMS', async () => {
@@ -82,6 +93,7 @@ describe('boject perf — e2e', () => {
         API_KEY,
         '--out',
         out,
+        '--read-only',
         '--yes',
       ],
       { encoding: 'utf8', timeout: 120_000 }

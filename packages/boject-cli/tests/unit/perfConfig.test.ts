@@ -67,4 +67,61 @@ describe('loadProjectConfig — perf section', () => {
     });
     await expect(loadProjectConfig(dir)).rejects.toThrow(/perf\.contentType/);
   });
+
+  it('parses size, seed, and perfDatabaseUrl when present', async () => {
+    const dir = await withTempConfig({
+      cms: { url: 'https://cms.example.com' },
+      schema: { path: 'content-types/schema.boject.json' },
+      perf: {
+        contentType: 'Article',
+        size: 5000,
+        seed: 42,
+        perfDatabaseUrl: 'postgresql://u:p@h/boject_perf',
+      },
+    });
+    const r = await loadProjectConfig(dir);
+    expect(r.config.perf).toEqual({
+      contentType: 'Article',
+      size: 5000,
+      seed: 42,
+      perfDatabaseUrl: 'postgresql://u:p@h/boject_perf',
+    });
+  });
+
+  it('rejects a non-positive size', async () => {
+    const dir = await withTempConfig({
+      cms: { url: 'https://cms.example.com' },
+      schema: { path: 'content-types/schema.boject.json' },
+      perf: { contentType: 'Article', size: 0 },
+    });
+    await expect(loadProjectConfig(dir)).rejects.toThrow(/size/i);
+  });
+
+  it('rejects a non-integer size', async () => {
+    const dir = await withTempConfig({
+      cms: { url: 'https://cms.example.com' },
+      schema: { path: 'content-types/schema.boject.json' },
+      perf: { contentType: 'Article', size: 1.5 },
+    });
+    await expect(loadProjectConfig(dir)).rejects.toThrow(/size|integer/i);
+  });
+
+  it('accepts a negative seed', async () => {
+    const dir = await withTempConfig({
+      cms: { url: 'https://cms.example.com' },
+      schema: { path: 'content-types/schema.boject.json' },
+      perf: { contentType: 'Article', seed: -7 },
+    });
+    const r = await loadProjectConfig(dir);
+    expect(r.config.perf?.seed).toBe(-7);
+  });
+
+  it('rejects an empty perfDatabaseUrl', async () => {
+    const dir = await withTempConfig({
+      cms: { url: 'https://cms.example.com' },
+      schema: { path: 'content-types/schema.boject.json' },
+      perf: { contentType: 'Article', perfDatabaseUrl: '' },
+    });
+    await expect(loadProjectConfig(dir)).rejects.toThrow(/perfDatabaseUrl/i);
+  });
 });

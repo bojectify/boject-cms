@@ -11,6 +11,8 @@ import { runPerfCheck } from './commands/perf/check.js';
 import { runPerfScenario } from './commands/perf/scenario.js';
 import { runPerfSweep } from './commands/perf/sweep.js';
 import { runPerfReport } from './commands/perf/report.js';
+import { runPerfReset } from './commands/perf/reset.js';
+import { runPerfSeed } from './commands/perf/seed.js';
 import { spawn } from 'node:child_process';
 import { CLI_VERSION } from './version.js';
 
@@ -26,7 +28,7 @@ Commands:
   apikey create      Create a new API key.
   apikey list        List API keys.
   apikey revoke      Revoke an API key by prefix.
-  perf <command>     Run perf scenarios / sweep / report / check.
+  perf <command>     Run perf scenarios / sweep / report / check / seed / reset.
 
 Run \`boject <command> --help\` for command-specific flags.
 `;
@@ -38,6 +40,8 @@ Commands:
   sweep             Run all scenarios across the default sweep matrix.
   report            Re-render a previous run.
   check             Preflight verification (k6, target, key, content type, fields).
+  seed              Generate + write perf entries (SQL or HTTP transport).
+  reset             Truncate the perf content tables in a target DB.
 
 Run \`boject perf <command> --help\` for command-specific flags.
 `;
@@ -55,6 +59,11 @@ Scenarios:
   graphql-flat       RPS ramp 50→2000 over 3 minutes (heavy load).
   graphql-sitemap    Cursor pagination drain at varied page sizes / VU levels.
 
+Mode (one required):
+  --read-only             Skip seeding; run k6 against the existing dataset.
+  --database-url <url>    Seed via SQL (writeViaSql) before running k6.
+  --http-seed             Seed via REST (writeViaHttp) before running k6.
+
 Common flags:
   --url <url>             Target CMS base URL. Defaults to .boject.config.json.
   --api-key <key>         Bearer token. Defaults to $BOJECT_API_KEY.
@@ -62,6 +71,14 @@ Common flags:
   --relation-field <id>   Override single-target RELATION field for "relation" shape.
   --out <dir>             Report output dir. Default ./perf-reports/.
   --yes                   Skip the heavy-run confirm prompt (CI-friendly).
+
+Seed-then-run flags (only when --read-only is NOT set):
+  --bundle <path>         Local bundle file. Default: GET /api/schema/export.
+  --size <n>              Entries to seed. Default 10000.
+  --seed <int>            PRNG seed for determinism. Default 1.
+  --concurrency <n>       HTTP only. Default 8.
+  --reset                 SQL only. Truncate perf tables before seeding.
+  --allow-non-perf-db     SQL only. Override the /boject_perf URL suffix lock.
 
 graphql-flat power-user overrides:
   --target-rps <n>        Override peak RPS (default 2000).
@@ -73,6 +90,11 @@ const PERF_SWEEP_USAGE = `Usage: boject perf sweep --content-type <id> [flags]
 Runs both graphql-sitemap (across page sizes × VU levels) and graphql-flat
 (across all three query shapes) producing one combined report.
 
+Mode (one required):
+  --read-only             Skip seeding; run k6 against the existing dataset.
+  --database-url <url>    Seed via SQL (writeViaSql) before running k6.
+  --http-seed             Seed via REST (writeViaHttp) before running k6.
+
 Common flags:
   --url <url>             Target CMS base URL.
   --api-key <key>         Bearer token. Defaults to $BOJECT_API_KEY.
@@ -80,6 +102,14 @@ Common flags:
   --relation-field <id>   Override single-target RELATION for "relation" shape.
   --out <dir>             Report output dir. Default ./perf-reports/.
   --yes                   Skip the heavy-run confirm prompt (CI-friendly).
+
+Seed-then-run flags (only when --read-only is NOT set):
+  --bundle <path>         Local bundle file. Default: GET /api/schema/export.
+  --size <n>              Entries to seed. Default 10000.
+  --seed <int>            PRNG seed for determinism. Default 1.
+  --concurrency <n>       HTTP only. Default 8.
+  --reset                 SQL only. Truncate perf tables before seeding.
+  --allow-non-perf-db     SQL only. Override the /boject_perf URL suffix lock.
 
 Sweep matrix:
   --page-sizes <csv>      Default 100,500,1000.
@@ -98,6 +128,43 @@ With no flags, picks the latest run in ./perf-reports/ (or perf.out from
 
   --from <dir>    Re-render this specific run dir.
   --out <dir>     Override the search root (default ./perf-reports/).
+`;
+
+const PERF_SEED_USAGE = `Usage: boject perf seed --content-type <id> [flags]
+
+Required:
+  --content-type <id>       Target content type (must exist in the bundle).
+
+Transport (exactly one):
+  --database-url <url>      Direct SQL via writeViaSql. URL must end /boject_perf.
+  --http-seed               REST via writeViaHttp. Uses --url + --api-key.
+
+Bundle source:
+  (default)                 GET /api/schema/export via --url + --api-key.
+  --bundle <path>           Read from local JSON file (validated).
+
+Common:
+  --size <n>                Entries to seed. Default 10000.
+  --seed <int>              PRNG seed for determinism. Default 1.
+  --concurrency <n>         HTTP only. Default 8.
+  --reset                   SQL only. Truncate perf data before seeding.
+  --allow-non-perf-db       SQL only. Override the /boject_perf URL suffix lock.
+  --url <url>               CMS base URL.
+  --api-key <key>           Defaults to $BOJECT_API_KEY.
+  --yes                     Bypass TTY confirmation prompts.
+`;
+
+const PERF_RESET_USAGE = `Usage: boject perf reset --database-url <url> [flags]
+
+Truncates the perf-specific content tables in the target database.
+
+Required flags:
+  --database-url <url>      Postgres connection string. Must end in /boject_perf
+                            unless --allow-non-perf-db is set.
+
+Optional flags:
+  --allow-non-perf-db       Override the /boject_perf URL suffix lock.
+  --yes                     Skip the TTY confirmation prompt.
 `;
 
 const SCHEMA_PULL_USAGE = `Usage: boject schema pull [--out <path>] [--url <url>]
@@ -406,6 +473,15 @@ async function dispatchPerf(args: string[]): Promise<number> {
           yes: { type: 'boolean', default: false },
           'target-rps': { type: 'string' },
           stages: { type: 'string' },
+          'read-only': { type: 'boolean', default: false },
+          'database-url': { type: 'string' },
+          'http-seed': { type: 'boolean', default: false },
+          bundle: { type: 'string' },
+          size: { type: 'string' },
+          seed: { type: 'string' },
+          concurrency: { type: 'string' },
+          reset: { type: 'boolean', default: false },
+          'allow-non-perf-db': { type: 'boolean', default: false },
         },
       });
       const r = await runPerfScenario({
@@ -426,6 +502,17 @@ async function dispatchPerf(args: string[]): Promise<number> {
           stages: values.stages
             ? values.stages.split(',').map((s) => Number(s.trim()))
             : undefined,
+          readOnly: values['read-only'] === true,
+          databaseUrl: values['database-url'],
+          httpSeed: values['http-seed'] === true,
+          bundle: values.bundle,
+          size: values.size ? Number(values.size) : undefined,
+          seed: values.seed ? Number(values.seed) : undefined,
+          concurrency: values.concurrency
+            ? Number(values.concurrency)
+            : undefined,
+          reset: values.reset === true,
+          allowNonPerfDb: values['allow-non-perf-db'] === true,
         },
         stdout,
         stderr,
@@ -452,6 +539,15 @@ async function dispatchPerf(args: string[]): Promise<number> {
           vus: { type: 'string' },
           'target-rps': { type: 'string' },
           stages: { type: 'string' },
+          'read-only': { type: 'boolean', default: false },
+          'database-url': { type: 'string' },
+          'http-seed': { type: 'boolean', default: false },
+          bundle: { type: 'string' },
+          size: { type: 'string' },
+          seed: { type: 'string' },
+          concurrency: { type: 'string' },
+          reset: { type: 'boolean', default: false },
+          'allow-non-perf-db': { type: 'boolean', default: false },
         },
       });
       const r = await runPerfSweep({
@@ -477,6 +573,17 @@ async function dispatchPerf(args: string[]): Promise<number> {
           stages: values.stages
             ? values.stages.split(',').map((s) => Number(s.trim()))
             : undefined,
+          readOnly: values['read-only'] === true,
+          databaseUrl: values['database-url'],
+          httpSeed: values['http-seed'] === true,
+          bundle: values.bundle,
+          size: values.size ? Number(values.size) : undefined,
+          seed: values.seed ? Number(values.seed) : undefined,
+          concurrency: values.concurrency
+            ? Number(values.concurrency)
+            : undefined,
+          reset: values.reset === true,
+          allowNonPerfDb: values['allow-non-perf-db'] === true,
         },
         stdout,
         stderr,
@@ -503,6 +610,111 @@ async function dispatchPerf(args: string[]): Promise<number> {
         stderr,
       });
       return r.exitCode;
+    }
+    case 'seed': {
+      if (rest.includes('--help') || rest.includes('-h')) {
+        process.stdout.write(PERF_SEED_USAGE);
+        return 0;
+      }
+      const { values } = parseArgs({
+        args: rest,
+        allowPositionals: false,
+        options: {
+          'content-type': { type: 'string' },
+          'database-url': { type: 'string' },
+          'http-seed': { type: 'boolean', default: false },
+          bundle: { type: 'string' },
+          size: { type: 'string' },
+          seed: { type: 'string' },
+          concurrency: { type: 'string' },
+          'allow-non-perf-db': { type: 'boolean', default: false },
+          reset: { type: 'boolean', default: false },
+          url: { type: 'string' },
+          'api-key': { type: 'string' },
+          yes: { type: 'boolean', default: false },
+        },
+      });
+
+      // Merge config defaults (CLI flags win).
+      let configPerf: import('./config.js').ProjectPerfConfig | undefined;
+      let configCms: import('./config.js').ProjectConfig['cms'] | undefined;
+      try {
+        const { loadProjectConfig } = await import('./config.js');
+        const r = await loadProjectConfig(process.cwd());
+        configPerf = r.config.perf;
+        configCms = r.config.cms;
+      } catch {
+        // No config file is fine — operator can pass everything via flags.
+      }
+
+      const contentType = values['content-type'] ?? configPerf?.contentType;
+      if (!contentType) {
+        process.stderr.write(
+          'boject perf seed requires --content-type (or perf.contentType in .boject.config.json)\n'
+        );
+        return 1;
+      }
+      const size = values.size
+        ? Number(values.size)
+        : (configPerf?.size ?? 10000);
+      if (!Number.isFinite(size) || size < 1) {
+        process.stderr.write(`Invalid --size: ${values.size}\n`);
+        return 1;
+      }
+      const seed = values.seed ? Number(values.seed) : configPerf?.seed;
+      const concurrency = values.concurrency
+        ? Number(values.concurrency)
+        : undefined;
+      const databaseUrl = values['database-url'] ?? configPerf?.perfDatabaseUrl;
+      try {
+        await runPerfSeed({
+          contentType,
+          size,
+          seed,
+          databaseUrl,
+          httpSeed: values['http-seed'],
+          bundle: values.bundle,
+          concurrency,
+          allowNonPerfDb: values['allow-non-perf-db'],
+          reset: values.reset === true,
+          url:
+            values.url ??
+            process.env.BOJECT_CMS_URL ??
+            (configCms?.url as string | undefined),
+          apiKey: values['api-key'] ?? process.env.BOJECT_API_KEY,
+          yes: values.yes === true,
+        });
+        return 0;
+      } catch (err) {
+        process.stderr.write(`${(err as Error).message}\n`);
+        return 1;
+      }
+    }
+    case 'reset': {
+      if (rest.includes('--help') || rest.includes('-h')) {
+        process.stdout.write(PERF_RESET_USAGE);
+        return 0;
+      }
+      const { values } = parseArgs({
+        args: rest,
+        allowPositionals: false,
+        options: {
+          'database-url': { type: 'string' },
+          'allow-non-perf-db': { type: 'boolean', default: false },
+          yes: { type: 'boolean', default: false },
+        },
+      });
+      try {
+        await runPerfReset({
+          databaseUrl: values['database-url'],
+          allowNonPerfDb: values['allow-non-perf-db'],
+          yes: values.yes === true,
+        });
+        return 0;
+      } catch (err) {
+        process.stderr.write(`${(err as Error).message}\n`);
+        return 1;
+      }
     }
     default:
       process.stderr.write(`Unknown perf subcommand: ${subcommand}\n`);

@@ -9,13 +9,13 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "typecheck:k6": "tsc --noEmit -p tsconfig.k6.json",
     "seed": "tsx seed/bulk-insert.ts",
-    "reset": "tsx seed/reset.ts",
     "scenario": "tsx scripts/run-scenario.ts",
     "sweep": "tsx scripts/sweep.ts",
     "report": "tsx scripts/render-report.ts",
     "followups": "tsx scripts/open-followups.ts"
   },
   "dependencies": {
+    "@boject/cli": "workspace:*",
     "@prisma/adapter-pg": "^7.4.1",
     "@prisma/client": "^7.4.1",
     "chart.js": "^4.5.0",
