@@ -1,0 +1,10 @@
+{"type":"Point","metric":"http_req_duration","data":{"time":"2026-05-06T14:32:00Z","value":1.5,"tags":{"scenario":"flat","shape":"bare"}}}
+{"type":"Point","metric":"http_req_duration","data":{"time":"2026-05-06T14:32:00Z","value":2.0,"tags":{"scenario":"flat","shape":"bare"}}}
+{"type":"Point","metric":"http_req_duration","data":{"time":"2026-05-06T14:32:00Z","value":3.0,"tags":{"scenario":"flat","shape":"bare"}}}
+{"type":"Point","metric":"http_req_failed","data":{"time":"2026-05-06T14:32:00Z","value":0,"tags":{"scenario":"flat","shape":"bare"}}}
+{"type":"Point","metric":"http_req_failed","data":{"time":"2026-05-06T14:32:00Z","value":0,"tags":{"scenario":"flat","shape":"bare"}}}
+{"type":"Point","metric":"http_req_failed","data":{"time":"2026-05-06T14:32:00Z","value":0,"tags":{"scenario":"flat","shape":"bare"}}}
+{"type":"Point","metric":"http_req_duration","data":{"time":"2026-05-06T14:32:01Z","value":50,"tags":{"scenario":"sitemap","page_size":"100"}}}
+{"type":"Point","metric":"http_req_duration","data":{"time":"2026-05-06T14:32:01Z","value":80,"tags":{"scenario":"sitemap","page_size":"100"}}}
+{"type":"Point","metric":"http_req_failed","data":{"time":"2026-05-06T14:32:01Z","value":0,"tags":{"scenario":"sitemap","page_size":"100"}}}
+{"type":"Point","metric":"http_req_failed","data":{"time":"2026-05-06T14:32:01Z","value":0,"tags":{"scenario":"sitemap","page_size":"100"}}}

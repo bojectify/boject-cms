@@ -7,6 +7,10 @@ import { runSchemaCheck } from './commands/schema/check.js';
 import { runApikeyCreate } from './commands/apikey/create.js';
 import { runApikeyList } from './commands/apikey/list.js';
 import { runApikeyRevoke } from './commands/apikey/revoke.js';
+import { runPerfCheck } from './commands/perf/check.js';
+import { runPerfScenario } from './commands/perf/scenario.js';
+import { runPerfSweep } from './commands/perf/sweep.js';
+import { runPerfReport } from './commands/perf/report.js';
 import { spawn } from 'node:child_process';
 import { CLI_VERSION } from './version.js';
 
@@ -22,8 +26,78 @@ Commands:
   apikey create      Create a new API key.
   apikey list        List API keys.
   apikey revoke      Revoke an API key by prefix.
+  perf <command>     Run perf scenarios / sweep / report / check.
 
 Run \`boject <command> --help\` for command-specific flags.
+`;
+
+const PERF_USAGE = `Usage: boject perf <command> [flags]
+
+Commands:
+  scenario <name>   Run one scenario (graphql-flat | graphql-sitemap).
+  sweep             Run all scenarios across the default sweep matrix.
+  report            Re-render a previous run.
+  check             Preflight verification (k6, target, key, content type, fields).
+
+Run \`boject perf <command> --help\` for command-specific flags.
+`;
+
+const PERF_CHECK_USAGE = `Usage: boject perf check --content-type <id> [--url <url>] [--filter-field <id>] [--relation-field <id>]
+
+Verifies: k6 is on PATH, target reachable, API key valid with content:read scope,
+content type exists, and DATETIME / single-target RELATION fields can be selected.
+Exits 0 on success, 2 on environment problems, 3 on input problems.
+`;
+
+const PERF_SCENARIO_USAGE = `Usage: boject perf scenario <name> --content-type <id> [flags]
+
+Scenarios:
+  graphql-flat       RPS ramp 50→2000 over 3 minutes (heavy load).
+  graphql-sitemap    Cursor pagination drain at varied page sizes / VU levels.
+
+Common flags:
+  --url <url>             Target CMS base URL. Defaults to .boject.config.json.
+  --api-key <key>         Bearer token. Defaults to $BOJECT_API_KEY.
+  --filter-field <id>     Override DATETIME field for the "filtered" shape.
+  --relation-field <id>   Override single-target RELATION field for "relation" shape.
+  --out <dir>             Report output dir. Default ./perf-reports/.
+  --yes                   Skip the heavy-run confirm prompt (CI-friendly).
+
+graphql-flat power-user overrides:
+  --target-rps <n>        Override peak RPS (default 2000).
+  --stages <csv>          Comma-separated RPS stages, e.g. 50,100,500,2000.
+`;
+
+const PERF_SWEEP_USAGE = `Usage: boject perf sweep --content-type <id> [flags]
+
+Runs both graphql-sitemap (across page sizes × VU levels) and graphql-flat
+(across all three query shapes) producing one combined report.
+
+Common flags:
+  --url <url>             Target CMS base URL.
+  --api-key <key>         Bearer token. Defaults to $BOJECT_API_KEY.
+  --filter-field <id>     Override DATETIME field for the "filtered" shape.
+  --relation-field <id>   Override single-target RELATION for "relation" shape.
+  --out <dir>             Report output dir. Default ./perf-reports/.
+  --yes                   Skip the heavy-run confirm prompt (CI-friendly).
+
+Sweep matrix:
+  --page-sizes <csv>      Default 100,500,1000.
+  --vus <csv>             Default 1,5,20.
+
+graphql-flat power-user overrides:
+  --target-rps <n>        Override peak RPS (default 2000).
+  --stages <csv>          Comma-separated RPS stages, e.g. 50,100,500,2000.
+`;
+
+const PERF_REPORT_USAGE = `Usage: boject perf report [--from <dir>] [--out <dir>]
+
+Re-renders summary.md, metadata.json, and metrics.csv from an existing run.
+With no flags, picks the latest run in ./perf-reports/ (or perf.out from
+.boject.config.json).
+
+  --from <dir>    Re-render this specific run dir.
+  --out <dir>     Override the search root (default ./perf-reports/).
 `;
 
 const SCHEMA_PULL_USAGE = `Usage: boject schema pull [--out <path>] [--url <url>]
@@ -272,6 +346,171 @@ async function dispatchApikey(args: string[]): Promise<number> {
   }
 }
 
+async function dispatchPerf(args: string[]): Promise<number> {
+  const subcommand = args[0];
+  const rest = args.slice(1);
+  if (!subcommand || subcommand === '--help' || subcommand === '-h') {
+    process.stdout.write(PERF_USAGE);
+    return subcommand ? 0 : 1;
+  }
+
+  const apiKey = process.env.BOJECT_API_KEY;
+
+  switch (subcommand) {
+    case 'check': {
+      if (rest.includes('--help') || rest.includes('-h')) {
+        process.stdout.write(PERF_CHECK_USAGE);
+        return 0;
+      }
+      const { values } = parseArgs({
+        args: rest,
+        allowPositionals: false,
+        options: {
+          url: { type: 'string' },
+          'api-key': { type: 'string' },
+          'content-type': { type: 'string' },
+          'filter-field': { type: 'string' },
+          'relation-field': { type: 'string' },
+        },
+      });
+      const r = await runPerfCheck({
+        cwd: process.cwd(),
+        apiKey,
+        flags: {
+          url: values.url,
+          apiKey: values['api-key'],
+          contentType: values['content-type'],
+          filterField: values['filter-field'],
+          relationField: values['relation-field'],
+        },
+        stdout,
+        stderr,
+      });
+      return r.exitCode;
+    }
+    case 'scenario': {
+      if (rest.includes('--help') || rest.includes('-h')) {
+        process.stdout.write(PERF_SCENARIO_USAGE);
+        return 0;
+      }
+      const { values, positionals } = parseArgs({
+        args: rest,
+        allowPositionals: true,
+        options: {
+          url: { type: 'string' },
+          'api-key': { type: 'string' },
+          'content-type': { type: 'string' },
+          'filter-field': { type: 'string' },
+          'relation-field': { type: 'string' },
+          out: { type: 'string' },
+          yes: { type: 'boolean', default: false },
+          'target-rps': { type: 'string' },
+          stages: { type: 'string' },
+        },
+      });
+      const r = await runPerfScenario({
+        cwd: process.cwd(),
+        apiKey,
+        flags: {
+          scenario: positionals[0],
+          url: values.url,
+          apiKey: values['api-key'],
+          contentType: values['content-type'],
+          filterField: values['filter-field'],
+          relationField: values['relation-field'],
+          out: values.out,
+          yes: values.yes === true,
+          targetRps: values['target-rps']
+            ? Number(values['target-rps'])
+            : undefined,
+          stages: values.stages
+            ? values.stages.split(',').map((s) => Number(s.trim()))
+            : undefined,
+        },
+        stdout,
+        stderr,
+      });
+      return r.exitCode;
+    }
+    case 'sweep': {
+      if (rest.includes('--help') || rest.includes('-h')) {
+        process.stdout.write(PERF_SWEEP_USAGE);
+        return 0;
+      }
+      const { values } = parseArgs({
+        args: rest,
+        allowPositionals: false,
+        options: {
+          url: { type: 'string' },
+          'api-key': { type: 'string' },
+          'content-type': { type: 'string' },
+          'filter-field': { type: 'string' },
+          'relation-field': { type: 'string' },
+          out: { type: 'string' },
+          yes: { type: 'boolean', default: false },
+          'page-sizes': { type: 'string' },
+          vus: { type: 'string' },
+          'target-rps': { type: 'string' },
+          stages: { type: 'string' },
+        },
+      });
+      const r = await runPerfSweep({
+        cwd: process.cwd(),
+        apiKey,
+        flags: {
+          url: values.url,
+          apiKey: values['api-key'],
+          contentType: values['content-type'],
+          filterField: values['filter-field'],
+          relationField: values['relation-field'],
+          out: values.out,
+          yes: values.yes === true,
+          pageSizes: values['page-sizes']
+            ? values['page-sizes'].split(',').map((s) => Number(s.trim()))
+            : undefined,
+          vus: values.vus
+            ? values.vus.split(',').map((s) => Number(s.trim()))
+            : undefined,
+          targetRps: values['target-rps']
+            ? Number(values['target-rps'])
+            : undefined,
+          stages: values.stages
+            ? values.stages.split(',').map((s) => Number(s.trim()))
+            : undefined,
+        },
+        stdout,
+        stderr,
+      });
+      return r.exitCode;
+    }
+    case 'report': {
+      if (rest.includes('--help') || rest.includes('-h')) {
+        process.stdout.write(PERF_REPORT_USAGE);
+        return 0;
+      }
+      const { values } = parseArgs({
+        args: rest,
+        allowPositionals: false,
+        options: {
+          from: { type: 'string' },
+          out: { type: 'string' },
+        },
+      });
+      const r = await runPerfReport({
+        cwd: process.cwd(),
+        flags: { from: values.from, out: values.out },
+        stdout,
+        stderr,
+      });
+      return r.exitCode;
+    }
+    default:
+      process.stderr.write(`Unknown perf subcommand: ${subcommand}\n`);
+      process.stdout.write(PERF_USAGE);
+      return 1;
+  }
+}
+
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
 
@@ -293,6 +532,11 @@ async function main(): Promise<void> {
 
   if (command === 'apikey') {
     const code = await dispatchApikey(rest);
+    process.exit(code);
+  }
+
+  if (command === 'perf') {
+    const code = await dispatchPerf(rest);
     process.exit(code);
   }
 

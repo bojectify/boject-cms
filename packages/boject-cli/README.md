@@ -126,15 +126,115 @@ CI pattern:
 - run: BOJECT_API_KEY=$BOJECT_API_KEY pnpm boject schema check
 ```
 
+### `boject perf <command>`
+
+Operator-facing load-test runner. Spawns [k6](https://k6.io/) against your CMS, emits a markdown + JSON report. Read-only in v1 — operates on existing data, doesn't seed or mutate (seed-driven mode lands in a follow-up).
+
+**Prerequisites:** [k6](https://k6.io/docs/get-started/installation/) on PATH (`brew install k6` on macOS). The CLI fails fast with an install hint if it isn't.
+
+**Required scope:** `content:read`.
+
+`.boject.config.json` may include an optional `perf` section to cache the common flags:
+
+```json
+{
+  "cms": { "url": "https://cms-staging.example.com" },
+  "schema": { "path": "content-types/schema.boject.json" },
+  "perf": {
+    "contentType": "Article",
+    "filterField": "publishDate",
+    "relationField": "author",
+    "out": "./perf-reports"
+  }
+}
+```
+
+#### `boject perf check --content-type <id> [flags]`
+
+Preflight: verifies k6 is on PATH, the target is reachable, the API key works, the content type exists, and a DATETIME / single-target RELATION field can be selected for the `filtered` / `relation` query shapes. Doesn't run any load.
+
+```bash
+boject perf check --content-type Article
+# Preflight OK ✓
+#   list field:     articleList
+#   filter field:   publishDate
+#   relation field: author
+```
+
+Exits 0 on success, 2 on environment problems (k6 missing, target unreachable, key invalid), 3 on input problems (missing flag).
+
+#### `boject perf scenario <name> --content-type <id> [flags]`
+
+Run one scenario. `<name>` is `graphql-flat` or `graphql-sitemap`.
+
+- **`graphql-flat`** — RPS ramp 50→2000 over 3 minutes against three query shapes (`bare` / `filtered` / `relation`). Heavy load — fires a TTY confirm prompt before starting; bypass with `--yes` for CI.
+- **`graphql-sitemap`** — Cursor-paginated drain of the content type. Lighter; no confirm prompt.
+
+```bash
+boject perf scenario graphql-sitemap --content-type Article
+# [k6] running (10.4s), 100/100 VUs, 1 complete and 0 interrupted iterations
+# Report written to perf-reports/2026-05-06T14-32-11Z-a3f9
+```
+
+Power-user overrides for `graphql-flat`:
+
+- `--target-rps <n>` — peak RPS. Default 2000. The 6-stage ramp scales proportionally.
+- `--stages <csv>` — explicit RPS stages, e.g. `50,100,500,2000`. Overrides the scaled ramp wholesale.
+
+Field overrides (introspection picks defaults):
+
+- `--filter-field <id>` — DATETIME field for the `filtered` shape. Skipped if absent.
+- `--relation-field <id>` — single-target RELATION field for the `relation` shape. Skipped if absent.
+
+#### `boject perf sweep --content-type <id> [flags]`
+
+Run both scenarios across a matrix. `graphql-sitemap` iterates `pageSizes × vusList`; `graphql-flat` runs all three query shapes once. Single combined report at the end.
+
+```bash
+boject perf sweep --content-type Article --yes
+# ... 12 k6 runs ...
+# Sweep report written to perf-reports/2026-05-06T14-35-22Z-b1cd
+```
+
+Matrix overrides:
+
+- `--page-sizes <csv>` — default `100,500,1000`.
+- `--vus <csv>` — default `1,5,20`.
+
+Plus all the `boject perf scenario` flags (target RPS, stages, field overrides, etc.).
+
+#### `boject perf report [--from <dir>] [--out <dir>]`
+
+Re-render `summary.md`, `metadata.json`, and `metrics.csv` from an existing run. Useful when iterating on the renderer or after a partial run.
+
+```bash
+boject perf report                  # re-render the latest run in ./perf-reports
+boject perf report --from <dir>     # re-render a specific run dir
+```
+
+#### Output files
+
+Every run writes to `<out>/<timestamp>/`:
+
+- `summary.md` — human-readable report (banners, scenario tables, run notes)
+- `metadata.json` — machine-readable run context: target host, content type, fields used, intensity (RPS / stages), scenarios + outcomes, partial flag, schemaVersion. Consumed by downstream tooling. **API keys are never written.**
+- `metrics.csv` — one row per `(scenario, page_size, shape)` with count, p50, p95, p99, error rate as a fraction.
+- `raw.json` — k6 NDJSON output, one point per line.
+- `k6-stderr.log` — sanitised stderr from k6 (no API keys).
+
+#### Sanitisation
+
+API keys are never logged to stdout/stderr or written to any output file. URLs with embedded credentials (`https://user:pass@host`) are stripped before logging. The k6 stderr log file is sanitised text (not a byte mirror) — defence in depth in case k6 ever echoes a Bearer header.
+
 ## API key scopes
 
 CMS API keys carry one or more scopes:
 
-| Scope          | Grants                                                  |
-| -------------- | ------------------------------------------------------- |
-| `content:read` | Read content via the GraphQL endpoint (`/api/graphql`). |
-| `schema:read`  | Pull the schema bundle (`GET /api/schema/export`).      |
-| `schema:write` | Push schema (`POST /api/schema/apply`).                 |
+| Scope          | Grants                                                                              |
+| -------------- | ----------------------------------------------------------------------------------- |
+| `content:read` | Read content via the GraphQL endpoint (`/api/graphql`). Required for `boject perf`. |
+| `schema:read`  | Pull the schema bundle (`GET /api/schema/export`).                                  |
+| `schema:write` | Push schema (`POST /api/schema/apply`).                                             |
 
 A key created with `--scopes schema:read` cannot read content via GraphQL. A key created with `--scopes content:read,schema:read` can do both. Issue narrow keys for narrow automation.
 
