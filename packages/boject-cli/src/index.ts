@@ -11,6 +11,7 @@ import { runPerfCheck } from './commands/perf/check.js';
 import { runPerfScenario } from './commands/perf/scenario.js';
 import { runPerfSweep } from './commands/perf/sweep.js';
 import { runPerfReport } from './commands/perf/report.js';
+import { runPerfReset } from './commands/perf/reset.js';
 import { spawn } from 'node:child_process';
 import { CLI_VERSION } from './version.js';
 
@@ -26,7 +27,7 @@ Commands:
   apikey create      Create a new API key.
   apikey list        List API keys.
   apikey revoke      Revoke an API key by prefix.
-  perf <command>     Run perf scenarios / sweep / report / check.
+  perf <command>     Run perf scenarios / sweep / report / check / reset.
 
 Run \`boject <command> --help\` for command-specific flags.
 `;
@@ -38,6 +39,7 @@ Commands:
   sweep             Run all scenarios across the default sweep matrix.
   report            Re-render a previous run.
   check             Preflight verification (k6, target, key, content type, fields).
+  reset             Truncate the perf content tables in a target DB.
 
 Run \`boject perf <command> --help\` for command-specific flags.
 `;
@@ -98,6 +100,19 @@ With no flags, picks the latest run in ./perf-reports/ (or perf.out from
 
   --from <dir>    Re-render this specific run dir.
   --out <dir>     Override the search root (default ./perf-reports/).
+`;
+
+const PERF_RESET_USAGE = `Usage: boject perf reset --database-url <url> [flags]
+
+Truncates the perf-specific content tables in the target database.
+
+Required flags:
+  --database-url <url>      Postgres connection string. Must end in /boject_perf
+                            unless --allow-non-perf-db is set.
+
+Optional flags:
+  --allow-non-perf-db       Override the /boject_perf URL suffix lock.
+  --yes                     Skip the TTY confirmation prompt.
 `;
 
 const SCHEMA_PULL_USAGE = `Usage: boject schema pull [--out <path>] [--url <url>]
@@ -503,6 +518,32 @@ async function dispatchPerf(args: string[]): Promise<number> {
         stderr,
       });
       return r.exitCode;
+    }
+    case 'reset': {
+      if (rest.includes('--help') || rest.includes('-h')) {
+        process.stdout.write(PERF_RESET_USAGE);
+        return 0;
+      }
+      const { values } = parseArgs({
+        args: rest,
+        allowPositionals: false,
+        options: {
+          'database-url': { type: 'string' },
+          'allow-non-perf-db': { type: 'boolean', default: false },
+          yes: { type: 'boolean', default: false },
+        },
+      });
+      try {
+        await runPerfReset({
+          databaseUrl: values['database-url'],
+          allowNonPerfDb: values['allow-non-perf-db'],
+          yes: values.yes === true,
+        });
+        return 0;
+      } catch (err) {
+        process.stderr.write(`${(err as Error).message}\n`);
+        return 1;
+      }
     }
     default:
       process.stderr.write(`Unknown perf subcommand: ${subcommand}\n`);

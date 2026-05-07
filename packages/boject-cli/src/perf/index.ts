@@ -14,3 +14,4 @@ export {
   EntryValidationError,
 } from './writeViaHttp.js';
 export type { WriteViaHttpOptions } from './writeViaHttp.js';
+export { resetPerfDb, NonPerfDatabaseError } from './resetPerfDb.js';
