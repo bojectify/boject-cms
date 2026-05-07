@@ -147,6 +147,7 @@ Common:
   --size <n>                Entries to seed. Default 10000.
   --seed <int>              PRNG seed for determinism. Default 1.
   --concurrency <n>         HTTP only. Default 8.
+  --reset                   SQL only. Truncate perf data before seeding.
   --allow-non-perf-db       SQL only. Override the /boject_perf URL suffix lock.
   --url <url>               CMS base URL.
   --api-key <key>           Defaults to $BOJECT_API_KEY.
@@ -627,6 +628,7 @@ async function dispatchPerf(args: string[]): Promise<number> {
           seed: { type: 'string' },
           concurrency: { type: 'string' },
           'allow-non-perf-db': { type: 'boolean', default: false },
+          reset: { type: 'boolean', default: false },
           url: { type: 'string' },
           'api-key': { type: 'string' },
           yes: { type: 'boolean', default: false },
@@ -635,10 +637,12 @@ async function dispatchPerf(args: string[]): Promise<number> {
 
       // Merge config defaults (CLI flags win).
       let configPerf: import('./config.js').ProjectPerfConfig | undefined;
+      let configCms: import('./config.js').ProjectConfig['cms'] | undefined;
       try {
         const { loadProjectConfig } = await import('./config.js');
         const r = await loadProjectConfig(process.cwd());
         configPerf = r.config.perf;
+        configCms = r.config.cms;
       } catch {
         // No config file is fine — operator can pass everything via flags.
       }
@@ -672,7 +676,11 @@ async function dispatchPerf(args: string[]): Promise<number> {
           bundle: values.bundle,
           concurrency,
           allowNonPerfDb: values['allow-non-perf-db'],
-          url: values.url ?? process.env.BOJECT_CMS_URL,
+          reset: values.reset === true,
+          url:
+            values.url ??
+            process.env.BOJECT_CMS_URL ??
+            (configCms?.url as string | undefined),
           apiKey: values['api-key'] ?? process.env.BOJECT_API_KEY,
           yes: values.yes === true,
         });

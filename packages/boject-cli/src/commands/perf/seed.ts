@@ -2,6 +2,7 @@ import { Client } from 'pg';
 import { generatePerfData } from '../../perf/generate.js';
 import { writeViaSql } from '../../perf/writeViaSql.js';
 import { writeViaHttp } from '../../perf/writeViaHttp.js';
+import { resetPerfDb } from '../../perf/resetPerfDb.js';
 import { fetchBundle } from './shared/fetchBundle.js';
 import { loadBundleFile } from './shared/loadBundleFile.js';
 import type { Bundle } from '../../vendor/contentBundleTypes.js';
@@ -89,6 +90,18 @@ export async function runPerfSeed(
     const client = new Client({ connectionString: flags.databaseUrl! });
     await client.connect();
     try {
+      if (flags.reset) {
+        await resetPerfDb({
+          databaseUrl: flags.databaseUrl!,
+          runQuery: async (sql) => {
+            await client.query(sql);
+          },
+          allowNonPerfDb: flags.allowNonPerfDb,
+        });
+        process.stderr.write(
+          `[perf:seed] reset ${redactUrl(flags.databaseUrl!)}\n`
+        );
+      }
       const r = await writeViaSql(client, generated, { batchSize: 500 });
       process.stderr.write(`[perf:seed] inserted ${r.inserted} entries\n`);
       return r;
