@@ -28,6 +28,16 @@ export interface PerfScenarioFlags {
   yes: boolean;
   targetRps?: number;
   stages?: number[];
+  // New (#159) — seed-then-run + read-only opt-in
+  readOnly?: boolean;
+  databaseUrl?: string;
+  httpSeed?: boolean;
+  bundle?: string;
+  size?: number;
+  seed?: number;
+  concurrency?: number;
+  reset?: boolean;
+  allowNonPerfDb?: boolean;
 }
 
 // Mirrors the ramp `parseStages()` builds in
@@ -176,6 +186,45 @@ export async function runPerfScenario(
       `Error: unknown scenario "${name}". Valid: graphql-flat, graphql-sitemap.`
     );
     return { exitCode: 3 };
+  }
+
+  // #159: pre-flight requires either --read-only or a seed transport.
+  if (!flags.readOnly && !flags.databaseUrl && !flags.httpSeed) {
+    params.stderr(
+      'boject perf scenario without --read-only must provide a seed transport ' +
+        '(--database-url for SQL or --http-seed for HTTP). ' +
+        'Read-only mode is now opt-in via --read-only.'
+    );
+    return { exitCode: 2 };
+  }
+
+  if (!flags.readOnly) {
+    if (flags.reset && flags.databaseUrl) {
+      const { runPerfReset } = await import('./reset.js');
+      await runPerfReset({
+        databaseUrl: flags.databaseUrl,
+        yes: flags.yes,
+        allowNonPerfDb: flags.allowNonPerfDb,
+      });
+    }
+    if (!flags.contentType) {
+      params.stderr('Seed-then-run requires --content-type');
+      return { exitCode: 2 };
+    }
+    const { runPerfSeed } = await import('./seed.js');
+    await runPerfSeed({
+      contentType: flags.contentType,
+      size: flags.size ?? 10000,
+      seed: flags.seed,
+      databaseUrl: flags.databaseUrl,
+      httpSeed: flags.httpSeed,
+      bundle: flags.bundle,
+      url: flags.url,
+      apiKey: flags.apiKey ?? params.apiKey,
+      concurrency: flags.concurrency,
+      allowNonPerfDb: flags.allowNonPerfDb,
+      yes: flags.yes,
+    });
   }
 
   const v = await resolveAndValidate(params);

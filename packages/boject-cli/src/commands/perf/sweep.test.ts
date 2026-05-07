@@ -50,6 +50,7 @@ describe('runPerfSweep', () => {
         yes: true,
         pageSizes: [100, 500],
         vus: [1, 5],
+        readOnly: true,
       },
       stdout: () => {},
       stderr: () => {},
@@ -114,6 +115,7 @@ describe('runPerfSweep', () => {
         yes: true,
         pageSizes: [100],
         vus: [1],
+        readOnly: true,
       },
       stdout: () => {},
       stderr: (l) => stderr.push(l),
@@ -142,6 +144,7 @@ describe('runPerfSweep', () => {
         contentType: 'Article',
         out: outDir,
         yes: false,
+        readOnly: true,
       },
       stdout: () => {},
       stderr: () => {},
@@ -158,6 +161,7 @@ describe('runPerfSweep', () => {
         contentType: 'Article',
         out: outDir,
         yes: true,
+        readOnly: true,
       },
       stdout: () => {},
       stderr: () => {},
@@ -167,7 +171,7 @@ describe('runPerfSweep', () => {
     const r2 = await runPerfSweep({
       cwd: process.cwd(),
       apiKey: 'k',
-      flags: { contentType: 'Article', out: outDir, yes: true },
+      flags: { contentType: 'Article', out: outDir, yes: true, readOnly: true },
       stdout: () => {},
       stderr: () => {},
     });
@@ -176,7 +180,12 @@ describe('runPerfSweep', () => {
     const r3 = await runPerfSweep({
       cwd: process.cwd(),
       apiKey: 'k',
-      flags: { url: 'https://x.example.com', out: outDir, yes: true },
+      flags: {
+        url: 'https://x.example.com',
+        out: outDir,
+        yes: true,
+        readOnly: true,
+      },
       stdout: () => {},
       stderr: () => {},
     });
@@ -219,6 +228,7 @@ describe('runPerfSweep', () => {
         yes: true,
         pageSizes: [100],
         vus: [1],
+        readOnly: true,
       },
       stdout: () => {},
       stderr: () => {},
@@ -254,6 +264,7 @@ describe('runPerfSweep', () => {
         contentType: 'Article',
         out: '/dev/null/no',
         yes: true,
+        readOnly: true,
       },
       stdout: () => {},
       stderr: (l) => stderr.push(l),
@@ -292,6 +303,7 @@ describe('runPerfSweep', () => {
         contentType: 'Article',
         out: outDir,
         yes: true,
+        readOnly: true,
         // pageSizes / vus omitted
       },
       stdout: () => {},
@@ -300,5 +312,25 @@ describe('runPerfSweep', () => {
 
     // Default matrix: 3 page sizes × 3 VUs = 9 sitemap + 3 flat = 12 total
     expect(runK6).toHaveBeenCalledTimes(12);
+  });
+
+  it('hard-fails with exit code 2 when neither --read-only nor a seed transport is set (#159)', async () => {
+    const stderrLines: string[] = [];
+    const r = await runPerfSweep({
+      cwd: process.cwd(),
+      apiKey: 'boject_test',
+      flags: {
+        url: 'http://cms.test',
+        apiKey: 'boject_test',
+        contentType: 'Article',
+        yes: true,
+      },
+      stdout: () => {},
+      stderr: (line) => stderrLines.push(line),
+    });
+    expect(r.exitCode).toBe(2);
+    expect(
+      stderrLines.some((l) => /--read-only|--database-url|--http-seed/.test(l))
+    ).toBe(true);
   });
 });

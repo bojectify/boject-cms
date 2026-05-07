@@ -13,6 +13,7 @@ const baseFlags = {
   contentType: 'Article',
   yes: true,
   out: undefined as string | undefined,
+  readOnly: true,
 };
 
 const okPreflight = {
@@ -269,6 +270,27 @@ describe('runPerfScenario', () => {
     expect(r.exitCode).toBe(2);
     expect(stderr.join('\n')).toMatch(/cannot create output directory/i);
     expect(stderr.join('\n')).toMatch(/--out/);
+  });
+
+  it('hard-fails with exit code 2 when neither --read-only nor a seed transport is set (#159)', async () => {
+    const stderrLines: string[] = [];
+    const r = await runPerfScenario({
+      cwd: process.cwd(),
+      apiKey: 'boject_test',
+      flags: {
+        scenario: 'graphql-flat',
+        url: 'http://cms.test',
+        apiKey: 'boject_test',
+        contentType: 'Article',
+        yes: true,
+      },
+      stdout: () => {},
+      stderr: (line) => stderrLines.push(line),
+    });
+    expect(r.exitCode).toBe(2);
+    expect(
+      stderrLines.some((l) => /--read-only|--database-url|--http-seed/.test(l))
+    ).toBe(true);
   });
 
   it('returns 1 with explicit error when all shapes fail', async () => {

@@ -59,6 +59,11 @@ Scenarios:
   graphql-flat       RPS ramp 50→2000 over 3 minutes (heavy load).
   graphql-sitemap    Cursor pagination drain at varied page sizes / VU levels.
 
+Mode (one required):
+  --read-only             Skip seeding; run k6 against the existing dataset.
+  --database-url <url>    Seed via SQL (writeViaSql) before running k6.
+  --http-seed             Seed via REST (writeViaHttp) before running k6.
+
 Common flags:
   --url <url>             Target CMS base URL. Defaults to .boject.config.json.
   --api-key <key>         Bearer token. Defaults to $BOJECT_API_KEY.
@@ -66,6 +71,14 @@ Common flags:
   --relation-field <id>   Override single-target RELATION field for "relation" shape.
   --out <dir>             Report output dir. Default ./perf-reports/.
   --yes                   Skip the heavy-run confirm prompt (CI-friendly).
+
+Seed-then-run flags (only when --read-only is NOT set):
+  --bundle <path>         Local bundle file. Default: GET /api/schema/export.
+  --size <n>              Entries to seed. Default 10000.
+  --seed <int>            PRNG seed for determinism. Default 1.
+  --concurrency <n>       HTTP only. Default 8.
+  --reset                 SQL only. Truncate perf tables before seeding.
+  --allow-non-perf-db     SQL only. Override the /boject_perf URL suffix lock.
 
 graphql-flat power-user overrides:
   --target-rps <n>        Override peak RPS (default 2000).
@@ -77,6 +90,11 @@ const PERF_SWEEP_USAGE = `Usage: boject perf sweep --content-type <id> [flags]
 Runs both graphql-sitemap (across page sizes × VU levels) and graphql-flat
 (across all three query shapes) producing one combined report.
 
+Mode (one required):
+  --read-only             Skip seeding; run k6 against the existing dataset.
+  --database-url <url>    Seed via SQL (writeViaSql) before running k6.
+  --http-seed             Seed via REST (writeViaHttp) before running k6.
+
 Common flags:
   --url <url>             Target CMS base URL.
   --api-key <key>         Bearer token. Defaults to $BOJECT_API_KEY.
@@ -84,6 +102,14 @@ Common flags:
   --relation-field <id>   Override single-target RELATION for "relation" shape.
   --out <dir>             Report output dir. Default ./perf-reports/.
   --yes                   Skip the heavy-run confirm prompt (CI-friendly).
+
+Seed-then-run flags (only when --read-only is NOT set):
+  --bundle <path>         Local bundle file. Default: GET /api/schema/export.
+  --size <n>              Entries to seed. Default 10000.
+  --seed <int>            PRNG seed for determinism. Default 1.
+  --concurrency <n>       HTTP only. Default 8.
+  --reset                 SQL only. Truncate perf tables before seeding.
+  --allow-non-perf-db     SQL only. Override the /boject_perf URL suffix lock.
 
 Sweep matrix:
   --page-sizes <csv>      Default 100,500,1000.
@@ -446,6 +472,15 @@ async function dispatchPerf(args: string[]): Promise<number> {
           yes: { type: 'boolean', default: false },
           'target-rps': { type: 'string' },
           stages: { type: 'string' },
+          'read-only': { type: 'boolean', default: false },
+          'database-url': { type: 'string' },
+          'http-seed': { type: 'boolean', default: false },
+          bundle: { type: 'string' },
+          size: { type: 'string' },
+          seed: { type: 'string' },
+          concurrency: { type: 'string' },
+          reset: { type: 'boolean', default: false },
+          'allow-non-perf-db': { type: 'boolean', default: false },
         },
       });
       const r = await runPerfScenario({
@@ -466,6 +501,17 @@ async function dispatchPerf(args: string[]): Promise<number> {
           stages: values.stages
             ? values.stages.split(',').map((s) => Number(s.trim()))
             : undefined,
+          readOnly: values['read-only'] === true,
+          databaseUrl: values['database-url'],
+          httpSeed: values['http-seed'] === true,
+          bundle: values.bundle,
+          size: values.size ? Number(values.size) : undefined,
+          seed: values.seed ? Number(values.seed) : undefined,
+          concurrency: values.concurrency
+            ? Number(values.concurrency)
+            : undefined,
+          reset: values.reset === true,
+          allowNonPerfDb: values['allow-non-perf-db'] === true,
         },
         stdout,
         stderr,
@@ -492,6 +538,15 @@ async function dispatchPerf(args: string[]): Promise<number> {
           vus: { type: 'string' },
           'target-rps': { type: 'string' },
           stages: { type: 'string' },
+          'read-only': { type: 'boolean', default: false },
+          'database-url': { type: 'string' },
+          'http-seed': { type: 'boolean', default: false },
+          bundle: { type: 'string' },
+          size: { type: 'string' },
+          seed: { type: 'string' },
+          concurrency: { type: 'string' },
+          reset: { type: 'boolean', default: false },
+          'allow-non-perf-db': { type: 'boolean', default: false },
         },
       });
       const r = await runPerfSweep({
@@ -517,6 +572,17 @@ async function dispatchPerf(args: string[]): Promise<number> {
           stages: values.stages
             ? values.stages.split(',').map((s) => Number(s.trim()))
             : undefined,
+          readOnly: values['read-only'] === true,
+          databaseUrl: values['database-url'],
+          httpSeed: values['http-seed'] === true,
+          bundle: values.bundle,
+          size: values.size ? Number(values.size) : undefined,
+          seed: values.seed ? Number(values.seed) : undefined,
+          concurrency: values.concurrency
+            ? Number(values.concurrency)
+            : undefined,
+          reset: values.reset === true,
+          allowNonPerfDb: values['allow-non-perf-db'] === true,
         },
         stdout,
         stderr,
