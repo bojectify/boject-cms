@@ -68,12 +68,12 @@ async function main() {
   const keyPrefix = rawKey.slice(0, 11);
   await prisma.apiKey.upsert({
     where: { keyHash },
-    update: { revokedAt: null, scopes: ['content:read'] },
+    update: { revokedAt: null, scopes: ['content:read', 'content:write'] },
     create: {
       name: 'Integration tests',
       keyHash,
       keyPrefix,
-      scopes: ['content:read'],
+      scopes: ['content:read', 'content:write'],
     },
   });
 
