@@ -19,6 +19,10 @@ export default defineConfig({
           include: ['tests/e2e/**/*.test.ts'],
           environment: 'node',
           testTimeout: 10_000,
+          // Serialise e2e files: upgrade.test.ts and schemaCommands.test.ts
+          // both run `pnpm --filter @boject/cli build` in beforeAll, and
+          // parallel tsup invocations race on dist/vendor (rm/cp ENOTEMPTY).
+          fileParallelism: false,
         },
       },
     ],
