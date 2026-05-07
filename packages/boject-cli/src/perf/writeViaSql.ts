@@ -68,12 +68,34 @@ export async function writeViaSql(
       const slice = group.entries.slice(start, start + batchSize);
       await insertEnvelopes(client, slice, contentTypeId);
       await insertVersions(client, slice, idMap);
-      for (const e of slice) idMap.set(e.id!, e.id!);
+      // idMap is populated AFTER each slice's version insert, not before.
+      // This is safe because the SQL writer's synthetic id == real id (we pass
+      // the synthetic UUID as the actual primary key). Cross-slice / cross-group
+      // references inside a slice's data therefore resolve correctly even though
+      // they're "not yet in the map" — the rewrite at insertVersions falls
+      // through, the original id is preserved, and that id matches the
+      // envelope row inserted moments earlier.
+      //
+      // If a future writer ever rewrites synthetic→real IDs (e.g. via a SERIAL
+      // PK), this set call must move BEFORE insertVersions to keep the
+      // rewrite resolvable. Test #2 (cross-group ID rewriting) guards the
+      // invariant.
+      for (const e of slice) {
+        if (!e.id) {
+          throw new Error(
+            'Bundle entry is missing an id; cannot map for ID rewriting'
+          );
+        }
+        idMap.set(e.id, e.id);
+      }
       inserted += slice.length;
     }
   }
 
   // Apply patches (deferred-edge updates) after all entries exist
+  const patchTs =
+    generated.groups[0]?.entries[0]?.versions?.[0]?.publishedAt ??
+    new Date().toISOString();
   for (const group of generated.groups) {
     if (!group.patches) continue;
     for (const patch of group.patches) {
@@ -82,7 +104,7 @@ export async function writeViaSql(
         patch.fieldUpdates,
         idMap
       ) as Record<string, unknown>;
-      await applyPatch(client, realEntryId, rewritten);
+      await applyPatch(client, realEntryId, rewritten, patchTs);
     }
   }
 
@@ -99,10 +121,16 @@ async function insertEnvelopes(
   const params: unknown[] = [];
   let p = 1;
   for (const e of entries) {
+    if (!e.versions?.[0]) {
+      throw new Error(
+        `Bundle entry ${e.id ?? '<unknown>'} has no versions; refusing to insert envelope`
+      );
+    }
+    const ts = e.versions[0].publishedAt ?? new Date().toISOString();
     valuesPlaceholders.push(
-      `($${p++}, $${p++}, $${p++}, $${p++}, NOW(), NOW())`
+      `($${p++}, $${p++}, $${p++}, $${p++}, $${p++}, $${p++})`
     );
-    params.push(e.id, contentTypeId, e.entryTitle, e.slug);
+    params.push(e.id, contentTypeId, e.entryTitle, e.slug, ts, ts);
   }
   await client.query(
     `INSERT INTO "ContentEntry" ("id", "contentTypeId", "entryTitle", "slug", "createdAt", "updatedAt") VALUES ${valuesPlaceholders.join(', ')}`,
@@ -120,12 +148,25 @@ async function insertVersions(
   const params: unknown[] = [];
   let p = 1;
   for (const e of entries) {
-    const v = e.versions![0]!;
+    if (!e.versions?.[0]) {
+      throw new Error(
+        `Bundle entry ${e.id ?? '<unknown>'} has no versions; refusing to insert version`
+      );
+    }
+    const v = e.versions[0];
+    const ts = v.publishedAt ?? new Date().toISOString();
     const data = rewriteSyntheticIds(v.data, idMap);
     valuesPlaceholders.push(
-      `(gen_random_uuid(), $${p++}, 'PUBLISHED', $${p++}, $${p++}::jsonb, $${p++}, NOW(), NOW())`
+      `(gen_random_uuid(), $${p++}, 'PUBLISHED', $${p++}, $${p++}::jsonb, $${p++}, $${p++}, $${p++})`
     );
-    params.push(e.id, e.entryTitle, JSON.stringify(data), v.publishedAt);
+    params.push(
+      e.id,
+      e.entryTitle,
+      JSON.stringify(data),
+      v.publishedAt,
+      ts,
+      ts
+    );
   }
   await client.query(
     `INSERT INTO "ContentEntryVersion" ("id", "entryId", "status", "entryTitle", "data", "publishedAt", "createdAt", "updatedAt") VALUES ${valuesPlaceholders.join(', ')}`,
@@ -136,10 +177,11 @@ async function insertVersions(
 async function applyPatch(
   client: PgClientLike,
   entryId: string,
-  fieldUpdates: Record<string, unknown>
+  fieldUpdates: Record<string, unknown>,
+  ts: string
 ): Promise<void> {
   await client.query(
-    `UPDATE "ContentEntryVersion" SET "data" = "data" || $1::jsonb, "updatedAt" = NOW() WHERE "entryId" = $2 AND "status" = 'PUBLISHED'`,
-    [JSON.stringify(fieldUpdates), entryId]
+    `UPDATE "ContentEntryVersion" SET "data" = "data" || $1::jsonb, "updatedAt" = $2 WHERE "entryId" = $3 AND "status" = 'PUBLISHED'`,
+    [JSON.stringify(fieldUpdates), ts, entryId]
   );
 }
