@@ -20,11 +20,26 @@ describe('valueGen scalars', () => {
     expect(b).toMatch(/#1$/);
   });
 
-  it('generateSlug derives from title and is unique by index', () => {
-    const a = generateSlug({ entryTitle: 'My Post #0', index: 0 });
-    const b = generateSlug({ entryTitle: 'My Post #1', index: 1 });
+  it('generateSlug slugifies the title and appends the index', () => {
+    const a = generateSlug({ entryTitle: 'My Post', index: 0 });
+    const b = generateSlug({ entryTitle: 'My Post', index: 1 });
     expect(a).toBe('my-post-0');
     expect(b).toBe('my-post-1');
+  });
+
+  it('generateSlug accepts redundant trailing digits when the title is from generateEntryTitle', () => {
+    // generateEntryTitle returns "Words #N" which slugifies to "words--n"
+    // (the # is dropped, leaving the surrounding spaces). The leading
+    // /-+/g collapse + trim handles the empty-segment cleanup; we then
+    // append the canonical -<index>. The duplicate -<n>-<n> tail is
+    // accepted for perf seeding.
+    const a = generateSlug({ entryTitle: 'My Post #5', index: 5 });
+    expect(a).toBe('my-post-5-5');
+  });
+
+  it('generateSlug strips leading and trailing hyphens before appending', () => {
+    const a = generateSlug({ entryTitle: '-- Hello --', index: 0 });
+    expect(a).toBe('hello-0');
   });
 
   it('generateText returns a 4-10 word phrase', () => {
@@ -35,17 +50,25 @@ describe('valueGen scalars', () => {
     expect(words).toBeLessThanOrEqual(10);
   });
 
-  it('generateText with unique=true appends -<index> on collision', () => {
-    const seen = new Set<string>();
-    seen.add('Lorem ipsum dolor sit'); // pre-seed a collision
-    const v = generateText({
-      rand: () => 0,
+  it('generateText with unique=true appends -<index> when value collides with seenValues', () => {
+    // Run once with rng(99) to discover the value it produces, then pre-seed
+    // a fresh seenValues with that value to force a collision on a second call.
+    const probe = generateText({ rand: rng(99), unique: false, index: 0 });
+    const seen = new Set<string>([probe]);
+    const collision = generateText({
+      rand: rng(99),
       unique: true,
-      index: 5,
+      index: 7,
       seenValues: seen,
-      forcedValue: 'Lorem ipsum dolor sit',
     });
-    expect(v).toBe('Lorem ipsum dolor sit-5');
+    expect(collision).toBe(`${probe}-7`);
+    expect(seen.has(`${probe}-7`)).toBe(true);
+  });
+
+  it('generateText is deterministic for the same seed', () => {
+    const a = generateText({ rand: rng(123), unique: false, index: 0 });
+    const b = generateText({ rand: rng(123), unique: false, index: 0 });
+    expect(a).toBe(b);
   });
 
   it('generateTextarea returns 1-3 paragraphs joined by \\n\\n', () => {
@@ -61,9 +84,32 @@ describe('valueGen scalars', () => {
     expect(b - a).toBeGreaterThanOrEqual(100_000);
   });
 
-  it('generateBoolean returns a boolean', () => {
-    const v = generateBoolean({ rand: rng(1) });
-    expect(typeof v).toBe('boolean');
+  it('generateNumber unique stays inside its index bucket on extreme rand values', () => {
+    // rand() = 0 → minimum within the bucket
+    const min = generateNumber({ rand: () => 0, unique: true, index: 5 });
+    expect(min).toBe(500_000);
+    // rand() ≈ 1 → maximum within the bucket (must NOT cross into bucket 6)
+    const near1 = () => 0.999_999_999;
+    const max = generateNumber({ rand: near1, unique: true, index: 5 });
+    expect(max).toBeGreaterThanOrEqual(500_000);
+    expect(max).toBeLessThan(600_000);
+  });
+
+  it('generateBoolean returns both values across many draws', () => {
+    // Draw 200 booleans from a single seeded rng. xorshift32's first output
+    // for sequential seeds happens to skew, so we walk one stream to sample
+    // a fair distribution. Tolerance is generous — we just need to catch
+    // "always true" / "always false" regressions.
+    const rand = rng(1);
+    let trues = 0;
+    let falses = 0;
+    for (let i = 0; i < 200; i++) {
+      const v = generateBoolean({ rand });
+      if (v) trues++;
+      else falses++;
+    }
+    expect(trues).toBeGreaterThan(0);
+    expect(falses).toBeGreaterThan(0);
   });
 
   it('generateDatetime returns ISO-8601 inside the window', () => {

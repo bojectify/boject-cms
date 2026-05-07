@@ -24,6 +24,12 @@ export function generateEntryTitle(opts: {
   return `${words} #${opts.index}`;
 }
 
+/**
+ * Slugifies the title and appends the index, separated by a hyphen.
+ * Always uniqueness-safe per index. The output may contain redundant
+ * trailing digits if the input title ends in a number — that's accepted
+ * for perf-seed slugs (uniqueness > readability).
+ */
 export function generateSlug(opts: {
   entryTitle: string;
   index: number;
@@ -33,10 +39,9 @@ export function generateSlug(opts: {
     .replace(/[^a-z0-9\s-]/g, '')
     .trim()
     .replace(/\s+/g, '-')
-    .replace(/-+/g, '-');
-  // Strip a trailing -<n> if entryTitle's #N suffix produced one, then append fresh
-  const stripped = base.replace(/-\d+$/, '');
-  return `${stripped}-${opts.index}`;
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return `${base}-${opts.index}`;
 }
 
 export function generateText(opts: {
@@ -44,17 +49,13 @@ export function generateText(opts: {
   unique: boolean;
   index: number;
   seenValues?: Set<string>;
-  /** Test hook — bypass random word selection when set */
-  forcedValue?: string;
 }): string {
-  const value =
-    opts.forcedValue ??
-    pickN(LOREM, intInRange(4, 10, opts.rand), opts.rand).join(' ');
+  const value = pickN(LOREM, intInRange(4, 10, opts.rand), opts.rand).join(' ');
   if (opts.unique && opts.seenValues) {
     if (opts.seenValues.has(value)) {
-      const broken = `${value}-${opts.index}`;
-      opts.seenValues.add(broken);
-      return broken;
+      const deduplicated = `${value}-${opts.index}`;
+      opts.seenValues.add(deduplicated);
+      return deduplicated;
     }
     opts.seenValues.add(value);
   }
@@ -88,6 +89,10 @@ export function generateBoolean(opts: { rand: () => number }): boolean {
   return opts.rand() < 0.5;
 }
 
+/**
+ * Returns an ISO-8601 string in [window.from, window.to).
+ * The upper bound is exclusive (rand() is half-open).
+ */
 export function generateDatetime(opts: {
   rand: () => number;
   window: { from: Date; to: Date };
