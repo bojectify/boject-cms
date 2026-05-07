@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { setup, $fetch, fetch } from '@nuxt/test-utils/e2e';
+import { createHash } from 'node:crypto';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../../../generated/prisma/client';
 import { TEST_USERNAME, TEST_PASSWORD } from '../../test/credentials';
@@ -350,6 +351,63 @@ describe('Content Entry endpoints', async () => {
       });
 
       expect(res.status).toBe(409);
+    });
+  });
+
+  describe('POST /api/content-entries — content:write scope (#172)', () => {
+    it('allows API keys with content:write scope', async () => {
+      // The seeded test key has both content:read and content:write (T3).
+      // Use a distinct X-Forwarded-For so this test gets its own rate-limit
+      // bucket — the in-memory store lives in the dev-server process and
+      // is not cleared by `resetRateLimitStore()` (which only clears the
+      // test-process copy).
+      const res = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${TEST_API_KEY}`,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': '203.0.113.20',
+        },
+        body: JSON.stringify({
+          contentTypeId: testContentType.id,
+          data: { title: `API-key-created entry ${Date.now()}` },
+        }),
+      });
+      expect(res.status).toBe(201);
+    });
+
+    it('rejects API keys without content:write scope', async () => {
+      // Mint an inline key with content:read only.
+      const rawKey = `boject_test_readonly_${Date.now()}`;
+      const keyHash = createHash('sha256').update(rawKey).digest('hex');
+      const keyPrefix = rawKey.slice(0, 11);
+      await prisma.apiKey.create({
+        data: {
+          name: 'Readonly test key',
+          keyHash,
+          keyPrefix,
+          scopes: ['content:read'],
+        },
+      });
+      try {
+        const res = await fetch('/api/content-entries', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${rawKey}`,
+            'Content-Type': 'application/json',
+            'X-Forwarded-For': '203.0.113.21',
+          },
+          body: JSON.stringify({
+            contentTypeId: testContentType.id,
+            data: { title: `Readonly attempt ${Date.now()}` },
+          }),
+        });
+        expect(res.status).toBe(403);
+        const body = (await res.json()) as { data?: { error?: string } };
+        expect(body.data?.error).toBe('INSUFFICIENT_SCOPE');
+      } finally {
+        await prisma.apiKey.delete({ where: { keyHash } });
+      }
     });
   });
 
