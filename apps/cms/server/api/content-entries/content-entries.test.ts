@@ -3323,4 +3323,30 @@ describe('Content Entry endpoints', async () => {
       }
     });
   });
+
+  describe('POST /api/content-entries — rate limit fires before scope (#172)', () => {
+    it('returns 429 from rate limiter even with content:write key', async () => {
+      // The rate limiter is 50/60s per IP per endpoint. 60 rapid requests with
+      // a content:write-scoped key should trip it. Use a unique IP so this
+      // test doesn't collide with other tests' rate-limit windows.
+      const ip = '203.0.113.99';
+      const responses: number[] = [];
+      for (let i = 0; i < 60; i++) {
+        const res = await fetch('/api/content-entries', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${TEST_API_KEY}`,
+            'Content-Type': 'application/json',
+            'X-Forwarded-For': ip,
+          },
+          body: JSON.stringify({
+            contentTypeId: testContentType.id,
+            data: { title: `Rate limit test ${Date.now()}-${i}` },
+          }),
+        });
+        responses.push(res.status);
+      }
+      expect(responses).toContain(429);
+    }, 30_000);
+  });
 });
