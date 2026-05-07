@@ -2745,4 +2745,29 @@ describe('Content Entry endpoints', async () => {
       });
     });
   });
+
+  describe('Auth middleware — /api/content-entries (#172)', () => {
+    it('allows API keys past the middleware (no longer 403 read-only)', async () => {
+      // After #172 Task 2, /api/content-entries is in API_KEY_WRITABLE_PATHS.
+      // Without the per-handler scope check (added in T4), the request reaches
+      // the handler and gets whatever response the handler produces. Without a
+      // body, that's a 400 for missing contentTypeId. Anything other than the
+      // middleware's 403 'API keys have read-only access' is acceptable here.
+      const res = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${TEST_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({}),
+      });
+      expect(res.status).not.toBe(403);
+      if (res.status === 403) {
+        const body = (await res.json()) as { message?: string };
+        // Belt-and-braces: even if Vitest somehow accepted the not-403, this
+        // would surface a misdiagnosis early.
+        expect(body.message).not.toMatch(/read-only/i);
+      }
+    });
+  });
 });

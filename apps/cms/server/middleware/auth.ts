@@ -1,4 +1,8 @@
-const API_KEY_WRITABLE_PATHS = new Set(['/api/schema/apply', '/api/apikeys']);
+const API_KEY_WRITABLE_PATHS = new Set([
+  '/api/schema/apply',
+  '/api/apikeys',
+  '/api/content-entries',
+]);
 
 function isApiKeyWritablePath(path: string): boolean {
   if (API_KEY_WRITABLE_PATHS.has(path)) return true;
