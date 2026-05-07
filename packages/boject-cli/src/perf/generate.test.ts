@@ -235,3 +235,33 @@ describe('generatePerfData', () => {
     ).toThrow(/Nope/);
   });
 });
+
+describe('generatePerfData uniqueness at scale', () => {
+  it('produces unique entry IDs across 5000 entries (no PRNG-period collisions)', async () => {
+    const bundle = await loadFixture('minimal');
+    const r = generatePerfData(bundle, {
+      contentTypeIdentifier: 'Page',
+      count: 5000,
+      seed: 1,
+    });
+    const ids = r.groups[0]!.entries.map((e) => e.id!);
+    const unique = new Set(ids);
+    expect(unique.size).toBe(ids.length);
+  });
+
+  it('produces unique entry IDs across multiple groups in a 1000-entry run', async () => {
+    const bundle = await loadFixture('with-relations');
+    const r = generatePerfData(bundle, {
+      contentTypeIdentifier: 'Article',
+      count: 1000,
+      seed: 1,
+    });
+    // Combine IDs from all groups (Authors + Articles); they live in
+    // separate Postgres tables but the perf seeder MUST not produce
+    // duplicates because writers expect distinct primary keys per row.
+    const ids: string[] = [];
+    for (const g of r.groups) for (const e of g.entries) ids.push(e.id!);
+    const unique = new Set(ids);
+    expect(unique.size).toBe(ids.length);
+  });
+});

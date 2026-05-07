@@ -54,6 +54,12 @@ const DEFAULT_TARGET_CAP = 200;
  * Generates a deterministic UUID-v4-shaped string from the seeded PRNG.
  * Not cryptographically random — fine for perf seed data; required so a
  * seeded run produces byte-identical output across invocations.
+ *
+ * Underlying PRNG is xorshift32 with period 2^32 (~4.3 billion). Each
+ * UUID consumes ~5 rand() calls, so the safe ceiling is ~860M UUIDs
+ * before the sequence repeats. Production runs (50K-200K entries) sit
+ * orders of magnitude below that. See `generate.test.ts` uniqueness
+ * tests for empirical coverage.
  */
 function nextUuid(rand: () => number): string {
   const hex = (n: number, width: number): string =>
@@ -114,7 +120,9 @@ export function generatePerfData(
   };
 
   // 3. Generate group-by-group, threading entry-id pools forward
-  const idPools = new Map<string, RelationTargetPool>(); // identifier → pool of synthetic IDs
+  // Map keyed by contentTypeId (UUID). Readers (RELATION/MULTIRELATION/RICHTEXT
+  // pool builders) match against UUIDs from field options, so this lookup is O(1).
+  const idPools = new Map<string, RelationTargetPool>();
   const groups: GeneratedSeedGroup[] = [];
   const rand = rng(seed);
 
@@ -126,15 +134,21 @@ export function generatePerfData(
     deferredByType.set(e.from, list);
   }
 
+  const identifierToType = new Map<string, BundleContentType>(
+    reachable.map((t) => [t.identifier, t])
+  );
+
   for (const identifier of sorted.order) {
-    const ct = reachable.find((t) => t.identifier === identifier)!;
+    const ct = identifierToType.get(identifier)!;
     const count = sizeFor(identifier);
     const deferred = deferredByType.get(identifier) ?? [];
     const deferredFieldIds = new Set(deferred.map((e) => e.field));
+    const fieldByIdentifier = new Map(ct.fields.map((f) => [f.identifier, f]));
 
     const entries: BundleEntry[] = [];
     const patches: GeneratedSeedGroup['patches'] = [];
     const uniqueTrackers = new Map<string, Set<string>>();
+    const slugField = ct.fields.find((f) => f.type === 'SLUG');
 
     // First pass: build entries with deferred fields omitted; SLUG handled inline
     for (let i = 0; i < count; i++) {
@@ -163,7 +177,6 @@ export function generatePerfData(
       }
 
       // SLUG is synthesised after ENTRY_TITLE so it can derive from the actual title
-      const slugField = ct.fields.find((f) => f.type === 'SLUG');
       if (slugField && !deferredFieldIds.has(slugField.identifier)) {
         const slugValue = generateSlug({
           entryTitle: entryTitle || `entry-${i}`,
@@ -192,8 +205,9 @@ export function generatePerfData(
     }
 
     // Update the pool BEFORE deferred-field patches so self-references can use sibling IDs
-    idPools.set(ct.identifier, {
-      contentTypeId: ct.id ?? ct.identifier,
+    const poolKey = ct.id ?? ct.identifier;
+    idPools.set(poolKey, {
+      contentTypeId: poolKey,
       contentTypeIdentifier: ct.identifier,
       entryIds: entries.map((e) => e.id!),
     });
@@ -203,7 +217,7 @@ export function generatePerfData(
       const entry = entries[i]!;
       const fieldUpdates: Record<string, unknown> = {};
       for (const edge of deferred) {
-        const field = ct.fields.find((f) => f.identifier === edge.field);
+        const field = fieldByIdentifier.get(edge.field);
         if (!field) continue;
         const value = generateFieldValue({
           field,
@@ -381,11 +395,8 @@ function buildRelationPool(
   const targetIds = (field.options?.targetContentTypeIds ?? []) as string[];
   const pool: RelationTargetPool[] = [];
   for (const tid of targetIds) {
-    // idPools is keyed by identifier, but field options carry UUIDs. Walk the
-    // pool by matching contentTypeId.
-    for (const entry of idPools.values()) {
-      if (entry.contentTypeId === tid) pool.push(entry);
-    }
+    const entry = idPools.get(tid);
+    if (entry) pool.push(entry);
   }
   return pool;
 }
@@ -410,24 +421,30 @@ function matchPools(
 ): RichtextRefTarget[] {
   const out: RichtextRefTarget[] = [];
   for (const tid of targetIds) {
-    for (const entry of idPools.values()) {
-      if (entry.contentTypeId === tid) {
-        out.push({
-          contentTypeId: entry.contentTypeId,
-          contentTypeIdentifier: entry.contentTypeIdentifier,
-          entryIds: entry.entryIds,
-        });
-      }
+    const entry = idPools.get(tid);
+    if (entry) {
+      out.push({
+        contentTypeId: entry.contentTypeId,
+        contentTypeIdentifier: entry.contentTypeIdentifier,
+        entryIds: entry.entryIds,
+      });
     }
   }
   return out;
 }
 
-// Anchored to a fixed point so generator output is byte-identical across runs.
-// Choose 2026-01-01 UTC as the upper bound and walk back 5 years.
 const DEFAULT_WINDOW_END_MS = Date.UTC(2026, 0, 1);
 const FIVE_YEARS_MS = 5 * 365 * 24 * 60 * 60 * 1000;
 
+/**
+ * Default DATETIME window for synthesised values when caller omits one.
+ *
+ * Anchored to a fixed wall-clock point (2026-01-01 UTC), NOT "now minus
+ * 5 years". The window does not slide with time — generator output is
+ * byte-identical across runs and across years, which is required for
+ * the deterministic-output guarantee. If you need a sliding window,
+ * pass `datetimeWindow` explicitly via GenerateOptions.
+ */
 function defaultWindow(): { from: Date; to: Date } {
   const to = new Date(DEFAULT_WINDOW_END_MS);
   const from = new Date(DEFAULT_WINDOW_END_MS - FIVE_YEARS_MS);
