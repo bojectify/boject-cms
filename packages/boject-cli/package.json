@@ -26,11 +26,13 @@
     "test:e2e": "vitest run tests/e2e"
   },
   "dependencies": {
+    "pg": "^8.13.1",
     "semver": "^7.6.3",
     "yaml": "^2.6.1"
   },
   "devDependencies": {
     "@types/node": "^24.12.2",
+    "@types/pg": "^8.11.10",
     "@types/semver": "^7.5.8",
     "tsup": "^8.3.0",
     "tsx": "^4.19.0",
