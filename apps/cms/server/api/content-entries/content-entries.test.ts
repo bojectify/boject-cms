@@ -808,6 +808,83 @@ describe('Content Entry endpoints', async () => {
     });
   });
 
+  describe('POST /api/content-entries/[id]/unpublish — content:write scope (#172)', () => {
+    async function createPublished(ip: string): Promise<string> {
+      const cookie = await getSessionCookie();
+      const title = `Unpublish target ${Date.now()}-${Math.random()}`;
+      const create = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': ip,
+        },
+        body: JSON.stringify({
+          contentTypeId: testContentType.id,
+          data: { title },
+        }),
+      });
+      const created = (await create.json()) as { id: string };
+      await fetch(`/api/content-entries/${created.id}`, {
+        method: 'PUT',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': ip,
+        },
+        body: JSON.stringify({
+          data: { title },
+          status: 'PUBLISHED',
+        }),
+      });
+      return created.id;
+    }
+
+    it('allows API keys with content:write scope', async () => {
+      const id = await createPublished('203.0.113.32');
+      const res = await fetch(`/api/content-entries/${id}/unpublish`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${TEST_API_KEY}`,
+          'X-Forwarded-For': '203.0.113.32',
+        },
+      });
+      expect(res.status).toBe(200);
+    });
+
+    it('rejects API keys without content:write scope', async () => {
+      const id = await createPublished('203.0.113.33');
+      const rawKey = `boject_test_readonly_${Date.now()}`;
+      const keyHash = createHash('sha256').update(rawKey).digest('hex');
+      const keyPrefix = rawKey.slice(0, 11);
+      await prisma.apiKey.create({
+        data: {
+          name: 'Readonly test key',
+          keyHash,
+          keyPrefix,
+          scopes: ['content:read'],
+        },
+      });
+      try {
+        const res = await fetch(`/api/content-entries/${id}/unpublish`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${rawKey}`,
+            'X-Forwarded-For': '203.0.113.33',
+          },
+        });
+        expect(res.status).toBe(403);
+        const body = (await res.json()) as { data?: { error?: string } };
+        expect(body.data?.error).toBe('INSUFFICIENT_SCOPE');
+      } finally {
+        // The rejected unpublish leaves the entry as PUBLISHED — clean it up
+        // so it doesn't pollute the active-status-default-filter test counts.
+        await prisma.contentEntry.delete({ where: { id } });
+        await prisma.apiKey.delete({ where: { keyHash } });
+      }
+    });
+  });
+
   describe('GET /api/content-entries', () => {
     it('lists entries with contentTypeId (session sees all)', async () => {
       const cookie = await getSessionCookie();
@@ -2358,20 +2435,6 @@ describe('Content Entry endpoints', async () => {
       expect(res.status).toBe(409);
       const body = (await res.json()) as { data?: { error?: string } };
       expect(body.data?.error).toBe('WRONG_STATE');
-    });
-
-    it('rejects API-key callers', async () => {
-      const res = await fetch(
-        '/api/content-entries/00000000-0000-0000-0000-000000000000/unpublish',
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${TEST_API_KEY}`,
-            'X-Forwarded-For': '203.0.113.23',
-          },
-        }
-      );
-      expect(res.status).toBe(403);
     });
   });
 
