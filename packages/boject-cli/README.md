@@ -134,6 +134,8 @@ Operator-facing load-test runner. Spawns [k6](https://k6.io/) against your CMS, 
 
 **Required scope:** `content:read`.
 
+> **Local smoke tests:** when running against `http://localhost:...`, lower the rate with `--target-rps 200` (or similar). The default 50→2000 RPS ramp opens enough TCP connections to exhaust your OS's ephemeral port pool partway through (~30k ports on macOS, with `TIME_WAIT` holding sockets for 60–120s after close). You'll see `dial tcp: connect: can't assign requested address` once the pool runs dry. The default ramp is calibrated for perf-clones behind a load balancer, not single-machine localhost runs. The `boject perf sweep` defaults are equally heavy — same advice applies.
+
 `.boject.config.json` may include an optional `perf` section to cache the common flags:
 
 ```json
