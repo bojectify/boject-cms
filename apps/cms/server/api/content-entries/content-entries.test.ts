@@ -728,6 +728,86 @@ describe('Content Entry endpoints', async () => {
     });
   });
 
+  describe('POST /api/content-entries/[id]/unarchive — content:write scope (#172)', () => {
+    async function createArchived(ip: string): Promise<string> {
+      const cookie = await getSessionCookie();
+      const create = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': ip,
+        },
+        body: JSON.stringify({
+          contentTypeId: testContentType.id,
+          data: { title: 'Unarchive target' },
+        }),
+      });
+      const created = (await create.json()) as { id: string };
+      await fetch(`/api/content-entries/${created.id}`, {
+        method: 'PUT',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': ip,
+        },
+        body: JSON.stringify({
+          data: { title: 'Unarchive target' },
+          status: 'PUBLISHED',
+        }),
+      });
+      await fetch(`/api/content-entries/${created.id}/archive`, {
+        method: 'POST',
+        headers: {
+          cookie,
+          'X-Forwarded-For': ip,
+        },
+      });
+      return created.id;
+    }
+
+    it('allows API keys with content:write scope', async () => {
+      const id = await createArchived('203.0.113.30');
+      const res = await fetch(`/api/content-entries/${id}/unarchive`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${TEST_API_KEY}`,
+          'X-Forwarded-For': '203.0.113.30',
+        },
+      });
+      expect(res.status).toBe(200);
+    });
+
+    it('rejects API keys without content:write scope', async () => {
+      const id = await createArchived('203.0.113.31');
+      const rawKey = `boject_test_readonly_${Date.now()}`;
+      const keyHash = createHash('sha256').update(rawKey).digest('hex');
+      const keyPrefix = rawKey.slice(0, 11);
+      await prisma.apiKey.create({
+        data: {
+          name: 'Readonly test key',
+          keyHash,
+          keyPrefix,
+          scopes: ['content:read'],
+        },
+      });
+      try {
+        const res = await fetch(`/api/content-entries/${id}/unarchive`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${rawKey}`,
+            'X-Forwarded-For': '203.0.113.31',
+          },
+        });
+        expect(res.status).toBe(403);
+        const body = (await res.json()) as { data?: { error?: string } };
+        expect(body.data?.error).toBe('INSUFFICIENT_SCOPE');
+      } finally {
+        await prisma.apiKey.delete({ where: { keyHash } });
+      }
+    });
+  });
+
   describe('GET /api/content-entries', () => {
     it('lists entries with contentTypeId (session sees all)', async () => {
       const cookie = await getSessionCookie();
@@ -2548,20 +2628,6 @@ describe('Content Entry endpoints', async () => {
       expect(res.status).toBe(409);
       const body = (await res.json()) as { data?: { error?: string } };
       expect(body.data?.error).toBe('WRONG_STATE');
-    });
-
-    it('rejects API-key callers', async () => {
-      const res = await fetch(
-        '/api/content-entries/00000000-0000-0000-0000-000000000000/unarchive',
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${TEST_API_KEY}`,
-            'X-Forwarded-For': '203.0.113.42',
-          },
-        }
-      );
-      expect(res.status).toBe(403);
     });
   });
 
