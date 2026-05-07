@@ -1,11 +1,13 @@
 /**
- * Vendored from apps/cms/utils/apiKeyScopes.ts.
- * Keep in sync when the canonical file changes.
+ * Canonical registry of recognised API-key scopes.
  *
- * Pure module — zero Nuxt or Prisma dependencies.
+ * Pure module — zero Nuxt or Prisma dependencies — so it runs in the
+ * Nuxt client (#166 admin UI), the Nuxt server (REST endpoint
+ * validation), and `tsx`-run scripts (manage-api-keys).
  */
 export const API_KEY_SCOPES = [
   'content:read',
+  'content:write',
   'schema:read',
   'schema:write',
   'apikey:read',
@@ -22,6 +24,8 @@ export function isApiKeyScope(value: unknown): value is ApiKeyScope {
 
 export const API_KEY_SCOPE_DESCRIPTIONS: Record<ApiKeyScope, string> = {
   'content:read': 'Read content via GraphQL.',
+  'content:write':
+    'Create, update, delete, and transition content entries via /api/content-entries.',
   'schema:read': 'Export the schema bundle.',
   'schema:write': 'Apply schema changes.',
   'apikey:read': 'List API keys.',
