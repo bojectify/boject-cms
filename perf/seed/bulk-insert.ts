@@ -18,9 +18,11 @@ export interface SeedExecOptions {
  * + SQL writer in @boject/cli, pre-filling the bundle with the workspace's
  * historical PerfArticle/PerfAuthor shape.
  *
- * Caller responsibility: ensure content types exist in the perf DB
- * (the legacy seedPerfData did this via prisma upsert; the new flow
- * relies on `boject schema apply` or equivalent having been run first).
+ * This wrapper still upserts content types into the perf DB before
+ * inserting entries (Prisma upsert against PERF_BUNDLE) because
+ * `pnpm perf:sweep` is the workspace-internal harness, not a downstream
+ * `boject schema apply` flow. A future cleanup may replace this with a
+ * pre-run `boject schema apply` call so the wrapper becomes generator+writer-only.
  */
 export async function seedPerfData(
   opts: SeedExecOptions
