@@ -1,4 +1,11 @@
 import { intInRange, pickN, pickOne } from '../prng.js';
+import { LOREM } from './lorem.js';
+
+/** Probability that any given paragraph wraps a span in a cmsLink mark, when the link allow-list is non-empty. */
+const LINK_INSERTION_PROBABILITY = 0.4;
+
+/** Maximum number of cmsEmbed atom nodes inserted into a single doc. */
+const MAX_EMBEDS_PER_DOC = 2;
 
 export interface ProseMirrorMark {
   type: string;
@@ -24,14 +31,6 @@ export interface RichtextRefPool {
   link: RichtextRefTarget[];
 }
 
-const LOREM = (
-  'Lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod ' +
-  'tempor incididunt ut labore et dolore magna aliqua Ut enim ad minim ' +
-  'veniam quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea ' +
-  'commodo consequat Duis aute irure dolor in reprehenderit in voluptate ' +
-  'velit esse cillum dolore eu fugiat nulla pariatur'
-).split(' ');
-
 function paragraph(
   rand: () => number,
   linkPool: RichtextRefTarget[]
@@ -39,9 +38,17 @@ function paragraph(
   const wordCount = intInRange(70, 110, rand);
   const text = pickN(LOREM, wordCount, rand).join(' ');
   const usableLinkPool = linkPool.filter((p) => p.entryIds.length > 0);
+  const words = text.split(' ');
 
-  // Decide whether to wrap a span of this paragraph in a cmsLink mark.
-  if (usableLinkPool.length === 0 || rand() > 0.4) {
+  // Conditions for inserting a cmsLink mark in this paragraph.
+  // The 13-word floor ensures linkStart (>=2) + linkLen (3-7) leaves room
+  // for a non-empty suffix; below that, fall back to a plain paragraph.
+  const canInsertLink =
+    usableLinkPool.length > 0 &&
+    words.length >= 13 &&
+    rand() < LINK_INSERTION_PROBABILITY;
+
+  if (!canInsertLink) {
     return {
       type: 'paragraph',
       content: [{ type: 'text', text }],
@@ -49,8 +56,9 @@ function paragraph(
   }
 
   // Split the paragraph into [prefix, linked, suffix]. Linked = 3-7 mid words.
-  const words = text.split(' ');
-  const linkStart = intInRange(2, Math.max(3, words.length - 10), rand);
+  // linkStart >= 2 preserves at least one prefix word; words.length - 10 caps
+  // the start so suffix has room for at least 3-4 trailing words.
+  const linkStart = intInRange(2, words.length - 10, rand);
   const linkLen = intInRange(3, 7, rand);
   const prefix = words.slice(0, linkStart).join(' ');
   const linked = words.slice(linkStart, linkStart + linkLen).join(' ');
@@ -131,7 +139,7 @@ export function generateRichtext(opts: {
   ];
 
   // 0-2 embed nodes scattered through the doc
-  const embedCount = intInRange(0, 2, rand);
+  const embedCount = intInRange(0, MAX_EMBEDS_PER_DOC, rand);
   for (let i = 0; i < embedCount; i++) {
     const node = embedNode(rand, embedPool);
     if (node) content.push(node);
