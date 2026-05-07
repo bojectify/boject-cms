@@ -271,6 +271,9 @@ importers:
 
   perf:
     dependencies:
+      '@boject/cli':
+        specifier: workspace:*
+        version: link:../packages/boject-cli
       '@prisma/adapter-pg':
         specifier: ^7.4.1
         version: 7.4.1
