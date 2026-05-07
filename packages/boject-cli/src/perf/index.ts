@@ -10,6 +10,7 @@ export type { WriteViaSqlOptions, PgClientLike } from './writeViaSql.js';
 export {
   writeViaHttp,
   AuthError,
+  ApiKeyReadOnlyError,
   RateLimitedError,
   EntryValidationError,
 } from './writeViaHttp.js';

@@ -2,7 +2,12 @@ import { afterAll, afterEach, describe, expect, it } from 'vitest';
 import { setupServer, type SetupServer } from 'msw/node';
 import { http, HttpResponse } from 'msw';
 import type { GeneratedSeed } from './generate.js';
-import { writeViaHttp, AuthError, RateLimitedError } from './writeViaHttp.js';
+import {
+  writeViaHttp,
+  AuthError,
+  ApiKeyReadOnlyError,
+  RateLimitedError,
+} from './writeViaHttp.js';
 
 const baseUrl = 'http://cms.test';
 const apiKey = 'boject_test_key';
@@ -169,6 +174,39 @@ describe('writeViaHttp', () => {
       http.post(
         `${baseUrl}/api/content-entries`,
         async () => new HttpResponse(null, { status: 401 })
+      )
+    );
+    server.listen();
+
+    const generated = makeGenerated();
+    generated.groups = [generated.groups[0]!];
+    await expect(
+      writeViaHttp({ baseUrl, apiKey, generated, concurrency: 1 })
+    ).rejects.toBeInstanceOf(AuthError);
+  });
+
+  it('throws ApiKeyReadOnlyError on 403 with read-only message', async () => {
+    server = setupServer(
+      http.post(`${baseUrl}/api/content-entries`, async () =>
+        HttpResponse.json(
+          { message: 'API keys have read-only access' },
+          { status: 403 }
+        )
+      )
+    );
+    server.listen();
+
+    const generated = makeGenerated();
+    generated.groups = [generated.groups[0]!];
+    await expect(
+      writeViaHttp({ baseUrl, apiKey, generated, concurrency: 1 })
+    ).rejects.toBeInstanceOf(ApiKeyReadOnlyError);
+  });
+
+  it('throws AuthError on generic 403', async () => {
+    server = setupServer(
+      http.post(`${baseUrl}/api/content-entries`, async () =>
+        HttpResponse.json({ message: 'Forbidden' }, { status: 403 })
       )
     );
     server.listen();

@@ -11,9 +11,25 @@ export interface WriteViaHttpOptions {
 }
 
 export class AuthError extends Error {
-  constructor() {
-    super('API key rejected — check key validity and CSRF / Origin headers');
+  constructor(message?: string) {
+    super(
+      message ??
+        'API key rejected — check key validity and CSRF / Origin headers'
+    );
     this.name = 'AuthError';
+  }
+}
+
+export class ApiKeyReadOnlyError extends Error {
+  constructor() {
+    super(
+      'API keys are currently read-only on /api/content-entries (auth ' +
+        'middleware blocks non-GET methods). HTTP-mode seeding requires the ' +
+        '`content:write` scope, tracked in ' +
+        'https://github.com/bojectify/boject-cms/issues/172. Until that ' +
+        'lands, use --database-url for SQL-mode seeding instead.'
+    );
+    this.name = 'ApiKeyReadOnlyError';
   }
 }
 
@@ -165,7 +181,15 @@ async function retryingFetch(url: string, init: RequestInit): Promise<unknown> {
   let last5xx = false;
   while (attempt < MAX_RETRIES) {
     const res = await fetch(url, init);
-    if (res.status === 401 || res.status === 403) throw new AuthError();
+    if (res.status === 403) {
+      // Distinguish "key has no write scope" (read-only middleware gate) from
+      // generic 403s. The middleware sends a JSON body with `message` =
+      // 'API keys have read-only access'; sniff for it.
+      const body = await res.text().catch(() => '');
+      if (/read-only/i.test(body)) throw new ApiKeyReadOnlyError();
+      throw new AuthError(`Access denied (403): ${body}`);
+    }
+    if (res.status === 401) throw new AuthError();
     if (res.status === 429) {
       const retryAfter = parseInt(
         res.headers.get('Retry-After') ?? String(RETRY_AFTER_DEFAULT_SECONDS),
