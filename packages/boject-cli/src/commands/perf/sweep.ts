@@ -139,32 +139,42 @@ export async function runPerfSweep(
 
   if (!flags.readOnly) {
     if (flags.reset && effectiveDatabaseUrl) {
-      const { runPerfReset } = await import('./reset.js');
-      await runPerfReset({
-        databaseUrl: effectiveDatabaseUrl,
-        yes: flags.yes,
-        allowNonPerfDb: flags.allowNonPerfDb,
-      });
+      try {
+        const { runPerfReset } = await import('./reset.js');
+        await runPerfReset({
+          databaseUrl: effectiveDatabaseUrl,
+          yes: flags.yes,
+          allowNonPerfDb: flags.allowNonPerfDb,
+        });
+      } catch (err) {
+        params.stderr(`${(err as Error).message}\n`);
+        return { exitCode: 1 };
+      }
     }
     const seedContentType = flags.contentType ?? defaults.contentType;
     if (!seedContentType) {
       params.stderr('Seed-then-run requires --content-type');
       return { exitCode: 2 };
     }
-    const { runPerfSeed } = await import('./seed.js');
-    await runPerfSeed({
-      contentType: seedContentType,
-      size: flags.size ?? defaults.size ?? 10000,
-      seed: flags.seed ?? defaults.seed,
-      databaseUrl: effectiveDatabaseUrl,
-      httpSeed: flags.httpSeed,
-      bundle: flags.bundle,
-      url: flags.url ?? defaults.url,
-      apiKey: flags.apiKey ?? params.apiKey,
-      concurrency: flags.concurrency,
-      allowNonPerfDb: flags.allowNonPerfDb,
-      yes: flags.yes,
-    });
+    try {
+      const { runPerfSeed } = await import('./seed.js');
+      await runPerfSeed({
+        contentType: seedContentType,
+        size: flags.size ?? defaults.size ?? 10000,
+        seed: flags.seed ?? defaults.seed,
+        databaseUrl: effectiveDatabaseUrl,
+        httpSeed: flags.httpSeed,
+        bundle: flags.bundle,
+        url: flags.url ?? defaults.url,
+        apiKey: flags.apiKey ?? params.apiKey,
+        concurrency: flags.concurrency,
+        allowNonPerfDb: flags.allowNonPerfDb,
+        yes: flags.yes,
+      });
+    } catch (err) {
+      params.stderr(`${(err as Error).message}\n`);
+      return { exitCode: 1 };
+    }
   }
 
   const url = flags.url ?? defaults.url;

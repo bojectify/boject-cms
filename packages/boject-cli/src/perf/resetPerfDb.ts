@@ -9,10 +9,16 @@ export class NonPerfDatabaseError extends Error {
 }
 
 /**
- * Truncates the perf-specific content tables in the target database.
+ * Truncates the perf-specific entry tables in the target database.
  * Refuses any URL that doesn't end in `/boject_perf` unless
  * `allowNonPerfDb` is set — defence against accidentally truncating
  * production content.
+ *
+ * Data-only reset: truncates ContentEntryVersion + ContentEntry, but
+ * preserves ContentType + ContentTypeField rows so a subsequent seed
+ * run does not need to re-apply schema. Operators who want to wipe
+ * the schema entirely should use `boject schema apply` against an
+ * empty bundle (or run prisma migrate reset on the perf DB).
  *
  * Order matches FK dependencies: child rows first, parents last. CASCADE
  * means the order isn't strictly required for correctness, but it's
@@ -30,10 +36,6 @@ export async function resetPerfDb(opts: {
     `TRUNCATE TABLE "ContentEntryVersion" RESTART IDENTITY CASCADE`
   );
   await opts.runQuery(`TRUNCATE TABLE "ContentEntry" RESTART IDENTITY CASCADE`);
-  await opts.runQuery(
-    `TRUNCATE TABLE "ContentTypeField" RESTART IDENTITY CASCADE`
-  );
-  await opts.runQuery(`TRUNCATE TABLE "ContentType" RESTART IDENTITY CASCADE`);
 }
 
 function redact(url: string): string {

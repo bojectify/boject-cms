@@ -30,5 +30,11 @@ export default defineConfig({
     await cp('src/vendor/perf/lib', 'dist/vendor/perf/lib', {
       recursive: true,
     });
+    // Also copy contentBundleTypes.ts so the workspace fixture and any
+    // downstream TypeScript consumer can import @boject/cli/vendor/contentBundleTypes.
+    await cp(
+      'src/vendor/contentBundleTypes.ts',
+      'dist/vendor/contentBundleTypes.ts'
+    );
   },
 });

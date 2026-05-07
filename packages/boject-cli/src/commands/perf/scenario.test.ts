@@ -59,7 +59,7 @@ describe('runPerfScenario', () => {
       stderr: (l) => stderr.push(l),
     });
     expect(r.exitCode).toBe(3);
-    expect(stderr.join('\n')).toMatch(/seed mode|#171/);
+    expect(stderr.join('\n')).toMatch(/rest-crud-cycle|not yet implemented/);
   });
 
   it('runs graphql-flat across all three shapes', async () => {

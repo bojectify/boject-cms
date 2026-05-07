@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { resetPerfDb, NonPerfDatabaseError } from './resetPerfDb.js';
 
 describe('resetPerfDb', () => {
-  it('runs TRUNCATE statements in dependency order', async () => {
+  it('truncates only the entry tables (preserves schema)', async () => {
     const queries: string[] = [];
     const runQuery = vi.fn(async (sql: string) => {
       queries.push(sql);
@@ -14,8 +14,8 @@ describe('resetPerfDb', () => {
     const combined = queries.join('\n');
     expect(combined).toContain('TRUNCATE TABLE "ContentEntryVersion"');
     expect(combined).toContain('TRUNCATE TABLE "ContentEntry"');
-    expect(combined).toContain('TRUNCATE TABLE "ContentTypeField"');
-    expect(combined).toContain('TRUNCATE TABLE "ContentType"');
+    expect(combined).not.toContain('TRUNCATE TABLE "ContentType"');
+    expect(combined).not.toContain('TRUNCATE TABLE "ContentTypeField"');
   });
 
   it('refuses non-perf URLs by default', async () => {

@@ -183,7 +183,7 @@ export async function runPerfScenario(
   }
   if (name === 'rest-crud-cycle') {
     params.stderr(
-      'Error: rest-crud-cycle requires seed mode and ships in #171. This CLI only supports read-only scenarios (graphql-flat, graphql-sitemap).'
+      'Error: rest-crud-cycle scenario is not yet implemented in the CLI. Supported scenarios: graphql-flat, graphql-sitemap.'
     );
     return { exitCode: 3 };
   }
@@ -212,32 +212,42 @@ export async function runPerfScenario(
 
   if (!flags.readOnly) {
     if (flags.reset && effectiveDatabaseUrl) {
-      const { runPerfReset } = await import('./reset.js');
-      await runPerfReset({
-        databaseUrl: effectiveDatabaseUrl,
-        yes: flags.yes,
-        allowNonPerfDb: flags.allowNonPerfDb,
-      });
+      try {
+        const { runPerfReset } = await import('./reset.js');
+        await runPerfReset({
+          databaseUrl: effectiveDatabaseUrl,
+          yes: flags.yes,
+          allowNonPerfDb: flags.allowNonPerfDb,
+        });
+      } catch (err) {
+        params.stderr(`${(err as Error).message}\n`);
+        return { exitCode: 1 };
+      }
     }
     const seedContentType = flags.contentType ?? configDefaults.contentType;
     if (!seedContentType) {
       params.stderr('Seed-then-run requires --content-type');
       return { exitCode: 2 };
     }
-    const { runPerfSeed } = await import('./seed.js');
-    await runPerfSeed({
-      contentType: seedContentType,
-      size: flags.size ?? configDefaults.size ?? 10000,
-      seed: flags.seed ?? configDefaults.seed,
-      databaseUrl: effectiveDatabaseUrl,
-      httpSeed: flags.httpSeed,
-      bundle: flags.bundle,
-      url: flags.url ?? configDefaults.url,
-      apiKey: flags.apiKey ?? params.apiKey,
-      concurrency: flags.concurrency,
-      allowNonPerfDb: flags.allowNonPerfDb,
-      yes: flags.yes,
-    });
+    try {
+      const { runPerfSeed } = await import('./seed.js');
+      await runPerfSeed({
+        contentType: seedContentType,
+        size: flags.size ?? configDefaults.size ?? 10000,
+        seed: flags.seed ?? configDefaults.seed,
+        databaseUrl: effectiveDatabaseUrl,
+        httpSeed: flags.httpSeed,
+        bundle: flags.bundle,
+        url: flags.url ?? configDefaults.url,
+        apiKey: flags.apiKey ?? params.apiKey,
+        concurrency: flags.concurrency,
+        allowNonPerfDb: flags.allowNonPerfDb,
+        yes: flags.yes,
+      });
+    } catch (err) {
+      params.stderr(`${(err as Error).message}\n`);
+      return { exitCode: 1 };
+    }
   }
 
   const v = await resolveAndValidate(params);

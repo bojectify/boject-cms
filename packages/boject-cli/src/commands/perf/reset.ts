@@ -37,8 +37,7 @@ export async function runPerfReset(flags: PerfResetFlags): Promise<void> {
     yes: flags.yes,
   });
   if (!confirmed) {
-    process.stderr.write('Cancelled.\n');
-    process.exit(1);
+    throw new Error('Cancelled by operator');
   }
   const client: PerfResetClient =
     flags._testClient ??
