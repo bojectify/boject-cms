@@ -4,9 +4,11 @@ import { withPrismaErrors } from '../../utils/prismaErrors';
 import { enforceMutationRateLimit } from '../../utils/rateLimitEndpoint';
 import { enqueueWebhookDeliveries } from '../../utils/webhooks';
 import { getPublishedVersion } from '../../utils/resolveVersion';
+import { assertApiKeyScope } from '../../utils/assertApiKeyScope';
 
 export default defineEventHandler(async (event) => {
   enforceMutationRateLimit(event, 'content-entries.delete');
+  assertApiKeyScope(event, 'content:write');
   const id = assertUuid(getRouterParam(event, 'id'), 'id');
 
   const existing = await prisma.contentEntry.findUnique({

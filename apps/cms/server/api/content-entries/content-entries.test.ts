@@ -493,6 +493,77 @@ describe('Content Entry endpoints', async () => {
     });
   });
 
+  describe('DELETE /api/content-entries/[id] — content:write scope (#172)', () => {
+    it('allows API keys with content:write scope', async () => {
+      const cookie = await getSessionCookie();
+      const create = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': '203.0.113.24',
+        },
+        body: JSON.stringify({
+          contentTypeId: testContentType.id,
+          data: { title: 'Delete target (allowed)' },
+        }),
+      });
+      const created = (await create.json()) as { id: string };
+
+      const res = await fetch(`/api/content-entries/${created.id}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${TEST_API_KEY}`,
+          'X-Forwarded-For': '203.0.113.24',
+        },
+      });
+      expect(res.status).toBe(200);
+    });
+
+    it('rejects API keys without content:write scope', async () => {
+      const cookie = await getSessionCookie();
+      const create = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': '203.0.113.25',
+        },
+        body: JSON.stringify({
+          contentTypeId: testContentType.id,
+          data: { title: 'Delete target (rejected)' },
+        }),
+      });
+      const created = (await create.json()) as { id: string };
+
+      const rawKey = `boject_test_readonly_${Date.now()}`;
+      const keyHash = createHash('sha256').update(rawKey).digest('hex');
+      const keyPrefix = rawKey.slice(0, 11);
+      await prisma.apiKey.create({
+        data: {
+          name: 'Readonly test key',
+          keyHash,
+          keyPrefix,
+          scopes: ['content:read'],
+        },
+      });
+      try {
+        const res = await fetch(`/api/content-entries/${created.id}`, {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${rawKey}`,
+            'X-Forwarded-For': '203.0.113.25',
+          },
+        });
+        expect(res.status).toBe(403);
+        const body = (await res.json()) as { data?: { error?: string } };
+        expect(body.data?.error).toBe('INSUFFICIENT_SCOPE');
+      } finally {
+        await prisma.apiKey.delete({ where: { keyHash } });
+      }
+    });
+  });
+
   describe('GET /api/content-entries', () => {
     it('lists entries with contentTypeId (session sees all)', async () => {
       const cookie = await getSessionCookie();
