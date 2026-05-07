@@ -93,6 +93,9 @@ async function loadDefaults(
   filterField?: string;
   relationField?: string;
   out?: string;
+  size?: number;
+  seed?: number;
+  perfDatabaseUrl?: string;
 }> {
   try {
     const c = await loadProjectConfig(cwd);
@@ -102,6 +105,9 @@ async function loadDefaults(
       filterField: c.config.perf?.filterField,
       relationField: c.config.perf?.relationField,
       out: c.config.perf?.out,
+      size: c.config.perf?.size,
+      seed: c.config.perf?.seed,
+      perfDatabaseUrl: c.config.perf?.perfDatabaseUrl,
     };
   } catch (err) {
     const message = (err as Error).message;
@@ -188,8 +194,14 @@ export async function runPerfScenario(
     return { exitCode: 3 };
   }
 
+  const configDefaults = await loadDefaults(params.cwd, params.stderr);
+
+  // CLI flags win; config fills the gap.
+  const effectiveDatabaseUrl =
+    flags.databaseUrl ?? configDefaults.perfDatabaseUrl;
+
   // #159: pre-flight requires either --read-only or a seed transport.
-  if (!flags.readOnly && !flags.databaseUrl && !flags.httpSeed) {
+  if (!flags.readOnly && !effectiveDatabaseUrl && !flags.httpSeed) {
     params.stderr(
       'boject perf scenario without --read-only must provide a seed transport ' +
         '(--database-url for SQL or --http-seed for HTTP). ' +
@@ -199,27 +211,28 @@ export async function runPerfScenario(
   }
 
   if (!flags.readOnly) {
-    if (flags.reset && flags.databaseUrl) {
+    if (flags.reset && effectiveDatabaseUrl) {
       const { runPerfReset } = await import('./reset.js');
       await runPerfReset({
-        databaseUrl: flags.databaseUrl,
+        databaseUrl: effectiveDatabaseUrl,
         yes: flags.yes,
         allowNonPerfDb: flags.allowNonPerfDb,
       });
     }
-    if (!flags.contentType) {
+    const seedContentType = flags.contentType ?? configDefaults.contentType;
+    if (!seedContentType) {
       params.stderr('Seed-then-run requires --content-type');
       return { exitCode: 2 };
     }
     const { runPerfSeed } = await import('./seed.js');
     await runPerfSeed({
-      contentType: flags.contentType,
-      size: flags.size ?? 10000,
-      seed: flags.seed,
-      databaseUrl: flags.databaseUrl,
+      contentType: seedContentType,
+      size: flags.size ?? configDefaults.size ?? 10000,
+      seed: flags.seed ?? configDefaults.seed,
+      databaseUrl: effectiveDatabaseUrl,
       httpSeed: flags.httpSeed,
       bundle: flags.bundle,
-      url: flags.url,
+      url: flags.url ?? configDefaults.url,
       apiKey: flags.apiKey ?? params.apiKey,
       concurrency: flags.concurrency,
       allowNonPerfDb: flags.allowNonPerfDb,

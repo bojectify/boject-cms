@@ -632,25 +632,42 @@ async function dispatchPerf(args: string[]): Promise<number> {
           yes: { type: 'boolean', default: false },
         },
       });
-      if (!values['content-type']) {
-        process.stderr.write('boject perf seed requires --content-type\n');
+
+      // Merge config defaults (CLI flags win).
+      let configPerf: import('./config.js').ProjectPerfConfig | undefined;
+      try {
+        const { loadProjectConfig } = await import('./config.js');
+        const r = await loadProjectConfig(process.cwd());
+        configPerf = r.config.perf;
+      } catch {
+        // No config file is fine — operator can pass everything via flags.
+      }
+
+      const contentType = values['content-type'] ?? configPerf?.contentType;
+      if (!contentType) {
+        process.stderr.write(
+          'boject perf seed requires --content-type (or perf.contentType in .boject.config.json)\n'
+        );
         return 1;
       }
-      const size = values.size ? Number(values.size) : 10000;
+      const size = values.size
+        ? Number(values.size)
+        : (configPerf?.size ?? 10000);
       if (!Number.isFinite(size) || size < 1) {
         process.stderr.write(`Invalid --size: ${values.size}\n`);
         return 1;
       }
-      const seed = values.seed ? Number(values.seed) : undefined;
+      const seed = values.seed ? Number(values.seed) : configPerf?.seed;
       const concurrency = values.concurrency
         ? Number(values.concurrency)
         : undefined;
+      const databaseUrl = values['database-url'] ?? configPerf?.perfDatabaseUrl;
       try {
         await runPerfSeed({
-          contentType: values['content-type'],
+          contentType,
           size,
           seed,
-          databaseUrl: values['database-url'],
+          databaseUrl,
           httpSeed: values['http-seed'],
           bundle: values.bundle,
           concurrency,
