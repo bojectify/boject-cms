@@ -2,6 +2,7 @@ import type { Prisma, ContentEntryVersion, FieldType } from '#prisma';
 import { assertUuid } from '../../utils/validation';
 import { withPrismaErrors } from '../../utils/prismaErrors';
 import { enforceMutationRateLimit } from '../../utils/rateLimitEndpoint';
+import { assertApiKeyScope } from '../../utils/assertApiKeyScope';
 import { assertUniqueFieldValues } from '../../utils/assertUniqueFieldValues';
 import { enrichEntryDataWithEmbedIdentifiers } from '../../utils/enrichRichtextEmbeds';
 import { enqueueWebhookDeliveries } from '../../utils/webhooks';
@@ -15,6 +16,7 @@ import {
 
 export default defineEventHandler(async (event) => {
   enforceMutationRateLimit(event, 'content-entries.put');
+  assertApiKeyScope(event, 'content:write');
   const id = assertUuid(getRouterParam(event, 'id'), 'id');
   const body = await readBody<Record<string, unknown>>(event);
 

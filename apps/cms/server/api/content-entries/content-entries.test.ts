@@ -411,6 +411,88 @@ describe('Content Entry endpoints', async () => {
     });
   });
 
+  describe('PUT /api/content-entries/[id] — content:write scope (#172)', () => {
+    it('allows API keys with content:write scope', async () => {
+      // Create an entry via session auth first
+      const cookie = await getSessionCookie();
+      const create = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': '203.0.113.22',
+        },
+        body: JSON.stringify({
+          contentTypeId: testContentType.id,
+          data: { title: 'Update target' },
+        }),
+      });
+      const created = (await create.json()) as { id: string };
+
+      // Update via API key with content:write. Publish so the API-key
+      // response (which can only see PUBLISHED versions) has a version
+      // to return — otherwise the handler 404s after saving the draft.
+      const res = await fetch(`/api/content-entries/${created.id}`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${TEST_API_KEY}`,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': '203.0.113.22',
+        },
+        body: JSON.stringify({
+          data: { title: 'Updated by API key' },
+          status: 'PUBLISHED',
+        }),
+      });
+      expect(res.status).toBe(200);
+    });
+
+    it('rejects API keys without content:write scope', async () => {
+      const cookie = await getSessionCookie();
+      const create = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': '203.0.113.23',
+        },
+        body: JSON.stringify({
+          contentTypeId: testContentType.id,
+          data: { title: 'Readonly update target' },
+        }),
+      });
+      const created = (await create.json()) as { id: string };
+
+      const rawKey = `boject_test_readonly_${Date.now()}`;
+      const keyHash = createHash('sha256').update(rawKey).digest('hex');
+      const keyPrefix = rawKey.slice(0, 11);
+      await prisma.apiKey.create({
+        data: {
+          name: 'Readonly test key',
+          keyHash,
+          keyPrefix,
+          scopes: ['content:read'],
+        },
+      });
+      try {
+        const res = await fetch(`/api/content-entries/${created.id}`, {
+          method: 'PUT',
+          headers: {
+            Authorization: `Bearer ${rawKey}`,
+            'Content-Type': 'application/json',
+            'X-Forwarded-For': '203.0.113.23',
+          },
+          body: JSON.stringify({ data: { title: 'Should be rejected' } }),
+        });
+        expect(res.status).toBe(403);
+        const body = (await res.json()) as { data?: { error?: string } };
+        expect(body.data?.error).toBe('INSUFFICIENT_SCOPE');
+      } finally {
+        await prisma.apiKey.delete({ where: { keyHash } });
+      }
+    });
+  });
+
   describe('GET /api/content-entries', () => {
     it('lists entries with contentTypeId (session sees all)', async () => {
       const cookie = await getSessionCookie();
