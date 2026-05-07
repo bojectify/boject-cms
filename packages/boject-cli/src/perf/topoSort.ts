@@ -17,18 +17,26 @@ export interface TopoSortResult {
 }
 
 export class CycleRequiresNullError extends Error {
-  constructor(
-    public cycle: string[],
-    public requiredEdges: Edge[]
-  ) {
+  /**
+   * The set of nodes that remained when the algorithm got stuck.
+   * This is a *superset* of the actual cycle — it includes any node
+   * that was waiting on the cycle, transitively. The `requiredEdges`
+   * field is the precise set of edges that prevented further progress.
+   */
+  public residual: string[];
+  public requiredEdges: Edge[];
+
+  constructor(residual: string[], requiredEdges: Edge[]) {
     super(
-      `Cycle through [${cycle.join(' → ')}] has only required edges; ` +
-        `cannot defer. Make at least one edge optional. ` +
-        `Required edges: ${requiredEdges
+      `Stuck on residual nodes [${residual.join(', ')}]: cycle through them ` +
+        `has only required edges; cannot defer. Make at least one edge ` +
+        `optional. Required edges: ${requiredEdges
           .map((e) => `${e.from}.${e.field} → ${e.to}`)
           .join(', ')}`
     );
     this.name = 'CycleRequiresNullError';
+    this.residual = residual;
+    this.requiredEdges = requiredEdges;
   }
 }
 

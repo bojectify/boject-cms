@@ -84,4 +84,62 @@ describe('topoSort', () => {
       CycleRequiresNullError
     );
   });
+
+  it('returns empty result for empty input', () => {
+    const r = topoSort([], []);
+    expect(r.order).toEqual([]);
+    expect(r.deferredEdges).toEqual([]);
+  });
+
+  it('places identifiers with no edges in the order', () => {
+    const r = topoSort(['Solo'], []);
+    expect(r.order).toEqual(['Solo']);
+    expect(r.deferredEdges).toEqual([]);
+  });
+
+  it('places multiple unrelated identifiers in input order', () => {
+    const r = topoSort(['A', 'B', 'C'], []);
+    expect(r.order).toEqual(['A', 'B', 'C']);
+  });
+
+  it('ignores edges that reference identifiers outside the input set', () => {
+    const edges: Edge[] = [
+      { from: 'A', to: 'GhostType', field: 'g', required: true },
+      { from: 'OtherGhost', to: 'A', field: 'a', required: true },
+    ];
+    const r = topoSort(['A'], edges);
+    expect(r.order).toEqual(['A']);
+    expect(r.deferredEdges).toEqual([]);
+  });
+
+  it('is deterministic — same input twice produces identical output', () => {
+    const edges: Edge[] = [
+      { from: 'B', to: 'A', field: 'a', required: false },
+      { from: 'C', to: 'A', field: 'a', required: false },
+      { from: 'D', to: 'B', field: 'b', required: false },
+      { from: 'D', to: 'C', field: 'c', required: false },
+    ];
+    const a = topoSort(['A', 'B', 'C', 'D'], edges);
+    const b = topoSort(['A', 'B', 'C', 'D'], edges);
+    expect(a.order).toEqual(b.order);
+    expect(a.deferredEdges).toEqual(b.deferredEdges);
+  });
+
+  it('reports residual nodes via the residual field on the error', () => {
+    const edges: Edge[] = [
+      { from: 'A', to: 'B', field: 'b', required: true },
+      { from: 'B', to: 'A', field: 'a', required: true },
+    ];
+    try {
+      topoSort(['A', 'B'], edges);
+      throw new Error('expected throw');
+    } catch (err) {
+      expect(err).toBeInstanceOf(CycleRequiresNullError);
+      expect((err as CycleRequiresNullError).residual.sort()).toEqual([
+        'A',
+        'B',
+      ]);
+      expect((err as CycleRequiresNullError).requiredEdges).toEqual(edges);
+    }
+  });
 });
