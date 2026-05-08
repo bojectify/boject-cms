@@ -1,4 +1,5 @@
 import { Client } from 'pg';
+import { assertAllowedDatabase } from '../../perf/allowedDatabase.js';
 import { resetPerfDb } from '../../perf/resetPerfDb.js';
 import { confirmReset } from './shared/confirmReset.js';
 
@@ -32,6 +33,7 @@ export async function runPerfReset(flags: PerfResetFlags): Promise<void> {
         '(There is no HTTP equivalent — multi-instance reset is not supported.)'
     );
   }
+  assertAllowedDatabase(flags.databaseUrl, flags.allowDatabase ?? []);
   const confirmed = await confirmReset({
     databaseUrl: flags.databaseUrl,
     yes: flags.yes,
