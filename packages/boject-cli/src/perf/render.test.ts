@@ -30,7 +30,11 @@ function minimalMetadata(overrides: Partial<RunMetadata> = {}): RunMetadata {
       duration: '180s',
       stages: [50, 100, 250, 500, 1000, 2000],
     },
+    mode: 'read-only',
+    seedSize: null,
+    seedDeterministicSeed: null,
     partial: false,
+    partialFailureSource: null,
     ...overrides,
   };
 }
@@ -128,7 +132,7 @@ describe('renderReport', () => {
     expect(md).toMatch(/1 malformed line/);
   });
 
-  it('reports schemaVersion 1 in metadata.json', async () => {
+  it('reports schemaVersion 2 in metadata.json', async () => {
     const out = await mkdtemp(join(tmpdir(), 'boject-render-'));
     await renderReport({
       rawJsonPath: FIXTURE,
@@ -136,7 +140,7 @@ describe('renderReport', () => {
       runMetadata: minimalMetadata(),
     });
     const meta = JSON.parse(await readFile(join(out, 'metadata.json'), 'utf8'));
-    expect(meta.schemaVersion).toBe(1);
+    expect(meta.schemaVersion).toBe(2);
   });
 
   it('CSV error_rate is a fractional number not a percentage string', async () => {

@@ -5,6 +5,7 @@ import { runPreflight } from '../../perf/preflight.js';
 import { runK6 } from '../../perf/runK6.js';
 import { renderReport, type RunMetadata } from '../../perf/render.js';
 import { confirmHeavyRun } from '../../perf/confirm.js';
+import { deriveMode } from '../../perf/runMode.js';
 import { sanitiseUrl } from '../../perf/sanitise.js';
 import {
   defaultK6Available,
@@ -137,6 +138,7 @@ export async function runPerfSweep(
     return { exitCode: 2 };
   }
 
+  let seedResult: { inserted: number } | null = null;
   if (!flags.readOnly) {
     if (flags.reset && effectiveDatabaseUrl) {
       try {
@@ -158,7 +160,7 @@ export async function runPerfSweep(
     }
     try {
       const { runPerfSeed } = await import('./seed.js');
-      await runPerfSeed({
+      seedResult = await runPerfSeed({
         contentType: seedContentType,
         size: flags.size ?? defaults.size ?? 10000,
         seed: flags.seed ?? defaults.seed,
@@ -386,7 +388,15 @@ export async function runPerfSweep(
       duration: '180s',
       stages: flags.stages ?? scaleDefaultStages(flags.targetRps ?? 2000),
     },
+    mode: deriveMode({
+      readOnly: flags.readOnly,
+      httpSeed: flags.httpSeed,
+      databaseUrl: effectiveDatabaseUrl,
+    }),
+    seedSize: seedResult?.inserted ?? null,
+    seedDeterministicSeed: flags.seed ?? defaults.seed ?? null,
     partial,
+    partialFailureSource: partial ? 'k6' : null,
   };
 
   await renderReport({ rawJsonPath, outDir, runMetadata: meta });

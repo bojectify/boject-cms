@@ -107,7 +107,11 @@ export async function runPerfReport(
         duration: '0s',
         stages: [],
       },
+      mode: 'read-only',
+      seedSize: null,
+      seedDeterministicSeed: null,
       partial: parsed.partial === true,
+      partialFailureSource: null,
     };
   } catch (err) {
     params.stderr(`Error parsing ${metadataPath}: ${(err as Error).message}`);
