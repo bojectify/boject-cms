@@ -1,7 +1,14 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { renderReport, type RunMetadata } from '../../perf/render.js';
+import type { RunMode } from '../../perf/runMode.js';
 import { loadProjectConfig } from '../../config.js';
+
+const RUN_MODES = ['seed-direct', 'seed-http', 'read-only'] as const;
+type RunModeStr = (typeof RUN_MODES)[number];
+
+const PARTIAL_SOURCES = ['reset', 'seed', 'k6'] as const;
+type PartialSource = (typeof PARTIAL_SOURCES)[number];
 
 export interface PerfReportFlags {
   from?: string;
@@ -107,11 +114,20 @@ export async function runPerfReport(
         duration: '0s',
         stages: [],
       },
-      mode: 'read-only',
-      seedSize: null,
-      seedDeterministicSeed: null,
+      mode: RUN_MODES.includes(parsed.mode as RunModeStr)
+        ? (parsed.mode as RunMode)
+        : 'read-only',
+      seedSize: typeof parsed.seedSize === 'number' ? parsed.seedSize : null,
+      seedDeterministicSeed:
+        typeof parsed.seedDeterministicSeed === 'number'
+          ? parsed.seedDeterministicSeed
+          : null,
       partial: parsed.partial === true,
-      partialFailureSource: null,
+      partialFailureSource: PARTIAL_SOURCES.includes(
+        parsed.partialFailureSource as PartialSource
+      )
+        ? (parsed.partialFailureSource as PartialSource)
+        : null,
     };
   } catch (err) {
     params.stderr(`Error parsing ${metadataPath}: ${(err as Error).message}`);
