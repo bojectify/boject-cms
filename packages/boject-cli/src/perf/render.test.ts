@@ -155,4 +155,124 @@ describe('renderReport', () => {
     // Expect the trailing column to look like a 4-decimal fraction
     expect(csv).toMatch(/0\.0000/);
   });
+
+  it('omits the Run status section for seed-direct non-partial runs', async () => {
+    const out = await mkdtemp(join(tmpdir(), 'boject-render-'));
+    await renderReport({
+      rawJsonPath: FIXTURE,
+      outDir: out,
+      runMetadata: minimalMetadata({ mode: 'seed-direct' }),
+    });
+    const md = await readFile(join(out, 'summary.md'), 'utf8');
+    expect(md).not.toContain('## Run status');
+    const meta = JSON.parse(await readFile(join(out, 'metadata.json'), 'utf8'));
+    expect(meta.mode).toBe('seed-direct');
+  });
+
+  it('renders the seed-http mode banner for seed-http non-partial runs', async () => {
+    const out = await mkdtemp(join(tmpdir(), 'boject-render-'));
+    await renderReport({
+      rawJsonPath: FIXTURE,
+      outDir: out,
+      runMetadata: minimalMetadata({ mode: 'seed-http' }),
+    });
+    const md = await readFile(join(out, 'summary.md'), 'utf8');
+    expect(md).toContain('operator seeded via REST');
+    const meta = JSON.parse(await readFile(join(out, 'metadata.json'), 'utf8'));
+    expect(meta.mode).toBe('seed-http');
+  });
+
+  it('renders the read-only mode banner for read-only non-partial runs', async () => {
+    const out = await mkdtemp(join(tmpdir(), 'boject-render-'));
+    await renderReport({
+      rawJsonPath: FIXTURE,
+      outDir: out,
+      runMetadata: minimalMetadata({ mode: 'read-only' }),
+    });
+    const md = await readFile(join(out, 'summary.md'), 'utf8');
+    expect(md).toContain('Read-only run');
+    const meta = JSON.parse(await readFile(join(out, 'metadata.json'), 'utf8'));
+    expect(meta.mode).toBe('read-only');
+  });
+
+  it('renders the reset partial-source banner', async () => {
+    const out = await mkdtemp(join(tmpdir(), 'boject-render-'));
+    await renderReport({
+      rawJsonPath: FIXTURE,
+      outDir: out,
+      runMetadata: minimalMetadata({
+        partial: true,
+        partialFailureSource: 'reset',
+      }),
+    });
+    const md = await readFile(join(out, 'summary.md'), 'utf8');
+    expect(md).toContain('perf-DB reset failed');
+    const meta = JSON.parse(await readFile(join(out, 'metadata.json'), 'utf8'));
+    expect(meta.partialFailureSource).toBe('reset');
+  });
+
+  it('renders the seed partial-source banner', async () => {
+    const out = await mkdtemp(join(tmpdir(), 'boject-render-'));
+    await renderReport({
+      rawJsonPath: FIXTURE,
+      outDir: out,
+      runMetadata: minimalMetadata({
+        partial: true,
+        partialFailureSource: 'seed',
+      }),
+    });
+    const md = await readFile(join(out, 'summary.md'), 'utf8');
+    expect(md).toContain('seed step failed');
+    const meta = JSON.parse(await readFile(join(out, 'metadata.json'), 'utf8'));
+    expect(meta.partialFailureSource).toBe('seed');
+  });
+
+  it('renders the k6 partial-source banner', async () => {
+    const out = await mkdtemp(join(tmpdir(), 'boject-render-'));
+    await renderReport({
+      rawJsonPath: FIXTURE,
+      outDir: out,
+      runMetadata: minimalMetadata({
+        partial: true,
+        partialFailureSource: 'k6',
+      }),
+    });
+    const md = await readFile(join(out, 'summary.md'), 'utf8');
+    expect(md).toContain('k6 exited mid-run');
+    const meta = JSON.parse(await readFile(join(out, 'metadata.json'), 'utf8'));
+    expect(meta.partialFailureSource).toBe('k6');
+  });
+
+  it('stacks mode + partial-source banners when both apply', async () => {
+    const out = await mkdtemp(join(tmpdir(), 'boject-render-'));
+    await renderReport({
+      rawJsonPath: FIXTURE,
+      outDir: out,
+      runMetadata: minimalMetadata({
+        mode: 'seed-http',
+        partial: true,
+        partialFailureSource: 'seed',
+      }),
+    });
+    const md = await readFile(join(out, 'summary.md'), 'utf8');
+    expect(md).toContain('operator seeded via REST');
+    expect(md).toContain('seed step failed');
+  });
+
+  it('round-trips mode + seedSize + seedDeterministicSeed in metadata.json', async () => {
+    const out = await mkdtemp(join(tmpdir(), 'boject-render-'));
+    await renderReport({
+      rawJsonPath: FIXTURE,
+      outDir: out,
+      runMetadata: minimalMetadata({
+        mode: 'seed-direct',
+        seedSize: 10000,
+        seedDeterministicSeed: 7,
+      }),
+    });
+    const meta = JSON.parse(await readFile(join(out, 'metadata.json'), 'utf8'));
+    expect(meta.mode).toBe('seed-direct');
+    expect(meta.seedSize).toBe(10000);
+    expect(meta.seedDeterministicSeed).toBe(7);
+  });
 });
