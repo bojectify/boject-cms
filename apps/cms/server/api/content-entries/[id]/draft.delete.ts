@@ -1,5 +1,6 @@
 import { assertUuid } from '../../../utils/validation';
 import { enforceMutationRateLimit } from '../../../utils/rateLimitEndpoint';
+import { assertApiKeyScope } from '../../../utils/assertApiKeyScope';
 import {
   getDraftVersion,
   getPublishedVersion,
@@ -8,6 +9,7 @@ import {
 
 export default defineEventHandler(async (event) => {
   enforceMutationRateLimit(event, 'content-entries.draft.delete');
+  assertApiKeyScope(event, 'content:write');
   const id = assertUuid(getRouterParam(event, 'id'), 'id');
 
   const entry = await prisma.contentEntry.findUnique({

@@ -7,6 +7,7 @@
  */
 export const API_KEY_SCOPES = [
   'content:read',
+  'content:write',
   'schema:read',
   'schema:write',
   'apikey:read',
@@ -23,6 +24,8 @@ export function isApiKeyScope(value: unknown): value is ApiKeyScope {
 
 export const API_KEY_SCOPE_DESCRIPTIONS: Record<ApiKeyScope, string> = {
   'content:read': 'Read content via GraphQL.',
+  'content:write':
+    'Create, update, delete, and transition content entries via /api/content-entries.',
   'schema:read': 'Export the schema bundle.',
   'schema:write': 'Apply schema changes.',
   'apikey:read': 'List API keys.',

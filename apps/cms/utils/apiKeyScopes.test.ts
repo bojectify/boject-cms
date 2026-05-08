@@ -10,6 +10,7 @@ describe('apiKeyScopes', () => {
   it('exposes the canonical list of scopes', () => {
     expect(API_KEY_SCOPES).toEqual([
       'content:read',
+      'content:write',
       'schema:read',
       'schema:write',
       'apikey:read',
@@ -43,7 +44,7 @@ describe('apiKeyScopes', () => {
     it.each([
       ['empty string', ''],
       ['unknown scope', 'admin'],
-      ['similar but wrong', 'content:write'],
+      ['similar but wrong', 'content:delete'],
       ['null', null],
       ['undefined', undefined],
       ['number', 42],

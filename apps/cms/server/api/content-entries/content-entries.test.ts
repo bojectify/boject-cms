@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { setup, $fetch, fetch } from '@nuxt/test-utils/e2e';
+import { createHash } from 'node:crypto';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../../../generated/prisma/client';
 import { TEST_USERNAME, TEST_PASSWORD } from '../../test/credentials';
@@ -350,6 +351,537 @@ describe('Content Entry endpoints', async () => {
       });
 
       expect(res.status).toBe(409);
+    });
+  });
+
+  describe('POST /api/content-entries — content:write scope (#172)', () => {
+    it('allows API keys with content:write scope', async () => {
+      // The seeded test key has both content:read and content:write (T3).
+      // Use a distinct X-Forwarded-For so this test gets its own rate-limit
+      // bucket — the in-memory store lives in the dev-server process and
+      // is not cleared by `resetRateLimitStore()` (which only clears the
+      // test-process copy).
+      const res = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${TEST_API_KEY}`,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': '203.0.113.20',
+        },
+        body: JSON.stringify({
+          contentTypeId: testContentType.id,
+          data: { title: `API-key-created entry ${Date.now()}` },
+        }),
+      });
+      expect(res.status).toBe(201);
+    });
+
+    it('rejects API keys without content:write scope', async () => {
+      // Mint an inline key with content:read only.
+      const rawKey = `boject_test_readonly_${Date.now()}`;
+      const keyHash = createHash('sha256').update(rawKey).digest('hex');
+      const keyPrefix = rawKey.slice(0, 11);
+      await prisma.apiKey.create({
+        data: {
+          name: 'Readonly test key',
+          keyHash,
+          keyPrefix,
+          scopes: ['content:read'],
+        },
+      });
+      try {
+        const res = await fetch('/api/content-entries', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${rawKey}`,
+            'Content-Type': 'application/json',
+            'X-Forwarded-For': '203.0.113.21',
+          },
+          body: JSON.stringify({
+            contentTypeId: testContentType.id,
+            data: { title: `Readonly attempt ${Date.now()}` },
+          }),
+        });
+        expect(res.status).toBe(403);
+        const body = (await res.json()) as { data?: { error?: string } };
+        expect(body.data?.error).toBe('INSUFFICIENT_SCOPE');
+      } finally {
+        await prisma.apiKey.delete({ where: { keyHash } });
+      }
+    });
+  });
+
+  describe('PUT /api/content-entries/[id] — content:write scope (#172)', () => {
+    it('allows API keys with content:write scope', async () => {
+      // Create an entry via session auth first
+      const cookie = await getSessionCookie();
+      const create = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': '203.0.113.22',
+        },
+        body: JSON.stringify({
+          contentTypeId: testContentType.id,
+          data: { title: 'Update target' },
+        }),
+      });
+      const created = (await create.json()) as { id: string };
+
+      // Update via API key with content:write. Publish so the API-key
+      // response (which can only see PUBLISHED versions) has a version
+      // to return — otherwise the handler 404s after saving the draft.
+      const res = await fetch(`/api/content-entries/${created.id}`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${TEST_API_KEY}`,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': '203.0.113.22',
+        },
+        body: JSON.stringify({
+          data: { title: 'Updated by API key' },
+          status: 'PUBLISHED',
+        }),
+      });
+      expect(res.status).toBe(200);
+    });
+
+    it('rejects API keys without content:write scope', async () => {
+      const cookie = await getSessionCookie();
+      const create = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': '203.0.113.23',
+        },
+        body: JSON.stringify({
+          contentTypeId: testContentType.id,
+          data: { title: 'Readonly update target' },
+        }),
+      });
+      const created = (await create.json()) as { id: string };
+
+      const rawKey = `boject_test_readonly_${Date.now()}`;
+      const keyHash = createHash('sha256').update(rawKey).digest('hex');
+      const keyPrefix = rawKey.slice(0, 11);
+      await prisma.apiKey.create({
+        data: {
+          name: 'Readonly test key',
+          keyHash,
+          keyPrefix,
+          scopes: ['content:read'],
+        },
+      });
+      try {
+        const res = await fetch(`/api/content-entries/${created.id}`, {
+          method: 'PUT',
+          headers: {
+            Authorization: `Bearer ${rawKey}`,
+            'Content-Type': 'application/json',
+            'X-Forwarded-For': '203.0.113.23',
+          },
+          body: JSON.stringify({ data: { title: 'Should be rejected' } }),
+        });
+        expect(res.status).toBe(403);
+        const body = (await res.json()) as { data?: { error?: string } };
+        expect(body.data?.error).toBe('INSUFFICIENT_SCOPE');
+      } finally {
+        await prisma.apiKey.delete({ where: { keyHash } });
+      }
+    });
+  });
+
+  describe('DELETE /api/content-entries/[id] — content:write scope (#172)', () => {
+    it('allows API keys with content:write scope', async () => {
+      const cookie = await getSessionCookie();
+      const create = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': '203.0.113.24',
+        },
+        body: JSON.stringify({
+          contentTypeId: testContentType.id,
+          data: { title: 'Delete target (allowed)' },
+        }),
+      });
+      const created = (await create.json()) as { id: string };
+
+      const res = await fetch(`/api/content-entries/${created.id}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${TEST_API_KEY}`,
+          'X-Forwarded-For': '203.0.113.24',
+        },
+      });
+      expect(res.status).toBe(200);
+    });
+
+    it('rejects API keys without content:write scope', async () => {
+      const cookie = await getSessionCookie();
+      const create = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': '203.0.113.25',
+        },
+        body: JSON.stringify({
+          contentTypeId: testContentType.id,
+          data: { title: 'Delete target (rejected)' },
+        }),
+      });
+      const created = (await create.json()) as { id: string };
+
+      const rawKey = `boject_test_readonly_${Date.now()}`;
+      const keyHash = createHash('sha256').update(rawKey).digest('hex');
+      const keyPrefix = rawKey.slice(0, 11);
+      await prisma.apiKey.create({
+        data: {
+          name: 'Readonly test key',
+          keyHash,
+          keyPrefix,
+          scopes: ['content:read'],
+        },
+      });
+      try {
+        const res = await fetch(`/api/content-entries/${created.id}`, {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${rawKey}`,
+            'X-Forwarded-For': '203.0.113.25',
+          },
+        });
+        expect(res.status).toBe(403);
+        const body = (await res.json()) as { data?: { error?: string } };
+        expect(body.data?.error).toBe('INSUFFICIENT_SCOPE');
+      } finally {
+        await prisma.apiKey.delete({ where: { keyHash } });
+      }
+    });
+  });
+
+  describe('DELETE /api/content-entries/[id]/draft — content:write scope (#172)', () => {
+    // Helper: create entry, publish it, then make a CHANGED draft.
+    // discardDraft requires a PUBLISHED fallback to exist.
+    async function createWithDraft(ip: string): Promise<string> {
+      const cookie = await getSessionCookie();
+      const create = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': ip,
+        },
+        body: JSON.stringify({
+          contentTypeId: testContentType.id,
+          data: { title: 'Discard target' },
+        }),
+      });
+      const created = (await create.json()) as { id: string };
+      // Publish
+      await fetch(`/api/content-entries/${created.id}`, {
+        method: 'PUT',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': ip,
+        },
+        body: JSON.stringify({
+          data: { title: 'Discard target' },
+          status: 'PUBLISHED',
+        }),
+      });
+      // Update (creates a CHANGED draft)
+      await fetch(`/api/content-entries/${created.id}`, {
+        method: 'PUT',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': ip,
+        },
+        body: JSON.stringify({ data: { title: 'Edited' } }),
+      });
+      return created.id;
+    }
+
+    it('allows API keys with content:write scope', async () => {
+      const id = await createWithDraft('203.0.113.26');
+      const res = await fetch(`/api/content-entries/${id}/draft`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${TEST_API_KEY}`,
+          'X-Forwarded-For': '203.0.113.26',
+        },
+      });
+      expect(res.status).toBe(200);
+    });
+
+    it('rejects API keys without content:write scope', async () => {
+      const id = await createWithDraft('203.0.113.27');
+      const rawKey = `boject_test_readonly_${Date.now()}`;
+      const keyHash = createHash('sha256').update(rawKey).digest('hex');
+      const keyPrefix = rawKey.slice(0, 11);
+      await prisma.apiKey.create({
+        data: {
+          name: 'Readonly test key',
+          keyHash,
+          keyPrefix,
+          scopes: ['content:read'],
+        },
+      });
+      try {
+        const res = await fetch(`/api/content-entries/${id}/draft`, {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${rawKey}`,
+            'X-Forwarded-For': '203.0.113.27',
+          },
+        });
+        expect(res.status).toBe(403);
+        const body = (await res.json()) as { data?: { error?: string } };
+        expect(body.data?.error).toBe('INSUFFICIENT_SCOPE');
+      } finally {
+        await prisma.apiKey.delete({ where: { keyHash } });
+        // Clean up the PUBLISHED+CHANGED entry so it doesn't pollute the
+        // "filters by status=PUBLISHED" test in the GET describe below.
+        await prisma.contentEntry.delete({ where: { id } });
+      }
+    });
+  });
+
+  describe('POST /api/content-entries/[id]/archive — content:write scope (#172)', () => {
+    async function createPublished(ip: string): Promise<string> {
+      const cookie = await getSessionCookie();
+      const create = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': ip,
+        },
+        body: JSON.stringify({
+          contentTypeId: testContentType.id,
+          data: { title: 'Archive target' },
+        }),
+      });
+      const created = (await create.json()) as { id: string };
+      await fetch(`/api/content-entries/${created.id}`, {
+        method: 'PUT',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': ip,
+        },
+        body: JSON.stringify({
+          data: { title: 'Archive target' },
+          status: 'PUBLISHED',
+        }),
+      });
+      return created.id;
+    }
+
+    it('allows API keys with content:write scope', async () => {
+      const id = await createPublished('203.0.113.28');
+      const res = await fetch(`/api/content-entries/${id}/archive`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${TEST_API_KEY}`,
+          'X-Forwarded-For': '203.0.113.28',
+        },
+      });
+      expect(res.status).toBe(200);
+    });
+
+    it('rejects API keys without content:write scope', async () => {
+      const id = await createPublished('203.0.113.29');
+      const rawKey = `boject_test_readonly_${Date.now()}`;
+      const keyHash = createHash('sha256').update(rawKey).digest('hex');
+      const keyPrefix = rawKey.slice(0, 11);
+      await prisma.apiKey.create({
+        data: {
+          name: 'Readonly test key',
+          keyHash,
+          keyPrefix,
+          scopes: ['content:read'],
+        },
+      });
+      try {
+        const res = await fetch(`/api/content-entries/${id}/archive`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${rawKey}`,
+            'X-Forwarded-For': '203.0.113.29',
+          },
+        });
+        expect(res.status).toBe(403);
+        const body = (await res.json()) as { data?: { error?: string } };
+        expect(body.data?.error).toBe('INSUFFICIENT_SCOPE');
+      } finally {
+        // Clean up: archived entries don't pollute the active-status default
+        // filter, but the inline-minted key must be removed.
+        await prisma.apiKey.delete({ where: { keyHash } });
+      }
+    });
+  });
+
+  describe('POST /api/content-entries/[id]/unarchive — content:write scope (#172)', () => {
+    async function createArchived(ip: string): Promise<string> {
+      const cookie = await getSessionCookie();
+      const create = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': ip,
+        },
+        body: JSON.stringify({
+          contentTypeId: testContentType.id,
+          data: { title: 'Unarchive target' },
+        }),
+      });
+      const created = (await create.json()) as { id: string };
+      await fetch(`/api/content-entries/${created.id}`, {
+        method: 'PUT',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': ip,
+        },
+        body: JSON.stringify({
+          data: { title: 'Unarchive target' },
+          status: 'PUBLISHED',
+        }),
+      });
+      await fetch(`/api/content-entries/${created.id}/archive`, {
+        method: 'POST',
+        headers: {
+          cookie,
+          'X-Forwarded-For': ip,
+        },
+      });
+      return created.id;
+    }
+
+    it('allows API keys with content:write scope', async () => {
+      const id = await createArchived('203.0.113.30');
+      const res = await fetch(`/api/content-entries/${id}/unarchive`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${TEST_API_KEY}`,
+          'X-Forwarded-For': '203.0.113.30',
+        },
+      });
+      expect(res.status).toBe(200);
+    });
+
+    it('rejects API keys without content:write scope', async () => {
+      const id = await createArchived('203.0.113.31');
+      const rawKey = `boject_test_readonly_${Date.now()}`;
+      const keyHash = createHash('sha256').update(rawKey).digest('hex');
+      const keyPrefix = rawKey.slice(0, 11);
+      await prisma.apiKey.create({
+        data: {
+          name: 'Readonly test key',
+          keyHash,
+          keyPrefix,
+          scopes: ['content:read'],
+        },
+      });
+      try {
+        const res = await fetch(`/api/content-entries/${id}/unarchive`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${rawKey}`,
+            'X-Forwarded-For': '203.0.113.31',
+          },
+        });
+        expect(res.status).toBe(403);
+        const body = (await res.json()) as { data?: { error?: string } };
+        expect(body.data?.error).toBe('INSUFFICIENT_SCOPE');
+      } finally {
+        await prisma.apiKey.delete({ where: { keyHash } });
+      }
+    });
+  });
+
+  describe('POST /api/content-entries/[id]/unpublish — content:write scope (#172)', () => {
+    async function createPublished(ip: string): Promise<string> {
+      const cookie = await getSessionCookie();
+      const title = `Unpublish target ${Date.now()}-${Math.random()}`;
+      const create = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': ip,
+        },
+        body: JSON.stringify({
+          contentTypeId: testContentType.id,
+          data: { title },
+        }),
+      });
+      const created = (await create.json()) as { id: string };
+      await fetch(`/api/content-entries/${created.id}`, {
+        method: 'PUT',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': ip,
+        },
+        body: JSON.stringify({
+          data: { title },
+          status: 'PUBLISHED',
+        }),
+      });
+      return created.id;
+    }
+
+    it('allows API keys with content:write scope', async () => {
+      const id = await createPublished('203.0.113.32');
+      const res = await fetch(`/api/content-entries/${id}/unpublish`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${TEST_API_KEY}`,
+          'X-Forwarded-For': '203.0.113.32',
+        },
+      });
+      expect(res.status).toBe(200);
+    });
+
+    it('rejects API keys without content:write scope', async () => {
+      const id = await createPublished('203.0.113.33');
+      const rawKey = `boject_test_readonly_${Date.now()}`;
+      const keyHash = createHash('sha256').update(rawKey).digest('hex');
+      const keyPrefix = rawKey.slice(0, 11);
+      await prisma.apiKey.create({
+        data: {
+          name: 'Readonly test key',
+          keyHash,
+          keyPrefix,
+          scopes: ['content:read'],
+        },
+      });
+      try {
+        const res = await fetch(`/api/content-entries/${id}/unpublish`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${rawKey}`,
+            'X-Forwarded-For': '203.0.113.33',
+          },
+        });
+        expect(res.status).toBe(403);
+        const body = (await res.json()) as { data?: { error?: string } };
+        expect(body.data?.error).toBe('INSUFFICIENT_SCOPE');
+      } finally {
+        // The rejected unpublish leaves the entry as PUBLISHED — clean it up
+        // so it doesn't pollute the active-status-default-filter test counts.
+        await prisma.contentEntry.delete({ where: { id } });
+        await prisma.apiKey.delete({ where: { keyHash } });
+      }
     });
   });
 
@@ -1904,20 +2436,6 @@ describe('Content Entry endpoints', async () => {
       const body = (await res.json()) as { data?: { error?: string } };
       expect(body.data?.error).toBe('WRONG_STATE');
     });
-
-    it('rejects API-key callers', async () => {
-      const res = await fetch(
-        '/api/content-entries/00000000-0000-0000-0000-000000000000/unpublish',
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${TEST_API_KEY}`,
-            'X-Forwarded-For': '203.0.113.23',
-          },
-        }
-      );
-      expect(res.status).toBe(403);
-    });
   });
 
   describe('POST /api/content-entries/[id]/archive', () => {
@@ -2082,20 +2600,6 @@ describe('Content Entry endpoints', async () => {
       const body = (await res.json()) as { data?: { error?: string } };
       expect(body.data?.error).toBe('DRAFT_PRESENT');
     });
-
-    it('rejects API-key callers', async () => {
-      const res = await fetch(
-        '/api/content-entries/00000000-0000-0000-0000-000000000000/archive',
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${TEST_API_KEY}`,
-            'X-Forwarded-For': '203.0.113.33',
-          },
-        }
-      );
-      expect(res.status).toBe(403);
-    });
   });
 
   describe('POST /api/content-entries/[id]/unarchive', () => {
@@ -2187,20 +2691,6 @@ describe('Content Entry endpoints', async () => {
       expect(res.status).toBe(409);
       const body = (await res.json()) as { data?: { error?: string } };
       expect(body.data?.error).toBe('WRONG_STATE');
-    });
-
-    it('rejects API-key callers', async () => {
-      const res = await fetch(
-        '/api/content-entries/00000000-0000-0000-0000-000000000000/unarchive',
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${TEST_API_KEY}`,
-            'X-Forwarded-For': '203.0.113.42',
-          },
-        }
-      );
-      expect(res.status).toBe(403);
     });
   });
 
@@ -2360,19 +2850,82 @@ describe('Content Entry endpoints', async () => {
       const body = (await res.json()) as { status: string };
       expect(body.status).toBe('PUBLISHED');
     });
+  });
 
-    it('rejects API-key callers', async () => {
-      const res = await fetch(
-        '/api/content-entries/00000000-0000-0000-0000-000000000000/republish',
-        {
+  describe('POST /api/content-entries/[id]/republish — content:write scope (#172)', () => {
+    async function createPublished(ip: string): Promise<string> {
+      const cookie = await getSessionCookie();
+      const title = `Republish target ${Date.now()}-${Math.random()}`;
+      const create = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': ip,
+        },
+        body: JSON.stringify({
+          contentTypeId: testContentType.id,
+          data: { title },
+        }),
+      });
+      const created = (await create.json()) as { id: string };
+      await fetch(`/api/content-entries/${created.id}`, {
+        method: 'PUT',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': ip,
+        },
+        body: JSON.stringify({
+          data: { title },
+          status: 'PUBLISHED',
+        }),
+      });
+      return created.id;
+    }
+
+    it('allows API keys with content:write scope', async () => {
+      const id = await createPublished('203.0.113.34');
+      const res = await fetch(`/api/content-entries/${id}/republish`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${TEST_API_KEY}`,
+          'X-Forwarded-For': '203.0.113.34',
+        },
+      });
+      expect(res.status).toBe(200);
+    });
+
+    it('rejects API keys without content:write scope', async () => {
+      const id = await createPublished('203.0.113.35');
+      const rawKey = `boject_test_readonly_${Date.now()}`;
+      const keyHash = createHash('sha256').update(rawKey).digest('hex');
+      const keyPrefix = rawKey.slice(0, 11);
+      await prisma.apiKey.create({
+        data: {
+          name: 'Readonly test key',
+          keyHash,
+          keyPrefix,
+          scopes: ['content:read'],
+        },
+      });
+      try {
+        const res = await fetch(`/api/content-entries/${id}/republish`, {
           method: 'POST',
           headers: {
-            Authorization: `Bearer ${TEST_API_KEY}`,
-            'X-Forwarded-For': '203.0.113.53',
+            Authorization: `Bearer ${rawKey}`,
+            'X-Forwarded-For': '203.0.113.35',
           },
-        }
-      );
-      expect(res.status).toBe(403);
+        });
+        expect(res.status).toBe(403);
+        const body = (await res.json()) as { data?: { error?: string } };
+        expect(body.data?.error).toBe('INSUFFICIENT_SCOPE');
+      } finally {
+        // The rejected republish leaves the entry as PUBLISHED — clean up
+        // so it doesn't pollute downstream active-status-default-filter tests.
+        await prisma.contentEntry.delete({ where: { id } });
+        await prisma.apiKey.delete({ where: { keyHash } });
+      }
     });
   });
 
@@ -2744,5 +3297,56 @@ describe('Content Entry endpoints', async () => {
         contentTypeIdentifier: 'EmbedNote',
       });
     });
+  });
+
+  describe('Auth middleware — /api/content-entries (#172)', () => {
+    it('allows API keys past the middleware (no longer 403 read-only)', async () => {
+      // After #172 Task 2, /api/content-entries is in API_KEY_WRITABLE_PATHS.
+      // Without the per-handler scope check (added in T4), the request reaches
+      // the handler and gets whatever response the handler produces. Without a
+      // body, that's a 400 for missing contentTypeId. Anything other than the
+      // middleware's 403 'API keys have read-only access' is acceptable here.
+      const res = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${TEST_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({}),
+      });
+      expect(res.status).not.toBe(403);
+      if (res.status === 403) {
+        const body = (await res.json()) as { message?: string };
+        // Belt-and-braces: even if Vitest somehow accepted the not-403, this
+        // would surface a misdiagnosis early.
+        expect(body.message).not.toMatch(/read-only/i);
+      }
+    });
+  });
+
+  describe('POST /api/content-entries — rate limit fires before scope (#172)', () => {
+    it('returns 429 from rate limiter even with content:write key', async () => {
+      // The rate limiter is 50/60s per IP per endpoint. 60 rapid requests with
+      // a content:write-scoped key should trip it. Use a unique IP so this
+      // test doesn't collide with other tests' rate-limit windows.
+      const ip = '203.0.113.99';
+      const responses: number[] = [];
+      for (let i = 0; i < 60; i++) {
+        const res = await fetch('/api/content-entries', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${TEST_API_KEY}`,
+            'Content-Type': 'application/json',
+            'X-Forwarded-For': ip,
+          },
+          body: JSON.stringify({
+            contentTypeId: testContentType.id,
+            data: { title: `Rate limit test ${Date.now()}-${i}` },
+          }),
+        });
+        responses.push(res.status);
+      }
+      expect(responses).toContain(429);
+    }, 30_000);
   });
 });

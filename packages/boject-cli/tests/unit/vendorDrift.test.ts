@@ -28,9 +28,13 @@ const PAIRS: Array<{ canonical: string; vendored: string }> = [
     vendored:
       'packages/boject-cli/src/vendor/perf/scenarios/graphql-sitemap.ts',
   },
+  {
+    canonical: 'apps/cms/utils/apiKeyScopes.ts',
+    vendored: 'packages/boject-cli/src/vendor/apiKeyScopes.ts',
+  },
 ];
 
-describe('vendored perf files are byte-identical to canonicals', () => {
+describe('vendored files are byte-identical to canonicals', () => {
   for (const pair of PAIRS) {
     it(`${pair.vendored} matches ${pair.canonical}`, async () => {
       const a = await readFile(resolve(REPO_ROOT, pair.canonical), 'utf8');

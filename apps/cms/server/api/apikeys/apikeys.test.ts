@@ -149,6 +149,7 @@ describe('POST /api/apikeys', () => {
       expect(body.data?.error).toBe('UNKNOWN_SCOPE');
       expect(body.data?.recognised).toEqual([
         'content:read',
+        'content:write',
         'schema:read',
         'schema:write',
         'apikey:read',

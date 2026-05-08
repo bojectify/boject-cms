@@ -2,6 +2,7 @@ import type { Prisma } from '#prisma';
 import { assertUuid } from '../../utils/validation';
 import { withPrismaErrors } from '../../utils/prismaErrors';
 import { enforceMutationRateLimit } from '../../utils/rateLimitEndpoint';
+import { assertApiKeyScope } from '../../utils/assertApiKeyScope';
 import { assertUniqueFieldValues } from '../../utils/assertUniqueFieldValues';
 import { enrichEntryDataWithEmbedIdentifiers } from '../../utils/enrichRichtextEmbeds';
 import {
@@ -19,6 +20,7 @@ const VALID_STATUSES = new Set<string>([
 
 export default defineEventHandler(async (event) => {
   enforceMutationRateLimit(event, 'content-entries.post');
+  assertApiKeyScope(event, 'content:write');
   const body = await readBody<Record<string, unknown>>(event);
 
   const contentTypeId = assertUuid(body.contentTypeId, 'contentTypeId');
