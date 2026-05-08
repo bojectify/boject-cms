@@ -46,7 +46,7 @@ describe('runPerfReset', () => {
     expect(fc.calls.some((c) => c.sql.includes('TRUNCATE'))).toBe(true);
   });
 
-  it('refuses a non-perf URL without --allow-non-perf-db', async () => {
+  it('refuses a non-suffix URL without --allow-database', async () => {
     const fc = fakeClient();
     await expect(
       runPerfReset({
@@ -54,15 +54,15 @@ describe('runPerfReset', () => {
         yes: true,
         _testClient: fc.client,
       })
-    ).rejects.toThrow(/non.?perf|allow-non-perf-db/i);
+    ).rejects.toThrow(/--allow-database|_perf|_staging/i);
   });
 
-  it('calls resetPerfDb with allowNonPerfDb=true when flag set', async () => {
+  it('calls resetPerfDb with allowDatabase=[<name>] when flag set', async () => {
     const fc = fakeClient();
     await runPerfReset({
       databaseUrl: 'postgresql://u:p@h/staging',
       yes: true,
-      allowNonPerfDb: true,
+      allowDatabase: ['staging'],
       _testClient: fc.client,
     });
     expect(fc.calls.some((c) => c.sql.includes('TRUNCATE'))).toBe(true);

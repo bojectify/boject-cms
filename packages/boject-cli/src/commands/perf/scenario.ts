@@ -37,7 +37,7 @@ export interface PerfScenarioFlags {
   seed?: number;
   concurrency?: number;
   reset?: boolean;
-  allowNonPerfDb?: boolean;
+  allowDatabase?: string[];
 }
 
 // Mirrors the ramp `parseStages()` builds in
@@ -217,7 +217,7 @@ export async function runPerfScenario(
         await runPerfReset({
           databaseUrl: effectiveDatabaseUrl,
           yes: flags.yes,
-          allowNonPerfDb: flags.allowNonPerfDb,
+          allowDatabase: flags.allowDatabase,
         });
       } catch (err) {
         params.stderr(`${(err as Error).message}\n`);
@@ -241,7 +241,7 @@ export async function runPerfScenario(
         url: flags.url ?? configDefaults.url,
         apiKey: flags.apiKey ?? params.apiKey,
         concurrency: flags.concurrency,
-        allowNonPerfDb: flags.allowNonPerfDb,
+        allowDatabase: flags.allowDatabase,
         yes: flags.yes,
       });
     } catch (err) {

@@ -119,7 +119,7 @@ describe('runPerfSeed', () => {
     expect(puts).toBe(3);
   });
 
-  it('refuses non-/boject_perf SQL URL without --allow-non-perf-db', async () => {
+  it('refuses non-suffix SQL URL without --allow-database', async () => {
     server = setupServer(
       http.get(`${baseUrl}/api/schema/export`, () =>
         HttpResponse.json(minimalBundleResponse)
@@ -135,7 +135,7 @@ describe('runPerfSeed', () => {
         apiKey,
         yes: true,
       })
-    ).rejects.toThrow(/non.?perf|allow-non-perf-db/i);
+    ).rejects.toThrow(/--allow-database|_perf|_staging/i);
   });
 
   it('loads bundle from --bundle path when provided', async () => {
