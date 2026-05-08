@@ -78,7 +78,8 @@ Seed-then-run flags (only when --read-only is NOT set):
   --seed <int>            PRNG seed for determinism. Default 1.
   --concurrency <n>       HTTP only. Default 8.
   --reset                 SQL only. Truncate perf tables before seeding.
-  --allow-non-perf-db     SQL only. Override the /boject_perf URL suffix lock.
+  --allow-database <name> SQL only. Allow this DB even if it doesn't end
+                          in _perf/_staging. Repeatable.
 
 graphql-flat power-user overrides:
   --target-rps <n>        Override peak RPS (default 2000).
@@ -109,7 +110,8 @@ Seed-then-run flags (only when --read-only is NOT set):
   --seed <int>            PRNG seed for determinism. Default 1.
   --concurrency <n>       HTTP only. Default 8.
   --reset                 SQL only. Truncate perf tables before seeding.
-  --allow-non-perf-db     SQL only. Override the /boject_perf URL suffix lock.
+  --allow-database <name> SQL only. Allow this DB even if it doesn't end
+                          in _perf/_staging. Repeatable.
 
 Sweep matrix:
   --page-sizes <csv>      Default 100,500,1000.
@@ -136,7 +138,7 @@ Required:
   --content-type <id>       Target content type (must exist in the bundle).
 
 Transport (exactly one):
-  --database-url <url>      Direct SQL via writeViaSql. URL must end /boject_perf.
+  --database-url <url>      Direct SQL via writeViaSql. DB name must end _perf/_staging.
   --http-seed               REST via writeViaHttp. Uses --url + --api-key.
 
 Bundle source:
@@ -148,7 +150,8 @@ Common:
   --seed <int>              PRNG seed for determinism. Default 1.
   --concurrency <n>         HTTP only. Default 8.
   --reset                   SQL only. Truncate perf data before seeding.
-  --allow-non-perf-db       SQL only. Override the /boject_perf URL suffix lock.
+  --allow-database <name>   SQL only. Allow this DB even if it doesn't end
+                            in _perf/_staging. Repeatable.
   --url <url>               CMS base URL.
   --api-key <key>           Defaults to $BOJECT_API_KEY.
   --yes                     Bypass TTY confirmation prompts.
@@ -159,11 +162,12 @@ const PERF_RESET_USAGE = `Usage: boject perf reset --database-url <url> [flags]
 Truncates the perf-specific content tables in the target database.
 
 Required flags:
-  --database-url <url>      Postgres connection string. Must end in /boject_perf
-                            unless --allow-non-perf-db is set.
+  --database-url <url>      Postgres connection string. DB name must end
+                            in _perf/_staging unless --allow-database lists it.
 
 Optional flags:
-  --allow-non-perf-db       Override the /boject_perf URL suffix lock.
+  --allow-database <name>   Allow this DB even if it doesn't end in
+                            _perf/_staging. Repeatable.
   --yes                     Skip the TTY confirmation prompt.
 `;
 
@@ -481,7 +485,7 @@ async function dispatchPerf(args: string[]): Promise<number> {
           seed: { type: 'string' },
           concurrency: { type: 'string' },
           reset: { type: 'boolean', default: false },
-          'allow-non-perf-db': { type: 'boolean', default: false },
+          'allow-database': { type: 'string', multiple: true, default: [] },
         },
       });
       const r = await runPerfScenario({
@@ -512,7 +516,7 @@ async function dispatchPerf(args: string[]): Promise<number> {
             ? Number(values.concurrency)
             : undefined,
           reset: values.reset === true,
-          allowNonPerfDb: values['allow-non-perf-db'] === true,
+          allowDatabase: values['allow-database'] as string[],
         },
         stdout,
         stderr,
@@ -547,7 +551,7 @@ async function dispatchPerf(args: string[]): Promise<number> {
           seed: { type: 'string' },
           concurrency: { type: 'string' },
           reset: { type: 'boolean', default: false },
-          'allow-non-perf-db': { type: 'boolean', default: false },
+          'allow-database': { type: 'string', multiple: true, default: [] },
         },
       });
       const r = await runPerfSweep({
@@ -583,7 +587,7 @@ async function dispatchPerf(args: string[]): Promise<number> {
             ? Number(values.concurrency)
             : undefined,
           reset: values.reset === true,
-          allowNonPerfDb: values['allow-non-perf-db'] === true,
+          allowDatabase: values['allow-database'] as string[],
         },
         stdout,
         stderr,
@@ -627,7 +631,7 @@ async function dispatchPerf(args: string[]): Promise<number> {
           size: { type: 'string' },
           seed: { type: 'string' },
           concurrency: { type: 'string' },
-          'allow-non-perf-db': { type: 'boolean', default: false },
+          'allow-database': { type: 'string', multiple: true, default: [] },
           reset: { type: 'boolean', default: false },
           url: { type: 'string' },
           'api-key': { type: 'string' },
@@ -675,7 +679,7 @@ async function dispatchPerf(args: string[]): Promise<number> {
           httpSeed: values['http-seed'],
           bundle: values.bundle,
           concurrency,
-          allowNonPerfDb: values['allow-non-perf-db'],
+          allowDatabase: values['allow-database'] as string[],
           reset: values.reset === true,
           url:
             values.url ??
@@ -700,14 +704,14 @@ async function dispatchPerf(args: string[]): Promise<number> {
         allowPositionals: false,
         options: {
           'database-url': { type: 'string' },
-          'allow-non-perf-db': { type: 'boolean', default: false },
+          'allow-database': { type: 'string', multiple: true, default: [] },
           yes: { type: 'boolean', default: false },
         },
       });
       try {
         await runPerfReset({
           databaseUrl: values['database-url'],
-          allowNonPerfDb: values['allow-non-perf-db'],
+          allowDatabase: values['allow-database'] as string[],
           yes: values.yes === true,
         });
         return 0;

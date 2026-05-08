@@ -3,6 +3,7 @@ import { generatePerfData } from '../../perf/generate.js';
 import { writeViaSql } from '../../perf/writeViaSql.js';
 import { writeViaHttp } from '../../perf/writeViaHttp.js';
 import { resetPerfDb } from '../../perf/resetPerfDb.js';
+import { assertAllowedDatabase } from '../../perf/allowedDatabase.js';
 import { fetchBundle } from './shared/fetchBundle.js';
 import { loadBundleFile } from './shared/loadBundleFile.js';
 import type { Bundle } from '../../vendor/contentBundleTypes.js';
@@ -14,7 +15,7 @@ export interface PerfSeedFlags {
   /** SQL transport */
   databaseUrl?: string;
   reset?: boolean;
-  allowNonPerfDb?: boolean;
+  allowDatabase?: string[];
   /** HTTP transport */
   httpSeed?: boolean;
   concurrency?: number;
@@ -36,8 +37,9 @@ export interface PerfSeedFlags {
  * (REST POST/PUT). The two are mutually exclusive — pick the one that
  * matches the operator's deployment topology (see the spec).
  *
- * SQL transport refuses any database URL that doesn't end in
- * /boject_perf unless --allow-non-perf-db is set, mirroring resetPerfDb.
+ * SQL transport refuses any database whose name doesn't end in
+ * `_perf` / `_staging` unless --allow-database lists it,
+ * mirroring resetPerfDb.
  */
 export async function runPerfSeed(
   flags: PerfSeedFlags
@@ -54,15 +56,8 @@ export async function runPerfSeed(
       'boject perf seed accepts exactly one transport: --database-url OR --http-seed, not both.'
     );
   }
-  if (
-    hasSql &&
-    !/\/boject_perf(\?|$)/.test(flags.databaseUrl!) &&
-    !flags.allowNonPerfDb
-  ) {
-    throw new Error(
-      `Refusing to seed non-perf database (${redactUrl(flags.databaseUrl!)}). ` +
-        `URL must end in /boject_perf or pass --allow-non-perf-db.`
-    );
+  if (hasSql) {
+    assertAllowedDatabase(flags.databaseUrl!, flags.allowDatabase ?? []);
   }
 
   // Bundle source
@@ -96,7 +91,7 @@ export async function runPerfSeed(
           runQuery: async (sql) => {
             await client.query(sql);
           },
-          allowNonPerfDb: flags.allowNonPerfDb,
+          allowDatabase: flags.allowDatabase,
         });
         process.stderr.write(
           `[perf:seed] reset ${redactUrl(flags.databaseUrl!)}\n`

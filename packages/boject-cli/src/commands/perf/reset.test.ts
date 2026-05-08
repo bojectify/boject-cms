@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { runPerfReset } from './reset.js';
 
 interface QueryCall {
@@ -46,7 +46,7 @@ describe('runPerfReset', () => {
     expect(fc.calls.some((c) => c.sql.includes('TRUNCATE'))).toBe(true);
   });
 
-  it('refuses a non-perf URL without --allow-non-perf-db', async () => {
+  it('refuses a non-suffix URL without --allow-database', async () => {
     const fc = fakeClient();
     await expect(
       runPerfReset({
@@ -54,15 +54,34 @@ describe('runPerfReset', () => {
         yes: true,
         _testClient: fc.client,
       })
-    ).rejects.toThrow(/non.?perf|allow-non-perf-db/i);
+    ).rejects.toThrow(/--allow-database|_perf|_staging/i);
   });
 
-  it('calls resetPerfDb with allowNonPerfDb=true when flag set', async () => {
+  it('rejects non-suffix URL without --allow-database before opening a DB connection', async () => {
+    const connect = vi.fn(async () => {
+      throw new Error('client.connect should not be called');
+    });
+    const client = {
+      connect,
+      query: vi.fn(async () => ({ rows: [] })),
+      end: vi.fn(async () => {}),
+    };
+    await expect(
+      runPerfReset({
+        databaseUrl: 'postgresql://u:p@h/prod',
+        yes: true,
+        _testClient: client,
+      })
+    ).rejects.toThrow(/--allow-database|_perf|_staging/i);
+    expect(connect).not.toHaveBeenCalled();
+  });
+
+  it('calls resetPerfDb with allowDatabase=[<name>] when flag set', async () => {
     const fc = fakeClient();
     await runPerfReset({
       databaseUrl: 'postgresql://u:p@h/staging',
       yes: true,
-      allowNonPerfDb: true,
+      allowDatabase: ['staging'],
       _testClient: fc.client,
     });
     expect(fc.calls.some((c) => c.sql.includes('TRUNCATE'))).toBe(true);

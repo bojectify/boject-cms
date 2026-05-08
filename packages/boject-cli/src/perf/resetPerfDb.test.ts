@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { resetPerfDb, NonPerfDatabaseError } from './resetPerfDb.js';
+import { resetPerfDb } from './resetPerfDb.js';
+import { DisallowedDatabaseError } from './allowedDatabase.js';
 
 describe('resetPerfDb', () => {
   it('truncates only the entry tables (preserves schema)', async () => {
@@ -18,21 +19,30 @@ describe('resetPerfDb', () => {
     expect(combined).not.toContain('TRUNCATE TABLE "ContentTypeField"');
   });
 
-  it('refuses non-perf URLs by default', async () => {
+  it('refuses non-suffix-matching URLs without an allow-list', async () => {
     await expect(
       resetPerfDb({
-        databaseUrl: 'postgresql://u:p@h/boject',
+        databaseUrl: 'postgresql://u:p@h/prod',
         runQuery: vi.fn(),
       })
-    ).rejects.toBeInstanceOf(NonPerfDatabaseError);
+    ).rejects.toBeInstanceOf(DisallowedDatabaseError);
   });
 
-  it('allows non-perf URLs when allowNonPerfDb=true', async () => {
+  it('accepts _staging-suffix names without an allow-list', async () => {
     const runQuery = vi.fn(async () => {});
     await resetPerfDb({
-      databaseUrl: 'postgresql://u:p@h/staging',
+      databaseUrl: 'postgresql://u:p@h/myapp_staging',
       runQuery,
-      allowNonPerfDb: true,
+    });
+    expect(runQuery).toHaveBeenCalled();
+  });
+
+  it('allows non-suffix names when listed in allowDatabase', async () => {
+    const runQuery = vi.fn(async () => {});
+    await resetPerfDb({
+      databaseUrl: 'postgresql://u:p@h/prod',
+      runQuery,
+      allowDatabase: ['prod'],
     });
     expect(runQuery).toHaveBeenCalled();
   });

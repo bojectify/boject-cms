@@ -1,4 +1,5 @@
 import { Client } from 'pg';
+import { assertAllowedDatabase } from '../../perf/allowedDatabase.js';
 import { resetPerfDb } from '../../perf/resetPerfDb.js';
 import { confirmReset } from './shared/confirmReset.js';
 
@@ -11,7 +12,7 @@ export interface PerfResetClient {
 export interface PerfResetFlags {
   databaseUrl?: string;
   yes: boolean;
-  allowNonPerfDb?: boolean;
+  allowDatabase?: string[];
   /** Test seam — inject a fake pg client */
   _testClient?: PerfResetClient;
 }
@@ -22,7 +23,7 @@ export interface PerfResetFlags {
  * (no DELETE-ALL endpoint exists, and adding one is out of scope for #159).
  *
  * The destructive operation is gated by:
- *   1. URL ends in /boject_perf (override with --allow-non-perf-db)
+ *   1. Database name ends in _perf or _staging (override with --allow-database <name>)
  *   2. TTY confirmation prompt (bypass with --yes or non-TTY stdin)
  */
 export async function runPerfReset(flags: PerfResetFlags): Promise<void> {
@@ -32,6 +33,7 @@ export async function runPerfReset(flags: PerfResetFlags): Promise<void> {
         '(There is no HTTP equivalent — multi-instance reset is not supported.)'
     );
   }
+  assertAllowedDatabase(flags.databaseUrl, flags.allowDatabase ?? []);
   const confirmed = await confirmReset({
     databaseUrl: flags.databaseUrl,
     yes: flags.yes,
@@ -51,7 +53,7 @@ export async function runPerfReset(flags: PerfResetFlags): Promise<void> {
       runQuery: async (sql) => {
         await client.query(sql);
       },
-      allowNonPerfDb: flags.allowNonPerfDb,
+      allowDatabase: flags.allowDatabase,
     });
     process.stderr.write(
       `[perf:reset] truncated ${redactUrl(flags.databaseUrl)}\n`
