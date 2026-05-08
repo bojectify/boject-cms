@@ -75,9 +75,11 @@ export async function ensurePerfDbBootstrap(
 
   // Scopes the perf key needs:
   // - content:read   → GraphQL queries (graphql-flat, graphql-sitemap)
+  // - content:write  → POST /api/content-entries (used by `boject perf seed
+  //                    --http-seed`, gated post-#172 on this scope)
   // - schema:read    → GET /api/schema/export (used by `boject perf seed`
-  //                    when the bundle source is HTTP)
-  const PERF_KEY_SCOPES = ['content:read', 'schema:read'];
+  //                    to introspect the live schema before generating)
+  const PERF_KEY_SCOPES = ['content:read', 'content:write', 'schema:read'];
   const keyHash = createHash('sha256').update(PERF_KEY_RAW).digest('hex');
   const keyPrefix = PERF_KEY_RAW.slice(0, 11);
   await opts.prisma.apiKey.upsert({
