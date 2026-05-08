@@ -35,6 +35,7 @@
     "prisma:seed:test": "pnpm --filter cms prisma:seed:test",
     "prisma:studio": "pnpm --filter cms prisma:studio",
     "prisma:studio:test": "pnpm --filter cms prisma:studio:test",
+    "prisma:studio:perf": "pnpm --filter cms prisma:studio:perf",
     "apikey:create": "pnpm --filter cms apikey:create",
     "apikey:list": "pnpm --filter cms apikey:list",
     "apikey:revoke": "pnpm --filter cms apikey:revoke",
