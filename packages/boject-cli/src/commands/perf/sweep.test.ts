@@ -7,6 +7,8 @@ import * as preflightModule from '../../perf/preflight.js';
 import * as runK6Module from '../../perf/runK6.js';
 import * as renderModule from '../../perf/render.js';
 import * as confirmModule from '../../perf/confirm.js';
+import * as resetModule from './reset.js';
+import * as seedModule from './seed.js';
 
 describe('runPerfSweep', () => {
   let outDir: string;
@@ -239,7 +241,88 @@ describe('runPerfSweep', () => {
     expect(renderedMeta?.scenarios[0]?.outcome).toBe('completed');
     expect(renderedMeta?.scenarios[1]?.name).toBe('graphql-flat');
     expect(renderedMeta?.scenarios[1]?.outcome).toBe('partial');
-    expect(renderedMeta?.partial).toBe(true);
+    expect(renderedMeta).toMatchObject({
+      partial: true,
+      partialFailureSource: 'k6',
+      mode: 'read-only',
+    });
+  });
+
+  it("renders a partial report when reset throws (partialFailureSource: 'reset')", async () => {
+    vi.spyOn(resetModule, 'runPerfReset').mockRejectedValue(
+      new Error('connect ECONNREFUSED 127.0.0.1:5432')
+    );
+    const preflightSpy = vi.spyOn(preflightModule, 'runPreflight');
+    const runK6Spy = vi.spyOn(runK6Module, 'runK6');
+    const renderSpy = vi
+      .spyOn(renderModule, 'renderReport')
+      .mockResolvedValue();
+
+    const stderr: string[] = [];
+    const r = await runPerfSweep({
+      cwd: process.cwd(),
+      apiKey: 'k',
+      flags: {
+        url: 'https://x.example.com',
+        contentType: 'Article',
+        out: outDir,
+        yes: true,
+        databaseUrl: 'postgresql://boject:boject@localhost:5432/boject_perf',
+        reset: true,
+        allowDatabase: ['boject_perf'],
+      },
+      stdout: () => {},
+      stderr: (l) => stderr.push(l),
+    });
+    expect(r.exitCode).toBe(1);
+    expect(preflightSpy).not.toHaveBeenCalled();
+    expect(runK6Spy).not.toHaveBeenCalled();
+    expect(renderSpy).toHaveBeenCalledTimes(1);
+    expect(renderSpy.mock.calls[0]?.[0].runMetadata).toMatchObject({
+      partial: true,
+      partialFailureSource: 'reset',
+      mode: 'seed-direct',
+      seedSize: null,
+    });
+  });
+
+  it("renders a partial report when seed throws (partialFailureSource: 'seed')", async () => {
+    vi.spyOn(seedModule, 'runPerfSeed').mockRejectedValue(
+      new Error('seed bundle missing required field')
+    );
+    const preflightSpy = vi.spyOn(preflightModule, 'runPreflight');
+    const runK6Spy = vi.spyOn(runK6Module, 'runK6');
+    const renderSpy = vi
+      .spyOn(renderModule, 'renderReport')
+      .mockResolvedValue();
+
+    const stderr: string[] = [];
+    const r = await runPerfSweep({
+      cwd: process.cwd(),
+      apiKey: 'k',
+      flags: {
+        url: 'https://x.example.com',
+        contentType: 'Article',
+        out: outDir,
+        yes: true,
+        httpSeed: true,
+        seed: 7,
+        size: 50,
+      },
+      stdout: () => {},
+      stderr: (l) => stderr.push(l),
+    });
+    expect(r.exitCode).toBe(1);
+    expect(preflightSpy).not.toHaveBeenCalled();
+    expect(runK6Spy).not.toHaveBeenCalled();
+    expect(renderSpy).toHaveBeenCalledTimes(1);
+    expect(renderSpy.mock.calls[0]?.[0].runMetadata).toMatchObject({
+      partial: true,
+      partialFailureSource: 'seed',
+      mode: 'seed-http',
+      seedSize: null,
+      seedDeterministicSeed: 7,
+    });
   });
 
   it('returns 2 with hint when output dir cannot be created', async () => {
