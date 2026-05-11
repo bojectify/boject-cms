@@ -259,6 +259,109 @@ describe('renderReport', () => {
     expect(md).toContain('seed step failed');
   });
 
+  it('renders the connection panel for seed-direct runs with a valid CSV', async () => {
+    const out = await mkdtemp(join(tmpdir(), 'boject-render-'));
+    const csvPath = join(out, 'pg-samples.csv');
+    await writeFile(
+      csvPath,
+      [
+        'timestamp,total,active,idle,cpu_percent,mem_mb',
+        '2026-05-11T00:00:00Z,10,2,8,0,0',
+        '2026-05-11T00:00:05Z,20,8,12,0,0',
+      ].join('\n')
+    );
+    await renderReport({
+      rawJsonPath: FIXTURE,
+      outDir: out,
+      runMetadata: minimalMetadata({ mode: 'seed-direct' }),
+      pgSamplesCsvPath: csvPath,
+    });
+    const md = await readFile(join(out, 'summary.md'), 'utf8');
+    expect(md).toContain('## Database connection pool');
+    expect(md).toContain('| peak  | 20 | 8 | 12 |');
+    expect(md).toContain('| mean  | 15 | 5 | 10 |');
+  });
+
+  it('omits the connection panel when seed-direct run has no pgSamplesCsvPath', async () => {
+    const out = await mkdtemp(join(tmpdir(), 'boject-render-'));
+    await renderReport({
+      rawJsonPath: FIXTURE,
+      outDir: out,
+      runMetadata: minimalMetadata({ mode: 'seed-direct' }),
+    });
+    const md = await readFile(join(out, 'summary.md'), 'utf8');
+    expect(md).not.toContain('## Database connection pool');
+  });
+
+  it('omits the connection panel when the pgSamplesCsvPath is missing', async () => {
+    const out = await mkdtemp(join(tmpdir(), 'boject-render-'));
+    await renderReport({
+      rawJsonPath: FIXTURE,
+      outDir: out,
+      runMetadata: minimalMetadata({ mode: 'seed-direct' }),
+      pgSamplesCsvPath: join(out, 'does-not-exist.csv'),
+    });
+    const md = await readFile(join(out, 'summary.md'), 'utf8');
+    expect(md).not.toContain('## Database connection pool');
+  });
+
+  it('omits the connection panel when CSV has only a header row', async () => {
+    const out = await mkdtemp(join(tmpdir(), 'boject-render-'));
+    const csvPath = join(out, 'pg-samples.csv');
+    await writeFile(
+      csvPath,
+      'timestamp,total,active,idle,cpu_percent,mem_mb\n'
+    );
+    await renderReport({
+      rawJsonPath: FIXTURE,
+      outDir: out,
+      runMetadata: minimalMetadata({ mode: 'seed-direct' }),
+      pgSamplesCsvPath: csvPath,
+    });
+    const md = await readFile(join(out, 'summary.md'), 'utf8');
+    expect(md).not.toContain('## Database connection pool');
+  });
+
+  it('omits the connection panel for seed-http runs even with a valid CSV', async () => {
+    const out = await mkdtemp(join(tmpdir(), 'boject-render-'));
+    const csvPath = join(out, 'pg-samples.csv');
+    await writeFile(
+      csvPath,
+      [
+        'timestamp,total,active,idle,cpu_percent,mem_mb',
+        '2026-05-11T00:00:00Z,10,2,8,0,0',
+      ].join('\n')
+    );
+    await renderReport({
+      rawJsonPath: FIXTURE,
+      outDir: out,
+      runMetadata: minimalMetadata({ mode: 'seed-http' }),
+      pgSamplesCsvPath: csvPath,
+    });
+    const md = await readFile(join(out, 'summary.md'), 'utf8');
+    expect(md).not.toContain('## Database connection pool');
+  });
+
+  it('omits the connection panel for read-only runs even with a valid CSV', async () => {
+    const out = await mkdtemp(join(tmpdir(), 'boject-render-'));
+    const csvPath = join(out, 'pg-samples.csv');
+    await writeFile(
+      csvPath,
+      [
+        'timestamp,total,active,idle,cpu_percent,mem_mb',
+        '2026-05-11T00:00:00Z,10,2,8,0,0',
+      ].join('\n')
+    );
+    await renderReport({
+      rawJsonPath: FIXTURE,
+      outDir: out,
+      runMetadata: minimalMetadata({ mode: 'read-only' }),
+      pgSamplesCsvPath: csvPath,
+    });
+    const md = await readFile(join(out, 'summary.md'), 'utf8');
+    expect(md).not.toContain('## Database connection pool');
+  });
+
   it('round-trips mode + seedSize + seedDeterministicSeed in metadata.json', async () => {
     const out = await mkdtemp(join(tmpdir(), 'boject-render-'));
     await renderReport({

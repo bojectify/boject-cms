@@ -1,6 +1,11 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { RunMode } from './runMode.js';
+import {
+  computeConnectionStats,
+  readSamplesIfPresent,
+  renderConnectionPanel,
+} from './renderConnectionPanel.js';
 
 export interface RunMetadata {
   perfCalibratedAt: string;
@@ -31,6 +36,7 @@ export interface RenderParams {
   rawJsonPath: string;
   outDir: string;
   runMetadata: RunMetadata;
+  pgSamplesCsvPath?: string;
 }
 
 interface RawPoint {
@@ -206,7 +212,8 @@ function buildPartialBanner(
 function buildSummary(
   meta: RunMetadata,
   stats: ScenarioStats[],
-  malformedCount: number
+  malformedCount: number,
+  connectionPanel: string | null
 ): string {
   const flatScenario = meta.scenarios.find((s) => s.name === 'graphql-flat');
   const heavyBanner = flatScenario
@@ -246,6 +253,7 @@ function buildSummary(
       : null,
     '',
     runStatusSection,
+    connectionPanel ? `${connectionPanel}\n` : null,
     heavyBanner ? `## Run shape\n\n${heavyBanner}\n` : null,
     skipBanners.length > 0 ? `${skipBanners.join('\n')}\n` : null,
     '## Scenario 1A — GraphQL cursor pagination',
@@ -288,13 +296,31 @@ function buildMetadata(meta: RunMetadata): object {
   };
 }
 
+async function loadConnectionPanel(
+  params: RenderParams
+): Promise<string | null> {
+  if (params.runMetadata.mode !== 'seed-direct') return null;
+  if (!params.pgSamplesCsvPath) return null;
+  const csv = await readSamplesIfPresent(params.pgSamplesCsvPath);
+  if (csv === null) return null;
+  const stats = computeConnectionStats(csv);
+  if (stats === null) return null;
+  return renderConnectionPanel(stats);
+}
+
 export async function renderReport(params: RenderParams): Promise<void> {
   await mkdir(params.outDir, { recursive: true });
   const raw = await readFile(params.rawJsonPath, 'utf8');
   const { points, malformedCount } = parseRawJson(raw);
   const stats = compute(points);
+  const connectionPanel = await loadConnectionPanel(params);
 
-  const summary = buildSummary(params.runMetadata, stats, malformedCount);
+  const summary = buildSummary(
+    params.runMetadata,
+    stats,
+    malformedCount,
+    connectionPanel
+  );
   const metadata = buildMetadata(params.runMetadata);
   const csv = toCsv(stats);
 
