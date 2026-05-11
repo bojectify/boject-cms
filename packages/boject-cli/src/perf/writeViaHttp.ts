@@ -1,6 +1,13 @@
 import type { BundleEntry } from '../vendor/contentBundleTypes.js';
 import type { GeneratedSeed } from './generate.js';
 import { rewriteSyntheticIds } from './rewriteSyntheticIds.js';
+import {
+  SeedMostlyDuplicateError,
+  SEED_DUPLICATE_THRESHOLD,
+} from './seedErrors.js';
+
+const SKIPPED = Symbol('skipped-duplicate');
+type SkippedSentinel = typeof SKIPPED;
 
 export interface WriteViaHttpOptions {
   baseUrl: string;
@@ -74,12 +81,13 @@ const FIVE_HUNDRED_RETRY_DELAY_MS = 1000;
  */
 export async function writeViaHttp(
   opts: WriteViaHttpOptions
-): Promise<{ inserted: number }> {
+): Promise<{ inserted: number; skipped: number }> {
   const { baseUrl, apiKey, generated, onProgress } = opts;
   const concurrency = opts.concurrency ?? 8;
   const total = generated.groups.reduce((s, g) => s + g.entries.length, 0);
   const idMap = new Map<string, string>(); // synthetic → real
   let inserted = 0;
+  let skipped = 0;
 
   for (const group of generated.groups) {
     // Fully drain this group before moving on so its IDs are in idMap
@@ -91,10 +99,14 @@ export async function writeViaHttp(
         const next = queue.shift();
         if (!next) return;
         const [, entry] = next;
-        const realId = await postAndPublish(baseUrl, apiKey, entry, idMap);
-        if (entry.id) idMap.set(entry.id, realId);
-        inserted++;
-        onProgress?.(inserted, total);
+        const result = await postAndPublish(baseUrl, apiKey, entry, idMap);
+        if (result === SKIPPED) {
+          skipped++;
+        } else {
+          if (entry.id) idMap.set(entry.id, result);
+          inserted++;
+          onProgress?.(inserted, total);
+        }
       }
     }
 
@@ -114,7 +126,14 @@ export async function writeViaHttp(
     }
   }
 
-  return { inserted };
+  const totalProcessed = inserted + skipped;
+  if (
+    totalProcessed > 0 &&
+    skipped / totalProcessed > SEED_DUPLICATE_THRESHOLD
+  ) {
+    throw new SeedMostlyDuplicateError(inserted, skipped, totalProcessed);
+  }
+  return { inserted, skipped };
 }
 
 async function postAndPublish(
@@ -122,7 +141,7 @@ async function postAndPublish(
   apiKey: string,
   entry: BundleEntry,
   idMap: Map<string, string>
-): Promise<string> {
+): Promise<string | SkippedSentinel> {
   if (!entry.versions?.[0]) {
     throw new Error(
       `Bundle entry ${entry.id ?? '<unknown>'} has no versions; cannot post`
@@ -132,7 +151,7 @@ async function postAndPublish(
   const rewrittenData = rewriteSyntheticIds(v.data, idMap);
 
   // POST to create DRAFT
-  const created = (await retryingFetch(`${baseUrl}/api/content-entries`, {
+  const created = await retryingFetch(`${baseUrl}/api/content-entries`, {
     method: 'POST',
     headers: jsonHeaders(apiKey),
     body: JSON.stringify({
@@ -140,18 +159,23 @@ async function postAndPublish(
       data: rewrittenData,
       slug: entry.slug,
     }),
-  })) as { id: string };
-  const realId = created.id;
+  });
+  if (created === SKIPPED) return SKIPPED;
+  const realId = (created as { id: string }).id;
 
   // PUT to publish
-  await retryingFetch(`${baseUrl}/api/content-entries/${realId}`, {
-    method: 'PUT',
-    headers: jsonHeaders(apiKey),
-    body: JSON.stringify({
-      data: rewrittenData,
-      status: 'PUBLISHED',
-    }),
-  });
+  const published = await retryingFetch(
+    `${baseUrl}/api/content-entries/${realId}`,
+    {
+      method: 'PUT',
+      headers: jsonHeaders(apiKey),
+      body: JSON.stringify({
+        data: rewrittenData,
+        status: 'PUBLISHED',
+      }),
+    }
+  );
+  if (published === SKIPPED) return SKIPPED;
 
   return realId;
 }
@@ -176,7 +200,10 @@ function jsonHeaders(apiKey: string): Record<string, string> {
   };
 }
 
-async function retryingFetch(url: string, init: RequestInit): Promise<unknown> {
+async function retryingFetch(
+  url: string,
+  init: RequestInit
+): Promise<unknown | SkippedSentinel> {
   let attempt = 0;
   let last5xx = false;
   while (attempt < MAX_RETRIES) {
@@ -202,6 +229,9 @@ async function retryingFetch(url: string, init: RequestInit): Promise<unknown> {
     if (res.status === 422) {
       const body = await res.json().catch(() => ({}));
       throw new EntryValidationError(0, 'unknown', body);
+    }
+    if (res.status === 409) {
+      return SKIPPED;
     }
     if (res.status >= 500 && res.status < 600) {
       if (last5xx) {

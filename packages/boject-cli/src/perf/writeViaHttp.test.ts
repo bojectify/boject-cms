@@ -7,7 +7,9 @@ import {
   AuthError,
   ApiKeyReadOnlyError,
   RateLimitedError,
+  EntryValidationError,
 } from './writeViaHttp.js';
+import { SeedMostlyDuplicateError } from './seedErrors.js';
 
 const baseUrl = 'http://cms.test';
 const apiKey = 'boject_test_key';
@@ -279,5 +281,190 @@ describe('writeViaHttp', () => {
     };
     await writeViaHttp({ baseUrl, apiKey, generated, concurrency: 3 });
     expect(peak).toBeLessThanOrEqual(3);
+  });
+
+  // ----- 409 skip-and-continue (#194) -----
+
+  function makeNAuthors(n: number): GeneratedSeed {
+    return {
+      warnings: [],
+      groups: [
+        {
+          contentTypeIdentifier: 'Author',
+          entries: Array.from({ length: n }).map((_, i) => ({
+            id: `syn-${i}`,
+            contentTypeId: 'ct-author',
+            contentTypeIdentifier: 'Author',
+            entryTitle: `A${i}`,
+            slug: null,
+            versions: [
+              {
+                status: 'PUBLISHED' as const,
+                data: { name: `A${i}` },
+                publishedAt: '2026-01-01T00:00:00.000Z',
+              },
+            ],
+          })),
+        },
+      ],
+    };
+  }
+
+  /**
+   * Build an MSW server where each successive POST returns the next
+   * status code from `postStatuses`. PUT always succeeds.
+   */
+  function setupMultiPostServer(postStatuses: number[]): SetupServer {
+    let i = 0;
+    return setupServer(
+      http.post(`${baseUrl}/api/content-entries`, async () => {
+        const status = postStatuses[i++] ?? 500;
+        if (status === 201) {
+          return HttpResponse.json({ id: `real-${i}` });
+        }
+        return new HttpResponse(null, { status });
+      }),
+      http.put(`${baseUrl}/api/content-entries/:id`, async ({ params }) =>
+        HttpResponse.json({ id: params.id })
+      )
+    );
+  }
+
+  it('all-success: returns { inserted: N, skipped: 0 }', async () => {
+    server = setupMultiPostServer([201, 201, 201, 201, 201]);
+    server.listen();
+    const r = await writeViaHttp({
+      baseUrl,
+      apiKey,
+      generated: makeNAuthors(5),
+      concurrency: 1,
+    });
+    expect(r).toEqual({ inserted: 5, skipped: 0 });
+  });
+
+  it('some-409 (25%): returns { inserted, skipped }, no throw', async () => {
+    server = setupMultiPostServer([201, 201, 201, 409]);
+    server.listen();
+    const r = await writeViaHttp({
+      baseUrl,
+      apiKey,
+      generated: makeNAuthors(4),
+      concurrency: 1,
+    });
+    expect(r).toEqual({ inserted: 3, skipped: 1 });
+  });
+
+  it('threshold trip (75%): throws SeedMostlyDuplicateError', async () => {
+    server = setupMultiPostServer([201, 409, 409, 409]);
+    server.listen();
+    let caught: SeedMostlyDuplicateError | null = null;
+    try {
+      await writeViaHttp({
+        baseUrl,
+        apiKey,
+        generated: makeNAuthors(4),
+        concurrency: 1,
+      });
+    } catch (err) {
+      caught = err as SeedMostlyDuplicateError;
+    }
+    expect(caught).toBeInstanceOf(SeedMostlyDuplicateError);
+    expect(caught?.inserted).toBe(1);
+    expect(caught?.skipped).toBe(3);
+    expect(caught?.total).toBe(4);
+  });
+
+  it('exact 50%: does NOT throw (strict >, not >=)', async () => {
+    server = setupMultiPostServer([201, 201, 409, 409]);
+    server.listen();
+    const r = await writeViaHttp({
+      baseUrl,
+      apiKey,
+      generated: makeNAuthors(4),
+      concurrency: 1,
+    });
+    expect(r).toEqual({ inserted: 2, skipped: 2 });
+  });
+
+  it('empty input: returns { inserted: 0, skipped: 0 } without threshold check', async () => {
+    server = setupMultiPostServer([]);
+    server.listen();
+    const empty: GeneratedSeed = { warnings: [], groups: [] };
+    const r = await writeViaHttp({
+      baseUrl,
+      apiKey,
+      generated: empty,
+      concurrency: 1,
+    });
+    expect(r).toEqual({ inserted: 0, skipped: 0 });
+  });
+
+  it('onProgress only fires for inserts, not skips', async () => {
+    server = setupMultiPostServer([201, 409, 201]);
+    server.listen();
+    const calls: Array<{ n: number; total: number }> = [];
+    const r = await writeViaHttp({
+      baseUrl,
+      apiKey,
+      generated: makeNAuthors(3),
+      concurrency: 1,
+      onProgress: (n, total) => calls.push({ n, total }),
+    });
+    expect(r).toEqual({ inserted: 2, skipped: 1 });
+    expect(calls.map((c) => c.n)).toEqual([1, 2]);
+    // `total` reflects the full input count (3), unchanged by skips.
+    expect(calls.every((c) => c.total === 3)).toBe(true);
+  });
+
+  it('mixed status codes: 422 still throws, 409 silenced, 429 retried', async () => {
+    // Identify each logical entry via its synthetic id (`syn-N`) so 429
+    // retries don't shift sequencing. Per-entry plan:
+    //   syn-0: 201
+    //   syn-1: 409 (skip)
+    //   syn-2: 429 once, then 201
+    //   syn-3: 422 (throws EntryValidationError)
+    const attemptsByEntry: Record<string, number> = {};
+    server = setupServer(
+      http.post(`${baseUrl}/api/content-entries`, async ({ request }) => {
+        const body = (await request.json()) as {
+          data?: { name?: string };
+        };
+        const name = body.data?.name ?? '';
+        attemptsByEntry[name] = (attemptsByEntry[name] ?? 0) + 1;
+        if (name === 'A0') return HttpResponse.json({ id: 'real-0' });
+        if (name === 'A1') return new HttpResponse(null, { status: 409 });
+        if (name === 'A2') {
+          if (attemptsByEntry[name] === 1) {
+            return new HttpResponse(null, {
+              status: 429,
+              headers: { 'Retry-After': '0' },
+            });
+          }
+          return HttpResponse.json({ id: 'real-2' });
+        }
+        if (name === 'A3') {
+          return HttpResponse.json({ message: 'invalid' }, { status: 422 });
+        }
+        return new HttpResponse(null, { status: 500 });
+      }),
+      http.put(`${baseUrl}/api/content-entries/:id`, async ({ params }) =>
+        HttpResponse.json({ id: params.id })
+      )
+    );
+    server.listen();
+    await expect(
+      writeViaHttp({
+        baseUrl,
+        apiKey,
+        generated: makeNAuthors(4),
+        concurrency: 1,
+      })
+    ).rejects.toBeInstanceOf(EntryValidationError);
+    // The 409 was silenced (didn't throw); the 422 propagated; the 429
+    // path was retried successfully but is not asserted here beyond the
+    // fact that it didn't error before A3 was reached.
+    expect(attemptsByEntry['A1']).toBe(1);
+    expect(attemptsByEntry['A2']).toBe(2);
+    expect(attemptsByEntry['A3']).toBe(1);
   });
 });
