@@ -172,7 +172,7 @@ describe('boject perf — e2e', () => {
         out,
         '--yes',
       ],
-      { encoding: 'utf8', timeout: 90_000 }
+      { encoding: 'utf8', timeout: 30_000 }
     );
 
     expect(r.status).toBe(0);
@@ -188,5 +188,5 @@ describe('boject perf — e2e', () => {
     // the canonical scenario's comments):
     expect(md).toMatch(/\| create\s+\|/);
     expect(md).toMatch(/\| delete\s+\|/);
-  }, 90_000);
+  }, 30_000);
 });
