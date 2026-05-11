@@ -3,7 +3,6 @@ import { spawn } from 'node:child_process';
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { loadNodeConfig } from './config-node';
 
 export interface Sample {
   timestamp: Date;
@@ -146,11 +145,13 @@ export function parseIntervalMs(raw: string | undefined): number {
 async function main(): Promise<void> {
   const outPath = process.env.PERF_SAMPLER_OUT ?? 'pg-samples.csv';
   const intervalMs = parseIntervalMs(process.env.PERF_SAMPLER_INTERVAL_MS);
-  const cfg = loadNodeConfig();
+  const databaseUrl =
+    process.env.PERF_DATABASE_URL ??
+    'postgresql://boject:boject@localhost:5432/boject_perf';
   mkdirSync(dirname(outPath), { recursive: true });
   appendFileSync(outPath, CSV_HEADER + '\n');
 
-  const client = new Client({ connectionString: cfg.perfDatabaseUrl });
+  const client = new Client({ connectionString: databaseUrl });
   await client.connect();
 
   // Cooperative shutdown: SIGINT/SIGTERM flips `running` and aborts the
