@@ -362,6 +362,169 @@ describe('renderReport', () => {
     expect(md).not.toContain('## Database connection pool');
   });
 
+  it('emits Scenario 2 section with all four phase rows for a crud run', async () => {
+    const out = await mkdtemp(join(tmpdir(), 'boject-render-'));
+    const rawPath = join(out, 'crud.json');
+    const crudRaw = [
+      '{"type":"Point","metric":"http_req_duration","data":{"time":"2026-05-11T00:00:00Z","value":25.0,"tags":{"scenario":"crud","phase":"create"}}}',
+      '{"type":"Point","metric":"http_req_duration","data":{"time":"2026-05-11T00:00:01Z","value":30.0,"tags":{"scenario":"crud","phase":"create"}}}',
+      '{"type":"Point","metric":"http_req_duration","data":{"time":"2026-05-11T00:00:02Z","value":8.0,"tags":{"scenario":"crud","phase":"read"}}}',
+      '{"type":"Point","metric":"http_req_duration","data":{"time":"2026-05-11T00:00:03Z","value":11.0,"tags":{"scenario":"crud","phase":"list"}}}',
+      '{"type":"Point","metric":"http_req_duration","data":{"time":"2026-05-11T00:00:04Z","value":22.0,"tags":{"scenario":"crud","phase":"delete"}}}',
+      '{"type":"Point","metric":"http_req_failed","data":{"time":"2026-05-11T00:00:00Z","value":0,"tags":{"scenario":"crud","phase":"create"}}}',
+    ].join('\n');
+    await writeFile(rawPath, crudRaw);
+    await renderReport({
+      rawJsonPath: rawPath,
+      outDir: out,
+      runMetadata: minimalMetadata({
+        scenarios: [{ name: 'rest-crud-cycle', outcome: 'completed' }],
+      }),
+    });
+    const md = await readFile(join(out, 'summary.md'), 'utf8');
+    expect(md).toContain('## Scenario 2 — REST CRUD cycle');
+    expect(md).toMatch(/\| create\s+\|/);
+    expect(md).toMatch(/\| read\s+\|/);
+    expect(md).toMatch(/\| list\s+\|/);
+    expect(md).toMatch(/\| delete\s+\|/);
+  });
+
+  it('crud table emits only the phases that produced data (partial)', async () => {
+    const out = await mkdtemp(join(tmpdir(), 'boject-render-'));
+    const rawPath = join(out, 'crud-partial.json');
+    const crudRaw = [
+      '{"type":"Point","metric":"http_req_duration","data":{"time":"2026-05-11T00:00:00Z","value":25.0,"tags":{"scenario":"crud","phase":"create"}}}',
+      '{"type":"Point","metric":"http_req_duration","data":{"time":"2026-05-11T00:00:02Z","value":8.0,"tags":{"scenario":"crud","phase":"read"}}}',
+    ].join('\n');
+    await writeFile(rawPath, crudRaw);
+    await renderReport({
+      rawJsonPath: rawPath,
+      outDir: out,
+      runMetadata: minimalMetadata({
+        scenarios: [{ name: 'rest-crud-cycle', outcome: 'partial' }],
+      }),
+    });
+    const md = await readFile(join(out, 'summary.md'), 'utf8');
+    expect(md).toContain('## Scenario 2 — REST CRUD cycle');
+    expect(md).toMatch(/\| create\s+\|/);
+    expect(md).toMatch(/\| read\s+\|/);
+    expect(md).not.toMatch(/\| list\s+\|/);
+    expect(md).not.toMatch(/\| delete\s+\|/);
+  });
+
+  it('omits Scenario 1A and Scenario 2 when only graphql-flat ran', async () => {
+    const out = await mkdtemp(join(tmpdir(), 'boject-render-'));
+    await renderReport({
+      rawJsonPath: FIXTURE,
+      outDir: out,
+      runMetadata: minimalMetadata({
+        scenarios: [
+          { name: 'graphql-flat', outcome: 'completed', shapesRun: ['bare'] },
+        ],
+      }),
+    });
+    const md = await readFile(join(out, 'summary.md'), 'utf8');
+    expect(md).not.toContain('## Scenario 1A');
+    expect(md).not.toContain('## Scenario 2');
+    expect(md).toContain('## Scenario 1B');
+  });
+
+  it('omits Scenario 1B and Scenario 2 when only graphql-sitemap ran', async () => {
+    const out = await mkdtemp(join(tmpdir(), 'boject-render-'));
+    await renderReport({
+      rawJsonPath: FIXTURE,
+      outDir: out,
+      runMetadata: minimalMetadata({
+        scenarios: [{ name: 'graphql-sitemap', outcome: 'completed' }],
+      }),
+    });
+    const md = await readFile(join(out, 'summary.md'), 'utf8');
+    expect(md).not.toContain('## Scenario 1B');
+    expect(md).not.toContain('## Scenario 2');
+    expect(md).toContain('## Scenario 1A');
+  });
+
+  it('emits both Scenario 1B and Scenario 2 when flat + crud both present', async () => {
+    const out = await mkdtemp(join(tmpdir(), 'boject-render-'));
+    const rawPath = join(out, 'mixed.json');
+    const mixedRaw = [
+      '{"type":"Point","metric":"http_req_duration","data":{"time":"2026-05-11T00:00:00Z","value":1.5,"tags":{"scenario":"flat","shape":"bare"}}}',
+      '{"type":"Point","metric":"http_req_duration","data":{"time":"2026-05-11T00:00:00Z","value":25.0,"tags":{"scenario":"crud","phase":"create"}}}',
+    ].join('\n');
+    await writeFile(rawPath, mixedRaw);
+    await renderReport({
+      rawJsonPath: rawPath,
+      outDir: out,
+      runMetadata: minimalMetadata({
+        scenarios: [
+          { name: 'graphql-flat', outcome: 'completed', shapesRun: ['bare'] },
+          { name: 'rest-crud-cycle', outcome: 'completed' },
+        ],
+      }),
+    });
+    const md = await readFile(join(out, 'summary.md'), 'utf8');
+    expect(md).toContain('## Scenario 1B — GraphQL flat RPS');
+    expect(md).toContain('## Scenario 2 — REST CRUD cycle');
+    expect(md).not.toContain('## Scenario 1A');
+  });
+
+  it('CSV emits crud rows with shape=phase and page_size="-"', async () => {
+    const out = await mkdtemp(join(tmpdir(), 'boject-render-'));
+    const rawPath = join(out, 'crud-csv.json');
+    const crudRaw = [
+      '{"type":"Point","metric":"http_req_duration","data":{"time":"2026-05-11T00:00:00Z","value":25.0,"tags":{"scenario":"crud","phase":"create"}}}',
+      '{"type":"Point","metric":"http_req_duration","data":{"time":"2026-05-11T00:00:02Z","value":8.0,"tags":{"scenario":"crud","phase":"read"}}}',
+      '{"type":"Point","metric":"http_req_duration","data":{"time":"2026-05-11T00:00:03Z","value":22.0,"tags":{"scenario":"crud","phase":"delete"}}}',
+    ].join('\n');
+    await writeFile(rawPath, crudRaw);
+    await renderReport({
+      rawJsonPath: rawPath,
+      outDir: out,
+      runMetadata: minimalMetadata({
+        scenarios: [{ name: 'rest-crud-cycle', outcome: 'completed' }],
+      }),
+    });
+    const csv = await readFile(join(out, 'metrics.csv'), 'utf8');
+    expect(csv).toMatch(/^crud,-,create,1,/m);
+    expect(csv).toMatch(/^crud,-,read,1,/m);
+    expect(csv).toMatch(/^crud,-,delete,1,/m);
+  });
+
+  it('CSV header is unchanged when crud rows are present', async () => {
+    const out = await mkdtemp(join(tmpdir(), 'boject-render-'));
+    const rawPath = join(out, 'crud-header.json');
+    const crudRaw =
+      '{"type":"Point","metric":"http_req_duration","data":{"time":"2026-05-11T00:00:00Z","value":25.0,"tags":{"scenario":"crud","phase":"create"}}}';
+    await writeFile(rawPath, crudRaw);
+    await renderReport({
+      rawJsonPath: rawPath,
+      outDir: out,
+      runMetadata: minimalMetadata({
+        scenarios: [{ name: 'rest-crud-cycle', outcome: 'completed' }],
+      }),
+    });
+    const csv = await readFile(join(out, 'metrics.csv'), 'utf8');
+    expect(csv.split('\n')[0]).toBe(
+      'scenario,page_size,shape,count,p50,p95,p99,error_rate'
+    );
+  });
+
+  it('emits Scenario 2 placeholder when scenarios includes crud but raw is empty', async () => {
+    const out = await mkdtemp(join(tmpdir(), 'boject-render-'));
+    const emptyFile = join(out, 'empty-crud.json');
+    await writeFile(emptyFile, '\n');
+    await renderReport({
+      rawJsonPath: emptyFile,
+      outDir: out,
+      runMetadata: minimalMetadata({
+        scenarios: [{ name: 'rest-crud-cycle', outcome: 'partial' }],
+      }),
+    });
+    const md = await readFile(join(out, 'summary.md'), 'utf8');
+    expect(md).toContain('## Scenario 2 — REST CRUD cycle');
+    expect(md).toMatch(/No rest-crud-cycle data captured/);
+  });
+
   it('round-trips mode + seedSize + seedDeterministicSeed in metadata.json', async () => {
     const out = await mkdtemp(join(tmpdir(), 'boject-render-'));
     await renderReport({

@@ -56,6 +56,15 @@ interface ScenarioStats {
   errorRate: number;
 }
 
+export interface CrudStats {
+  phase: string;
+  count: number;
+  p50: number;
+  p95: number;
+  p99: number;
+  errorRate: number;
+}
+
 function percentile(sorted: number[], p: number): number {
   if (sorted.length === 0) return 0;
   const rank = Math.max(1, Math.ceil(p * sorted.length));
@@ -128,6 +137,44 @@ function compute(points: RawPoint[]): ScenarioStats[] {
   });
 }
 
+function computeCrudStats(points: RawPoint[]): CrudStats[] {
+  const groups = new Map<string, number[]>();
+  const failGroups = new Map<string, { total: number; failed: number }>();
+  for (const p of points) {
+    if (p.data.tags.scenario !== 'crud') continue;
+    const phase = p.data.tags.phase;
+    if (!phase) continue;
+    if (p.metric === 'http_req_duration') {
+      let arr = groups.get(phase);
+      if (!arr) {
+        arr = [];
+        groups.set(phase, arr);
+      }
+      arr.push(p.data.value);
+    } else if (p.metric === 'http_req_failed') {
+      let g = failGroups.get(phase);
+      if (!g) {
+        g = { total: 0, failed: 0 };
+        failGroups.set(phase, g);
+      }
+      g.total++;
+      if (p.data.value === 1) g.failed++;
+    }
+  }
+  return Array.from(groups.entries()).map(([phase, values]) => {
+    const sorted = [...values].sort((a, b) => a - b);
+    const fg = failGroups.get(phase);
+    return {
+      phase,
+      count: values.length,
+      p50: percentile(sorted, 0.5),
+      p95: percentile(sorted, 0.95),
+      p99: percentile(sorted, 0.99),
+      errorRate: fg && fg.total > 0 ? fg.failed / fg.total : 0,
+    };
+  });
+}
+
 function fmtMs(n: number): string {
   return (Math.round(n * 10) / 10).toString();
 }
@@ -168,13 +215,34 @@ function sitemapTable(stats: ScenarioStats[]): string {
   ].join('\n');
 }
 
-function toCsv(stats: ScenarioStats[]): string {
+function crudTable(stats: CrudStats[]): string {
+  const rows = stats.map(
+    (s) =>
+      `| ${s.phase} | ${s.count} | ${fmtMs(s.p50)} | ${fmtMs(s.p95)} | ${fmtMs(s.p99)} | ${fmtPct(s.errorRate)} |`
+  );
+  if (rows.length === 0)
+    return '_No rest-crud-cycle data captured (scenario skipped or partial)._';
+  return [
+    '| phase   | count | p50 (ms) | p95 (ms) | p99 (ms) | errors |',
+    '| ------- | ----- | -------- | -------- | -------- | ------ |',
+    ...rows,
+  ].join('\n');
+}
+
+// For rest-crud-cycle rows, scenario='crud', page_size='-', and the
+// shape column carries the phase value (create|read|list|delete).
+// Existing schema; no schemaVersion bump.
+function toCsv(stats: ScenarioStats[], crudStats: CrudStats[]): string {
   const header = 'scenario,page_size,shape,count,p50,p95,p99,error_rate';
   const rows = stats.map(
     (s) =>
       `${s.scenario},${s.pageSize},${s.shape},${s.count},${fmtMs(s.p50)},${fmtMs(s.p95)},${fmtMs(s.p99)},${s.errorRate.toFixed(4)}`
   );
-  return [header, ...rows].join('\n');
+  const crudRows = crudStats.map(
+    (c) =>
+      `crud,-,${c.phase},${c.count},${fmtMs(c.p50)},${fmtMs(c.p95)},${fmtMs(c.p99)},${c.errorRate.toFixed(4)}`
+  );
+  return [header, ...rows, ...crudRows].join('\n');
 }
 
 function buildModeBanner(mode: RunMode): string | null {
@@ -212,10 +280,14 @@ function buildPartialBanner(
 function buildSummary(
   meta: RunMetadata,
   stats: ScenarioStats[],
+  crudStats: CrudStats[],
   malformedCount: number,
   connectionPanel: string | null
 ): string {
   const flatScenario = meta.scenarios.find((s) => s.name === 'graphql-flat');
+  const hasFlat = meta.scenarios.some((s) => s.name === 'graphql-flat');
+  const hasSitemap = meta.scenarios.some((s) => s.name === 'graphql-sitemap');
+  const hasCrud = meta.scenarios.some((s) => s.name === 'rest-crud-cycle');
   const heavyBanner = flatScenario
     ? `**Heavy load run** — peak ${meta.intensity.targetRps} RPS sustained over ${meta.intensity.duration}. Target should be a perf-clone, not production.`
     : '';
@@ -256,14 +328,18 @@ function buildSummary(
     connectionPanel ? `${connectionPanel}\n` : null,
     heavyBanner ? `## Run shape\n\n${heavyBanner}\n` : null,
     skipBanners.length > 0 ? `${skipBanners.join('\n')}\n` : null,
-    '## Scenario 1A — GraphQL cursor pagination',
-    '',
-    sitemapTable(stats),
-    '',
-    '## Scenario 1B — GraphQL flat RPS',
-    '',
-    flatTable(stats),
-    '',
+    hasSitemap ? '## Scenario 1A — GraphQL cursor pagination' : null,
+    hasSitemap ? '' : null,
+    hasSitemap ? sitemapTable(stats) : null,
+    hasSitemap ? '' : null,
+    hasFlat ? '## Scenario 1B — GraphQL flat RPS' : null,
+    hasFlat ? '' : null,
+    hasFlat ? flatTable(stats) : null,
+    hasFlat ? '' : null,
+    hasCrud ? '## Scenario 2 — REST CRUD cycle' : null,
+    hasCrud ? '' : null,
+    hasCrud ? crudTable(crudStats) : null,
+    hasCrud ? '' : null,
     '## Run notes',
     '',
     `- Content type: ${meta.contentType}`,
@@ -313,16 +389,18 @@ export async function renderReport(params: RenderParams): Promise<void> {
   const raw = await readFile(params.rawJsonPath, 'utf8');
   const { points, malformedCount } = parseRawJson(raw);
   const stats = compute(points);
+  const crudStats = computeCrudStats(points);
   const connectionPanel = await loadConnectionPanel(params);
 
   const summary = buildSummary(
     params.runMetadata,
     stats,
+    crudStats,
     malformedCount,
     connectionPanel
   );
   const metadata = buildMetadata(params.runMetadata);
-  const csv = toCsv(stats);
+  const csv = toCsv(stats, crudStats);
 
   await writeFile(join(params.outDir, 'summary.md'), summary);
   await writeFile(
