@@ -1,6 +1,9 @@
 import type { BundleEntry } from '../vendor/contentBundleTypes.js';
 import type { GeneratedSeed } from './generate.js';
-import { rewriteSyntheticIds } from './rewriteSyntheticIds.js';
+import {
+  findUnresolvedRefs,
+  rewriteSyntheticIds,
+} from './rewriteSyntheticIds.js';
 import {
   SeedMostlyDuplicateError,
   SEED_DUPLICATE_THRESHOLD,
@@ -88,6 +91,7 @@ export async function writeViaHttp(
   const idMap = new Map<string, string>(); // synthetic → real
   let inserted = 0;
   let skipped = 0;
+  const skippedIds = new Set<string>();
 
   for (const group of generated.groups) {
     // Fully drain this group before moving on so its IDs are in idMap
@@ -99,9 +103,24 @@ export async function writeViaHttp(
         const next = queue.shift();
         if (!next) return;
         const [, entry] = next;
+
+        // Cascade-skip check: if this entry's data references any
+        // synthetic ID we've already skipped this run, skip it too.
+        // Prevents the CMS from returning a 400 "references an entry
+        // that does not exist".
+        const data = entry.versions?.[0]?.data;
+        const unresolved = findUnresolvedRefs(data, idMap);
+        const cascadeSkip = [...unresolved].some((id) => skippedIds.has(id));
+        if (cascadeSkip) {
+          skipped++;
+          if (entry.id) skippedIds.add(entry.id);
+          continue;
+        }
+
         const result = await postAndPublish(baseUrl, apiKey, entry, idMap);
         if (result === SKIPPED) {
           skipped++;
+          if (entry.id) skippedIds.add(entry.id);
         } else {
           if (entry.id) idMap.set(entry.id, result);
           inserted++;
