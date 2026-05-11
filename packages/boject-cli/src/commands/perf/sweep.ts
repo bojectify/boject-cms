@@ -7,6 +7,10 @@ import { runK6 } from '../../perf/runK6.js';
 import { renderReport, type RunMetadata } from '../../perf/render.js';
 import { confirmHeavyRun } from '../../perf/confirm.js';
 import { deriveMode } from '../../perf/runMode.js';
+import {
+  startPgSampler,
+  type PgSamplerHandle,
+} from '../../perf/runPgSampler.js';
 import { buildPartialMeta } from '../../perf/buildPartialMeta.js';
 import { sanitiseUrl } from '../../perf/sanitise.js';
 import {
@@ -67,6 +71,8 @@ export interface PerfSweepParams {
   stderr: (line: string) => void;
   /** Test-only injection seam for the content:write probe. */
   probeContentWrite?: typeof probeContentWriteScope;
+  /** Test-only injection seam for the pg-sampler factory. */
+  startPgSampler?: typeof startPgSampler;
 }
 
 export interface PerfSweepResult {
@@ -317,18 +323,75 @@ export async function runPerfSweep(
   let sitemapTotal = 0;
   let flatSuccessful = 0;
 
-  // Sitemap matrix: page sizes × VU levels.
-  for (const pageSize of pageSizes) {
-    for (const vus of vusList) {
-      sitemapTotal++;
+  // Bracket the entire sweep's k6 spawns with a single pg-sampler when
+  // running in seed-direct mode. We don't start a new sampler per scenario
+  // — one sampler covers the full sweep. Stops before renderReport runs
+  // so the CSV is fully flushed.
+  const mode = deriveMode({
+    readOnly: flags.readOnly,
+    httpSeed: flags.httpSeed,
+    databaseUrl: effectiveDatabaseUrl,
+  });
+  const startSampler = params.startPgSampler ?? startPgSampler;
+  let samplerHandle: PgSamplerHandle | null = null;
+  if (mode === 'seed-direct' && effectiveDatabaseUrl) {
+    try {
+      samplerHandle = await startSampler({
+        databaseUrl: effectiveDatabaseUrl,
+        outDir,
+      });
+    } catch (err) {
+      params.stderr(
+        `[pg-sampler] failed to start: ${(err as Error).message} — report will omit connection panel.\n`
+      );
+    }
+  }
+
+  // Flat shapes — skip those gated by missing introspection results.
+  const shapesToRun = FLAT_SHAPES.filter((s) => {
+    if (s === 'filtered') return Boolean(preflightResult.fields.filterField);
+    if (s === 'relation') return Boolean(preflightResult.fields.relationField);
+    return true;
+  });
+  const flatTotal = shapesToRun.length;
+
+  try {
+    // Sitemap matrix: page sizes × VU levels.
+    for (const pageSize of pageSizes) {
+      for (const vus of vusList) {
+        sitemapTotal++;
+        const env: Record<string, string> = {
+          ...baseEnv,
+          PERF_PAGE_SIZE: String(pageSize),
+          PERF_VUS: String(vus),
+        };
+        const rawFilename = `raw-sitemap-${pageSize}-${vus}.json`;
+        const r = await runK6({
+          scenarioFile: resolveScenarioPath('graphql-sitemap'),
+          env,
+          apiKey,
+          outDir,
+          rawFilename,
+          stdout: params.stdout,
+          stderr: params.stderr,
+        });
+        if (!r.ok) {
+          params.stderr(`Error: ${r.error}`);
+          continue;
+        }
+        if (r.exitCode === 0) sitemapSuccessful++;
+        rawFiles.push(r.rawJsonPath);
+      }
+    }
+
+    for (const shape of shapesToRun) {
       const env: Record<string, string> = {
         ...baseEnv,
-        PERF_PAGE_SIZE: String(pageSize),
-        PERF_VUS: String(vus),
+        PERF_QUERY_SHAPE: shape,
       };
-      const rawFilename = `raw-sitemap-${pageSize}-${vus}.json`;
+      const rawFilename = `raw-flat-${shape}.json`;
       const r = await runK6({
-        scenarioFile: resolveScenarioPath('graphql-sitemap'),
+        scenarioFile: resolveScenarioPath('graphql-flat'),
         env,
         apiKey,
         outDir,
@@ -340,39 +403,11 @@ export async function runPerfSweep(
         params.stderr(`Error: ${r.error}`);
         continue;
       }
-      if (r.exitCode === 0) sitemapSuccessful++;
+      if (r.exitCode === 0) flatSuccessful++;
       rawFiles.push(r.rawJsonPath);
     }
-  }
-
-  // Flat shapes — skip those gated by missing introspection results.
-  const shapesToRun = FLAT_SHAPES.filter((s) => {
-    if (s === 'filtered') return Boolean(preflightResult.fields.filterField);
-    if (s === 'relation') return Boolean(preflightResult.fields.relationField);
-    return true;
-  });
-  const flatTotal = shapesToRun.length;
-  for (const shape of shapesToRun) {
-    const env: Record<string, string> = {
-      ...baseEnv,
-      PERF_QUERY_SHAPE: shape,
-    };
-    const rawFilename = `raw-flat-${shape}.json`;
-    const r = await runK6({
-      scenarioFile: resolveScenarioPath('graphql-flat'),
-      env,
-      apiKey,
-      outDir,
-      rawFilename,
-      stdout: params.stdout,
-      stderr: params.stderr,
-    });
-    if (!r.ok) {
-      params.stderr(`Error: ${r.error}`);
-      continue;
-    }
-    if (r.exitCode === 0) flatSuccessful++;
-    rawFiles.push(r.rawJsonPath);
+  } finally {
+    if (samplerHandle) await samplerHandle.stop();
   }
 
   const successfulRuns = sitemapSuccessful + flatSuccessful;
@@ -434,18 +469,19 @@ export async function runPerfSweep(
       duration: '180s',
       stages: flags.stages ?? scaleDefaultStages(flags.targetRps ?? 2000),
     },
-    mode: deriveMode({
-      readOnly: flags.readOnly,
-      httpSeed: flags.httpSeed,
-      databaseUrl: effectiveDatabaseUrl,
-    }),
+    mode,
     seedSize: seedResult?.inserted ?? null,
     seedDeterministicSeed: flags.seed ?? defaults.seed ?? null,
     partial,
     partialFailureSource: partial ? 'k6' : null,
   };
 
-  await renderReport({ rawJsonPath, outDir, runMetadata: meta });
+  await renderReport({
+    rawJsonPath,
+    outDir,
+    runMetadata: meta,
+    pgSamplesCsvPath: samplerHandle?.csvPath,
+  });
   params.stdout(`Sweep report written to ${sanitiseUrl(outDir)}`);
   return { exitCode: partial ? 1 : 0 };
 }

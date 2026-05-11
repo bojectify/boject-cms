@@ -10,6 +10,31 @@ import * as confirmModule from '../../perf/confirm.js';
 import * as resetModule from './reset.js';
 import * as seedModule from './seed.js';
 
+const okPreflight = {
+  ok: true as const,
+  fields: {
+    listField: 'articleList',
+    filterField: 'publishDate',
+    relationField: 'author',
+  },
+  warnings: [],
+};
+
+import type { startPgSampler } from '../../perf/runPgSampler.js';
+
+function makeFakeSampler(
+  opts: { csvPath?: string; callOrder?: string[] } = {}
+) {
+  const stopSpy = vi.fn(async () => {
+    if (opts.callOrder) opts.callOrder.push('stop');
+  });
+  const factory = vi.fn<typeof startPgSampler>(async () => ({
+    csvPath: opts.csvPath ?? '/tmp/fake-samples.csv',
+    stop: stopSpy,
+  }));
+  return { stopSpy, factory };
+}
+
 describe('runPerfSweep', () => {
   let outDir: string;
 
@@ -550,5 +575,230 @@ describe('runPerfSweep', () => {
     expect(
       stderrLines.some((l) => /--read-only|--database-url|--http-seed/.test(l))
     ).toBe(true);
+  });
+
+  describe('pg-sampler wiring', () => {
+    it('starts the sampler once in seed-direct mode (not per scenario)', async () => {
+      vi.spyOn(preflightModule, 'runPreflight').mockResolvedValue(okPreflight);
+      vi.spyOn(seedModule, 'runPerfSeed').mockResolvedValue({ inserted: 1 });
+      vi.spyOn(runK6Module, 'runK6').mockImplementation(async (p) => ({
+        ok: true,
+        exitCode: 0,
+        rawJsonPath: join(p.outDir, p.rawFilename ?? 'raw.json'),
+        stderrLogPath: join(p.outDir, 'k6-stderr.log'),
+      }));
+      vi.spyOn(renderModule, 'renderReport').mockResolvedValue();
+      vi.spyOn(confirmModule, 'confirmHeavyRun').mockResolvedValue(true);
+      const { factory } = makeFakeSampler();
+
+      const r = await runPerfSweep({
+        cwd: process.cwd(),
+        apiKey: 'k',
+        flags: {
+          url: 'https://x.example.com',
+          contentType: 'Article',
+          out: outDir,
+          yes: true,
+          pageSizes: [100],
+          vus: [1],
+          readOnly: false,
+          databaseUrl: 'postgresql://boject:boject@localhost:5432/boject_perf',
+          size: 1,
+        },
+        stdout: () => {},
+        stderr: () => {},
+        startPgSampler: factory,
+      });
+      expect(r.exitCode).toBe(0);
+      // One sampler for the whole sweep — not one per scenario.
+      expect(factory).toHaveBeenCalledTimes(1);
+      const arg = factory.mock.calls[0]?.[0];
+      expect(arg?.databaseUrl).toBe(
+        'postgresql://boject:boject@localhost:5432/boject_perf'
+      );
+      expect(arg?.outDir).toContain(outDir);
+    });
+
+    it('does NOT start the sampler in read-only mode', async () => {
+      vi.spyOn(preflightModule, 'runPreflight').mockResolvedValue(okPreflight);
+      vi.spyOn(runK6Module, 'runK6').mockImplementation(async (p) => ({
+        ok: true,
+        exitCode: 0,
+        rawJsonPath: join(p.outDir, p.rawFilename ?? 'raw.json'),
+        stderrLogPath: join(p.outDir, 'k6-stderr.log'),
+      }));
+      vi.spyOn(renderModule, 'renderReport').mockResolvedValue();
+      vi.spyOn(confirmModule, 'confirmHeavyRun').mockResolvedValue(true);
+      const { factory } = makeFakeSampler();
+
+      const r = await runPerfSweep({
+        cwd: process.cwd(),
+        apiKey: 'k',
+        flags: {
+          url: 'https://x.example.com',
+          contentType: 'Article',
+          out: outDir,
+          yes: true,
+          pageSizes: [100],
+          vus: [1],
+          readOnly: true,
+        },
+        stdout: () => {},
+        stderr: () => {},
+        startPgSampler: factory,
+      });
+      expect(r.exitCode).toBe(0);
+      expect(factory).not.toHaveBeenCalled();
+    });
+
+    it('does NOT start the sampler in seed-http mode', async () => {
+      vi.spyOn(preflightModule, 'runPreflight').mockResolvedValue(okPreflight);
+      vi.spyOn(seedModule, 'runPerfSeed').mockResolvedValue({ inserted: 1 });
+      vi.spyOn(runK6Module, 'runK6').mockImplementation(async (p) => ({
+        ok: true,
+        exitCode: 0,
+        rawJsonPath: join(p.outDir, p.rawFilename ?? 'raw.json'),
+        stderrLogPath: join(p.outDir, 'k6-stderr.log'),
+      }));
+      vi.spyOn(renderModule, 'renderReport').mockResolvedValue();
+      vi.spyOn(confirmModule, 'confirmHeavyRun').mockResolvedValue(true);
+      const { factory } = makeFakeSampler();
+
+      const r = await runPerfSweep({
+        cwd: process.cwd(),
+        apiKey: 'k',
+        flags: {
+          url: 'https://x.example.com',
+          contentType: 'Article',
+          out: outDir,
+          yes: true,
+          pageSizes: [100],
+          vus: [1],
+          readOnly: false,
+          httpSeed: true,
+          size: 1,
+        },
+        stdout: () => {},
+        stderr: () => {},
+        startPgSampler: factory,
+      });
+      expect(r.exitCode).toBe(0);
+      expect(factory).not.toHaveBeenCalled();
+    });
+
+    it('continues without panel + warns on sampler-start failure', async () => {
+      vi.spyOn(preflightModule, 'runPreflight').mockResolvedValue(okPreflight);
+      vi.spyOn(seedModule, 'runPerfSeed').mockResolvedValue({ inserted: 1 });
+      vi.spyOn(runK6Module, 'runK6').mockImplementation(async (p) => ({
+        ok: true,
+        exitCode: 0,
+        rawJsonPath: join(p.outDir, p.rawFilename ?? 'raw.json'),
+        stderrLogPath: join(p.outDir, 'k6-stderr.log'),
+      }));
+      const renderSpy = vi
+        .spyOn(renderModule, 'renderReport')
+        .mockResolvedValue();
+      vi.spyOn(confirmModule, 'confirmHeavyRun').mockResolvedValue(true);
+      const factory = vi.fn(async () => {
+        throw new Error('connect ECONNREFUSED');
+      });
+
+      const stderr: string[] = [];
+      const r = await runPerfSweep({
+        cwd: process.cwd(),
+        apiKey: 'k',
+        flags: {
+          url: 'https://x.example.com',
+          contentType: 'Article',
+          out: outDir,
+          yes: true,
+          pageSizes: [100],
+          vus: [1],
+          readOnly: false,
+          databaseUrl: 'postgresql://boject:boject@localhost:5432/boject_perf',
+          size: 1,
+        },
+        stdout: () => {},
+        stderr: (l) => stderr.push(l),
+        startPgSampler: factory,
+      });
+      expect(r.exitCode).toBe(0);
+      expect(factory).toHaveBeenCalledTimes(1);
+      expect(stderr.join('\n')).toMatch(/\[pg-sampler\] failed to start:/);
+      expect(renderSpy).toHaveBeenCalledTimes(1);
+      expect(renderSpy.mock.calls[0]?.[0].pgSamplesCsvPath).toBeUndefined();
+    });
+
+    it('calls sampler.stop BEFORE renderReport (happy path)', async () => {
+      const callOrder: string[] = [];
+      vi.spyOn(preflightModule, 'runPreflight').mockResolvedValue(okPreflight);
+      vi.spyOn(seedModule, 'runPerfSeed').mockResolvedValue({ inserted: 1 });
+      vi.spyOn(runK6Module, 'runK6').mockImplementation(async (p) => ({
+        ok: true,
+        exitCode: 0,
+        rawJsonPath: join(p.outDir, p.rawFilename ?? 'raw.json'),
+        stderrLogPath: join(p.outDir, 'k6-stderr.log'),
+      }));
+      vi.spyOn(renderModule, 'renderReport').mockImplementation(async () => {
+        callOrder.push('render');
+      });
+      vi.spyOn(confirmModule, 'confirmHeavyRun').mockResolvedValue(true);
+      const { factory } = makeFakeSampler({ callOrder });
+
+      const r = await runPerfSweep({
+        cwd: process.cwd(),
+        apiKey: 'k',
+        flags: {
+          url: 'https://x.example.com',
+          contentType: 'Article',
+          out: outDir,
+          yes: true,
+          pageSizes: [100],
+          vus: [1],
+          readOnly: false,
+          databaseUrl: 'postgresql://boject:boject@localhost:5432/boject_perf',
+          size: 1,
+        },
+        stdout: () => {},
+        stderr: () => {},
+        startPgSampler: factory,
+      });
+      expect(r.exitCode).toBe(0);
+      expect(callOrder).toEqual(['stop', 'render']);
+    });
+
+    it('still stops the sampler when all k6 runs fail (no render path)', async () => {
+      vi.spyOn(preflightModule, 'runPreflight').mockResolvedValue(okPreflight);
+      vi.spyOn(seedModule, 'runPerfSeed').mockResolvedValue({ inserted: 1 });
+      vi.spyOn(runK6Module, 'runK6').mockResolvedValue({
+        ok: false,
+        error: 'k6 process error: ENOENT',
+      });
+      vi.spyOn(renderModule, 'renderReport').mockResolvedValue();
+      vi.spyOn(confirmModule, 'confirmHeavyRun').mockResolvedValue(true);
+      const { factory, stopSpy } = makeFakeSampler();
+
+      const r = await runPerfSweep({
+        cwd: process.cwd(),
+        apiKey: 'k',
+        flags: {
+          url: 'https://x.example.com',
+          contentType: 'Article',
+          out: outDir,
+          yes: true,
+          pageSizes: [100],
+          vus: [1],
+          readOnly: false,
+          databaseUrl: 'postgresql://boject:boject@localhost:5432/boject_perf',
+          size: 1,
+        },
+        stdout: () => {},
+        stderr: () => {},
+        startPgSampler: factory,
+      });
+      expect(r.exitCode).toBe(1);
+      expect(factory).toHaveBeenCalledTimes(1);
+      expect(stopSpy).toHaveBeenCalledTimes(1);
+    });
   });
 });
