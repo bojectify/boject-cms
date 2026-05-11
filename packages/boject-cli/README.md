@@ -188,6 +188,30 @@ Field overrides (introspection picks defaults):
 - `--filter-field <id>` — DATETIME field for the `filtered` shape. Skipped if absent.
 - `--relation-field <id>` — single-target RELATION field for the `relation` shape. Skipped if absent.
 
+#### `boject perf seed --content-type <id> [flags]`
+
+Generates and writes deterministic seed entries for a content type. Pick one transport:
+
+- `--database-url <perf>` — raw `pg` writes. Refuses any database whose name doesn't end in `_perf` / `_staging` unless `--allow-database` lists it. Pair with `--reset` for a clean target.
+- `--http-seed` — REST `POST /api/content-entries`. Requires `--url` + `--api-key` with the `content:write` scope. Self-rate-limits against the CMS's 50 req/60s mutation limiter.
+
+Use `--size <n>` to control the entry count and `--seed <n>` (default `1`) to pick the deterministic data set.
+
+##### Conflict handling on re-run
+
+If the target DB already contains entries with titles or slugs that match what the seed step would generate (this happens when re-running with the default `--seed 1` against a populated DB), the seed step skips conflicting rows and continues. The final progress line surfaces how many were skipped:
+
+```
+[perf:seed] inserted 950 / total 1000 (50 skipped) entries
+```
+
+If the skip rate exceeds 50%, the seed step aborts with a `SeedMostlyDuplicateError` — this catches the case where the target DB is mostly already populated and the new run would do nothing useful. Two ways to unblock:
+
+- **Pass `--seed <n>`** for a different deterministic data set.
+- **Reset the target DB first** (SQL only): `boject perf reset --database-url <url> --yes`. HTTP-side reset is sibling issue #184 — until that lands, operators on `--http-seed` use the `--seed <n>` workaround.
+
+This applies to both SQL (`--database-url`) and HTTP (`--http-seed`) transports — same behaviour across both.
+
 #### `boject perf scenario rest-crud-cycle --content-type <id> [flags]`
 
 Write-load scenario: 10 VUs run interleaved CREATE / READ / DELETE iterations against `/api/content-entries`. Requires either `--database-url <perf>` (SQL transport) or `--http-seed` (REST). Refuses `--read-only`. Use `--crud-n <n>` to control iterations per phase (default 10000, matches the canonical sweep).

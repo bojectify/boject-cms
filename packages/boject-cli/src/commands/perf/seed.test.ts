@@ -174,6 +174,53 @@ describe('runPerfSeed', () => {
     expect(r.inserted).toBe(1);
   });
 
+  it('logs skipped count when writeViaHttp returns non-zero skipped', async () => {
+    let posts = 0;
+    server = setupServer(
+      http.get(`${baseUrl}/api/schema/export`, () =>
+        HttpResponse.json(minimalBundleResponse)
+      ),
+      http.post(`${baseUrl}/api/content-entries`, () => {
+        posts++;
+        // Return 409 for the last two POSTs (2 of 10 = 20% skip rate,
+        // well below the 50% threshold).
+        if (posts > 8) {
+          return HttpResponse.json(
+            { error: 'UNIQUE_CONFLICT' },
+            { status: 409 }
+          );
+        }
+        return HttpResponse.json({ id: `real-${posts}` });
+      }),
+      http.put(`${baseUrl}/api/content-entries/:id`, ({ params }) =>
+        HttpResponse.json({ id: params.id })
+      )
+    );
+    server.listen();
+    const stderrSpy = vi
+      .spyOn(process.stderr, 'write')
+      .mockImplementation(() => true);
+    try {
+      const r = await runPerfSeed({
+        contentType: 'Page',
+        size: 10,
+        httpSeed: true,
+        url: baseUrl,
+        apiKey,
+        yes: true,
+        probeContentWrite: okProbe,
+      });
+      expect(r.inserted).toBe(8);
+      expect(r.skipped).toBe(2);
+      const finalLogCalls = stderrSpy.mock.calls.filter((c) =>
+        String(c[0]).includes('inserted 8 / total 10 (2 skipped) entries')
+      );
+      expect(finalLogCalls).toHaveLength(1);
+    } finally {
+      stderrSpy.mockRestore();
+    }
+  });
+
   it('throws with actionable error when probe reports missing scope (HTTP)', async () => {
     let posts = 0;
     server = setupServer(

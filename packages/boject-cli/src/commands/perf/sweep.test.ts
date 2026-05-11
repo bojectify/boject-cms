@@ -423,7 +423,10 @@ describe('runPerfSweep', () => {
   });
 
   it('--http-seed without --read-only sets requireContentWrite=true on preflight', async () => {
-    vi.spyOn(seedModule, 'runPerfSeed').mockResolvedValue({ inserted: 0 });
+    vi.spyOn(seedModule, 'runPerfSeed').mockResolvedValue({
+      inserted: 0,
+      skipped: 0,
+    });
     const preflightSpy = vi
       .spyOn(preflightModule, 'runPreflight')
       .mockResolvedValue({
@@ -466,7 +469,10 @@ describe('runPerfSweep', () => {
   });
 
   it('--http-seed with passing preflight runs k6 as today', async () => {
-    vi.spyOn(seedModule, 'runPerfSeed').mockResolvedValue({ inserted: 1 });
+    vi.spyOn(seedModule, 'runPerfSeed').mockResolvedValue({
+      inserted: 1,
+      skipped: 0,
+    });
     const preflightSpy = vi
       .spyOn(preflightModule, 'runPreflight')
       .mockResolvedValue({
@@ -580,7 +586,10 @@ describe('runPerfSweep', () => {
   describe('pg-sampler wiring', () => {
     it('starts the sampler once in seed-direct mode (not per scenario)', async () => {
       vi.spyOn(preflightModule, 'runPreflight').mockResolvedValue(okPreflight);
-      vi.spyOn(seedModule, 'runPerfSeed').mockResolvedValue({ inserted: 1 });
+      vi.spyOn(seedModule, 'runPerfSeed').mockResolvedValue({
+        inserted: 1,
+        skipped: 0,
+      });
       vi.spyOn(runK6Module, 'runK6').mockImplementation(async (p) => ({
         ok: true,
         exitCode: 0,
@@ -653,7 +662,10 @@ describe('runPerfSweep', () => {
 
     it('does NOT start the sampler in seed-http mode', async () => {
       vi.spyOn(preflightModule, 'runPreflight').mockResolvedValue(okPreflight);
-      vi.spyOn(seedModule, 'runPerfSeed').mockResolvedValue({ inserted: 1 });
+      vi.spyOn(seedModule, 'runPerfSeed').mockResolvedValue({
+        inserted: 1,
+        skipped: 0,
+      });
       vi.spyOn(runK6Module, 'runK6').mockImplementation(async (p) => ({
         ok: true,
         exitCode: 0,
@@ -688,7 +700,10 @@ describe('runPerfSweep', () => {
 
     it('continues without panel + warns on sampler-start failure', async () => {
       vi.spyOn(preflightModule, 'runPreflight').mockResolvedValue(okPreflight);
-      vi.spyOn(seedModule, 'runPerfSeed').mockResolvedValue({ inserted: 1 });
+      vi.spyOn(seedModule, 'runPerfSeed').mockResolvedValue({
+        inserted: 1,
+        skipped: 0,
+      });
       vi.spyOn(runK6Module, 'runK6').mockImplementation(async (p) => ({
         ok: true,
         exitCode: 0,
@@ -732,7 +747,10 @@ describe('runPerfSweep', () => {
     it('calls sampler.stop BEFORE renderReport (happy path)', async () => {
       const callOrder: string[] = [];
       vi.spyOn(preflightModule, 'runPreflight').mockResolvedValue(okPreflight);
-      vi.spyOn(seedModule, 'runPerfSeed').mockResolvedValue({ inserted: 1 });
+      vi.spyOn(seedModule, 'runPerfSeed').mockResolvedValue({
+        inserted: 1,
+        skipped: 0,
+      });
       vi.spyOn(runK6Module, 'runK6').mockImplementation(async (p) => ({
         ok: true,
         exitCode: 0,
@@ -769,7 +787,10 @@ describe('runPerfSweep', () => {
 
     it('still stops the sampler when all k6 runs fail (no render path)', async () => {
       vi.spyOn(preflightModule, 'runPreflight').mockResolvedValue(okPreflight);
-      vi.spyOn(seedModule, 'runPerfSeed').mockResolvedValue({ inserted: 1 });
+      vi.spyOn(seedModule, 'runPerfSeed').mockResolvedValue({
+        inserted: 1,
+        skipped: 0,
+      });
       vi.spyOn(runK6Module, 'runK6').mockResolvedValue({
         ok: false,
         error: 'k6 process error: ENOENT',

@@ -128,6 +128,14 @@ describe('boject perf — e2e', () => {
         CONTENT_TYPE,
         '--size',
         '5',
+        // Use Date.now() as the deterministic seed so the e2e is repeatable
+        // against a long-lived perf DB. After #194 the seed step itself is
+        // resilient to conflicts (skip-and-continue with a 50% threshold),
+        // but at --size 5 even one repeated title trips the threshold; passing
+        // a fresh seed value is the operator-recommended pattern for repeat
+        // runs without resetting the target DB.
+        '--seed',
+        String(Date.now()),
       ],
       { encoding: 'utf8', timeout: 60_000 }
     );

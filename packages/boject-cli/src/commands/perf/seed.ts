@@ -46,7 +46,7 @@ export interface PerfSeedFlags {
  */
 export async function runPerfSeed(
   flags: PerfSeedFlags
-): Promise<{ inserted: number }> {
+): Promise<{ inserted: number; skipped: number }> {
   const hasSql = !!flags.databaseUrl;
   const hasHttp = flags.httpSeed === true;
   if (!hasSql && !hasHttp) {
@@ -101,7 +101,10 @@ export async function runPerfSeed(
         );
       }
       const r = await writeViaSql(client, generated, { batchSize: 500 });
-      process.stderr.write(`[perf:seed] inserted ${r.inserted} entries\n`);
+      const total = r.inserted + r.skipped;
+      process.stderr.write(
+        `[perf:seed] inserted ${r.inserted} / total ${total} (${r.skipped} skipped) entries\n`
+      );
       return r;
     } finally {
       await client.end();
@@ -148,7 +151,10 @@ export async function runPerfSeed(
         }
       },
     });
-    process.stderr.write(`[perf:seed] inserted ${r.inserted} entries\n`);
+    const total = r.inserted + r.skipped;
+    process.stderr.write(
+      `[perf:seed] inserted ${r.inserted} / total ${total} (${r.skipped} skipped) entries\n`
+    );
     return r;
   }
 }
