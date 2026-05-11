@@ -33,6 +33,11 @@ const PAIRS: Array<{ canonical: string; vendored: string }> = [
       'packages/boject-cli/src/vendor/perf/scenarios/graphql-sitemap.ts',
   },
   {
+    canonical: 'perf/scenarios/rest-crud-cycle.ts',
+    vendored:
+      'packages/boject-cli/src/vendor/perf/scenarios/rest-crud-cycle.ts',
+  },
+  {
     canonical: 'apps/cms/utils/apiKeyScopes.ts',
     vendored: 'packages/boject-cli/src/vendor/apiKeyScopes.ts',
   },
