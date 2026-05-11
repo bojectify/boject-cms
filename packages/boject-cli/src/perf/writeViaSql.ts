@@ -1,6 +1,10 @@
 import type { BundleEntry } from '../vendor/contentBundleTypes.js';
 import type { GeneratedSeed } from './generate.js';
 import { rewriteSyntheticIds } from './rewriteSyntheticIds.js';
+import {
+  SeedMostlyDuplicateError,
+  SEED_DUPLICATE_THRESHOLD,
+} from './seedErrors.js';
 
 export interface PgClientLike {
   query: (sql: string, params?: unknown[]) => Promise<{ rows: unknown[] }>;
@@ -43,10 +47,11 @@ export async function writeViaSql(
   client: PgClientLike,
   generated: GeneratedSeed,
   opts: WriteViaSqlOptions = {}
-): Promise<{ inserted: number }> {
+): Promise<{ inserted: number; skipped: number }> {
   const batchSize = opts.batchSize ?? 500;
   const idMap = new Map<string, string>(); // synthetic → real (== synthetic for SQL writer)
   let inserted = 0;
+  let skipped = 0;
 
   // Resolve contentTypeId for each group identifier
   const typeIdByIdentifier = new Map<string, string>();
@@ -66,8 +71,15 @@ export async function writeViaSql(
     const contentTypeId = typeIdByIdentifier.get(group.contentTypeIdentifier)!;
     for (let start = 0; start < group.entries.length; start += batchSize) {
       const slice = group.entries.slice(start, start + batchSize);
-      await insertEnvelopes(client, slice, contentTypeId);
-      await insertVersions(client, slice, idMap);
+      const { insertedIds } = await insertEnvelopes(
+        client,
+        slice,
+        contentTypeId
+      );
+      const survivors = slice.filter((e) => e.id && insertedIds.has(e.id));
+      const skippedInBatch = slice.length - survivors.length;
+      skipped += skippedInBatch;
+      await insertVersions(client, survivors, idMap);
       // idMap is populated AFTER each slice's version insert, not before.
       // This is safe because the SQL writer's synthetic id == real id (we pass
       // the synthetic UUID as the actual primary key). Cross-slice / cross-group
@@ -76,11 +88,15 @@ export async function writeViaSql(
       // through, the original id is preserved, and that id matches the
       // envelope row inserted moments earlier.
       //
+      // Only survivors land in idMap; patches referencing skipped entries
+      // fall through to UPDATE on a missing row (silent no-op). The 50%
+      // threshold backstop below catches the case where this would matter.
+      //
       // If a future writer ever rewrites synthetic→real IDs (e.g. via a SERIAL
       // PK), this set call must move BEFORE insertVersions to keep the
       // rewrite resolvable. Test #2 (cross-group ID rewriting) guards the
       // invariant.
-      for (const e of slice) {
+      for (const e of survivors) {
         if (!e.id) {
           throw new Error(
             'Bundle entry is missing an id; cannot map for ID rewriting'
@@ -88,7 +104,7 @@ export async function writeViaSql(
         }
         idMap.set(e.id, e.id);
       }
-      inserted += slice.length;
+      inserted += survivors.length;
     }
   }
 
@@ -108,15 +124,19 @@ export async function writeViaSql(
     }
   }
 
-  return { inserted };
+  const total = inserted + skipped;
+  if (total > 0 && skipped / total > SEED_DUPLICATE_THRESHOLD) {
+    throw new SeedMostlyDuplicateError(inserted, skipped, total);
+  }
+  return { inserted, skipped };
 }
 
 async function insertEnvelopes(
   client: PgClientLike,
   entries: BundleEntry[],
   contentTypeId: string
-): Promise<void> {
-  if (entries.length === 0) return;
+): Promise<{ insertedIds: Set<string> }> {
+  if (entries.length === 0) return { insertedIds: new Set() };
   const valuesPlaceholders: string[] = [];
   const params: unknown[] = [];
   let p = 1;
@@ -132,10 +152,12 @@ async function insertEnvelopes(
     );
     params.push(e.id, contentTypeId, e.entryTitle, e.slug, ts, ts);
   }
-  await client.query(
-    `INSERT INTO "ContentEntry" ("id", "contentTypeId", "entryTitle", "slug", "createdAt", "updatedAt") VALUES ${valuesPlaceholders.join(', ')}`,
+  const result = await client.query(
+    `INSERT INTO "ContentEntry" ("id", "contentTypeId", "entryTitle", "slug", "createdAt", "updatedAt") VALUES ${valuesPlaceholders.join(', ')} ON CONFLICT DO NOTHING RETURNING id`,
     params
   );
+  const insertedIds = new Set(result.rows.map((r) => (r as { id: string }).id));
+  return { insertedIds };
 }
 
 async function insertVersions(
