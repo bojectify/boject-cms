@@ -1,4 +1,5 @@
 import { introspectContentType } from './introspect.js';
+import { probeContentWriteScope } from './probeContentWriteScope.js';
 import { sanitiseUrl } from './sanitise.js';
 
 export interface PreflightParams {
@@ -11,6 +12,8 @@ export interface PreflightParams {
   fetchHealth: (
     url: string
   ) => Promise<{ ok: true } | { ok: false; error: string }>;
+  requireContentWrite?: boolean;
+  probeContentWrite?: typeof probeContentWriteScope;
 }
 
 export interface PreflightFields {
@@ -90,6 +93,21 @@ export async function runPreflight(
     warnings.push(
       `No single-target RELATION field on ${params.contentTypeIdentifier} — "relation" shape will be skipped.`
     );
+  }
+
+  if (params.requireContentWrite) {
+    const probe = params.probeContentWrite ?? probeContentWriteScope;
+    const result = await probe({ baseUrl: params.url, apiKey: params.apiKey });
+    if (!result.ok) {
+      if ('missingScope' in result) {
+        errors.push(
+          `API key missing required scope "${result.missingScope}". ` +
+            `Mint a new key with: boject apikey create --scopes content:write,content:read`
+        );
+      } else {
+        errors.push(`Could not verify content:write scope: ${result.error}`);
+      }
+    }
   }
 
   if (errors.length > 0) return { ok: false, errors };
