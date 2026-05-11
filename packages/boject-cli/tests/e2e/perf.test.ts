@@ -106,4 +106,43 @@ describe('boject perf — e2e', () => {
     const md = await readFile(join(out, entries[0]!, 'summary.md'), 'utf8');
     expect(md).toContain(URL_BASE.replace(/^https?:\/\//, ''));
   }, 180_000);
+
+  it('seed --http-seed populates the target via REST', async () => {
+    if (!canRun) {
+      console.log('Skipping: requires CMS dev server reachable.');
+      return;
+    }
+
+    const r = spawnSync(
+      process.execPath,
+      [
+        CLI,
+        'perf',
+        'seed',
+        '--http-seed',
+        '--url',
+        URL_BASE,
+        '--api-key',
+        API_KEY,
+        '--content-type',
+        CONTENT_TYPE,
+        '--size',
+        '5',
+      ],
+      { encoding: 'utf8', timeout: 60_000 }
+    );
+
+    expect(r.status).toBe(0);
+    expect(r.stderr).toContain('rate limiter is 50 req/60s');
+
+    // Verify entries exist via REST (no need for the full perPage list — the
+    // total count is the load-bearing assertion).
+    const res = await fetch(
+      `${URL_BASE}/api/content?contentType=${CONTENT_TYPE}&perPage=10`,
+      { headers: { Authorization: `Bearer ${API_KEY}` } }
+    );
+    expect(res.ok).toBe(true);
+    const list = (await res.json()) as { items: unknown[]; total: number };
+    expect(list.total).toBeGreaterThanOrEqual(5);
+  }, 60_000);
 });
