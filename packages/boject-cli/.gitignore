@@ -1,0 +1,8 @@
+# Transient pg-sampler output. The vendored pg-sampler's main() and
+# manual operator invocations default to writing here when no outDir
+# is supplied. Mirrors perf/.gitignore in canonical.
+pg-samples.csv
+
+# Default --out dir for boject perf scenario/sweep when invoked from
+# this directory without an --out override.
+perf-reports/
