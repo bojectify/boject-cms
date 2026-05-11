@@ -4,6 +4,7 @@ import { writeViaSql } from '../../perf/writeViaSql.js';
 import { writeViaHttp } from '../../perf/writeViaHttp.js';
 import { resetPerfDb } from '../../perf/resetPerfDb.js';
 import { assertAllowedDatabase } from '../../perf/allowedDatabase.js';
+import { probeContentWriteScope } from '../../perf/probeContentWriteScope.js';
 import { fetchBundle } from './shared/fetchBundle.js';
 import { loadBundleFile } from './shared/loadBundleFile.js';
 import type { Bundle } from '../../vendor/contentBundleTypes.js';
@@ -25,6 +26,8 @@ export interface PerfSeedFlags {
   apiKey?: string;
   /** UI */
   yes: boolean;
+  /** Test-only injection seam for the content:write probe. */
+  probeContentWrite?: typeof probeContentWriteScope;
 }
 
 /**
@@ -109,6 +112,31 @@ export async function runPerfSeed(
         'HTTP seed requires --url and --api-key (or $BOJECT_API_KEY).'
       );
     }
+    const probeFn = flags.probeContentWrite ?? probeContentWriteScope;
+    const probeResult = await probeFn({
+      baseUrl: flags.url,
+      apiKey: flags.apiKey,
+    });
+    if (!probeResult.ok) {
+      if ('missingScope' in probeResult) {
+        throw new Error(
+          `API key missing required scope "${probeResult.missingScope}". ` +
+            `Mint a new key with: boject apikey create --scopes content:write,content:read`
+        );
+      }
+      throw new Error(
+        `Could not verify content:write scope: ${probeResult.error}`
+      );
+    }
+
+    // Mirror of CMS rate limit in apps/cms/server/utils/rateLimitEndpoint.ts —
+    // keep in sync if the canonical limit changes.
+    process.stderr.write(
+      `[perf:seed] CMS rate limiter is 50 req/60s per IP per endpoint. ` +
+        `Bulk seeding from this machine self-rate-limits — stage from multiple ` +
+        `machines if you need faster fill.\n`
+    );
+
     const r = await writeViaHttp({
       baseUrl: flags.url,
       apiKey: flags.apiKey,

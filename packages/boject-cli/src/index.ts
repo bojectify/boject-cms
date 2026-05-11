@@ -46,11 +46,15 @@ Commands:
 Run \`boject perf <command> --help\` for command-specific flags.
 `;
 
-const PERF_CHECK_USAGE = `Usage: boject perf check --content-type <id> [--url <url>] [--filter-field <id>] [--relation-field <id>]
+const PERF_CHECK_USAGE = `Usage: boject perf check --content-type <id> [--url <url>] [--filter-field <id>] [--relation-field <id>] [--http-seed]
 
 Verifies: k6 is on PATH, target reachable, API key valid with content:read scope,
 content type exists, and DATETIME / single-target RELATION fields can be selected.
 Exits 0 on success, 2 on environment problems, 3 on input problems.
+
+Flags:
+  --http-seed              Verify the API key carries content:write (use
+                           when this run will seed via REST).
 `;
 
 const PERF_SCENARIO_USAGE = `Usage: boject perf scenario <name> --content-type <id> [flags]
@@ -442,6 +446,7 @@ async function dispatchPerf(args: string[]): Promise<number> {
           'content-type': { type: 'string' },
           'filter-field': { type: 'string' },
           'relation-field': { type: 'string' },
+          'http-seed': { type: 'boolean', default: false },
         },
       });
       const r = await runPerfCheck({
@@ -453,6 +458,7 @@ async function dispatchPerf(args: string[]): Promise<number> {
           contentType: values['content-type'],
           filterField: values['filter-field'],
           relationField: values['relation-field'],
+          httpSeed: values['http-seed'] === true,
         },
         stdout,
         stderr,

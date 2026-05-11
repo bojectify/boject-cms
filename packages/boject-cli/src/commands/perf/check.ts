@@ -1,6 +1,7 @@
 import { runPreflight } from '../../perf/preflight.js';
 import { loadProjectConfig } from '../../config.js';
 import { defaultK6Available, defaultFetchHealth } from '../../perf/runtime.js';
+import type { probeContentWriteScope } from '../../perf/probeContentWriteScope.js';
 
 export interface PerfCheckFlags {
   url?: string;
@@ -8,6 +9,7 @@ export interface PerfCheckFlags {
   contentType?: string;
   filterField?: string;
   relationField?: string;
+  httpSeed?: boolean;
 }
 
 export interface PerfCheckParams {
@@ -16,6 +18,7 @@ export interface PerfCheckParams {
   flags?: PerfCheckFlags;
   stdout: (line: string) => void;
   stderr: (line: string) => void;
+  probeContentWrite?: typeof probeContentWriteScope;
 }
 
 export interface PerfCheckResult {
@@ -79,6 +82,8 @@ export async function runPerfCheck(
     relationFieldOverride: flags.relationField ?? configRelation,
     k6Available: defaultK6Available,
     fetchHealth: defaultFetchHealth,
+    requireContentWrite: flags.httpSeed === true,
+    probeContentWrite: params.probeContentWrite,
   });
 
   if (!result.ok) {
@@ -93,6 +98,9 @@ export async function runPerfCheck(
   params.stdout(
     `  relation field: ${result.fields.relationField ?? '(no single-target RELATION — relation shape will be skipped)'}`
   );
+  if (flags.httpSeed) {
+    params.stdout('  content:write:  verified ✓');
+  }
   for (const w of result.warnings) params.stdout(`  warning: ${w}`);
   return { exitCode: 0 };
 }

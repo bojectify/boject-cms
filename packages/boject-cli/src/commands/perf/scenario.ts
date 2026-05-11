@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runPreflight } from '../../perf/preflight.js';
+import type { probeContentWriteScope } from '../../perf/probeContentWriteScope.js';
 import { runK6 } from '../../perf/runK6.js';
 import { renderReport, type RunMetadata } from '../../perf/render.js';
 import { confirmHeavyRun } from '../../perf/confirm.js';
@@ -62,6 +63,8 @@ export interface PerfScenarioParams {
   flags: PerfScenarioFlags;
   stdout: (line: string) => void;
   stderr: (line: string) => void;
+  /** Test-only injection seam for the content:write probe. */
+  probeContentWrite?: typeof probeContentWriteScope;
 }
 
 export interface PerfScenarioResult {
@@ -319,6 +322,8 @@ export async function runPerfScenario(
     relationFieldOverride: resolved.relationField,
     k6Available: defaultK6Available,
     fetchHealth: defaultFetchHealth,
+    requireContentWrite: !flags.readOnly && flags.httpSeed === true,
+    probeContentWrite: params.probeContentWrite,
   });
 
   if (!preflightResult.ok) {

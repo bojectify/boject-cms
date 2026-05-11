@@ -409,6 +409,52 @@ describe('Content Entry endpoints', async () => {
         await prisma.apiKey.delete({ where: { keyHash } });
       }
     });
+
+    it('POST /api/content-entries returns 403 INSUFFICIENT_SCOPE for content:read-only API keys before body validation', async () => {
+      // Pins the assertApiKeyScope-before-body-validation order. The
+      // @boject/cli probeContentWriteScope helper (#183) depends on
+      // this ordering to distinguish "missing scope" (403) from
+      // "scope OK but body invalid" (400/404). Sentinel body uses an
+      // all-zero UUID that won't match any real ContentType row; if
+      // the handler validated the body first, this would 404, not 403.
+      //
+      // Do NOT use the canonical perf key here — its scopes are
+      // widened in seed.ts for the e2e flow. Mint a fresh
+      // content:read-only key inline.
+      const rawKey = `boject_test_probe_readonly_${Date.now()}`;
+      const keyHash = createHash('sha256').update(rawKey).digest('hex');
+      const keyPrefix = rawKey.slice(0, 11);
+      await prisma.apiKey.create({
+        data: {
+          name: 'Probe contract test key',
+          keyHash,
+          keyPrefix,
+          scopes: ['content:read'],
+        },
+      });
+      try {
+        const res = await fetch('/api/content-entries', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${rawKey}`,
+            'Content-Type': 'application/json',
+            'X-Forwarded-For': '203.0.113.183',
+          },
+          body: JSON.stringify({
+            contentTypeId: '00000000-0000-0000-0000-000000000000',
+            data: {},
+          }),
+        });
+        expect(res.status).toBe(403);
+        const body = (await res.json()) as {
+          data?: { error?: string; required?: string };
+        };
+        expect(body.data?.error).toBe('INSUFFICIENT_SCOPE');
+        expect(body.data?.required).toBe('content:write');
+      } finally {
+        await prisma.apiKey.delete({ where: { keyHash } });
+      }
+    });
   });
 
   describe('PUT /api/content-entries/[id] — content:write scope (#172)', () => {

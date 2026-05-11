@@ -381,6 +381,127 @@ describe('runPerfScenario', () => {
     ).toBe(true);
   });
 
+  it('--http-seed without --read-only sets requireContentWrite=true on preflight', async () => {
+    vi.spyOn(seedModule, 'runPerfSeed').mockResolvedValue({ inserted: 0 });
+    // Make preflight surface the missing-scope error so we can also pin
+    // that scenario exits 2 and never invokes k6.
+    const preflightSpy = vi
+      .spyOn(preflightModule, 'runPreflight')
+      .mockResolvedValue({
+        ok: false,
+        errors: [
+          'API key missing required scope "content:write". Mint a new key with: boject apikey create --scopes content:write,content:read',
+        ],
+      });
+    const runK6Spy = vi.spyOn(runK6Module, 'runK6');
+    const probe = vi.fn(
+      async () => ({ ok: false, missingScope: 'content:write' }) as const
+    );
+
+    const stderrLines: string[] = [];
+    const r = await runPerfScenario({
+      cwd: process.cwd(),
+      apiKey: 'k',
+      flags: {
+        ...baseFlags,
+        scenario: 'graphql-flat',
+        out: outDir,
+        readOnly: false,
+        httpSeed: true,
+        size: 1,
+      },
+      stdout: () => {},
+      stderr: (l) => stderrLines.push(l),
+      probeContentWrite: probe,
+    });
+
+    expect(r.exitCode).toBe(2);
+    expect(runK6Spy).not.toHaveBeenCalled();
+    expect(preflightSpy).toHaveBeenCalledTimes(1);
+    const preflightArgs = preflightSpy.mock.calls[0]?.[0];
+    expect(preflightArgs?.requireContentWrite).toBe(true);
+    // Probe is threaded through to runPreflight (test injection seam).
+    expect(preflightArgs?.probeContentWrite).toBe(probe);
+    expect(stderrLines.join('\n')).toMatch(
+      /API key missing required scope "content:write"/
+    );
+  });
+
+  it('--http-seed with passing preflight runs k6 as today', async () => {
+    vi.spyOn(seedModule, 'runPerfSeed').mockResolvedValue({ inserted: 1 });
+    const preflightSpy = vi
+      .spyOn(preflightModule, 'runPreflight')
+      .mockResolvedValue(okPreflight);
+    const runK6 = vi
+      .spyOn(runK6Module, 'runK6')
+      .mockImplementation(async (p) => ({
+        ok: true,
+        exitCode: 0,
+        rawJsonPath: `${p.outDir}/${p.rawFilename ?? 'raw.json'}`,
+        stderrLogPath: `${p.outDir}/k6-stderr.log`,
+      }));
+    vi.spyOn(renderModule, 'renderReport').mockResolvedValue();
+    vi.spyOn(confirmModule, 'confirmHeavyRun').mockResolvedValue(true);
+
+    const r = await runPerfScenario({
+      cwd: process.cwd(),
+      apiKey: 'k',
+      flags: {
+        ...baseFlags,
+        scenario: 'graphql-flat',
+        out: outDir,
+        readOnly: false,
+        httpSeed: true,
+        size: 1,
+      },
+      stdout: () => {},
+      stderr: () => {},
+    });
+    expect(r.exitCode).toBe(0);
+    expect(preflightSpy).toHaveBeenCalledTimes(1);
+    expect(preflightSpy.mock.calls[0]?.[0].requireContentWrite).toBe(true);
+    expect(runK6).toHaveBeenCalled();
+  });
+
+  it('--http-seed --read-only sets requireContentWrite=false (read-only wins)', async () => {
+    const preflightSpy = vi
+      .spyOn(preflightModule, 'runPreflight')
+      .mockResolvedValue(okPreflight);
+    vi.spyOn(runK6Module, 'runK6').mockImplementation(async (p) => ({
+      ok: true,
+      exitCode: 0,
+      rawJsonPath: `${p.outDir}/${p.rawFilename ?? 'raw.json'}`,
+      stderrLogPath: `${p.outDir}/k6-stderr.log`,
+    }));
+    vi.spyOn(renderModule, 'renderReport').mockResolvedValue();
+    vi.spyOn(confirmModule, 'confirmHeavyRun').mockResolvedValue(true);
+    const probe = vi.fn(async () => ({ ok: true }) as const);
+    const seedSpy = vi.spyOn(seedModule, 'runPerfSeed');
+
+    const r = await runPerfScenario({
+      cwd: process.cwd(),
+      apiKey: 'k',
+      flags: {
+        ...baseFlags,
+        scenario: 'graphql-flat',
+        out: outDir,
+        readOnly: true,
+        httpSeed: true,
+      },
+      stdout: () => {},
+      stderr: () => {},
+      probeContentWrite: probe,
+    });
+    expect(r.exitCode).toBe(0);
+    expect(preflightSpy.mock.calls[0]?.[0].requireContentWrite).toBe(false);
+    // Probe is wired through but read-only short-circuits the gate inside
+    // runPreflight (asserted in preflight.test.ts). It must not have been
+    // invoked by scenario.ts itself.
+    expect(probe).not.toHaveBeenCalled();
+    // Read-only path → seed must not run either.
+    expect(seedSpy).not.toHaveBeenCalled();
+  });
+
   it('returns 1 with explicit error when all shapes fail', async () => {
     vi.spyOn(preflightModule, 'runPreflight').mockResolvedValue(okPreflight);
     vi.spyOn(runK6Module, 'runK6').mockResolvedValue({

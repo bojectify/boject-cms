@@ -397,6 +397,141 @@ describe('runPerfSweep', () => {
     expect(runK6).toHaveBeenCalledTimes(12);
   });
 
+  it('--http-seed without --read-only sets requireContentWrite=true on preflight', async () => {
+    vi.spyOn(seedModule, 'runPerfSeed').mockResolvedValue({ inserted: 0 });
+    const preflightSpy = vi
+      .spyOn(preflightModule, 'runPreflight')
+      .mockResolvedValue({
+        ok: false,
+        errors: [
+          'API key missing required scope "content:write". Mint a new key with: boject apikey create --scopes content:write,content:read',
+        ],
+      });
+    const runK6Spy = vi.spyOn(runK6Module, 'runK6');
+    const probe = vi.fn(
+      async () => ({ ok: false, missingScope: 'content:write' }) as const
+    );
+
+    const stderrLines: string[] = [];
+    const r = await runPerfSweep({
+      cwd: process.cwd(),
+      apiKey: 'k',
+      flags: {
+        url: 'https://x.example.com',
+        contentType: 'Article',
+        out: outDir,
+        yes: true,
+        readOnly: false,
+        httpSeed: true,
+        size: 1,
+      },
+      stdout: () => {},
+      stderr: (l) => stderrLines.push(l),
+      probeContentWrite: probe,
+    });
+    expect(r.exitCode).toBe(2);
+    expect(runK6Spy).not.toHaveBeenCalled();
+    expect(preflightSpy).toHaveBeenCalledTimes(1);
+    const preflightArgs = preflightSpy.mock.calls[0]?.[0];
+    expect(preflightArgs?.requireContentWrite).toBe(true);
+    expect(preflightArgs?.probeContentWrite).toBe(probe);
+    expect(stderrLines.join('\n')).toMatch(
+      /API key missing required scope "content:write"/
+    );
+  });
+
+  it('--http-seed with passing preflight runs k6 as today', async () => {
+    vi.spyOn(seedModule, 'runPerfSeed').mockResolvedValue({ inserted: 1 });
+    const preflightSpy = vi
+      .spyOn(preflightModule, 'runPreflight')
+      .mockResolvedValue({
+        ok: true,
+        fields: {
+          listField: 'articleList',
+          filterField: 'publishDate',
+          relationField: 'author',
+        },
+        warnings: [],
+      });
+    const runK6 = vi
+      .spyOn(runK6Module, 'runK6')
+      .mockImplementation(async (p) => ({
+        ok: true,
+        exitCode: 0,
+        rawJsonPath: join(p.outDir, p.rawFilename ?? 'raw.json'),
+        stderrLogPath: join(p.outDir, 'k6-stderr.log'),
+      }));
+    vi.spyOn(renderModule, 'renderReport').mockResolvedValue();
+    vi.spyOn(confirmModule, 'confirmHeavyRun').mockResolvedValue(true);
+
+    const r = await runPerfSweep({
+      cwd: process.cwd(),
+      apiKey: 'k',
+      flags: {
+        url: 'https://x.example.com',
+        contentType: 'Article',
+        out: outDir,
+        yes: true,
+        pageSizes: [100],
+        vus: [1],
+        readOnly: false,
+        httpSeed: true,
+        size: 1,
+      },
+      stdout: () => {},
+      stderr: () => {},
+    });
+    expect(r.exitCode).toBe(0);
+    expect(preflightSpy.mock.calls[0]?.[0].requireContentWrite).toBe(true);
+    expect(runK6).toHaveBeenCalled();
+  });
+
+  it('--http-seed --read-only sets requireContentWrite=false (read-only wins)', async () => {
+    const preflightSpy = vi
+      .spyOn(preflightModule, 'runPreflight')
+      .mockResolvedValue({
+        ok: true,
+        fields: {
+          listField: 'articleList',
+          filterField: 'publishDate',
+          relationField: 'author',
+        },
+        warnings: [],
+      });
+    vi.spyOn(runK6Module, 'runK6').mockImplementation(async (p) => ({
+      ok: true,
+      exitCode: 0,
+      rawJsonPath: join(p.outDir, p.rawFilename ?? 'raw.json'),
+      stderrLogPath: join(p.outDir, 'k6-stderr.log'),
+    }));
+    vi.spyOn(renderModule, 'renderReport').mockResolvedValue();
+    vi.spyOn(confirmModule, 'confirmHeavyRun').mockResolvedValue(true);
+    const probe = vi.fn(async () => ({ ok: true }) as const);
+    const seedSpy = vi.spyOn(seedModule, 'runPerfSeed');
+
+    const r = await runPerfSweep({
+      cwd: process.cwd(),
+      apiKey: 'k',
+      flags: {
+        url: 'https://x.example.com',
+        contentType: 'Article',
+        out: outDir,
+        yes: true,
+        pageSizes: [100],
+        vus: [1],
+        readOnly: true,
+        httpSeed: true,
+      },
+      stdout: () => {},
+      stderr: () => {},
+      probeContentWrite: probe,
+    });
+    expect(r.exitCode).toBe(0);
+    expect(preflightSpy.mock.calls[0]?.[0].requireContentWrite).toBe(false);
+    expect(probe).not.toHaveBeenCalled();
+    expect(seedSpy).not.toHaveBeenCalled();
+  });
+
   it('hard-fails with exit code 2 when neither --read-only nor a seed transport is set (#159)', async () => {
     const stderrLines: string[] = [];
     const r = await runPerfSweep({
