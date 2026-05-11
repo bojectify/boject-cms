@@ -5,6 +5,8 @@ import { runPreflight } from '../../perf/preflight.js';
 import { runK6 } from '../../perf/runK6.js';
 import { renderReport, type RunMetadata } from '../../perf/render.js';
 import { confirmHeavyRun } from '../../perf/confirm.js';
+import { deriveMode } from '../../perf/runMode.js';
+import { buildPartialMeta } from '../../perf/buildPartialMeta.js';
 import { sanitiseUrl } from '../../perf/sanitise.js';
 import {
   defaultK6Available,
@@ -137,46 +139,10 @@ export async function runPerfSweep(
     return { exitCode: 2 };
   }
 
-  if (!flags.readOnly) {
-    if (flags.reset && effectiveDatabaseUrl) {
-      try {
-        const { runPerfReset } = await import('./reset.js');
-        await runPerfReset({
-          databaseUrl: effectiveDatabaseUrl,
-          yes: flags.yes,
-          allowDatabase: flags.allowDatabase,
-        });
-      } catch (err) {
-        params.stderr(`${(err as Error).message}\n`);
-        return { exitCode: 1 };
-      }
-    }
-    const seedContentType = flags.contentType ?? defaults.contentType;
-    if (!seedContentType) {
-      params.stderr('Seed-then-run requires --content-type');
-      return { exitCode: 2 };
-    }
-    try {
-      const { runPerfSeed } = await import('./seed.js');
-      await runPerfSeed({
-        contentType: seedContentType,
-        size: flags.size ?? defaults.size ?? 10000,
-        seed: flags.seed ?? defaults.seed,
-        databaseUrl: effectiveDatabaseUrl,
-        httpSeed: flags.httpSeed,
-        bundle: flags.bundle,
-        url: flags.url ?? defaults.url,
-        apiKey: flags.apiKey ?? params.apiKey,
-        concurrency: flags.concurrency,
-        allowDatabase: flags.allowDatabase,
-        yes: flags.yes,
-      });
-    } catch (err) {
-      params.stderr(`${(err as Error).message}\n`);
-      return { exitCode: 1 };
-    }
-  }
-
+  // Hoisted above reset/seed (#181) so the partial-render-on-failure path
+  // can write metadata.json into outDir from the reset/seed catch blocks.
+  // These resolutions are pure (no side effects); the hoist preserves the
+  // existing early-return semantics for missing apiKey/url/contentType.
   const url = flags.url ?? defaults.url;
   const apiKey = flags.apiKey ?? params.apiKey;
   const contentType = flags.contentType ?? defaults.contentType;
@@ -198,6 +164,97 @@ export async function runPerfSweep(
       'Error: --content-type is required (or set perf.contentType in .boject.config.json).'
     );
     return { exitCode: 3 };
+  }
+
+  const outRoot = resolve(
+    params.cwd,
+    flags.out ?? defaults.out ?? './perf-reports'
+  );
+  const outDir = join(outRoot, timestampDir());
+  try {
+    await mkdir(outDir, { recursive: true });
+  } catch (err) {
+    // mkdir failed → we have nowhere to render to. Don't attempt a
+    // partial write; the existing exit-2 contract is correct here.
+    params.stderr(
+      `Error: cannot create output directory ${outDir}: ${(err as Error).message}. Try --out <writable-dir>.`
+    );
+    return { exitCode: 2 };
+  }
+
+  let seedResult: { inserted: number } | null = null;
+  if (!flags.readOnly) {
+    if (flags.reset && effectiveDatabaseUrl) {
+      try {
+        const { runPerfReset } = await import('./reset.js');
+        await runPerfReset({
+          databaseUrl: effectiveDatabaseUrl,
+          yes: flags.yes,
+          allowDatabase: flags.allowDatabase,
+        });
+      } catch (err) {
+        params.stderr(`${(err as Error).message}\n`);
+        await writeFile(join(outDir, 'raw.json'), '');
+        await renderReport({
+          rawJsonPath: join(outDir, 'raw.json'),
+          outDir,
+          runMetadata: buildPartialMeta({
+            mode: deriveMode({
+              readOnly: flags.readOnly,
+              httpSeed: flags.httpSeed,
+              databaseUrl: effectiveDatabaseUrl,
+            }),
+            contentType,
+            url,
+            cliVersion: CLI_VERSION,
+            k6Version: await defaultK6Version(),
+            partialFailureSource: 'reset',
+            seedSize: null,
+            seedDeterministicSeed: flags.seed ?? defaults.seed ?? null,
+          }),
+        });
+        return { exitCode: 1 };
+      }
+    }
+    const seedContentType = contentType;
+    try {
+      const { runPerfSeed } = await import('./seed.js');
+      seedResult = await runPerfSeed({
+        contentType: seedContentType,
+        size: flags.size ?? defaults.size ?? 10000,
+        seed: flags.seed ?? defaults.seed,
+        databaseUrl: effectiveDatabaseUrl,
+        httpSeed: flags.httpSeed,
+        bundle: flags.bundle,
+        url,
+        apiKey,
+        concurrency: flags.concurrency,
+        allowDatabase: flags.allowDatabase,
+        yes: flags.yes,
+      });
+    } catch (err) {
+      params.stderr(`${(err as Error).message}\n`);
+      await writeFile(join(outDir, 'raw.json'), '');
+      await renderReport({
+        rawJsonPath: join(outDir, 'raw.json'),
+        outDir,
+        runMetadata: buildPartialMeta({
+          mode: deriveMode({
+            readOnly: flags.readOnly,
+            httpSeed: flags.httpSeed,
+            databaseUrl: effectiveDatabaseUrl,
+          }),
+          contentType,
+          url,
+          cliVersion: CLI_VERSION,
+          k6Version: await defaultK6Version(),
+          partialFailureSource: 'seed',
+          seedSize: seedResult?.inserted ?? null,
+          seedDeterministicSeed: flags.seed ?? defaults.seed ?? null,
+        }),
+      });
+      return { exitCode: 1 };
+    }
   }
 
   const preflightResult = await runPreflight({
@@ -233,20 +290,6 @@ export async function runPerfSweep(
       'Aborted by user (or non-TTY without --yes). No data captured.'
     );
     return { exitCode: 130 };
-  }
-
-  const outRoot = resolve(
-    params.cwd,
-    flags.out ?? defaults.out ?? './perf-reports'
-  );
-  const outDir = join(outRoot, timestampDir());
-  try {
-    await mkdir(outDir, { recursive: true });
-  } catch (err) {
-    params.stderr(
-      `Error: cannot create output directory ${outDir}: ${(err as Error).message}. Try --out <writable-dir>.`
-    );
-    return { exitCode: 2 };
   }
 
   const baseEnv: Record<string, string> = {
@@ -386,7 +429,15 @@ export async function runPerfSweep(
       duration: '180s',
       stages: flags.stages ?? scaleDefaultStages(flags.targetRps ?? 2000),
     },
+    mode: deriveMode({
+      readOnly: flags.readOnly,
+      httpSeed: flags.httpSeed,
+      databaseUrl: effectiveDatabaseUrl,
+    }),
+    seedSize: seedResult?.inserted ?? null,
+    seedDeterministicSeed: flags.seed ?? defaults.seed ?? null,
     partial,
+    partialFailureSource: partial ? 'k6' : null,
   };
 
   await renderReport({ rawJsonPath, outDir, runMetadata: meta });

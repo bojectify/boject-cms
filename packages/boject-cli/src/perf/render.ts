@@ -1,5 +1,6 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
+import type { RunMode } from './runMode.js';
 
 export interface RunMetadata {
   perfCalibratedAt: string;
@@ -19,7 +20,11 @@ export interface RunMetadata {
     shapesRun?: string[];
   }>;
   intensity: { targetRps: number; duration: string; stages: number[] };
+  mode: RunMode;
+  seedSize: number | null;
+  seedDeterministicSeed: number | null;
   partial: boolean;
+  partialFailureSource: 'reset' | 'seed' | 'k6' | null;
 }
 
 export interface RenderParams {
@@ -166,6 +171,38 @@ function toCsv(stats: ScenarioStats[]): string {
   return [header, ...rows].join('\n');
 }
 
+function buildModeBanner(mode: RunMode): string | null {
+  switch (mode) {
+    case 'seed-direct':
+      return null;
+    case 'seed-http':
+      return (
+        'DB-side metrics unavailable — operator seeded via REST and ' +
+        'has no DB access from this run.'
+      );
+    case 'read-only':
+      return (
+        "Read-only run — DB-side metrics unavailable. Check your CMS host's " +
+        'database dashboards for connection-pool and lock data.'
+      );
+  }
+}
+
+function buildPartialBanner(
+  source: RunMetadata['partialFailureSource']
+): string | null {
+  switch (source) {
+    case 'reset':
+      return '**Run aborted before k6 started — perf-DB reset failed.** See logs for the underlying error.';
+    case 'seed':
+      return '**Run aborted before k6 started — seed step failed.** See logs for the underlying error.';
+    case 'k6':
+      return '**Run incomplete — k6 exited mid-run.** Some scenarios captured partial data; treat with care.';
+    case null:
+      return null;
+  }
+}
+
 function buildSummary(
   meta: RunMetadata,
   stats: ScenarioStats[],
@@ -189,6 +226,14 @@ function buildSummary(
       `_relation shape skipped — no single-target RELATION field on ${meta.contentType}._`
     );
 
+  const modeBanner = buildModeBanner(meta.mode);
+  const partialBanner = buildPartialBanner(meta.partialFailureSource);
+  const banners = [modeBanner, partialBanner].filter(
+    (s): s is string => s !== null
+  );
+  const runStatusSection =
+    banners.length > 0 ? `## Run status\n\n${banners.join('\n\n')}\n` : null;
+
   const lines: Array<string | null> = [
     `# Load test report — ${meta.contentType}`,
     '',
@@ -200,10 +245,7 @@ function buildSummary(
       ? `- raw.json had ${malformedCount} malformed line(s) (skipped)`
       : null,
     '',
-    '## Multi-instance banner',
-    '',
-    "Read-only run — DB-side metrics unavailable. Check your CMS host's database dashboards for connection-pool and lock data.",
-    '',
+    runStatusSection,
     heavyBanner ? `## Run shape\n\n${heavyBanner}\n` : null,
     skipBanners.length > 0 ? `${skipBanners.join('\n')}\n` : null,
     '## Scenario 1A — GraphQL cursor pagination',
@@ -229,7 +271,7 @@ function buildSummary(
 
 function buildMetadata(meta: RunMetadata): object {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     perfCalibratedAt: meta.perfCalibratedAt,
     cliVersion: meta.cliVersion,
     k6Version: meta.k6Version,
@@ -238,7 +280,11 @@ function buildMetadata(meta: RunMetadata): object {
     fields: meta.fields,
     scenarios: meta.scenarios,
     intensity: meta.intensity,
+    mode: meta.mode,
+    seedSize: meta.seedSize,
+    seedDeterministicSeed: meta.seedDeterministicSeed,
     partial: meta.partial,
+    partialFailureSource: meta.partialFailureSource,
   };
 }
 

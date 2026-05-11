@@ -5,6 +5,8 @@ import { runPreflight } from '../../perf/preflight.js';
 import { runK6 } from '../../perf/runK6.js';
 import { renderReport, type RunMetadata } from '../../perf/render.js';
 import { confirmHeavyRun } from '../../perf/confirm.js';
+import { deriveMode } from '../../perf/runMode.js';
+import { buildPartialMeta } from '../../perf/buildPartialMeta.js';
 import { sanitiseUrl } from '../../perf/sanitise.js';
 import {
   defaultK6Available,
@@ -210,6 +212,27 @@ export async function runPerfScenario(
     return { exitCode: 2 };
   }
 
+  // Hoisted above reset/seed (#181) so the partial-render-on-failure path
+  // can write metadata.json into outDir from the reset/seed catch blocks.
+  // resolveAndValidate is pure (no side effects); the hoist preserves its
+  // early-return semantics for missing apiKey/url/contentType.
+  const v = await resolveAndValidate(params);
+  if (!v.ok) return { exitCode: v.exitCode };
+  const resolved = v.resolved;
+
+  const outDir = join(resolve(params.cwd, resolved.out), timestampDir());
+  try {
+    await mkdir(outDir, { recursive: true });
+  } catch (err) {
+    // mkdir failed → we have nowhere to render to. Don't attempt a
+    // partial write; the existing exit-2 contract is correct here.
+    params.stderr(
+      `Error: cannot create output directory ${outDir}: ${(err as Error).message}. Try --out <writable-dir>.`
+    );
+    return { exitCode: 2 };
+  }
+
+  let seedResult: { inserted: number } | null = null;
   if (!flags.readOnly) {
     if (flags.reset && effectiveDatabaseUrl) {
       try {
@@ -221,6 +244,25 @@ export async function runPerfScenario(
         });
       } catch (err) {
         params.stderr(`${(err as Error).message}\n`);
+        await writeFile(join(outDir, 'raw.json'), '');
+        await renderReport({
+          rawJsonPath: join(outDir, 'raw.json'),
+          outDir,
+          runMetadata: buildPartialMeta({
+            mode: deriveMode({
+              readOnly: flags.readOnly,
+              httpSeed: flags.httpSeed,
+              databaseUrl: effectiveDatabaseUrl,
+            }),
+            contentType: resolved.contentType,
+            url: resolved.url,
+            cliVersion: CLI_VERSION,
+            k6Version: await defaultK6Version(),
+            partialFailureSource: 'reset',
+            seedSize: null,
+            seedDeterministicSeed: flags.seed ?? configDefaults.seed ?? null,
+          }),
+        });
         return { exitCode: 1 };
       }
     }
@@ -231,14 +273,14 @@ export async function runPerfScenario(
     }
     try {
       const { runPerfSeed } = await import('./seed.js');
-      await runPerfSeed({
+      seedResult = await runPerfSeed({
         contentType: seedContentType,
         size: flags.size ?? configDefaults.size ?? 10000,
         seed: flags.seed ?? configDefaults.seed,
         databaseUrl: effectiveDatabaseUrl,
         httpSeed: flags.httpSeed,
         bundle: flags.bundle,
-        url: flags.url ?? configDefaults.url,
+        url: resolved.url,
         apiKey: flags.apiKey ?? params.apiKey,
         concurrency: flags.concurrency,
         allowDatabase: flags.allowDatabase,
@@ -246,13 +288,28 @@ export async function runPerfScenario(
       });
     } catch (err) {
       params.stderr(`${(err as Error).message}\n`);
+      await writeFile(join(outDir, 'raw.json'), '');
+      await renderReport({
+        rawJsonPath: join(outDir, 'raw.json'),
+        outDir,
+        runMetadata: buildPartialMeta({
+          mode: deriveMode({
+            readOnly: flags.readOnly,
+            httpSeed: flags.httpSeed,
+            databaseUrl: effectiveDatabaseUrl,
+          }),
+          contentType: resolved.contentType,
+          url: resolved.url,
+          cliVersion: CLI_VERSION,
+          k6Version: await defaultK6Version(),
+          partialFailureSource: 'seed',
+          seedSize: seedResult?.inserted ?? null,
+          seedDeterministicSeed: flags.seed ?? configDefaults.seed ?? null,
+        }),
+      });
       return { exitCode: 1 };
     }
   }
-
-  const v = await resolveAndValidate(params);
-  if (!v.ok) return { exitCode: v.exitCode };
-  const resolved = v.resolved;
 
   const preflightResult = await runPreflight({
     url: resolved.url,
@@ -291,16 +348,6 @@ export async function runPerfScenario(
       );
       return { exitCode: 130 };
     }
-  }
-
-  const outDir = join(resolve(params.cwd, resolved.out), timestampDir());
-  try {
-    await mkdir(outDir, { recursive: true });
-  } catch (err) {
-    params.stderr(
-      `Error: cannot create output directory ${outDir}: ${(err as Error).message}. Try --out <writable-dir>.`
-    );
-    return { exitCode: 2 };
   }
 
   const baseEnv: Record<string, string> = {
@@ -411,7 +458,15 @@ export async function runPerfScenario(
       duration: '180s',
       stages: flags.stages ?? scaleDefaultStages(flags.targetRps ?? 2000),
     },
+    mode: deriveMode({
+      readOnly: flags.readOnly,
+      httpSeed: flags.httpSeed,
+      databaseUrl: effectiveDatabaseUrl,
+    }),
+    seedSize: seedResult?.inserted ?? null,
+    seedDeterministicSeed: flags.seed ?? configDefaults.seed ?? null,
     partial: combinedExit !== 0,
+    partialFailureSource: combinedExit !== 0 ? 'k6' : null,
   };
 
   if (rawJsonPath) {
