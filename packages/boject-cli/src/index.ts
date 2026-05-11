@@ -62,6 +62,7 @@ const PERF_SCENARIO_USAGE = `Usage: boject perf scenario <name> --content-type <
 Scenarios:
   graphql-flat       RPS ramp 50→2000 over 3 minutes (heavy load).
   graphql-sitemap    Cursor pagination drain at varied page sizes / VU levels.
+  rest-crud-cycle    Sequential REST CRUD (create/read/update/delete) — mutates target.
 
 Mode (one required):
   --read-only             Skip seeding; run k6 against the existing dataset.
@@ -88,6 +89,10 @@ Seed-then-run flags (only when --read-only is NOT set):
 graphql-flat power-user overrides:
   --target-rps <n>        Override peak RPS (default 2000).
   --stages <csv>          Comma-separated RPS stages, e.g. 50,100,500,2000.
+
+rest-crud-cycle overrides:
+  --crud-n <n>            Iterations per phase for rest-crud-cycle.
+                          Default 10000 (matches canonical).
 `;
 
 const PERF_SWEEP_USAGE = `Usage: boject perf sweep --content-type <id> [flags]
@@ -492,8 +497,18 @@ async function dispatchPerf(args: string[]): Promise<number> {
           concurrency: { type: 'string' },
           reset: { type: 'boolean', default: false },
           'allow-database': { type: 'string', multiple: true, default: [] },
+          'crud-n': { type: 'string' },
         },
       });
+      if (values['crud-n'] !== undefined) {
+        const n = Number(values['crud-n']);
+        if (!Number.isInteger(n) || n <= 0) {
+          process.stderr.write(
+            `Error: --crud-n must be a positive integer, got "${values['crud-n']}".\n`
+          );
+          process.exit(2);
+        }
+      }
       const r = await runPerfScenario({
         cwd: process.cwd(),
         apiKey,
@@ -523,6 +538,7 @@ async function dispatchPerf(args: string[]): Promise<number> {
             : undefined,
           reset: values.reset === true,
           allowDatabase: values['allow-database'] as string[],
+          crudN: values['crud-n'] ? Number(values['crud-n']) : undefined,
         },
         stdout,
         stderr,

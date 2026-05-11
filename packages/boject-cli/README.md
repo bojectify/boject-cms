@@ -188,6 +188,19 @@ Field overrides (introspection picks defaults):
 - `--filter-field <id>` — DATETIME field for the `filtered` shape. Skipped if absent.
 - `--relation-field <id>` — single-target RELATION field for the `relation` shape. Skipped if absent.
 
+#### `boject perf scenario rest-crud-cycle --content-type <id> [flags]`
+
+Write-load scenario: 10 VUs run interleaved CREATE / READ / DELETE iterations against `/api/content-entries`. Requires either `--database-url <perf>` (SQL transport) or `--http-seed` (REST). Refuses `--read-only`. Use `--crud-n <n>` to control iterations per phase (default 10000, matches the canonical sweep).
+
+```bash
+boject perf scenario rest-crud-cycle --content-type Article \
+  --http-seed --crud-n 50 --yes
+```
+
+The report's `## Scenario 2 — REST CRUD cycle` section breaks down latency by phase (`create` / `read` / `list` / `delete`).
+
+**Required scope:** `content:write`.
+
 #### `boject perf sweep --content-type <id> [flags]`
 
 Run both scenarios across a matrix. `graphql-sitemap` iterates `pageSizes × vusList`; `graphql-flat` runs all three query shapes once. Single combined report at the end.
@@ -221,6 +234,9 @@ Every run writes to `<out>/<timestamp>/`:
 - `summary.md` — human-readable report (banners, scenario tables, run notes)
 - `metadata.json` — machine-readable run context: target host, content type, fields used, intensity (RPS / stages), scenarios + outcomes, partial flag, schemaVersion. Consumed by downstream tooling. **API keys are never written.**
 - `metrics.csv` — one row per `(scenario, page_size, shape)` with count, p50, p95, p99, error rate as a fraction.
+
+  **CSV column convention for `rest-crud-cycle`:** when the scenario is `rest-crud-cycle`, the `shape` column carries the phase value (`create` / `read` / `list` / `delete`) and the `page_size` column is `-`. This preserves the existing CSV schema without a `schemaVersion` bump — consumers parsing crud rows should know to read `shape` as the phase dimension.
+
 - `raw.json` — k6 NDJSON output, one point per line.
 - `k6-stderr.log` — sanitised stderr from k6 (no API keys).
 - `pg-samples.csv` — **seed-direct only.** When `--database-url` is set, `boject perf scenario` / `sweep` runs a `pg_stat_activity` sampler alongside k6 (5s interval by default; override via `PERF_SAMPLER_INTERVAL_MS`). Peak and mean connection-pool counts are rendered into `summary.md` as a `Database connection pool` table. Operators using `--read-only` or `--http-seed` get no panel — there's no DB access in those modes.
