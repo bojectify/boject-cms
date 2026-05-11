@@ -108,8 +108,8 @@ describe('runPerfScenario', () => {
     expect(joined).toMatch(/rest-crud-cycle/);
   });
 
-  it('rest-crud-cycle --database-url runs preflight and invokes k6 with the crud scenario file', async () => {
-    vi.spyOn(seedModule, 'runPerfSeed').mockResolvedValue({ inserted: 1 });
+  it('rest-crud-cycle --database-url runs preflight and invokes k6 with the crud scenario file (seed step skipped)', async () => {
+    const seedSpy = vi.spyOn(seedModule, 'runPerfSeed');
     const preflightSpy = vi
       .spyOn(preflightModule, 'runPreflight')
       .mockResolvedValue(okPreflight);
@@ -145,10 +145,12 @@ describe('runPerfScenario', () => {
     expect(runK6.mock.calls[0]?.[0].scenarioFile).toMatch(
       /vendor\/perf\/scenarios\/rest-crud-cycle\.ts$/
     );
+    // crud creates its own data — seed step must NOT run.
+    expect(seedSpy).not.toHaveBeenCalled();
   });
 
-  it('rest-crud-cycle --http-seed runs k6 with the crud scenario file and skips the pg-sampler', async () => {
-    vi.spyOn(seedModule, 'runPerfSeed').mockResolvedValue({ inserted: 1 });
+  it('rest-crud-cycle --http-seed runs k6 with the crud scenario file and skips the pg-sampler (seed step skipped)', async () => {
+    const seedSpy = vi.spyOn(seedModule, 'runPerfSeed');
     vi.spyOn(preflightModule, 'runPreflight').mockResolvedValue(okPreflight);
     const runK6 = vi
       .spyOn(runK6Module, 'runK6')
@@ -183,10 +185,50 @@ describe('runPerfScenario', () => {
     );
     // mode = 'seed-http' → sampler must NOT be started.
     expect(factory).not.toHaveBeenCalled();
+    // crud creates its own data — seed step must NOT run.
+    expect(seedSpy).not.toHaveBeenCalled();
+  });
+
+  it('rest-crud-cycle --reset --database-url runs reset BUT skips seed', async () => {
+    const resetSpy = vi
+      .spyOn(resetModule, 'runPerfReset')
+      .mockResolvedValue(undefined);
+    const seedSpy = vi.spyOn(seedModule, 'runPerfSeed');
+    vi.spyOn(preflightModule, 'runPreflight').mockResolvedValue(okPreflight);
+    const runK6 = vi
+      .spyOn(runK6Module, 'runK6')
+      .mockImplementation(async (p) => ({
+        ok: true,
+        exitCode: 0,
+        rawJsonPath: `${p.outDir}/${p.rawFilename ?? 'raw.json'}`,
+        stderrLogPath: `${p.outDir}/k6-stderr.log`,
+      }));
+    vi.spyOn(renderModule, 'renderReport').mockResolvedValue();
+    const { factory } = makeFakeSampler();
+
+    const r = await runPerfScenario({
+      cwd: process.cwd(),
+      apiKey: 'k',
+      flags: {
+        ...baseFlags,
+        scenario: 'rest-crud-cycle',
+        out: outDir,
+        readOnly: false,
+        databaseUrl: 'postgresql://boject:boject@localhost:5432/boject_perf',
+        reset: true,
+        allowDatabase: ['boject_perf'],
+      },
+      stdout: () => {},
+      stderr: () => {},
+      startPgSampler: factory,
+    });
+    expect(r.exitCode).toBe(0);
+    expect(resetSpy).toHaveBeenCalledTimes(1);
+    expect(seedSpy).not.toHaveBeenCalled();
+    expect(runK6).toHaveBeenCalledTimes(1);
   });
 
   it('rest-crud-cycle --crud-n 50 forwards PERF_CRUD_N=50 to k6', async () => {
-    vi.spyOn(seedModule, 'runPerfSeed').mockResolvedValue({ inserted: 1 });
     vi.spyOn(preflightModule, 'runPreflight').mockResolvedValue(okPreflight);
     const runK6 = vi
       .spyOn(runK6Module, 'runK6')
@@ -219,7 +261,6 @@ describe('runPerfScenario', () => {
   });
 
   it('rest-crud-cycle without --crud-n omits PERF_CRUD_N (canonical default applies)', async () => {
-    vi.spyOn(seedModule, 'runPerfSeed').mockResolvedValue({ inserted: 1 });
     vi.spyOn(preflightModule, 'runPreflight').mockResolvedValue(okPreflight);
     const runK6 = vi
       .spyOn(runK6Module, 'runK6')

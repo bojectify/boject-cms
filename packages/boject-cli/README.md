@@ -199,6 +199,8 @@ boject perf scenario rest-crud-cycle --content-type Article \
 
 The report's `## Scenario 2 — REST CRUD cycle` section breaks down latency by phase (`create` / `read` / `list` / `delete`).
 
+`rest-crud-cycle` does not run a seed step regardless of transport mode — the scenario's CREATE phase produces its own entries. Pass `--reset` with a SQL transport if you want a clean DB before the run.
+
 **Required scope:** `content:write`.
 
 #### `boject perf sweep --content-type <id> [flags]`

@@ -286,48 +286,54 @@ export async function runPerfScenario(
         return { exitCode: 1 };
       }
     }
-    const seedContentType = flags.contentType ?? configDefaults.contentType;
-    if (!seedContentType) {
-      params.stderr('Seed-then-run requires --content-type');
-      return { exitCode: 2 };
-    }
-    try {
-      const { runPerfSeed } = await import('./seed.js');
-      seedResult = await runPerfSeed({
-        contentType: seedContentType,
-        size: flags.size ?? configDefaults.size ?? 10000,
-        seed: flags.seed ?? configDefaults.seed,
-        databaseUrl: effectiveDatabaseUrl,
-        httpSeed: flags.httpSeed,
-        bundle: flags.bundle,
-        url: resolved.url,
-        apiKey: flags.apiKey ?? params.apiKey,
-        concurrency: flags.concurrency,
-        allowDatabase: flags.allowDatabase,
-        yes: flags.yes,
-      });
-    } catch (err) {
-      params.stderr(`${(err as Error).message}\n`);
-      await writeFile(join(outDir, 'raw.json'), '');
-      await renderReport({
-        rawJsonPath: join(outDir, 'raw.json'),
-        outDir,
-        runMetadata: buildPartialMeta({
-          mode: deriveMode({
-            readOnly: flags.readOnly,
-            httpSeed: flags.httpSeed,
-            databaseUrl: effectiveDatabaseUrl,
-          }),
-          contentType: resolved.contentType,
+    // rest-crud-cycle creates its own entries in its CREATE phase and
+    // handles empty state in READ/DELETE via early returns — no pre-seed
+    // needed. Skipping saves ~3hrs at default --size 10000 (limited by
+    // the CMS rate limiter at 50 req/60s).
+    if (name !== 'rest-crud-cycle') {
+      const seedContentType = flags.contentType ?? configDefaults.contentType;
+      if (!seedContentType) {
+        params.stderr('Seed-then-run requires --content-type');
+        return { exitCode: 2 };
+      }
+      try {
+        const { runPerfSeed } = await import('./seed.js');
+        seedResult = await runPerfSeed({
+          contentType: seedContentType,
+          size: flags.size ?? configDefaults.size ?? 10000,
+          seed: flags.seed ?? configDefaults.seed,
+          databaseUrl: effectiveDatabaseUrl,
+          httpSeed: flags.httpSeed,
+          bundle: flags.bundle,
           url: resolved.url,
-          cliVersion: CLI_VERSION,
-          k6Version: await defaultK6Version(),
-          partialFailureSource: 'seed',
-          seedSize: seedResult?.inserted ?? null,
-          seedDeterministicSeed: flags.seed ?? configDefaults.seed ?? null,
-        }),
-      });
-      return { exitCode: 1 };
+          apiKey: flags.apiKey ?? params.apiKey,
+          concurrency: flags.concurrency,
+          allowDatabase: flags.allowDatabase,
+          yes: flags.yes,
+        });
+      } catch (err) {
+        params.stderr(`${(err as Error).message}\n`);
+        await writeFile(join(outDir, 'raw.json'), '');
+        await renderReport({
+          rawJsonPath: join(outDir, 'raw.json'),
+          outDir,
+          runMetadata: buildPartialMeta({
+            mode: deriveMode({
+              readOnly: flags.readOnly,
+              httpSeed: flags.httpSeed,
+              databaseUrl: effectiveDatabaseUrl,
+            }),
+            contentType: resolved.contentType,
+            url: resolved.url,
+            cliVersion: CLI_VERSION,
+            k6Version: await defaultK6Version(),
+            partialFailureSource: 'seed',
+            seedSize: seedResult?.inserted ?? null,
+            seedDeterministicSeed: flags.seed ?? configDefaults.seed ?? null,
+          }),
+        });
+        return { exitCode: 1 };
+      }
     }
   }
 
