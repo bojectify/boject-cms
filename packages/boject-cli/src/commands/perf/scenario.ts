@@ -7,6 +7,10 @@ import { runK6 } from '../../perf/runK6.js';
 import { renderReport, type RunMetadata } from '../../perf/render.js';
 import { confirmHeavyRun } from '../../perf/confirm.js';
 import { deriveMode } from '../../perf/runMode.js';
+import {
+  startPgSampler,
+  type PgSamplerHandle,
+} from '../../perf/runPgSampler.js';
 import { buildPartialMeta } from '../../perf/buildPartialMeta.js';
 import { sanitiseUrl } from '../../perf/sanitise.js';
 import {
@@ -65,6 +69,8 @@ export interface PerfScenarioParams {
   stderr: (line: string) => void;
   /** Test-only injection seam for the content:write probe. */
   probeContentWrite?: typeof probeContentWriteScope;
+  /** Test-only injection seam for the pg-sampler factory. */
+  startPgSampler?: typeof startPgSampler;
 }
 
 export interface PerfScenarioResult {
@@ -382,34 +388,62 @@ export async function runPerfScenario(
   let rawJsonPath = '';
   let successfulShapes = 0;
 
-  for (const shape of shapesToRun) {
-    const env: Record<string, string> = { ...baseEnv };
-    if (name === 'graphql-flat') env.PERF_QUERY_SHAPE = shape;
-
-    // For graphql-flat we invoke k6 once per shape against the same outDir,
-    // so each invocation must write to a distinct file or it overwrites the
-    // previous shape's data. graphql-sitemap is a single invocation — keep
-    // the default raw.json filename.
-    const rawFilename =
-      name === 'graphql-flat' ? `raw-${shape}.json` : 'raw.json';
-
-    const r = await runK6({
-      scenarioFile: scenarioPath,
-      env,
-      apiKey: resolved.apiKey,
-      outDir,
-      rawFilename,
-      stdout: params.stdout,
-      stderr: params.stderr,
-    });
-    if (!r.ok) {
-      params.stderr(`Error: ${r.error}`);
-      combinedExit = 1;
-      continue;
+  // Bracket the k6 spawn(s) with the pg-sampler when running in
+  // seed-direct mode. The sampler must be stopped BEFORE renderReport
+  // runs so the CSV is fully flushed; the `try/finally` below gives us
+  // that ordering — renderReport sits outside both the try and finally.
+  const mode = deriveMode({
+    readOnly: flags.readOnly,
+    httpSeed: flags.httpSeed,
+    databaseUrl: effectiveDatabaseUrl,
+  });
+  const startSampler = params.startPgSampler ?? startPgSampler;
+  let samplerHandle: PgSamplerHandle | null = null;
+  if (mode === 'seed-direct' && effectiveDatabaseUrl) {
+    try {
+      samplerHandle = await startSampler({
+        databaseUrl: effectiveDatabaseUrl,
+        outDir,
+      });
+    } catch (err) {
+      params.stderr(
+        `[pg-sampler] failed to start: ${(err as Error).message} — report will omit connection panel.\n`
+      );
     }
-    rawJsonPath = r.rawJsonPath;
-    if (r.exitCode === 0) successfulShapes++;
-    else combinedExit = 1;
+  }
+
+  try {
+    for (const shape of shapesToRun) {
+      const env: Record<string, string> = { ...baseEnv };
+      if (name === 'graphql-flat') env.PERF_QUERY_SHAPE = shape;
+
+      // For graphql-flat we invoke k6 once per shape against the same outDir,
+      // so each invocation must write to a distinct file or it overwrites the
+      // previous shape's data. graphql-sitemap is a single invocation — keep
+      // the default raw.json filename.
+      const rawFilename =
+        name === 'graphql-flat' ? `raw-${shape}.json` : 'raw.json';
+
+      const r = await runK6({
+        scenarioFile: scenarioPath,
+        env,
+        apiKey: resolved.apiKey,
+        outDir,
+        rawFilename,
+        stdout: params.stdout,
+        stderr: params.stderr,
+      });
+      if (!r.ok) {
+        params.stderr(`Error: ${r.error}`);
+        combinedExit = 1;
+        continue;
+      }
+      rawJsonPath = r.rawJsonPath;
+      if (r.exitCode === 0) successfulShapes++;
+      else combinedExit = 1;
+    }
+  } finally {
+    if (samplerHandle) await samplerHandle.stop();
   }
 
   if (successfulShapes === 0) {
@@ -463,11 +497,7 @@ export async function runPerfScenario(
       duration: '180s',
       stages: flags.stages ?? scaleDefaultStages(flags.targetRps ?? 2000),
     },
-    mode: deriveMode({
-      readOnly: flags.readOnly,
-      httpSeed: flags.httpSeed,
-      databaseUrl: effectiveDatabaseUrl,
-    }),
+    mode,
     seedSize: seedResult?.inserted ?? null,
     seedDeterministicSeed: flags.seed ?? configDefaults.seed ?? null,
     partial: combinedExit !== 0,
@@ -475,7 +505,12 @@ export async function runPerfScenario(
   };
 
   if (rawJsonPath) {
-    await renderReport({ rawJsonPath, outDir, runMetadata: meta });
+    await renderReport({
+      rawJsonPath,
+      outDir,
+      runMetadata: meta,
+      pgSamplesCsvPath: samplerHandle?.csvPath,
+    });
     params.stdout(`Report written to ${sanitiseUrl(outDir)}`);
   }
   return { exitCode: combinedExit };

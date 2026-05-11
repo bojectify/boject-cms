@@ -223,6 +223,7 @@ Every run writes to `<out>/<timestamp>/`:
 - `metrics.csv` — one row per `(scenario, page_size, shape)` with count, p50, p95, p99, error rate as a fraction.
 - `raw.json` — k6 NDJSON output, one point per line.
 - `k6-stderr.log` — sanitised stderr from k6 (no API keys).
+- `pg-samples.csv` — **seed-direct only.** When `--database-url` is set, `boject perf scenario` / `sweep` runs a `pg_stat_activity` sampler alongside k6 (5s interval by default; override via `PERF_SAMPLER_INTERVAL_MS`). Peak and mean connection-pool counts are rendered into `summary.md` as a `Database connection pool` table. Operators using `--read-only` or `--http-seed` get no panel — there's no DB access in those modes.
 
 #### Sanitisation
 

@@ -149,4 +149,93 @@ describe('runPerfReport', () => {
     expect(r.exitCode).toBe(2);
     expect(stderr.join('\n')).toMatch(/Error parsing/);
   });
+
+  it('re-renders a seed-direct run dir with pg-samples.csv into a connection-pool panel', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'boject-report-pg-'));
+    const dir = join(root, 'run');
+    await mkdir(dir);
+    await writeFile(join(dir, 'raw.json'), '');
+    const meta = {
+      schemaVersion: 2,
+      perfCalibratedAt: '2026-05-11T10:00:00Z',
+      cliVersion: '0.0.1',
+      k6Version: '0.50.0',
+      target: { host: 'x.example.com', scheme: 'https' },
+      contentType: 'Article',
+      fields: {
+        list: 'articleList',
+        filter: 'publishDate',
+        relation: 'author',
+      },
+      scenarios: [],
+      intensity: { targetRps: 2000, duration: '180s', stages: [] },
+      mode: 'seed-direct',
+      seedSize: 100,
+      seedDeterministicSeed: 42,
+      partial: false,
+      partialFailureSource: null,
+    };
+    await writeFile(join(dir, 'metadata.json'), JSON.stringify(meta));
+    // Three sample rows alongside metadata.json.
+    const csv = [
+      'timestamp,total,active,idle,cpu_percent,mem_mb',
+      '2026-05-11T10:00:00Z,10,3,7,0,0',
+      '2026-05-11T10:00:05Z,12,5,7,0,0',
+      '2026-05-11T10:00:10Z,11,4,7,0,0',
+    ].join('\n');
+    await writeFile(join(dir, 'pg-samples.csv'), csv);
+
+    const r = await runPerfReport({
+      cwd: process.cwd(),
+      flags: { from: dir },
+      stdout: () => {},
+      stderr: () => {},
+    });
+    expect(r.exitCode).toBe(0);
+
+    const summary = await readFile(join(dir, 'summary.md'), 'utf8');
+    expect(summary).toContain('## Database connection pool');
+    // Peak total across 10/12/11 = 12.
+    expect(summary).toMatch(/\|\s*peak\s*\|\s*12\s*\|/);
+  });
+
+  it('re-renders a seed-direct run dir WITHOUT pg-samples.csv and omits the panel', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'boject-report-no-pg-'));
+    const dir = join(root, 'run');
+    await mkdir(dir);
+    await writeFile(join(dir, 'raw.json'), '');
+    const meta = {
+      schemaVersion: 2,
+      perfCalibratedAt: '2026-05-11T10:00:00Z',
+      cliVersion: '0.0.1',
+      k6Version: '0.50.0',
+      target: { host: 'x.example.com', scheme: 'https' },
+      contentType: 'Article',
+      fields: {
+        list: 'articleList',
+        filter: 'publishDate',
+        relation: 'author',
+      },
+      scenarios: [],
+      intensity: { targetRps: 2000, duration: '180s', stages: [] },
+      mode: 'seed-direct',
+      seedSize: 100,
+      seedDeterministicSeed: 42,
+      partial: false,
+      partialFailureSource: null,
+    };
+    await writeFile(join(dir, 'metadata.json'), JSON.stringify(meta));
+    // No pg-samples.csv written.
+
+    const r = await runPerfReport({
+      cwd: process.cwd(),
+      flags: { from: dir },
+      stdout: () => {},
+      stderr: () => {},
+    });
+    expect(r.exitCode).toBe(0);
+
+    const summary = await readFile(join(dir, 'summary.md'), 'utf8');
+    expect(summary).not.toContain('## Database connection pool');
+  });
 });

@@ -134,8 +134,15 @@ export async function runPerfReport(
     return { exitCode: 2 };
   }
 
+  const pgSamplesCsvPath = join(runDir, 'pg-samples.csv');
+
   try {
-    await renderReport({ rawJsonPath, outDir: runDir, runMetadata: metadata });
+    await renderReport({
+      rawJsonPath,
+      outDir: runDir,
+      runMetadata: metadata,
+      pgSamplesCsvPath,
+    });
   } catch (err) {
     params.stderr(`Error re-rendering ${runDir}: ${(err as Error).message}`);
     return { exitCode: 2 };

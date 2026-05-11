@@ -20,6 +20,10 @@ const PAIRS: Array<{ canonical: string; vendored: string }> = [
     vendored: 'packages/boject-cli/src/vendor/perf/lib/metrics-k6.ts',
   },
   {
+    canonical: 'perf/lib/pg-sampler.ts',
+    vendored: 'packages/boject-cli/src/vendor/perf/lib/pg-sampler.ts',
+  },
+  {
     canonical: 'perf/scenarios/graphql-flat.ts',
     vendored: 'packages/boject-cli/src/vendor/perf/scenarios/graphql-flat.ts',
   },
