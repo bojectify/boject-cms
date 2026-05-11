@@ -145,4 +145,48 @@ describe('boject perf — e2e', () => {
     const list = (await res.json()) as { items: unknown[]; total: number };
     expect(list.total).toBeGreaterThanOrEqual(5);
   }, 60_000);
+
+  it('rest-crud-cycle --http-seed runs a small CRUD cycle and emits Scenario 2', async () => {
+    if (!canRun) {
+      console.log('Skipping: requires CMS dev server reachable.');
+      return;
+    }
+    const out = await mkdtemp(join(tmpdir(), 'boject-crud-e2e-'));
+    const r = spawnSync(
+      process.execPath,
+      [
+        CLI,
+        'perf',
+        'scenario',
+        'rest-crud-cycle',
+        '--http-seed',
+        '--url',
+        URL_BASE,
+        '--api-key',
+        API_KEY,
+        '--content-type',
+        CONTENT_TYPE,
+        '--crud-n',
+        '5',
+        '--out',
+        out,
+        '--yes',
+      ],
+      { encoding: 'utf8', timeout: 90_000 }
+    );
+
+    expect(r.status).toBe(0);
+
+    // Find the timestamped run dir and verify summary.md has the crud section.
+    const { readdir } = await import('node:fs/promises');
+    const entries = await readdir(out);
+    expect(entries.length).toBe(1);
+    const md = await readFile(join(out, entries[0]!, 'summary.md'), 'utf8');
+    expect(md).toContain('## Scenario 2 — REST CRUD cycle');
+    // Should have rows for create + delete at minimum (read/list depend on
+    // whether the list query returned items in time — race-tolerant per
+    // the canonical scenario's comments):
+    expect(md).toMatch(/\| create\s+\|/);
+    expect(md).toMatch(/\| delete\s+\|/);
+  }, 90_000);
 });
