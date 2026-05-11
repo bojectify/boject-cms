@@ -67,3 +67,12 @@ CLAUDE.local.md
 
 # Git worktrees
 .worktrees/
+
+# Perf CLI artifacts when run from repo root.
+# The @boject/cli's --out defaults to ./perf-reports and the vendored
+# pg-sampler defaults to ./pg-samples.csv — both relative paths that
+# resolve against CWD. Running smokes via `node packages/boject-cli/dist/...`
+# from the repo root produces these here rather than under the package dir
+# (where packages/boject-cli/.gitignore already covers them).
+/perf-reports/
+/pg-samples.csv
