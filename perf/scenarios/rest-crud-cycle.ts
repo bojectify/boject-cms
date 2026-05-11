@@ -1,13 +1,14 @@
 // Scenario 2 — REST CRUD churn for the rate-limit + write path.
 // 10 VUs run interleaved create / read / delete iterations against
 // /api/content-entries. PERF_CRUD_N controls the number of items per
-// phase (default 10000). Uses session-cookie auth (POST /api/auth/login),
-// not the Bearer API key — exercises the CSRF middleware too.
-// Requires the perf DB seeded and admin@example.com / password reachable.
+// phase (default 10000). Uses Bearer API key auth — requires the key
+// to carry content:write. CSRF middleware bypasses Bearer-authed
+// requests so no Origin threading is needed.
+// Requires the perf DB seeded and a valid PERF_API_KEY in scope.
 import http from 'k6/http';
 import { group } from 'k6';
 import { loadK6Config } from '../lib/config-k6.ts';
-import { sessionLoginCookie, sessionHeaders } from '../lib/auth-k6.ts';
+import { apiKeyHeaders } from '../lib/auth-k6.ts';
 import {
   crudCreateLatency,
   crudReadLatency,
@@ -31,14 +32,12 @@ export const options = {
 };
 
 interface SetupData {
-  cookie: string;
   contentTypeId: string;
 }
 
 export function setup(): SetupData {
   const cfg = loadK6Config();
-  const cookie = sessionLoginCookie();
-  const headers = sessionHeaders(cookie);
+  const headers = apiKeyHeaders();
 
   // Find the PerfArticle content type id
   const res = http.get(`${cfg.baseUrl}/api/content-types`, { headers });
@@ -51,12 +50,12 @@ export function setup(): SetupData {
       'PerfArticle content type not found — run `pnpm perf:seed --size=1` first'
     );
   }
-  return { cookie, contentTypeId: ct.id };
+  return { contentTypeId: ct.id };
 }
 
 export default function crud(data: SetupData) {
   const cfg = loadK6Config();
-  const headers = sessionHeaders(data.cookie);
+  const headers = apiKeyHeaders();
   const iter = __ITER;
 
   // Use a simple phase calculation from __VU + __ITER — imperfect ordering,
@@ -69,7 +68,7 @@ export default function crud(data: SetupData) {
       const body = {
         contentTypeId: data.contentTypeId,
         data: {
-          title: `CRUD ${__VU}-${iter}`,
+          title: `CRUD ${__VU}-${iter}-${Date.now()}`,
           slug: `crud-${__VU}-${iter}-${Date.now()}`,
           excerpt: 'CRUD cycle',
           body: {
