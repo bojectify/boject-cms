@@ -67,17 +67,187 @@ describe('runPerfScenario', () => {
     expect(r.exitCode).toBe(3);
   });
 
-  it('errors when scenario name is not graphql-flat or graphql-sitemap', async () => {
+  it('rest-crud-cycle --read-only is refused with exit 2 and an actionable hint', async () => {
+    const preflightSpy = vi.spyOn(preflightModule, 'runPreflight');
+    const runK6Spy = vi.spyOn(runK6Module, 'runK6');
     const stderr: string[] = [];
     const r = await runPerfScenario({
       cwd: process.cwd(),
       apiKey: 'k',
-      flags: { ...baseFlags, scenario: 'rest-crud-cycle', out: outDir },
+      flags: {
+        ...baseFlags,
+        scenario: 'rest-crud-cycle',
+        out: outDir,
+        readOnly: true,
+      },
+      stdout: () => {},
+      stderr: (l) => stderr.push(l),
+    });
+    expect(r.exitCode).toBe(2);
+    const joined = stderr.join('\n');
+    expect(joined).toMatch(/rest-crud-cycle mutates target state/);
+    expect(joined).toMatch(/--database-url or --http-seed/);
+    expect(preflightSpy).not.toHaveBeenCalled();
+    expect(runK6Spy).not.toHaveBeenCalled();
+  });
+
+  it('unknown scenario errors with the updated three-scenario list', async () => {
+    const stderr: string[] = [];
+    const r = await runPerfScenario({
+      cwd: process.cwd(),
+      apiKey: 'k',
+      flags: { ...baseFlags, scenario: 'xyz', out: outDir },
       stdout: () => {},
       stderr: (l) => stderr.push(l),
     });
     expect(r.exitCode).toBe(3);
-    expect(stderr.join('\n')).toMatch(/rest-crud-cycle|not yet implemented/);
+    const joined = stderr.join('\n');
+    expect(joined).toMatch(/unknown scenario "xyz"/);
+    expect(joined).toMatch(/graphql-flat/);
+    expect(joined).toMatch(/graphql-sitemap/);
+    expect(joined).toMatch(/rest-crud-cycle/);
+  });
+
+  it('rest-crud-cycle --database-url runs preflight and invokes k6 with the crud scenario file', async () => {
+    vi.spyOn(seedModule, 'runPerfSeed').mockResolvedValue({ inserted: 1 });
+    const preflightSpy = vi
+      .spyOn(preflightModule, 'runPreflight')
+      .mockResolvedValue(okPreflight);
+    const runK6 = vi
+      .spyOn(runK6Module, 'runK6')
+      .mockImplementation(async (p) => ({
+        ok: true,
+        exitCode: 0,
+        rawJsonPath: `${p.outDir}/${p.rawFilename ?? 'raw.json'}`,
+        stderrLogPath: `${p.outDir}/k6-stderr.log`,
+      }));
+    vi.spyOn(renderModule, 'renderReport').mockResolvedValue();
+    const { factory } = makeFakeSampler();
+
+    const r = await runPerfScenario({
+      cwd: process.cwd(),
+      apiKey: 'k',
+      flags: {
+        ...baseFlags,
+        scenario: 'rest-crud-cycle',
+        out: outDir,
+        readOnly: false,
+        databaseUrl: 'postgresql://boject:boject@localhost:5432/boject_perf',
+        size: 1,
+      },
+      stdout: () => {},
+      stderr: () => {},
+      startPgSampler: factory,
+    });
+    expect(r.exitCode).toBe(0);
+    expect(preflightSpy).toHaveBeenCalledTimes(1);
+    expect(runK6).toHaveBeenCalledTimes(1);
+    expect(runK6.mock.calls[0]?.[0].scenarioFile).toMatch(
+      /vendor\/perf\/scenarios\/rest-crud-cycle\.ts$/
+    );
+  });
+
+  it('rest-crud-cycle --http-seed runs k6 with the crud scenario file and skips the pg-sampler', async () => {
+    vi.spyOn(seedModule, 'runPerfSeed').mockResolvedValue({ inserted: 1 });
+    vi.spyOn(preflightModule, 'runPreflight').mockResolvedValue(okPreflight);
+    const runK6 = vi
+      .spyOn(runK6Module, 'runK6')
+      .mockImplementation(async (p) => ({
+        ok: true,
+        exitCode: 0,
+        rawJsonPath: `${p.outDir}/${p.rawFilename ?? 'raw.json'}`,
+        stderrLogPath: `${p.outDir}/k6-stderr.log`,
+      }));
+    vi.spyOn(renderModule, 'renderReport').mockResolvedValue();
+    const { factory } = makeFakeSampler();
+
+    const r = await runPerfScenario({
+      cwd: process.cwd(),
+      apiKey: 'k',
+      flags: {
+        ...baseFlags,
+        scenario: 'rest-crud-cycle',
+        out: outDir,
+        readOnly: false,
+        httpSeed: true,
+        size: 1,
+      },
+      stdout: () => {},
+      stderr: () => {},
+      startPgSampler: factory,
+    });
+    expect(r.exitCode).toBe(0);
+    expect(runK6).toHaveBeenCalledTimes(1);
+    expect(runK6.mock.calls[0]?.[0].scenarioFile).toMatch(
+      /vendor\/perf\/scenarios\/rest-crud-cycle\.ts$/
+    );
+    // mode = 'seed-http' → sampler must NOT be started.
+    expect(factory).not.toHaveBeenCalled();
+  });
+
+  it('rest-crud-cycle --crud-n 50 forwards PERF_CRUD_N=50 to k6', async () => {
+    vi.spyOn(seedModule, 'runPerfSeed').mockResolvedValue({ inserted: 1 });
+    vi.spyOn(preflightModule, 'runPreflight').mockResolvedValue(okPreflight);
+    const runK6 = vi
+      .spyOn(runK6Module, 'runK6')
+      .mockImplementation(async (p) => ({
+        ok: true,
+        exitCode: 0,
+        rawJsonPath: `${p.outDir}/${p.rawFilename ?? 'raw.json'}`,
+        stderrLogPath: `${p.outDir}/k6-stderr.log`,
+      }));
+    vi.spyOn(renderModule, 'renderReport').mockResolvedValue();
+
+    const r = await runPerfScenario({
+      cwd: process.cwd(),
+      apiKey: 'k',
+      flags: {
+        ...baseFlags,
+        scenario: 'rest-crud-cycle',
+        out: outDir,
+        readOnly: false,
+        httpSeed: true,
+        size: 1,
+        crudN: 50,
+      },
+      stdout: () => {},
+      stderr: () => {},
+    });
+    expect(r.exitCode).toBe(0);
+    expect(runK6).toHaveBeenCalledTimes(1);
+    expect(runK6.mock.calls[0]?.[0].env.PERF_CRUD_N).toBe('50');
+  });
+
+  it('rest-crud-cycle without --crud-n omits PERF_CRUD_N (canonical default applies)', async () => {
+    vi.spyOn(seedModule, 'runPerfSeed').mockResolvedValue({ inserted: 1 });
+    vi.spyOn(preflightModule, 'runPreflight').mockResolvedValue(okPreflight);
+    const runK6 = vi
+      .spyOn(runK6Module, 'runK6')
+      .mockImplementation(async (p) => ({
+        ok: true,
+        exitCode: 0,
+        rawJsonPath: `${p.outDir}/${p.rawFilename ?? 'raw.json'}`,
+        stderrLogPath: `${p.outDir}/k6-stderr.log`,
+      }));
+    vi.spyOn(renderModule, 'renderReport').mockResolvedValue();
+
+    const r = await runPerfScenario({
+      cwd: process.cwd(),
+      apiKey: 'k',
+      flags: {
+        ...baseFlags,
+        scenario: 'rest-crud-cycle',
+        out: outDir,
+        readOnly: false,
+        httpSeed: true,
+        size: 1,
+      },
+      stdout: () => {},
+      stderr: () => {},
+    });
+    expect(r.exitCode).toBe(0);
+    expect(runK6).toHaveBeenCalledTimes(1);
+    expect(runK6.mock.calls[0]?.[0].env).not.toHaveProperty('PERF_CRUD_N');
   });
 
   it('runs graphql-flat across all three shapes', async () => {

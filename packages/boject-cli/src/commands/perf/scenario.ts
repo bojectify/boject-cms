@@ -21,7 +21,10 @@ import {
 import { loadProjectConfig } from '../../config.js';
 import { CLI_VERSION } from '../../version.js';
 
-export type PerfScenarioName = 'graphql-flat' | 'graphql-sitemap';
+export type PerfScenarioName =
+  | 'graphql-flat'
+  | 'graphql-sitemap'
+  | 'rest-crud-cycle';
 const FLAT_SHAPES = ['bare', 'filtered', 'relation'] as const;
 
 export interface PerfScenarioFlags {
@@ -45,6 +48,8 @@ export interface PerfScenarioFlags {
   concurrency?: number;
   reset?: boolean;
   allowDatabase?: string[];
+  // #179 — rest-crud-cycle iterations per phase.
+  crudN?: number;
 }
 
 // Mirrors the ramp `parseStages()` builds in
@@ -192,17 +197,23 @@ export async function runPerfScenario(
     );
     return { exitCode: 3 };
   }
-  if (name === 'rest-crud-cycle') {
+  if (
+    name !== 'graphql-flat' &&
+    name !== 'graphql-sitemap' &&
+    name !== 'rest-crud-cycle'
+  ) {
     params.stderr(
-      'Error: rest-crud-cycle scenario is not yet implemented in the CLI. Supported scenarios: graphql-flat, graphql-sitemap.'
+      `Error: unknown scenario "${name}". Valid: graphql-flat, graphql-sitemap, rest-crud-cycle.`
     );
     return { exitCode: 3 };
   }
-  if (name !== 'graphql-flat' && name !== 'graphql-sitemap') {
+
+  if (name === 'rest-crud-cycle' && flags.readOnly) {
     params.stderr(
-      `Error: unknown scenario "${name}". Valid: graphql-flat, graphql-sitemap.`
+      'Error: rest-crud-cycle mutates target state. ' +
+        'Re-run with --database-url or --http-seed to opt into target mutation.\n'
     );
-    return { exitCode: 3 };
+    return { exitCode: 2 };
   }
 
   const configDefaults = await loadDefaults(params.cwd, params.stderr);
@@ -372,6 +383,7 @@ export async function runPerfScenario(
     baseEnv.PERF_RELATION_FIELD = preflightResult.fields.relationField;
   if (flags.targetRps) baseEnv.PERF_TARGET_RPS = String(flags.targetRps);
   if (flags.stages) baseEnv.PERF_STAGES = flags.stages.join(',');
+  if (flags.crudN) baseEnv.PERF_CRUD_N = String(flags.crudN);
 
   const scenarioPath = resolveScenarioPath(name);
   const shapesToRun: string[] =

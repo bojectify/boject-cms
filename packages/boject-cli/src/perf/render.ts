@@ -20,7 +20,7 @@ export interface RunMetadata {
     relation: string | null;
   };
   scenarios: Array<{
-    name: 'graphql-flat' | 'graphql-sitemap';
+    name: 'graphql-flat' | 'graphql-sitemap' | 'rest-crud-cycle';
     outcome: 'completed' | 'partial' | 'skipped';
     shapesRun?: string[];
   }>;
