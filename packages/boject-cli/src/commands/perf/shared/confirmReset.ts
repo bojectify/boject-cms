@@ -21,7 +21,7 @@ export async function confirmReset(
   if (!isTty) return true; // CI mode: assume confirmed
   const url = redactCredentials(opts.databaseUrl);
   process.stderr.write(
-    `About to TRUNCATE perf data in ${url}. Type "yes" to proceed: `
+    `About to TRUNCATE ALL content entries (not just perf-seeded rows) in ${url}. Type "yes" to proceed: `
   );
   const answer = (await (opts.readLine ?? readStdinLine)())
     .trim()

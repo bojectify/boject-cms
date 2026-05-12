@@ -64,6 +64,17 @@ describe('assertAllowedDatabase', () => {
     }
   });
 
+  it('error message warns that reset truncates all entries, not just perf rows', () => {
+    try {
+      assertAllowedDatabase('postgres://u:p@h/prod', []);
+      expect.fail('should have thrown');
+    } catch (err) {
+      const msg = (err as Error).message;
+      expect(msg).toMatch(/TRUNCATE/i);
+      expect(msg).toMatch(/not just perf-seeded rows/i);
+    }
+  });
+
   it('redacts userinfo in error messages', () => {
     try {
       assertAllowedDatabase('postgres://user:secret@h/prod', []);

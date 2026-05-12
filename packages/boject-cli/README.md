@@ -190,6 +190,9 @@ Field overrides (introspection picks defaults):
 
 #### `boject perf seed --content-type <id> [flags]`
 
+> ⚠ **Destructive — throwaway DBs only.**
+> `boject perf reset` and `boject perf seed --reset` issue an unconditional `TRUNCATE` against the target DB's `ContentEntry` and `ContentEntryVersion` tables. **Every entry is wiped, not just the ones this CLI created.** Only run against a disposable `_perf` or `_staging` clone you can rebuild. The `--allow-database <name>` escape hatch exists for non-conforming clone names; never reach for it to point at a production or dev database.
+
 Generates and writes deterministic seed entries for a content type. Pick one transport:
 
 - `--database-url <perf>` — raw `pg` writes. Refuses any database whose name doesn't end in `_perf` / `_staging` unless `--allow-database` lists it. Pair with `--reset` for a clean target.

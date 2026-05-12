@@ -6,7 +6,9 @@ export class DisallowedDatabaseError extends Error {
     super(
       `Refusing to operate on database "${dbName}" (${redact(databaseUrl)}): ` +
         `name must end in "_perf" or "_staging". ` +
-        `Pass --allow-database ${dbName} to override.`
+        `Pass --allow-database ${dbName} to override. ` +
+        `Reset operations TRUNCATE every entry in the named database, ` +
+        `not just perf-seeded rows — only override for disposable / cloned databases.`
     );
     this.name = 'DisallowedDatabaseError';
   }
