@@ -40,21 +40,17 @@ Commands:
   sweep             Run all scenarios across the default sweep matrix.
   report            Re-render a previous run.
   check             Preflight verification (k6, target, key, content type, fields).
-  seed              Generate + write perf entries (SQL or HTTP transport).
+  seed              Generate + write perf entries into a _perf/_staging database.
   reset             Truncate the perf content tables in a target DB.
 
 Run \`boject perf <command> --help\` for command-specific flags.
 `;
 
-const PERF_CHECK_USAGE = `Usage: boject perf check --content-type <id> [--url <url>] [--filter-field <id>] [--relation-field <id>] [--http-seed]
+const PERF_CHECK_USAGE = `Usage: boject perf check --content-type <id> [--url <url>] [--filter-field <id>] [--relation-field <id>]
 
 Verifies: k6 is on PATH, target reachable, API key valid with content:read scope,
 content type exists, and DATETIME / single-target RELATION fields can be selected.
 Exits 0 on success, 2 on environment problems, 3 on input problems.
-
-Flags:
-  --http-seed              Verify the API key carries content:write (use
-                           when this run will seed via REST).
 `;
 
 const PERF_SCENARIO_USAGE = `Usage: boject perf scenario <name> --content-type <id> [flags]
@@ -67,7 +63,6 @@ Scenarios:
 Mode (one required):
   --read-only             Skip seeding; run k6 against the existing dataset.
   --database-url <url>    Seed via SQL (writeViaSql) before running k6.
-  --http-seed             Seed via REST (writeViaHttp) before running k6.
 
 Common flags:
   --url <url>             Target CMS base URL. Defaults to .boject.config.json.
@@ -81,9 +76,8 @@ Seed-then-run flags (only when --read-only is NOT set):
   --bundle <path>         Local bundle file. Default: GET /api/schema/export.
   --size <n>              Entries to seed. Default 10000.
   --seed <int>            PRNG seed for determinism. Default 1.
-  --concurrency <n>       HTTP only. Default 8.
-  --reset                 SQL only. Truncate perf tables before seeding.
-  --allow-database <name> SQL only. Allow this DB even if it doesn't end
+  --reset                 Truncate perf tables before seeding.
+  --allow-database <name> Allow this DB even if it doesn't end
                           in _perf/_staging. Repeatable.
                           ⚠ Reset TRUNCATES all entries — use only
                           for throwaway DBs you can rebuild.
@@ -105,7 +99,6 @@ Runs both graphql-sitemap (across page sizes × VU levels) and graphql-flat
 Mode (one required):
   --read-only             Skip seeding; run k6 against the existing dataset.
   --database-url <url>    Seed via SQL (writeViaSql) before running k6.
-  --http-seed             Seed via REST (writeViaHttp) before running k6.
 
 Common flags:
   --url <url>             Target CMS base URL.
@@ -119,9 +112,8 @@ Seed-then-run flags (only when --read-only is NOT set):
   --bundle <path>         Local bundle file. Default: GET /api/schema/export.
   --size <n>              Entries to seed. Default 10000.
   --seed <int>            PRNG seed for determinism. Default 1.
-  --concurrency <n>       HTTP only. Default 8.
-  --reset                 SQL only. Truncate perf tables before seeding.
-  --allow-database <name> SQL only. Allow this DB even if it doesn't end
+  --reset                 Truncate perf tables before seeding.
+  --allow-database <name> Allow this DB even if it doesn't end
                           in _perf/_staging. Repeatable.
                           ⚠ Reset TRUNCATES all entries — use only
                           for throwaway DBs you can rebuild.
@@ -150,9 +142,8 @@ const PERF_SEED_USAGE = `Usage: boject perf seed --content-type <id> [flags]
 Required:
   --content-type <id>       Target content type (must exist in the bundle).
 
-Transport (exactly one):
+Transport (required):
   --database-url <url>      Direct SQL via writeViaSql. DB name must end _perf/_staging.
-  --http-seed               REST via writeViaHttp. Uses --url + --api-key.
 
 Bundle source:
   (default)                 GET /api/schema/export via --url + --api-key.
@@ -161,9 +152,8 @@ Bundle source:
 Common:
   --size <n>                Entries to seed. Default 10000.
   --seed <int>              PRNG seed for determinism. Default 1.
-  --concurrency <n>         HTTP only. Default 8.
-  --reset                   SQL only. Truncate perf data before seeding.
-  --allow-database <name>   SQL only. Allow this DB even if it doesn't end
+  --reset                   Truncate perf data before seeding.
+  --allow-database <name>   Allow this DB even if it doesn't end
                             in _perf/_staging. Repeatable.
                             ⚠ Reset TRUNCATES all entries — use only
                             for throwaway DBs you can rebuild.
@@ -459,7 +449,6 @@ async function dispatchPerf(args: string[]): Promise<number> {
           'content-type': { type: 'string' },
           'filter-field': { type: 'string' },
           'relation-field': { type: 'string' },
-          'http-seed': { type: 'boolean', default: false },
         },
       });
       const r = await runPerfCheck({
@@ -471,7 +460,6 @@ async function dispatchPerf(args: string[]): Promise<number> {
           contentType: values['content-type'],
           filterField: values['filter-field'],
           relationField: values['relation-field'],
-          httpSeed: values['http-seed'] === true,
         },
         stdout,
         stderr,
@@ -498,11 +486,9 @@ async function dispatchPerf(args: string[]): Promise<number> {
           stages: { type: 'string' },
           'read-only': { type: 'boolean', default: false },
           'database-url': { type: 'string' },
-          'http-seed': { type: 'boolean', default: false },
           bundle: { type: 'string' },
           size: { type: 'string' },
           seed: { type: 'string' },
-          concurrency: { type: 'string' },
           reset: { type: 'boolean', default: false },
           'allow-database': { type: 'string', multiple: true, default: [] },
           'crud-n': { type: 'string' },
@@ -537,13 +523,9 @@ async function dispatchPerf(args: string[]): Promise<number> {
             : undefined,
           readOnly: values['read-only'] === true,
           databaseUrl: values['database-url'],
-          httpSeed: values['http-seed'] === true,
           bundle: values.bundle,
           size: values.size ? Number(values.size) : undefined,
           seed: values.seed ? Number(values.seed) : undefined,
-          concurrency: values.concurrency
-            ? Number(values.concurrency)
-            : undefined,
           reset: values.reset === true,
           allowDatabase: values['allow-database'] as string[],
           crudN: values['crud-n'] ? Number(values['crud-n']) : undefined,
@@ -575,11 +557,9 @@ async function dispatchPerf(args: string[]): Promise<number> {
           stages: { type: 'string' },
           'read-only': { type: 'boolean', default: false },
           'database-url': { type: 'string' },
-          'http-seed': { type: 'boolean', default: false },
           bundle: { type: 'string' },
           size: { type: 'string' },
           seed: { type: 'string' },
-          concurrency: { type: 'string' },
           reset: { type: 'boolean', default: false },
           'allow-database': { type: 'string', multiple: true, default: [] },
         },
@@ -609,13 +589,9 @@ async function dispatchPerf(args: string[]): Promise<number> {
             : undefined,
           readOnly: values['read-only'] === true,
           databaseUrl: values['database-url'],
-          httpSeed: values['http-seed'] === true,
           bundle: values.bundle,
           size: values.size ? Number(values.size) : undefined,
           seed: values.seed ? Number(values.seed) : undefined,
-          concurrency: values.concurrency
-            ? Number(values.concurrency)
-            : undefined,
           reset: values.reset === true,
           allowDatabase: values['allow-database'] as string[],
         },
@@ -656,11 +632,9 @@ async function dispatchPerf(args: string[]): Promise<number> {
         options: {
           'content-type': { type: 'string' },
           'database-url': { type: 'string' },
-          'http-seed': { type: 'boolean', default: false },
           bundle: { type: 'string' },
           size: { type: 'string' },
           seed: { type: 'string' },
-          concurrency: { type: 'string' },
           'allow-database': { type: 'string', multiple: true, default: [] },
           reset: { type: 'boolean', default: false },
           url: { type: 'string' },
@@ -696,9 +670,6 @@ async function dispatchPerf(args: string[]): Promise<number> {
         return 1;
       }
       const seed = values.seed ? Number(values.seed) : configPerf?.seed;
-      const concurrency = values.concurrency
-        ? Number(values.concurrency)
-        : undefined;
       const databaseUrl = values['database-url'] ?? configPerf?.perfDatabaseUrl;
       try {
         await runPerfSeed({
@@ -706,9 +677,7 @@ async function dispatchPerf(args: string[]): Promise<number> {
           size,
           seed,
           databaseUrl,
-          httpSeed: values['http-seed'],
           bundle: values.bundle,
-          concurrency,
           allowDatabase: values['allow-database'] as string[],
           reset: values.reset === true,
           url:

@@ -128,7 +128,7 @@ CI pattern:
 
 ### `boject perf <command>`
 
-Operator-facing load-test runner. Spawns [k6](https://k6.io/) against your CMS, emits a markdown + JSON report. Read-only in v1 — operates on existing data, doesn't seed or mutate (seed-driven mode lands in a follow-up).
+Operator-facing load-test runner. Spawns [k6](https://k6.io/) against your CMS, emits a markdown + JSON report. Run read-only against an existing dataset, or seed first via SQL — see the subcommands below.
 
 **Prerequisites:** [k6](https://k6.io/docs/get-started/installation/) on PATH (`brew install k6` on macOS). The CLI fails fast with an install hint if it isn't.
 
@@ -193,10 +193,7 @@ Field overrides (introspection picks defaults):
 > ⚠ **Destructive — throwaway DBs only.**
 > `boject perf reset` and `boject perf seed --reset` issue an unconditional `TRUNCATE` against the target DB's `ContentEntry` and `ContentEntryVersion` tables. **Every entry is wiped, not just the ones this CLI created.** Only run against a disposable `_perf` or `_staging` clone you can rebuild. The `--allow-database <name>` escape hatch exists for non-conforming clone names; never reach for it to point at a production or dev database.
 
-Generates and writes deterministic seed entries for a content type. Pick one transport:
-
-- `--database-url <perf>` — raw `pg` writes. Refuses any database whose name doesn't end in `_perf` / `_staging` unless `--allow-database` lists it. Pair with `--reset` for a clean target.
-- `--http-seed` — REST `POST /api/content-entries`. Requires `--url` + `--api-key` with the `content:write` scope. Self-rate-limits against the CMS's 50 req/60s mutation limiter.
+Generates and writes deterministic seed entries for a content type. Uses `--database-url <perf>` — raw `pg` writes. Refuses any database whose name doesn't end in `_perf` / `_staging` unless `--allow-database` lists it. Pair with `--reset` for a clean target.
 
 Use `--size <n>` to control the entry count and `--seed <n>` (default `1`) to pick the deterministic data set.
 
@@ -211,30 +208,29 @@ If the target DB already contains entries with titles or slugs that match what t
 If the skip rate exceeds 50%, the seed step aborts with a `SeedMostlyDuplicateError` — this catches the case where the target DB is mostly already populated and the new run would do nothing useful. Two ways to unblock:
 
 - **Pass `--seed <n>`** for a different deterministic data set.
-- **Reset the target DB first** (SQL only): `boject perf reset --database-url <url> --yes`. HTTP-side reset is sibling issue #184 — until that lands, operators on `--http-seed` use the `--seed <n>` workaround.
-
-This applies to both SQL (`--database-url`) and HTTP (`--http-seed`) transports — same behaviour across both.
+- **Reset the target DB first:** `boject perf reset --database-url <url> --yes`.
 
 **Cascade skips for cross-references.** When an entry is skipped (either via 409 conflict or because a previous entry it references was skipped), the skip propagates: any entry whose data points at the skipped entry's synthetic ID is also skipped. This prevents 400 errors from the CMS validating broken RELATION/MULTIRELATION/RICHTEXT references.
 
 The threshold check (50%) accounts for both kinds of skip. A repeat seed against a populated DB with multi-group bundles (e.g. Author + Article) trips the threshold cleanly: authors collide, articles cascade-skip, everything is loudly reported, the operator passes `--seed <n>` or resets.
 
-In the SQL transport, cascade-skipped entries are filtered BEFORE the envelope `INSERT` — no orphan `ContentEntry` rows are created. In the HTTP transport, cascade-skipped entries are filtered before the POST is issued — no failed request hits the CMS. Same semantic outcome via different mechanics.
+Cascade-skipped entries are filtered BEFORE the envelope `INSERT` — no orphan `ContentEntry` rows are created.
 
 For SQL bundles with deferred-edge patches: if a patch's target or `fieldUpdates` reference a skipped entry, the patch is suppressed with an `stderr` log (`[perf:seed] skipping patch — ...`). Patch skips do NOT count toward the entry-level threshold — they're an internal mechanism for cross-group circular refs, not an operator-visible metric.
 
 #### `boject perf scenario rest-crud-cycle --content-type <id> [flags]`
 
-Write-load scenario: 10 VUs run interleaved CREATE / READ / DELETE iterations against `/api/content-entries`. Requires either `--database-url <perf>` (SQL transport) or `--http-seed` (REST). Refuses `--read-only`. Use `--crud-n <n>` to control iterations per phase (default 10000, matches the canonical sweep).
+Write-load scenario: 10 VUs run interleaved CREATE / READ / DELETE iterations against `/api/content-entries`. Requires `--database-url <perf>`. Refuses `--read-only`. Use `--crud-n <n>` to control iterations per phase (default 10000, matches the canonical sweep).
 
 ```bash
 boject perf scenario rest-crud-cycle --content-type Article \
-  --http-seed --crud-n 50 --yes
+  --database-url postgresql://boject:boject@localhost:5432/boject_perf \
+  --crud-n 50 --yes
 ```
 
 The report's `## Scenario 2 — REST CRUD cycle` section breaks down latency by phase (`create` / `read` / `list` / `delete`).
 
-`rest-crud-cycle` does not run a seed step regardless of transport mode — the scenario's CREATE phase produces its own entries. Pass `--reset` with a SQL transport if you want a clean DB before the run.
+`rest-crud-cycle` does not run a seed step — the scenario's CREATE phase produces its own entries. Pass `--reset` if you want a clean DB before the run.
 
 **Required scope:** `content:write`.
 
@@ -276,7 +272,7 @@ Every run writes to `<out>/<timestamp>/`:
 
 - `raw.json` — k6 NDJSON output, one point per line.
 - `k6-stderr.log` — sanitised stderr from k6 (no API keys).
-- `pg-samples.csv` — **seed-direct only.** When `--database-url` is set, `boject perf scenario` / `sweep` runs a `pg_stat_activity` sampler alongside k6 (5s interval by default; override via `PERF_SAMPLER_INTERVAL_MS`). Peak and mean connection-pool counts are rendered into `summary.md` as a `Database connection pool` table. Operators using `--read-only` or `--http-seed` get no panel — there's no DB access in those modes.
+- `pg-samples.csv` — **seed-direct only.** When `--database-url` is set, `boject perf scenario` / `sweep` runs a `pg_stat_activity` sampler alongside k6 (5s interval by default; override via `PERF_SAMPLER_INTERVAL_MS`). Peak and mean connection-pool counts are rendered into `summary.md` as a `Database connection pool` table. Operators using `--read-only` get no panel — there's no DB access in that mode.
 
 #### Sanitisation
 

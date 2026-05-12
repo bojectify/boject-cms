@@ -4,7 +4,7 @@ import { renderReport, type RunMetadata } from '../../perf/render.js';
 import type { RunMode } from '../../perf/runMode.js';
 import { loadProjectConfig } from '../../config.js';
 
-const RUN_MODES = ['seed-direct', 'seed-http', 'read-only'] as const;
+const RUN_MODES = ['seed-direct', 'read-only'] as const;
 type RunModeStr = (typeof RUN_MODES)[number];
 
 const PARTIAL_SOURCES = ['reset', 'seed', 'k6'] as const;

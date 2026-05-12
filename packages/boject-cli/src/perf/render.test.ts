@@ -169,19 +169,6 @@ describe('renderReport', () => {
     expect(meta.mode).toBe('seed-direct');
   });
 
-  it('renders the seed-http mode banner for seed-http non-partial runs', async () => {
-    const out = await mkdtemp(join(tmpdir(), 'boject-render-'));
-    await renderReport({
-      rawJsonPath: FIXTURE,
-      outDir: out,
-      runMetadata: minimalMetadata({ mode: 'seed-http' }),
-    });
-    const md = await readFile(join(out, 'summary.md'), 'utf8');
-    expect(md).toContain('operator seeded via REST');
-    const meta = JSON.parse(await readFile(join(out, 'metadata.json'), 'utf8'));
-    expect(meta.mode).toBe('seed-http');
-  });
-
   it('renders the read-only mode banner for read-only non-partial runs', async () => {
     const out = await mkdtemp(join(tmpdir(), 'boject-render-'));
     await renderReport({
@@ -243,22 +230,6 @@ describe('renderReport', () => {
     expect(meta.partialFailureSource).toBe('k6');
   });
 
-  it('stacks mode + partial-source banners when both apply', async () => {
-    const out = await mkdtemp(join(tmpdir(), 'boject-render-'));
-    await renderReport({
-      rawJsonPath: FIXTURE,
-      outDir: out,
-      runMetadata: minimalMetadata({
-        mode: 'seed-http',
-        partial: true,
-        partialFailureSource: 'seed',
-      }),
-    });
-    const md = await readFile(join(out, 'summary.md'), 'utf8');
-    expect(md).toContain('operator seeded via REST');
-    expect(md).toContain('seed step failed');
-  });
-
   it('renders the connection panel for seed-direct runs with a valid CSV', async () => {
     const out = await mkdtemp(join(tmpdir(), 'boject-render-'));
     const csvPath = join(out, 'pg-samples.csv');
@@ -316,26 +287,6 @@ describe('renderReport', () => {
       rawJsonPath: FIXTURE,
       outDir: out,
       runMetadata: minimalMetadata({ mode: 'seed-direct' }),
-      pgSamplesCsvPath: csvPath,
-    });
-    const md = await readFile(join(out, 'summary.md'), 'utf8');
-    expect(md).not.toContain('## Database connection pool');
-  });
-
-  it('omits the connection panel for seed-http runs even with a valid CSV', async () => {
-    const out = await mkdtemp(join(tmpdir(), 'boject-render-'));
-    const csvPath = join(out, 'pg-samples.csv');
-    await writeFile(
-      csvPath,
-      [
-        'timestamp,total,active,idle,cpu_percent,mem_mb',
-        '2026-05-11T00:00:00Z,10,2,8,0,0',
-      ].join('\n')
-    );
-    await renderReport({
-      rawJsonPath: FIXTURE,
-      outDir: out,
-      runMetadata: minimalMetadata({ mode: 'seed-http' }),
       pgSamplesCsvPath: csvPath,
     });
     const md = await readFile(join(out, 'summary.md'), 'utf8');

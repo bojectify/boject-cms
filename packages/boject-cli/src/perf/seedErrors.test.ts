@@ -17,7 +17,6 @@ describe('SeedMostlyDuplicateError', () => {
     expect(err.message).toContain('20%');
     expect(err.message).toContain('--seed <n>');
     expect(err.message).toContain('boject perf reset --database-url');
-    expect(err.message).toContain('see #184');
   });
 
   it('has name === "SeedMostlyDuplicateError"', () => {
