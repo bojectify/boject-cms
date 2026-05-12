@@ -85,6 +85,8 @@ Seed-then-run flags (only when --read-only is NOT set):
   --reset                 SQL only. Truncate perf tables before seeding.
   --allow-database <name> SQL only. Allow this DB even if it doesn't end
                           in _perf/_staging. Repeatable.
+                          ⚠ Reset TRUNCATES all entries — use only
+                          for throwaway DBs you can rebuild.
 
 graphql-flat power-user overrides:
   --target-rps <n>        Override peak RPS (default 2000).
@@ -121,6 +123,8 @@ Seed-then-run flags (only when --read-only is NOT set):
   --reset                 SQL only. Truncate perf tables before seeding.
   --allow-database <name> SQL only. Allow this DB even if it doesn't end
                           in _perf/_staging. Repeatable.
+                          ⚠ Reset TRUNCATES all entries — use only
+                          for throwaway DBs you can rebuild.
 
 Sweep matrix:
   --page-sizes <csv>      Default 100,500,1000.
@@ -161,6 +165,8 @@ Common:
   --reset                   SQL only. Truncate perf data before seeding.
   --allow-database <name>   SQL only. Allow this DB even if it doesn't end
                             in _perf/_staging. Repeatable.
+                            ⚠ Reset TRUNCATES all entries — use only
+                            for throwaway DBs you can rebuild.
   --url <url>               CMS base URL.
   --api-key <key>           Defaults to $BOJECT_API_KEY.
   --yes                     Bypass TTY confirmation prompts.
@@ -177,6 +183,8 @@ Required flags:
 Optional flags:
   --allow-database <name>   Allow this DB even if it doesn't end in
                             _perf/_staging. Repeatable.
+                            ⚠ Reset TRUNCATES all entries — use only
+                            for throwaway DBs you can rebuild.
   --yes                     Skip the TTY confirmation prompt.
 `;
 

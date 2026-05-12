@@ -40,4 +40,28 @@ describe('confirmReset', () => {
     });
     expect(r).toBe(false);
   });
+
+  it('prompt copy makes clear ALL entries are truncated, not just perf-seeded rows', async () => {
+    const originalWrite = process.stderr.write.bind(process.stderr);
+    const writes: string[] = [];
+    process.stderr.write = ((chunk: string | Uint8Array) => {
+      writes.push(typeof chunk === 'string' ? chunk : chunk.toString());
+      return true;
+    }) as typeof process.stderr.write;
+    try {
+      await confirmReset({
+        databaseUrl: 'postgresql://u:p@h/boject_perf',
+        yes: false,
+        readLine: async () => 'no',
+        isTty: true,
+      });
+    } finally {
+      process.stderr.write = originalWrite;
+    }
+    const prompt = writes.join('');
+    expect(prompt).toContain('TRUNCATE');
+    expect(prompt).toContain('ALL content entries');
+    expect(prompt).toContain('not just perf-seeded rows');
+    expect(prompt).not.toContain('perf data');
+  });
 });
