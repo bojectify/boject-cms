@@ -110,3 +110,13 @@ export function findUnresolvedRefs(
     }
   }
 }
+
+/**
+ * Sibling walker — TDD-red placeholder. Real implementation lands in Task 2.
+ */
+export function rewriteContentTypeIds(
+  data: unknown,
+  _typeIdByIdentifier: Map<string, string>
+): unknown {
+  return data;
+}
