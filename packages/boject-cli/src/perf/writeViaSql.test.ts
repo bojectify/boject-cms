@@ -1213,4 +1213,91 @@ describe('writeViaSql', () => {
     expect(stderrOutput).toContain('was skipped');
     stderrSpy.mockRestore();
   });
+
+  it('translates identifier-form contentTypeId values in JSONB to real UUIDs before INSERT', async () => {
+    // Portable-bundle shape: generator emits identifier-form contentTypeId in
+    // RELATION refs. The writer must translate them to real UUIDs (looked up
+    // via the typeIdByIdentifier map) before the JSONB hits the DB — otherwise
+    // CMS resolvers can't traverse the relation.
+    const generated: GeneratedSeed = {
+      warnings: [],
+      groups: [
+        {
+          contentTypeIdentifier: 'Author',
+          entries: [
+            {
+              id: 'author-entry-1',
+              contentTypeId: null,
+              contentTypeIdentifier: 'Author',
+              entryTitle: 'A',
+              slug: 'a',
+              versions: [
+                {
+                  status: 'PUBLISHED',
+                  data: { name: 'A' },
+                  publishedAt: '2026-05-12T00:00:00.000Z',
+                },
+              ],
+            },
+          ],
+        },
+        {
+          contentTypeIdentifier: 'Article',
+          entries: [
+            {
+              id: 'article-entry-1',
+              contentTypeId: null,
+              contentTypeIdentifier: 'Article',
+              entryTitle: 'AR',
+              slug: 'ar',
+              versions: [
+                {
+                  status: 'PUBLISHED',
+                  data: {
+                    title: 'AR',
+                    author: {
+                      // Identifier-form contentTypeId — the bug this test
+                      // guards against. After the writer, this must be the
+                      // real Author UUID.
+                      contentTypeId: 'Author',
+                      contentTypeIdentifier: 'Author',
+                      entryId: 'author-entry-1',
+                    },
+                  },
+                  publishedAt: '2026-05-12T00:00:00.000Z',
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const client = fakeClient({
+      contentTypeLookup: [
+        { identifier: 'Author', id: 'ct-author-real-uuid' },
+        { identifier: 'Article', id: 'ct-article-real-uuid' },
+      ],
+    });
+    await writeViaSql(client as any, generated);
+
+    // Find the version INSERT call that carries the article-entry-1 row.
+    const articleVersionInsert = client.calls.find(
+      (c) =>
+        c.sql.includes('INSERT INTO "ContentEntryVersion"') &&
+        c.params.some(
+          (p) => typeof p === 'string' && p.includes('article-entry-1')
+        )
+    );
+    expect(articleVersionInsert).toBeDefined();
+    // The data param is a JSON-stringified blob containing 'author' + 'entryId'.
+    const dataParam = articleVersionInsert!.params.find(
+      (p) =>
+        typeof p === 'string' && p.includes('author') && p.includes('entryId')
+    ) as string | undefined;
+    expect(dataParam).toBeDefined();
+    const parsed = JSON.parse(dataParam!);
+    expect(parsed.author.contentTypeId).toBe('ct-author-real-uuid');
+    expect(parsed.author.contentTypeIdentifier).toBe('Author');
+    expect(parsed.author.entryId).toBe('author-entry-1');
+  });
 });

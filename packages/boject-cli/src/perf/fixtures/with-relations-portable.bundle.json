@@ -1,0 +1,86 @@
+{
+  "version": 2,
+  "exportedAt": "2026-05-07T00:00:00.000Z",
+  "portable": true,
+  "contentTypes": [
+    {
+      "id": null,
+      "identifier": "Author",
+      "name": "Author",
+      "description": null,
+      "fields": [
+        {
+          "id": null,
+          "identifier": "name",
+          "name": "Name",
+          "type": "ENTRY_TITLE",
+          "required": true,
+          "unique": true,
+          "order": 0,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "bio",
+          "name": "Bio",
+          "type": "TEXTAREA",
+          "required": false,
+          "order": 1,
+          "options": null
+        }
+      ]
+    },
+    {
+      "id": null,
+      "identifier": "Article",
+      "name": "Article",
+      "description": null,
+      "fields": [
+        {
+          "id": null,
+          "identifier": "title",
+          "name": "Title",
+          "type": "ENTRY_TITLE",
+          "required": true,
+          "unique": true,
+          "order": 0,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "slug",
+          "name": "Slug",
+          "type": "SLUG",
+          "required": false,
+          "unique": true,
+          "order": 1,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "author",
+          "name": "Author",
+          "type": "RELATION",
+          "required": true,
+          "order": 2,
+          "options": {
+            "targetContentTypeIds": [null],
+            "targetContentTypeIdentifiers": ["Author"]
+          }
+        },
+        {
+          "id": null,
+          "identifier": "tags",
+          "name": "Tags",
+          "type": "MULTIRELATION",
+          "required": false,
+          "order": 3,
+          "options": {
+            "targetContentTypeIds": [null],
+            "targetContentTypeIdentifiers": ["Author"]
+          }
+        }
+      ]
+    }
+  ]
+}

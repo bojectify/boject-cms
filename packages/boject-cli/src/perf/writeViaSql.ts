@@ -2,6 +2,7 @@ import type { BundleEntry } from '../vendor/contentBundleTypes.js';
 import type { GeneratedSeed } from './generate.js';
 import {
   findUnresolvedRefs,
+  rewriteContentTypeIds,
   rewriteSyntheticIds,
 } from './rewriteSyntheticIds.js';
 import {
@@ -101,7 +102,7 @@ export async function writeViaSql(
       }
       skipped += refValid.length - survivors.length;
 
-      await insertVersions(client, survivors, idMap);
+      await insertVersions(client, survivors, idMap, typeIdByIdentifier);
       // idMap is populated AFTER each slice's version insert, not before.
       // This is safe because the SQL writer's synthetic id == real id (we pass
       // the synthetic UUID as the actual primary key). Cross-slice / cross-group
@@ -157,9 +158,10 @@ export async function writeViaSql(
         continue;
       }
       const realEntryId = idMap.get(patch.entryId) ?? patch.entryId;
-      const rewritten = rewriteSyntheticIds(
-        patch.fieldUpdates,
-        idMap
+      const rewrittenIds = rewriteSyntheticIds(patch.fieldUpdates, idMap);
+      const rewritten = rewriteContentTypeIds(
+        rewrittenIds,
+        typeIdByIdentifier
       ) as Record<string, unknown>;
       await applyPatch(client, realEntryId, rewritten, patchTs);
     }
@@ -204,7 +206,8 @@ async function insertEnvelopes(
 async function insertVersions(
   client: PgClientLike,
   entries: BundleEntry[],
-  idMap: Map<string, string>
+  idMap: Map<string, string>,
+  typeIdByIdentifier: Map<string, string>
 ): Promise<void> {
   if (entries.length === 0) return;
   const valuesPlaceholders: string[] = [];
@@ -218,7 +221,11 @@ async function insertVersions(
     }
     const v = e.versions[0];
     const ts = v.publishedAt ?? new Date().toISOString();
-    const data = rewriteSyntheticIds(v.data, idMap);
+    const dataWithRealEntryIds = rewriteSyntheticIds(v.data, idMap);
+    const data = rewriteContentTypeIds(
+      dataWithRealEntryIds,
+      typeIdByIdentifier
+    );
     valuesPlaceholders.push(
       `(gen_random_uuid(), $${p++}, 'PUBLISHED', $${p++}, $${p++}::jsonb, $${p++}, $${p++}, $${p++})`
     );
