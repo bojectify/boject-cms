@@ -15,8 +15,8 @@ import {
 } from '../../utils/resolveVersion';
 
 export default defineEventHandler(async (event) => {
-  enforceMutationRateLimit(event, 'content-entries.put');
   assertApiKeyScope(event, 'content:write');
+  enforceMutationRateLimit(event, 'content-entries.put');
   const id = assertUuid(getRouterParam(event, 'id'), 'id');
   const body = await readBody<Record<string, unknown>>(event);
 

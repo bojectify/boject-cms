@@ -7,8 +7,8 @@ import { getPublishedVersion } from '../../utils/resolveVersion';
 import { assertApiKeyScope } from '../../utils/assertApiKeyScope';
 
 export default defineEventHandler(async (event) => {
-  enforceMutationRateLimit(event, 'content-entries.delete');
   assertApiKeyScope(event, 'content:write');
+  enforceMutationRateLimit(event, 'content-entries.delete');
   const id = assertUuid(getRouterParam(event, 'id'), 'id');
 
   const existing = await prisma.contentEntry.findUnique({

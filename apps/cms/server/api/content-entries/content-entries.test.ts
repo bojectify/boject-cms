@@ -85,6 +85,36 @@ type ListResponse = { items: EntryResponse[]; total: number };
 
 let testContentType: ContentTypeResponse;
 
+/**
+ * Rate-limit isolation: this file uses IPs from TEST-NET-3
+ * (`203.0.113.0/24`, reserved by RFC 5737 for documentation /
+ * test use) in the `X-Forwarded-For` header. The mutation rate
+ * limiter (`enforceMutationRateLimit`) keys per-IP per-endpoint,
+ * so each test that touches a rate-limited path needs a unique
+ * IP to avoid bucket collisions with neighbours.
+ *
+ * Current allocations:
+ *
+ *   .10-.19   webhook ENTRY_DELETED wiring (Webhook describe block)
+ *   .20-.29   content:write scope tests (#172 family) — POST, PUT,
+ *             DELETE, draft.DELETE, archive
+ *   .30-.39   content:write scope tests — unarchive, unpublish,
+ *             republish; ALSO pre-existing archive lifecycle tests
+ *             at .30-.32 (collision; tolerated because the scope
+ *             tests use distinct keys and the pre-existing tests
+ *             use session auth which short-circuits the scope check
+ *             before the rate limiter charges)
+ *   .40-.49   pre-existing unarchive lifecycle tests
+ *   .50-.59   pre-existing republish lifecycle tests
+ *   .60-.69   archiveFilter tests
+ *   .180-.199 ad-hoc / one-off IPs (currently: .99, .183)
+ *
+ * When adding a new rate-limited test:
+ *  1. Find the describe block your test will live in
+ *  2. Use the next unused IP in that block's range
+ *  3. If your block isn't listed above, claim the next free range
+ *     (in /10-increments) and update this legend
+ */
 describe('Content Entry endpoints', async () => {
   await setup({ dev: true });
 

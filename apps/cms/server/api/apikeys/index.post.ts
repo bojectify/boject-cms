@@ -66,6 +66,9 @@ export default defineEventHandler(async (event) => {
   const raw = await readBody(event);
   const body = parseCreateBody(raw);
 
+  // The (i)-rule — api-key callers cannot mint another apikey:write key.
+  // Documented in assertApiKeyScope.ts JSDoc; keep both sites in sync if
+  // either changes.
   if (
     event.context.authMethod === 'apikey' &&
     body.scopes.includes('apikey:write')

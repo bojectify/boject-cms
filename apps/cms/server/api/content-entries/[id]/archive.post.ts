@@ -9,8 +9,8 @@ import {
 import { enqueueWebhookDeliveries } from '../../../utils/webhooks';
 
 export default defineEventHandler(async (event) => {
-  enforceMutationRateLimit(event, 'content-entries.archive');
   assertApiKeyScope(event, 'content:write');
+  enforceMutationRateLimit(event, 'content-entries.archive');
   const id = assertUuid(getRouterParam(event, 'id'), 'id');
 
   const entry = await prisma.contentEntry.findUnique({

@@ -117,9 +117,25 @@ describe('CSRF Origin check', async () => {
         body: JSON.stringify({}),
       });
       // CSRF would have returned 403 with a clear "Origin mismatch" message.
-      // Anything else (including 400 for missing body fields, or 422) confirms
-      // the Bearer bypass kicks in.
+      // We assert (a) the status isn't 403, AND (b) if there IS an error
+      // body, it doesn't reference origin/referer/CSRF — that way the
+      // test won't false-positive if the test key ever loses content:write
+      // (which would yield its own 403 with a scope-related message).
       expect(res.status).not.toBe(403);
+      if (res.status >= 400) {
+        const body = (await res.json()) as {
+          message?: string;
+          statusMessage?: string;
+          data?: { error?: string };
+        };
+        const messages = [
+          body.message ?? '',
+          body.statusMessage ?? '',
+          body.data?.error ?? '',
+        ].join(' ');
+        expect(messages).not.toMatch(/origin|referer/i);
+        expect(messages).not.toMatch(/csrf/i);
+      }
     });
   });
 });
