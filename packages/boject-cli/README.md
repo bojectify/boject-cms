@@ -212,6 +212,14 @@ If the skip rate exceeds 50%, the seed step aborts with a `SeedMostlyDuplicateEr
 
 This applies to both SQL (`--database-url`) and HTTP (`--http-seed`) transports — same behaviour across both.
 
+**Cascade skips for cross-references.** When an entry is skipped (either via 409 conflict or because a previous entry it references was skipped), the skip propagates: any entry whose data points at the skipped entry's synthetic ID is also skipped. This prevents 400 errors from the CMS validating broken RELATION/MULTIRELATION/RICHTEXT references.
+
+The threshold check (50%) accounts for both kinds of skip. A repeat seed against a populated DB with multi-group bundles (e.g. Author + Article) trips the threshold cleanly: authors collide, articles cascade-skip, everything is loudly reported, the operator passes `--seed <n>` or resets.
+
+In the SQL transport, cascade-skipped entries are filtered BEFORE the envelope `INSERT` — no orphan `ContentEntry` rows are created. In the HTTP transport, cascade-skipped entries are filtered before the POST is issued — no failed request hits the CMS. Same semantic outcome via different mechanics.
+
+For SQL bundles with deferred-edge patches: if a patch's target or `fieldUpdates` reference a skipped entry, the patch is suppressed with an `stderr` log (`[perf:seed] skipping patch — ...`). Patch skips do NOT count toward the entry-level threshold — they're an internal mechanism for cross-group circular refs, not an operator-visible metric.
+
 #### `boject perf scenario rest-crud-cycle --content-type <id> [flags]`
 
 Write-load scenario: 10 VUs run interleaved CREATE / READ / DELETE iterations against `/api/content-entries`. Requires either `--database-url <perf>` (SQL transport) or `--http-seed` (REST). Refuses `--read-only`. Use `--crud-n <n>` to control iterations per phase (default 10000, matches the canonical sweep).

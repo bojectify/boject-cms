@@ -429,11 +429,10 @@ describe('writeViaSql', () => {
     expect(r).toEqual({ inserted: 2, skipped: 2 });
   });
 
-  it('issues the UPDATE for patches even when the referenced entry was skipped', async () => {
-    // Both p1 and p2 are inserted; the patch targets p2 referencing p1. We
-    // simulate p2's envelope getting skipped so the UPDATE runs against a
-    // (logically) missing row. The writer should still issue the UPDATE — it
-    // becomes a silent no-op at the DB layer.
+  it('skips the patch when its target was skipped at envelope insert (#199)', async () => {
+    // The patch targets p2 referencing p1. We simulate p2's envelope getting
+    // skipped so the patch's target ends up in skippedIds. The writer should
+    // NOT issue the UPDATE (it'd no-op anyway) and should log to stderr.
     const generated: GeneratedSeed = {
       warnings: [],
       groups: [
@@ -489,23 +488,28 @@ describe('writeViaSql', () => {
       contentTypeLookup: [{ identifier: 'Page', id: 'ct-page' }],
       envelopeInsert: { kind: 'subset', keep: (id) => id === 'syn-p1' },
     });
+    const stderrSpy = vi
+      .spyOn(process.stderr, 'write')
+      .mockImplementation(() => true);
     const r = await writeViaSql(client as any, generated);
     expect(r.inserted).toBe(1);
     expect(r.skipped).toBe(1);
     const updates = client.calls.filter((c) =>
       c.sql.startsWith('UPDATE "ContentEntryVersion"')
     );
-    expect(updates.length).toBe(1);
+    expect(updates.length).toBe(0);
+    const stderrOutput = stderrSpy.mock.calls.map((c) => c[0]).join('');
+    expect(stderrOutput).toContain('skipping patch');
+    expect(stderrOutput).toContain('target entry');
+    expect(stderrOutput).toContain('syn-p2');
+    stderrSpy.mockRestore();
   });
 
-  it('only populates idMap for survivors — skipped entries fall through to synthetic ID in cross-group refs', async () => {
+  it('cascade-skips an entry whose reference points at a previously skipped entry (#199)', async () => {
     // Group Author has 2 entries; syn-a1 will be skipped at envelope insert.
-    // Group Article references both authors; we verify that the Article
-    // version insert's data still contains 'syn-a1' (the synthetic id) rather
-    // than a rewritten id — confirming the skipped author isn't in idMap.
-    // (For the SQL writer synthetic === real, so this assertion is about the
-    // absence of an idMap entry rather than a different real-id value, but
-    // the test still pins the contract: skipped entries are NOT registered.)
+    // Group Article has 1 entry that references syn-a1. Under #199's
+    // cascade-skip, the Article must be skipped too (would otherwise leave
+    // a dangling reference in its version data).
     const generated: GeneratedSeed = {
       warnings: [],
       groups: [
@@ -565,11 +569,52 @@ describe('writeViaSql', () => {
                 },
               ],
             },
+            {
+              id: 'syn-art1',
+              contentTypeId: null,
+              contentTypeIdentifier: 'Article',
+              entryTitle: 'Art1',
+              slug: 'art-1',
+              versions: [
+                {
+                  status: 'PUBLISHED',
+                  data: {
+                    author: {
+                      entryId: 'syn-a0',
+                      contentTypeId: 'ct-author',
+                      contentTypeIdentifier: 'Author',
+                    },
+                  },
+                  publishedAt: '2026-01-01T00:00:00.000Z',
+                },
+              ],
+            },
+            {
+              id: 'syn-art2',
+              contentTypeId: null,
+              contentTypeIdentifier: 'Article',
+              entryTitle: 'Art2',
+              slug: 'art-2',
+              versions: [
+                {
+                  status: 'PUBLISHED',
+                  data: {
+                    author: {
+                      entryId: 'syn-a0',
+                      contentTypeId: 'ct-author',
+                      contentTypeIdentifier: 'Author',
+                    },
+                  },
+                  publishedAt: '2026-01-01T00:00:00.000Z',
+                },
+              ],
+            },
           ],
         },
       ],
     };
-    // Skip syn-a1; keep everything else
+    // Skip syn-a1; keep everything else at the envelope-insert layer. A0 +
+    // Art1 + Art2 survive; A1 + Art0 cascade. 3/5 inserted (under threshold).
     const client = fakeClient({
       contentTypeLookup: [
         { identifier: 'Author', id: 'ct-author' },
@@ -578,21 +623,23 @@ describe('writeViaSql', () => {
       envelopeInsert: { kind: 'subset', keep: (id) => id !== 'syn-a1' },
     });
     const r = await writeViaSql(client as any, generated);
-    expect(r.inserted).toBe(2); // A0 + Art0
-    expect(r.skipped).toBe(1); // A1
-    // Article version insert should contain the synthetic 'syn-a1' string —
-    // confirming that idMap did NOT register syn-a1 (otherwise rewriteSyntheticIds
-    // would have replaced it; here it falls through unchanged because synthetic
-    // === real for the SQL writer, but the key contract is that the lookup
-    // miss in idMap is silent).
-    const versionInserts = client.calls.filter((c) =>
-      c.sql.includes('INSERT INTO "ContentEntryVersion"')
+    expect(r.inserted).toBe(3); // A0 + Art1 + Art2
+    expect(r.skipped).toBe(2); // A1 + Art0 (cascade)
+    // Art0 must NOT have reached the envelope INSERT — the cascade filter
+    // runs before insertEnvelopes, so no orphan ContentEntry row is created.
+    const art0EnvelopeInsert = client.calls.find(
+      (c) =>
+        c.sql.startsWith('INSERT INTO "ContentEntry"') &&
+        JSON.stringify(c.params).includes('syn-art0')
     );
-    const articleVersion = versionInserts.find((c) =>
-      JSON.stringify(c.params).includes('Art0')
+    expect(art0EnvelopeInsert).toBeUndefined();
+    // Art1 and Art2 (referencing the surviving A0) DID reach the envelope.
+    const art1EnvelopeInsert = client.calls.find(
+      (c) =>
+        c.sql.startsWith('INSERT INTO "ContentEntry"') &&
+        JSON.stringify(c.params).includes('syn-art1')
     );
-    expect(articleVersion).toBeTruthy();
-    expect(JSON.stringify(articleVersion!.params)).toContain('syn-a1');
+    expect(art1EnvelopeInsert).toBeTruthy();
   });
 
   it('returns { inserted: 0, skipped: 0 } for empty input (no threshold check)', async () => {
@@ -600,5 +647,570 @@ describe('writeViaSql', () => {
     const client = fakeClient({ contentTypeLookup: [] });
     const r = await writeViaSql(client as any, generated);
     expect(r).toEqual({ inserted: 0, skipped: 0 });
+  });
+
+  // -----------------------------------------------------------------------
+  // #199 cascade-skip — cross-reference cascade + patch cascade
+  // -----------------------------------------------------------------------
+
+  function authorEntry(i: number) {
+    return {
+      id: `syn-author-${i}`,
+      contentTypeId: null,
+      contentTypeIdentifier: 'Author',
+      entryTitle: `Author ${i}`,
+      slug: `author-${i}`,
+      versions: [
+        {
+          status: 'PUBLISHED',
+          data: { name: `Author ${i}` },
+          publishedAt: '2026-01-01T00:00:00.000Z',
+        },
+      ],
+    };
+  }
+
+  function articleEntry(i: number, authorRefId: string) {
+    return {
+      id: `syn-article-${i}`,
+      contentTypeId: null,
+      contentTypeIdentifier: 'Article',
+      entryTitle: `Article ${i}`,
+      slug: `article-${i}`,
+      versions: [
+        {
+          status: 'PUBLISHED',
+          data: {
+            author: {
+              entryId: authorRefId,
+              contentTypeId: 'ct-author',
+              contentTypeIdentifier: 'Author',
+            },
+          },
+          publishedAt: '2026-01-01T00:00:00.000Z',
+        },
+      ],
+    };
+  }
+
+  it('single-hop cascade: dependent group skipped when parent group skipped (#199)', async () => {
+    // Authors (N=3) all skipped via ON CONFLICT, Articles (N=3) each reference
+    // one author → all cascade-skipped. Total: 0 inserted, 6 skipped. The
+    // Article batch's envelope INSERT must not contain any article id.
+    const generated: GeneratedSeed = {
+      warnings: [],
+      groups: [
+        {
+          contentTypeIdentifier: 'Author',
+          entries: [authorEntry(0), authorEntry(1), authorEntry(2)] as any,
+        },
+        {
+          contentTypeIdentifier: 'Article',
+          entries: [
+            articleEntry(0, 'syn-author-0'),
+            articleEntry(1, 'syn-author-1'),
+            articleEntry(2, 'syn-author-2'),
+          ] as any,
+        },
+      ],
+    };
+    const client = fakeClient({
+      contentTypeLookup: [
+        { identifier: 'Author', id: 'ct-author' },
+        { identifier: 'Article', id: 'ct-article' },
+      ],
+      envelopeInsert: { kind: 'subset', keep: () => false }, // skip all authors
+    });
+    await writeViaSql(client as any, generated).catch((err) => {
+      // 100% skip trips the threshold; that's the intended end-state — the
+      // ratio is reported correctly.
+      expect(err).toBeInstanceOf(SeedMostlyDuplicateError);
+      expect((err as SeedMostlyDuplicateError).inserted).toBe(0);
+      expect((err as SeedMostlyDuplicateError).skipped).toBe(6);
+      expect((err as SeedMostlyDuplicateError).total).toBe(6);
+    });
+    // Article envelope INSERT must not have been issued for any article —
+    // cascade-skip drops them before insertEnvelopes is called.
+    const articleEnvelopeInserts = client.calls.filter(
+      (c) =>
+        c.sql.startsWith('INSERT INTO "ContentEntry"') &&
+        JSON.stringify(c.params).includes('syn-article-')
+    );
+    expect(articleEnvelopeInserts.length).toBe(0);
+  });
+
+  it('multi-hop cascade: Categories → Articles → Comments all skipped (#199)', async () => {
+    const generated: GeneratedSeed = {
+      warnings: [],
+      groups: [
+        {
+          contentTypeIdentifier: 'Category',
+          entries: [
+            {
+              id: 'syn-cat-0',
+              contentTypeId: null,
+              contentTypeIdentifier: 'Category',
+              entryTitle: 'Cat 0',
+              slug: 'cat-0',
+              versions: [
+                {
+                  status: 'PUBLISHED',
+                  data: {},
+                  publishedAt: '2026-01-01T00:00:00.000Z',
+                },
+              ],
+            },
+          ],
+        },
+        {
+          contentTypeIdentifier: 'Article',
+          entries: [
+            {
+              id: 'syn-article-0',
+              contentTypeId: null,
+              contentTypeIdentifier: 'Article',
+              entryTitle: 'Article 0',
+              slug: 'article-0',
+              versions: [
+                {
+                  status: 'PUBLISHED',
+                  data: {
+                    category: {
+                      entryId: 'syn-cat-0',
+                      contentTypeId: 'ct-cat',
+                      contentTypeIdentifier: 'Category',
+                    },
+                  },
+                  publishedAt: '2026-01-01T00:00:00.000Z',
+                },
+              ],
+            },
+          ],
+        },
+        {
+          contentTypeIdentifier: 'Comment',
+          entries: [
+            {
+              id: 'syn-comment-0',
+              contentTypeId: null,
+              contentTypeIdentifier: 'Comment',
+              entryTitle: 'Comment 0',
+              slug: 'comment-0',
+              versions: [
+                {
+                  status: 'PUBLISHED',
+                  data: {
+                    article: {
+                      entryId: 'syn-article-0',
+                      contentTypeId: 'ct-article',
+                      contentTypeIdentifier: 'Article',
+                    },
+                  },
+                  publishedAt: '2026-01-01T00:00:00.000Z',
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const client = fakeClient({
+      contentTypeLookup: [
+        { identifier: 'Category', id: 'ct-cat' },
+        { identifier: 'Article', id: 'ct-article' },
+        { identifier: 'Comment', id: 'ct-comment' },
+      ],
+      envelopeInsert: { kind: 'subset', keep: () => false }, // skip categories
+    });
+    await writeViaSql(client as any, generated).catch((err) => {
+      expect(err).toBeInstanceOf(SeedMostlyDuplicateError);
+      expect((err as SeedMostlyDuplicateError).inserted).toBe(0);
+      expect((err as SeedMostlyDuplicateError).skipped).toBe(3);
+    });
+    // Neither Article nor Comment envelope INSERT should have been issued.
+    const cascadeEnvelopeInserts = client.calls.filter(
+      (c) =>
+        c.sql.startsWith('INSERT INTO "ContentEntry"') &&
+        (JSON.stringify(c.params).includes('syn-article-') ||
+          JSON.stringify(c.params).includes('syn-comment-'))
+    );
+    expect(cascadeEnvelopeInserts.length).toBe(0);
+  });
+
+  it('MULTIRELATION with one skipped ref cascade-skips the whole entry (#199)', async () => {
+    const generated: GeneratedSeed = {
+      warnings: [],
+      groups: [
+        {
+          contentTypeIdentifier: 'Author',
+          entries: [authorEntry(0), authorEntry(1)] as any,
+        },
+        {
+          contentTypeIdentifier: 'Article',
+          entries: [
+            {
+              id: 'syn-article-0',
+              contentTypeId: null,
+              contentTypeIdentifier: 'Article',
+              entryTitle: 'Article 0',
+              slug: 'article-0',
+              versions: [
+                {
+                  status: 'PUBLISHED',
+                  data: {
+                    coAuthors: [
+                      {
+                        entryId: 'syn-author-0',
+                        contentTypeId: 'ct-author',
+                        contentTypeIdentifier: 'Author',
+                      },
+                      {
+                        entryId: 'syn-author-1',
+                        contentTypeId: 'ct-author',
+                        contentTypeIdentifier: 'Author',
+                      },
+                    ],
+                  },
+                  publishedAt: '2026-01-01T00:00:00.000Z',
+                },
+              ],
+            },
+            // Extra survivor article so we don't trip the threshold.
+            articleEntry(1, 'syn-author-0'),
+            articleEntry(2, 'syn-author-0'),
+          ] as any,
+        },
+      ],
+    };
+    // Skip author-1 only (one of two MULTIRELATION targets).
+    const client = fakeClient({
+      contentTypeLookup: [
+        { identifier: 'Author', id: 'ct-author' },
+        { identifier: 'Article', id: 'ct-article' },
+      ],
+      envelopeInsert: { kind: 'subset', keep: (id) => id !== 'syn-author-1' },
+    });
+    const r = await writeViaSql(client as any, generated);
+    // A0 + Art1 + Art2 survive; A1 + Art0 cascade. inserted=3, skipped=2.
+    expect(r.inserted).toBe(3);
+    expect(r.skipped).toBe(2);
+    const art0EnvelopeInsert = client.calls.find(
+      (c) =>
+        c.sql.startsWith('INSERT INTO "ContentEntry"') &&
+        JSON.stringify(c.params).includes('syn-article-0')
+    );
+    expect(art0EnvelopeInsert).toBeUndefined();
+  });
+
+  it('RICHTEXT body with cmsEmbed pointing at a skipped entry cascade-skips (#199)', async () => {
+    const generated: GeneratedSeed = {
+      warnings: [],
+      groups: [
+        {
+          contentTypeIdentifier: 'Author',
+          entries: [authorEntry(0), authorEntry(1)] as any,
+        },
+        {
+          contentTypeIdentifier: 'Article',
+          entries: [
+            {
+              id: 'syn-article-0',
+              contentTypeId: null,
+              contentTypeIdentifier: 'Article',
+              entryTitle: 'Article 0',
+              slug: 'article-0',
+              versions: [
+                {
+                  status: 'PUBLISHED',
+                  data: {
+                    body: {
+                      type: 'doc',
+                      content: [
+                        {
+                          type: 'cmsEmbed',
+                          attrs: {
+                            entryId: 'syn-author-1',
+                            contentTypeId: 'ct-author',
+                            contentTypeIdentifier: 'Author',
+                          },
+                        },
+                      ],
+                    },
+                  },
+                  publishedAt: '2026-01-01T00:00:00.000Z',
+                },
+              ],
+            },
+            articleEntry(1, 'syn-author-0'),
+            articleEntry(2, 'syn-author-0'),
+          ] as any,
+        },
+      ],
+    };
+    const client = fakeClient({
+      contentTypeLookup: [
+        { identifier: 'Author', id: 'ct-author' },
+        { identifier: 'Article', id: 'ct-article' },
+      ],
+      envelopeInsert: { kind: 'subset', keep: (id) => id !== 'syn-author-1' },
+    });
+    const r = await writeViaSql(client as any, generated);
+    expect(r.inserted).toBe(3);
+    expect(r.skipped).toBe(2);
+    const art0EnvelopeInsert = client.calls.find(
+      (c) =>
+        c.sql.startsWith('INSERT INTO "ContentEntry"') &&
+        JSON.stringify(c.params).includes('syn-article-0')
+    );
+    expect(art0EnvelopeInsert).toBeUndefined();
+  });
+
+  it('threshold trips via cascade: 100% skip yields SeedMostlyDuplicateError (#199)', async () => {
+    const authors = Array.from({ length: 10 }).map((_, i) => authorEntry(i));
+    const articles = Array.from({ length: 10 }).map((_, i) =>
+      articleEntry(i, `syn-author-${i}`)
+    );
+    const generated: GeneratedSeed = {
+      warnings: [],
+      groups: [
+        { contentTypeIdentifier: 'Author', entries: authors as any },
+        { contentTypeIdentifier: 'Article', entries: articles as any },
+      ],
+    };
+    const client = fakeClient({
+      contentTypeLookup: [
+        { identifier: 'Author', id: 'ct-author' },
+        { identifier: 'Article', id: 'ct-article' },
+      ],
+      envelopeInsert: { kind: 'subset', keep: () => false },
+    });
+    await writeViaSql(client as any, generated)
+      .then(() => {
+        throw new Error('expected to throw');
+      })
+      .catch((err) => {
+        expect(err).toBeInstanceOf(SeedMostlyDuplicateError);
+        expect((err as SeedMostlyDuplicateError).inserted).toBe(0);
+        expect((err as SeedMostlyDuplicateError).skipped).toBe(20);
+        expect((err as SeedMostlyDuplicateError).total).toBe(20);
+      });
+  });
+
+  it('cascade-skipped entries never reach the envelope INSERT — no orphans (#199)', async () => {
+    // Belt-and-braces test for the key correctness property of the restructured
+    // batch loop: filter runs BEFORE insertEnvelopes, so cascade-skipped IDs
+    // must not appear in any ContentEntry INSERT params.
+    const generated: GeneratedSeed = {
+      warnings: [],
+      groups: [
+        {
+          contentTypeIdentifier: 'Author',
+          entries: [authorEntry(0), authorEntry(1)] as any,
+        },
+        {
+          contentTypeIdentifier: 'Article',
+          entries: [
+            articleEntry(0, 'syn-author-0'),
+            articleEntry(1, 'syn-author-1'),
+            articleEntry(2, 'syn-author-0'),
+          ] as any,
+        },
+      ],
+    };
+    const client = fakeClient({
+      contentTypeLookup: [
+        { identifier: 'Author', id: 'ct-author' },
+        { identifier: 'Article', id: 'ct-article' },
+      ],
+      envelopeInsert: { kind: 'subset', keep: (id) => id !== 'syn-author-1' },
+    });
+    const r = await writeViaSql(client as any, generated);
+    expect(r.inserted).toBe(3); // A0 + Art0 + Art2
+    expect(r.skipped).toBe(2); // A1 + Art1 (cascade)
+
+    // Collect all ContentEntry envelope INSERT calls and gather their first
+    // id-slot params (params[0], params[6], params[12], ...).
+    const envelopeInserts = client.calls.filter((c) =>
+      c.sql.startsWith('INSERT INTO "ContentEntry"')
+    );
+    const allInsertedIds: string[] = [];
+    for (const call of envelopeInserts) {
+      for (let i = 0; i < call.params.length; i += 6) {
+        allInsertedIds.push(call.params[i] as string);
+      }
+    }
+    // syn-article-1 references syn-author-1 (skipped). It must NEVER appear in
+    // any envelope INSERT — the cascade filter drops it pre-insert.
+    expect(allInsertedIds).not.toContain('syn-article-1');
+    // Sanity: the surviving ids DID reach insertEnvelopes.
+    expect(allInsertedIds).toContain('syn-article-0');
+    expect(allInsertedIds).toContain('syn-article-2');
+  });
+
+  it('patch is skipped when its fieldUpdates reference a skipped entry (#199)', async () => {
+    // p1 + p2 are inserted; p3 is skipped at envelope insert. The patch targets
+    // p2 with fieldUpdates referencing p3 (which is in skippedIds). The UPDATE
+    // must NOT be issued; stderr fires with "fieldUpdates reference"; the
+    // entry-level skipped counter is unchanged.
+    const generated: GeneratedSeed = {
+      warnings: [],
+      groups: [
+        {
+          contentTypeIdentifier: 'Page',
+          entries: [
+            {
+              id: 'syn-p1',
+              contentTypeId: null,
+              contentTypeIdentifier: 'Page',
+              entryTitle: 'P1',
+              slug: 'p1',
+              versions: [
+                {
+                  status: 'PUBLISHED',
+                  data: {},
+                  publishedAt: '2026-01-01T00:00:00.000Z',
+                },
+              ],
+            },
+            {
+              id: 'syn-p2',
+              contentTypeId: null,
+              contentTypeIdentifier: 'Page',
+              entryTitle: 'P2',
+              slug: 'p2',
+              versions: [
+                {
+                  status: 'PUBLISHED',
+                  data: {},
+                  publishedAt: '2026-01-01T00:00:00.000Z',
+                },
+              ],
+            },
+            {
+              id: 'syn-p3',
+              contentTypeId: null,
+              contentTypeIdentifier: 'Page',
+              entryTitle: 'P3',
+              slug: 'p3',
+              versions: [
+                {
+                  status: 'PUBLISHED',
+                  data: {},
+                  publishedAt: '2026-01-01T00:00:00.000Z',
+                },
+              ],
+            },
+          ],
+          patches: [
+            {
+              entryId: 'syn-p2',
+              fieldUpdates: {
+                relatedPage: {
+                  entryId: 'syn-p3',
+                  contentTypeId: 'ct-page',
+                  contentTypeIdentifier: 'Page',
+                },
+              },
+            },
+          ],
+        },
+      ],
+    };
+    const client = fakeClient({
+      contentTypeLookup: [{ identifier: 'Page', id: 'ct-page' }],
+      envelopeInsert: { kind: 'subset', keep: (id) => id !== 'syn-p3' },
+    });
+    const stderrSpy = vi
+      .spyOn(process.stderr, 'write')
+      .mockImplementation(() => true);
+    const r = await writeViaSql(client as any, generated);
+    // p1 + p2 inserted, p3 skipped. Patch is skipped without bumping the
+    // entry counter (patches don't increment skipped).
+    expect(r.inserted).toBe(2);
+    expect(r.skipped).toBe(1);
+    const updates = client.calls.filter((c) =>
+      c.sql.startsWith('UPDATE "ContentEntryVersion"')
+    );
+    expect(updates.length).toBe(0);
+    const stderrOutput = stderrSpy.mock.calls.map((c) => c[0]).join('');
+    expect(stderrOutput).toContain('skipping patch on');
+    expect(stderrOutput).toContain('fieldUpdates reference');
+    stderrSpy.mockRestore();
+  });
+
+  it('patch is skipped when its target entryId is in skippedIds (#199)', async () => {
+    // p1 inserted; p2 skipped at envelope insert. Patch targets p2 → must NOT
+    // issue UPDATE; stderr fires with "target entry … was skipped"; entry
+    // counter unchanged (patches don't increment).
+    const generated: GeneratedSeed = {
+      warnings: [],
+      groups: [
+        {
+          contentTypeIdentifier: 'Page',
+          entries: [
+            {
+              id: 'syn-p1',
+              contentTypeId: null,
+              contentTypeIdentifier: 'Page',
+              entryTitle: 'P1',
+              slug: 'p1',
+              versions: [
+                {
+                  status: 'PUBLISHED',
+                  data: {},
+                  publishedAt: '2026-01-01T00:00:00.000Z',
+                },
+              ],
+            },
+            {
+              id: 'syn-p2',
+              contentTypeId: null,
+              contentTypeIdentifier: 'Page',
+              entryTitle: 'P2',
+              slug: 'p2',
+              versions: [
+                {
+                  status: 'PUBLISHED',
+                  data: {},
+                  publishedAt: '2026-01-01T00:00:00.000Z',
+                },
+              ],
+            },
+          ],
+          patches: [
+            {
+              entryId: 'syn-p2',
+              fieldUpdates: {
+                parent: {
+                  entryId: 'syn-p1',
+                  contentTypeId: 'ct-page',
+                  contentTypeIdentifier: 'Page',
+                },
+              },
+            },
+          ],
+        },
+      ],
+    };
+    const client = fakeClient({
+      contentTypeLookup: [{ identifier: 'Page', id: 'ct-page' }],
+      envelopeInsert: { kind: 'subset', keep: (id) => id === 'syn-p1' },
+    });
+    const stderrSpy = vi
+      .spyOn(process.stderr, 'write')
+      .mockImplementation(() => true);
+    const r = await writeViaSql(client as any, generated);
+    // p1 inserted, p2 skipped. Patch skipped without bumping the entry counter.
+    expect(r.inserted).toBe(1);
+    expect(r.skipped).toBe(1);
+    const updates = client.calls.filter((c) =>
+      c.sql.startsWith('UPDATE "ContentEntryVersion"')
+    );
+    expect(updates.length).toBe(0);
+    const stderrOutput = stderrSpy.mock.calls.map((c) => c[0]).join('');
+    expect(stderrOutput).toContain('target entry');
+    expect(stderrOutput).toContain('syn-p2');
+    expect(stderrOutput).toContain('was skipped');
+    stderrSpy.mockRestore();
   });
 });

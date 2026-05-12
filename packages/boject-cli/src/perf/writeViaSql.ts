@@ -1,6 +1,9 @@
 import type { BundleEntry } from '../vendor/contentBundleTypes.js';
 import type { GeneratedSeed } from './generate.js';
-import { rewriteSyntheticIds } from './rewriteSyntheticIds.js';
+import {
+  findUnresolvedRefs,
+  rewriteSyntheticIds,
+} from './rewriteSyntheticIds.js';
 import {
   SeedMostlyDuplicateError,
   SEED_DUPLICATE_THRESHOLD,
@@ -52,6 +55,7 @@ export async function writeViaSql(
   const idMap = new Map<string, string>(); // synthetic → real (== synthetic for SQL writer)
   let inserted = 0;
   let skipped = 0;
+  const skippedIds = new Set<string>();
 
   // Resolve contentTypeId for each group identifier
   const typeIdByIdentifier = new Map<string, string>();
@@ -71,14 +75,32 @@ export async function writeViaSql(
     const contentTypeId = typeIdByIdentifier.get(group.contentTypeIdentifier)!;
     for (let start = 0; start < group.entries.length; start += batchSize) {
       const slice = group.entries.slice(start, start + batchSize);
+
+      // Cascade-skip filter: drop entries whose version data references any
+      // entry we've already skipped this run. Runs BEFORE envelope insert
+      // to avoid orphan ContentEntry rows (entries with no ContentEntryVersion).
+      const refValid = slice.filter((e) => {
+        const data = e.versions?.[0]?.data;
+        const unresolved = findUnresolvedRefs(data, idMap);
+        return ![...unresolved].some((id) => skippedIds.has(id));
+      });
+      for (const e of slice) {
+        if (!refValid.includes(e) && e.id) skippedIds.add(e.id);
+      }
+      skipped += slice.length - refValid.length;
+
+      // ON CONFLICT path catches duplicate titles/slugs (the #194 behaviour).
       const { insertedIds } = await insertEnvelopes(
         client,
-        slice,
+        refValid,
         contentTypeId
       );
-      const survivors = slice.filter((e) => e.id && insertedIds.has(e.id));
-      const skippedInBatch = slice.length - survivors.length;
-      skipped += skippedInBatch;
+      const survivors = refValid.filter((e) => e.id && insertedIds.has(e.id));
+      for (const e of refValid) {
+        if (!survivors.includes(e) && e.id) skippedIds.add(e.id);
+      }
+      skipped += refValid.length - survivors.length;
+
       await insertVersions(client, survivors, idMap);
       // idMap is populated AFTER each slice's version insert, not before.
       // This is safe because the SQL writer's synthetic id == real id (we pass
@@ -88,9 +110,10 @@ export async function writeViaSql(
       // through, the original id is preserved, and that id matches the
       // envelope row inserted moments earlier.
       //
-      // Only survivors land in idMap; patches referencing skipped entries
-      // fall through to UPDATE on a missing row (silent no-op). The 50%
-      // threshold backstop below catches the case where this would matter.
+      // Only survivors land in idMap; cascade-skip + 409-skip both populate
+      // skippedIds (used by the next batch's cascade filter and the patches
+      // pass below). The 50% threshold backstop still catches runaway skip
+      // rates.
       //
       // If a future writer ever rewrites synthetic→real IDs (e.g. via a SERIAL
       // PK), this set call must move BEFORE insertVersions to keep the
@@ -115,6 +138,24 @@ export async function writeViaSql(
   for (const group of generated.groups) {
     if (!group.patches) continue;
     for (const patch of group.patches) {
+      // Cascade-skip: if patch target was skipped, the UPDATE would no-op
+      // anyway (per #194). Surface the skip in stderr so operators see it.
+      if (skippedIds.has(patch.entryId)) {
+        process.stderr.write(
+          `[perf:seed] skipping patch — target entry ${patch.entryId} was skipped this run\n`
+        );
+        continue;
+      }
+      // Cascade-skip: if fieldUpdates reference skipped entries, the UPDATE
+      // would succeed at the SQL level (JSONB has no FK) but leave invalid
+      // data. Skip with a stderr log.
+      const unresolved = findUnresolvedRefs(patch.fieldUpdates, idMap);
+      if ([...unresolved].some((id) => skippedIds.has(id))) {
+        process.stderr.write(
+          `[perf:seed] skipping patch on ${patch.entryId} — fieldUpdates reference skipped entries\n`
+        );
+        continue;
+      }
       const realEntryId = idMap.get(patch.entryId) ?? patch.entryId;
       const rewritten = rewriteSyntheticIds(
         patch.fieldUpdates,

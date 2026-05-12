@@ -416,6 +416,462 @@ describe('writeViaHttp', () => {
     expect(calls.every((c) => c.total === 3)).toBe(true);
   });
 
+  // ----- cascade-skip (#199) -----
+
+  /**
+   * Two-group bundle: N Authors followed by N Articles. Each Article's
+   * `data.author` references the matching Author by synthetic ID.
+   */
+  function makeAuthorsAndArticles(n: number): GeneratedSeed {
+    return {
+      warnings: [],
+      groups: [
+        {
+          contentTypeIdentifier: 'Author',
+          entries: Array.from({ length: n }).map((_, i) => ({
+            id: `syn-author-${i}`,
+            contentTypeId: 'ct-author',
+            contentTypeIdentifier: 'Author',
+            entryTitle: `Author ${i}`,
+            slug: null,
+            versions: [
+              {
+                status: 'PUBLISHED' as const,
+                data: { name: `Author ${i}` },
+                publishedAt: '2026-01-01T00:00:00.000Z',
+              },
+            ],
+          })),
+        },
+        {
+          contentTypeIdentifier: 'Article',
+          entries: Array.from({ length: n }).map((_, i) => ({
+            id: `syn-article-${i}`,
+            contentTypeId: 'ct-article',
+            contentTypeIdentifier: 'Article',
+            entryTitle: `Article ${i}`,
+            slug: `article-${i}`,
+            versions: [
+              {
+                status: 'PUBLISHED' as const,
+                data: {
+                  title: `Article ${i}`,
+                  author: {
+                    entryId: `syn-author-${i}`,
+                    contentTypeId: 'ct-author',
+                    contentTypeIdentifier: 'Author',
+                  },
+                },
+                publishedAt: '2026-01-01T00:00:00.000Z',
+              },
+            ],
+          })),
+        },
+      ],
+    };
+  }
+
+  it('single-hop cascade: Author 409 → Article cascade-skip, no POST attempted', async () => {
+    const posted: Array<{ contentTypeId?: string }> = [];
+    server = setupServer(
+      http.post(`${baseUrl}/api/content-entries`, async ({ request }) => {
+        const body = (await request.json()) as { contentTypeId?: string };
+        posted.push(body);
+        if (body.contentTypeId === 'ct-author') {
+          return new HttpResponse(null, { status: 409 });
+        }
+        // Article POSTs should never happen.
+        return HttpResponse.json({ id: `unexpected-${posted.length}` });
+      }),
+      http.put(`${baseUrl}/api/content-entries/:id`, async ({ params }) =>
+        HttpResponse.json({ id: params.id })
+      )
+    );
+    server.listen();
+
+    let caught: SeedMostlyDuplicateError | null = null;
+    try {
+      await writeViaHttp({
+        baseUrl,
+        apiKey,
+        generated: makeAuthorsAndArticles(2),
+        concurrency: 1,
+      });
+    } catch (err) {
+      caught = err as SeedMostlyDuplicateError;
+    }
+    // 4 total entries (2 authors + 2 articles), all skipped → 100% > 50%.
+    expect(caught).toBeInstanceOf(SeedMostlyDuplicateError);
+    expect(caught?.inserted).toBe(0);
+    expect(caught?.skipped).toBe(4);
+    expect(caught?.total).toBe(4);
+    // Only the 2 authors were POSTed; the 2 articles were cascade-skipped.
+    expect(posted).toHaveLength(2);
+    expect(posted.every((p) => p.contentTypeId === 'ct-author')).toBe(true);
+  });
+
+  it('multi-hop cascade: Category 409 → Article cascade → Comment cascade', async () => {
+    const posted: Array<{ contentTypeId?: string }> = [];
+    server = setupServer(
+      http.post(`${baseUrl}/api/content-entries`, async ({ request }) => {
+        const body = (await request.json()) as { contentTypeId?: string };
+        posted.push(body);
+        if (body.contentTypeId === 'ct-category') {
+          return new HttpResponse(null, { status: 409 });
+        }
+        return HttpResponse.json({ id: `unexpected-${posted.length}` });
+      }),
+      http.put(`${baseUrl}/api/content-entries/:id`, async ({ params }) =>
+        HttpResponse.json({ id: params.id })
+      )
+    );
+    server.listen();
+
+    const generated: GeneratedSeed = {
+      warnings: [],
+      groups: [
+        {
+          contentTypeIdentifier: 'Category',
+          entries: [
+            {
+              id: 'syn-cat-0',
+              contentTypeId: 'ct-category',
+              contentTypeIdentifier: 'Category',
+              entryTitle: 'Cat 0',
+              slug: null,
+              versions: [
+                {
+                  status: 'PUBLISHED',
+                  data: { name: 'Cat 0' },
+                  publishedAt: '2026-01-01T00:00:00.000Z',
+                },
+              ],
+            },
+          ],
+        },
+        {
+          contentTypeIdentifier: 'Article',
+          entries: [
+            {
+              id: 'syn-art-0',
+              contentTypeId: 'ct-article',
+              contentTypeIdentifier: 'Article',
+              entryTitle: 'Art 0',
+              slug: 'art-0',
+              versions: [
+                {
+                  status: 'PUBLISHED',
+                  data: {
+                    title: 'Art 0',
+                    category: {
+                      entryId: 'syn-cat-0',
+                      contentTypeId: 'ct-category',
+                      contentTypeIdentifier: 'Category',
+                    },
+                  },
+                  publishedAt: '2026-01-01T00:00:00.000Z',
+                },
+              ],
+            },
+          ],
+        },
+        {
+          contentTypeIdentifier: 'Comment',
+          entries: [
+            {
+              id: 'syn-com-0',
+              contentTypeId: 'ct-comment',
+              contentTypeIdentifier: 'Comment',
+              entryTitle: 'Com 0',
+              slug: null,
+              versions: [
+                {
+                  status: 'PUBLISHED',
+                  data: {
+                    body: 'hi',
+                    article: {
+                      entryId: 'syn-art-0',
+                      contentTypeId: 'ct-article',
+                      contentTypeIdentifier: 'Article',
+                    },
+                  },
+                  publishedAt: '2026-01-01T00:00:00.000Z',
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    let caught: SeedMostlyDuplicateError | null = null;
+    try {
+      await writeViaHttp({ baseUrl, apiKey, generated, concurrency: 1 });
+    } catch (err) {
+      caught = err as SeedMostlyDuplicateError;
+    }
+    expect(caught).toBeInstanceOf(SeedMostlyDuplicateError);
+    expect(caught?.inserted).toBe(0);
+    expect(caught?.skipped).toBe(3);
+    expect(caught?.total).toBe(3);
+    // Only the Category POST fired; Article + Comment cascade-skipped.
+    expect(posted).toHaveLength(1);
+    expect(posted[0]!.contentTypeId).toBe('ct-category');
+  });
+
+  it('MULTIRELATION with mixed refs: cascade-skip when one ref is in skippedIds', async () => {
+    const posted: Array<{ contentTypeId?: string }> = [];
+    server = setupServer(
+      http.post(`${baseUrl}/api/content-entries`, async ({ request }) => {
+        const body = (await request.json()) as {
+          contentTypeId?: string;
+          data?: { name?: string };
+        };
+        posted.push(body);
+        // Author A0 inserts cleanly; Author A1 conflicts (409).
+        if (body.contentTypeId === 'ct-author') {
+          if (body.data?.name === 'A1') {
+            return new HttpResponse(null, { status: 409 });
+          }
+          return HttpResponse.json({ id: 'real-author-0' });
+        }
+        // Article POST should never fire — it references the skipped A1.
+        return HttpResponse.json({ id: `unexpected-${posted.length}` });
+      }),
+      http.put(`${baseUrl}/api/content-entries/:id`, async ({ params }) =>
+        HttpResponse.json({ id: params.id })
+      )
+    );
+    server.listen();
+
+    const generated: GeneratedSeed = {
+      warnings: [],
+      groups: [
+        {
+          contentTypeIdentifier: 'Author',
+          entries: [
+            {
+              id: 'syn-a0',
+              contentTypeId: 'ct-author',
+              contentTypeIdentifier: 'Author',
+              entryTitle: 'A0',
+              slug: null,
+              versions: [
+                {
+                  status: 'PUBLISHED',
+                  data: { name: 'A0' },
+                  publishedAt: '2026-01-01T00:00:00.000Z',
+                },
+              ],
+            },
+            {
+              id: 'syn-a1',
+              contentTypeId: 'ct-author',
+              contentTypeIdentifier: 'Author',
+              entryTitle: 'A1',
+              slug: null,
+              versions: [
+                {
+                  status: 'PUBLISHED',
+                  data: { name: 'A1' },
+                  publishedAt: '2026-01-01T00:00:00.000Z',
+                },
+              ],
+            },
+          ],
+        },
+        {
+          contentTypeIdentifier: 'Article',
+          entries: [
+            {
+              id: 'syn-art-0',
+              contentTypeId: 'ct-article',
+              contentTypeIdentifier: 'Article',
+              entryTitle: 'Art 0',
+              slug: 'art-0',
+              versions: [
+                {
+                  status: 'PUBLISHED',
+                  data: {
+                    title: 'Art 0',
+                    authors: [
+                      {
+                        entryId: 'syn-a0',
+                        contentTypeId: 'ct-author',
+                        contentTypeIdentifier: 'Author',
+                      },
+                      {
+                        entryId: 'syn-a1',
+                        contentTypeId: 'ct-author',
+                        contentTypeIdentifier: 'Author',
+                      },
+                    ],
+                  },
+                  publishedAt: '2026-01-01T00:00:00.000Z',
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    // 1 inserted (A0), 2 skipped (A1 via 409 + Article cascade on A1).
+    // 2/3 ≈ 0.667 > 0.5 → SeedMostlyDuplicateError fires. The interesting
+    // assertion is that the Article was NOT POSTed (it cascade-skipped on
+    // the MULTIRELATION ref to A1, not on its mapped ref to A0).
+    let caught: SeedMostlyDuplicateError | null = null;
+    try {
+      await writeViaHttp({ baseUrl, apiKey, generated, concurrency: 1 });
+    } catch (err) {
+      caught = err as SeedMostlyDuplicateError;
+    }
+    expect(caught).toBeInstanceOf(SeedMostlyDuplicateError);
+    expect(caught?.inserted).toBe(1);
+    expect(caught?.skipped).toBe(2);
+    expect(caught?.total).toBe(3);
+    // Only the two Author POSTs fired (A0 success + A1 409). The Article
+    // never reached the server.
+    const authorPosts = posted.filter((p) => p.contentTypeId === 'ct-author');
+    const articlePosts = posted.filter((p) => p.contentTypeId === 'ct-article');
+    expect(authorPosts).toHaveLength(2);
+    expect(articlePosts).toHaveLength(0);
+  });
+
+  it('RICHTEXT body embed cascade: cmsEmbed pointing at skipped entry → cascade-skip', async () => {
+    const posted: Array<{ contentTypeId?: string }> = [];
+    server = setupServer(
+      http.post(`${baseUrl}/api/content-entries`, async ({ request }) => {
+        const body = (await request.json()) as { contentTypeId?: string };
+        posted.push(body);
+        if (body.contentTypeId === 'ct-author') {
+          return new HttpResponse(null, { status: 409 });
+        }
+        return HttpResponse.json({ id: `unexpected-${posted.length}` });
+      }),
+      http.put(`${baseUrl}/api/content-entries/:id`, async ({ params }) =>
+        HttpResponse.json({ id: params.id })
+      )
+    );
+    server.listen();
+
+    const generated: GeneratedSeed = {
+      warnings: [],
+      groups: [
+        {
+          contentTypeIdentifier: 'Author',
+          entries: [
+            {
+              id: 'syn-author-0',
+              contentTypeId: 'ct-author',
+              contentTypeIdentifier: 'Author',
+              entryTitle: 'A0',
+              slug: null,
+              versions: [
+                {
+                  status: 'PUBLISHED',
+                  data: { name: 'A0' },
+                  publishedAt: '2026-01-01T00:00:00.000Z',
+                },
+              ],
+            },
+          ],
+        },
+        {
+          contentTypeIdentifier: 'Article',
+          entries: [
+            {
+              id: 'syn-art-0',
+              contentTypeId: 'ct-article',
+              contentTypeIdentifier: 'Article',
+              entryTitle: 'Art 0',
+              slug: 'art-0',
+              versions: [
+                {
+                  status: 'PUBLISHED',
+                  data: {
+                    body: {
+                      type: 'doc',
+                      content: [
+                        {
+                          type: 'paragraph',
+                          content: [
+                            {
+                              type: 'cmsEmbed',
+                              attrs: {
+                                entryId: 'syn-author-0',
+                                contentTypeId: 'ct-author',
+                                contentTypeIdentifier: 'Author',
+                              },
+                            },
+                          ],
+                        },
+                      ],
+                    },
+                  },
+                  publishedAt: '2026-01-01T00:00:00.000Z',
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    let caught: SeedMostlyDuplicateError | null = null;
+    try {
+      await writeViaHttp({ baseUrl, apiKey, generated, concurrency: 1 });
+    } catch (err) {
+      caught = err as SeedMostlyDuplicateError;
+    }
+    expect(caught).toBeInstanceOf(SeedMostlyDuplicateError);
+    expect(caught?.inserted).toBe(0);
+    expect(caught?.skipped).toBe(2);
+    expect(caught?.total).toBe(2);
+    // Only the Author POST fired; the Article was cascade-skipped on
+    // strength of the cmsEmbed ref.
+    expect(posted).toHaveLength(1);
+    expect(posted[0]!.contentTypeId).toBe('ct-author');
+  });
+
+  it('threshold trip via cascade: 10 authors 409 + 10 articles cascade → SeedMostlyDuplicateError', async () => {
+    const posted: Array<{ contentTypeId?: string }> = [];
+    server = setupServer(
+      http.post(`${baseUrl}/api/content-entries`, async ({ request }) => {
+        const body = (await request.json()) as { contentTypeId?: string };
+        posted.push(body);
+        if (body.contentTypeId === 'ct-author') {
+          return new HttpResponse(null, { status: 409 });
+        }
+        // Articles should never reach here.
+        return HttpResponse.json({ id: `unexpected-${posted.length}` });
+      }),
+      http.put(`${baseUrl}/api/content-entries/:id`, async ({ params }) =>
+        HttpResponse.json({ id: params.id })
+      )
+    );
+    server.listen();
+
+    let caught: SeedMostlyDuplicateError | null = null;
+    try {
+      await writeViaHttp({
+        baseUrl,
+        apiKey,
+        generated: makeAuthorsAndArticles(10),
+        concurrency: 1,
+      });
+    } catch (err) {
+      caught = err as SeedMostlyDuplicateError;
+    }
+    expect(caught).toBeInstanceOf(SeedMostlyDuplicateError);
+    expect(caught?.inserted).toBe(0);
+    expect(caught?.skipped).toBe(20);
+    expect(caught?.total).toBe(20);
+    // 10 authors POSTed; 10 articles cascade-skipped (no POST attempted).
+    expect(posted).toHaveLength(10);
+    expect(posted.every((p) => p.contentTypeId === 'ct-author')).toBe(true);
+  });
+
   it('mixed status codes: 422 still throws, 409 silenced, 429 retried', async () => {
     // Identify each logical entry via its synthetic id (`syn-N`) so 429
     // retries don't shift sequencing. Per-entry plan:
