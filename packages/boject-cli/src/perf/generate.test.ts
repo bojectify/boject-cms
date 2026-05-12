@@ -249,6 +249,53 @@ describe('generatePerfData', () => {
       })
     ).toThrow(/Nope/);
   });
+
+  it('generates dependent content types when given a portable bundle', async () => {
+    const bundle = await loadFixture('with-relations-portable');
+    const r = generatePerfData(bundle, {
+      contentTypeIdentifier: 'Article',
+      count: 5,
+      seed: 1,
+    });
+    // Both Author and Article groups should be present — Article depends on Author via relation
+    const groupIdentifiers = r.groups.map((g) => g.contentTypeIdentifier);
+    expect(groupIdentifiers).toContain('Article');
+    expect(groupIdentifiers).toContain('Author');
+    // Author group must have at least one entry so Article's required `author` relation can populate
+    const authorGroup = r.groups.find(
+      (g) => g.contentTypeIdentifier === 'Author'
+    );
+    expect(authorGroup).toBeDefined();
+    expect(authorGroup!.entries.length).toBeGreaterThan(0);
+  });
+
+  it('populates RELATION field values from the dependency pool when given a portable bundle', async () => {
+    const bundle = await loadFixture('with-relations-portable');
+    const r = generatePerfData(bundle, {
+      contentTypeIdentifier: 'Article',
+      count: 5,
+      seed: 1,
+    });
+    const authorGroup = r.groups.find(
+      (g) => g.contentTypeIdentifier === 'Author'
+    );
+    expect(authorGroup).toBeDefined();
+    const authorIds = new Set(authorGroup!.entries.map((e) => e.id));
+    const articleGroup = r.groups.find(
+      (g) => g.contentTypeIdentifier === 'Article'
+    );
+    expect(articleGroup).toBeDefined();
+    // `author` is required RELATION — every Article entry must reference a generated Author
+    for (const article of articleGroup!.entries) {
+      const authorRef = article.versions![0]!.data.author as {
+        contentTypeIdentifier: string;
+        entryId: string;
+      } | null;
+      expect(authorRef).not.toBeNull();
+      expect(authorRef!.contentTypeIdentifier).toBe('Author');
+      expect(authorIds.has(authorRef!.entryId)).toBe(true);
+    }
+  });
 });
 
 describe('generatePerfData uniqueness at scale', () => {
