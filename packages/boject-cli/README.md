@@ -335,6 +335,14 @@ const result = await runSchemaPull({
 process.exit(result.exitCode);
 ```
 
+## Testing
+
+Three Vitest projects, run via `pnpm test` (all) or individually:
+
+- `pnpm test:unit` — hermetic unit tests. No external dependencies.
+- `pnpm test:e2e` — end-to-end tests that build the CLI via `tsup` and exercise the built `dist/` binary. No DB.
+- `pnpm test:integration` — exercises the SQL writer against a real Postgres. Requires `docker compose up -d` (or any Postgres on `localhost:5432` with the `boject` / `boject` user). Owns its own `boject_perf_test` database — created automatically on first run, schema-reset between suite runs. Does not touch `boject` (dev) or `boject_test` (cms integration).
+
 ## See also
 
 - The CMS itself: [`boject-cms`](https://github.com/bojectify/boject-cms)

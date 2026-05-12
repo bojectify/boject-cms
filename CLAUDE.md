@@ -28,6 +28,7 @@ pnpm test                     # Run all tests across the workspace (cms + packag
 pnpm test:integration         # Run CMS integration tests only (server/api + server/middleware)
 pnpm test:unit                # Run unit tests across all packages (`pnpm -r --if-present test:unit`)
 pnpm test:storybook           # Run Storybook interaction tests in browser mode
+pnpm --filter @boject/cli test:integration   # Run CLI integration tests (real-pg, boject_perf_test DB)
 pnpm typecheck                # Run TypeScript type checker (nuxi typecheck)
 pnpm apikey:create <name>     # Create a new API key (prints raw key once)
 pnpm apikey:list              # List all API keys (prefix, name, status, last used)
@@ -326,6 +327,9 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder. The schema is
 - `packages/boject-cli/src/commands/perf/{scenario,sweep,report,check}.ts` — `boject perf *` command shells.
 - `packages/boject-cli/src/perf/{introspect,preflight,render,runK6,sanitise,confirm,runtime}.ts` — Pure modules powering the perf CLI.
 - `packages/boject-cli/src/vendor/perf/{lib,scenarios}/` — Vendored from `perf/lib/` and `perf/scenarios/`. Drift-detected by `tests/unit/vendorDrift.test.ts`.
+- `packages/boject-cli/tests/integration/globalSetup.ts` — Vitest globalSetup: ensures `boject_perf_test` exists, runs `prisma migrate reset` against it via the cms package's prisma config, seeds the PerfArticle ContentType
+- `packages/boject-cli/tests/integration/seedPerfArticleContentType.ts` — Idempotent direct Prisma seed for the PerfArticle ContentType used by SQL-writer integration tests
+- `packages/boject-cli/tests/integration/writeViaSql.integration.test.ts` — Real-pg coverage for `writeViaSql` (bulk insert, ID preservation, `ON CONFLICT` semantics, `MissingContentTypeError`, clean connection state)
 - `apps/cms/server/api/schema/export.get.ts` / `apply.post.ts` — REST endpoints
 - `apps/cms/server/utils/assertApiKeyScope.ts` — per-handler scope gate
 - `packages/create-boject-cms/src/templates/bojectConfig.ts` — scaffolds `.boject.config.json`
@@ -362,6 +366,8 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder. The schema is
 ## Testing
 
 - **Vitest** — Test runner, configured via `apps/cms/vitest.config.ts` with plain `defineConfig` (not `@nuxt/test-utils/config` due to Nuxt 4.3 incompatibility). Three test projects: `integration` (server/api + server/middleware tests, with `globalSetup` for DB reset/seed), `unit` (scripts, server/utils, utils tests, no DB needed), and `storybook` (browser-mode interaction tests). `fileParallelism: false` prevents port conflicts between test files. The repo root `vitest.config.ts` aggregates `apps/cms`, `packages/boject-cli`, `packages/create-boject-cms`, and `perf` into a single workspace for `pnpm test` (root).
+- **Test databases** — Three isolated Postgres DBs share the local container: `boject` (dev), `boject_test` (cms integration suite — reset+seeded by `apps/cms/vitest.globalSetup.ts`), and `boject_perf_test` (CLI integration suite — owned by `packages/boject-cli/tests/integration/globalSetup.ts`, schema-reset on every suite run via `pnpx prisma migrate reset --force` against the cms package's prisma config, then directly seeded with a `PerfArticle` ContentType). The CLI globalSetup explicitly issues `CREATE DATABASE boject_perf_test` against the admin DB if missing, since Prisma v7's `migrate reset` does not auto-create.
+- **CLI integration tests** — `packages/boject-cli/tests/integration/` holds real-pg tests for the SQL writer; run with `pnpm --filter @boject/cli test:integration`. File pattern: `*.integration.test.ts`. Tests share a single pg `Client` per file (opened in `beforeAll`, closed in `afterAll`); `beforeEach` truncates `ContentEntryVersion` + `ContentEntry` to isolate per-test state. The `boject_perf_test` ContentType row is seeded once per suite and reused across all tests.
 - **@nuxt/test-utils** — Starts a Nuxt dev server for integration tests. Tests must use `setup({ dev: true })` (production mode masks GraphQL errors).
 - **Test location** — Colocated with source files (e.g. `apps/cms/server/api/graphql/graphql.test.ts`).
 - **Test API key** — All REST and GraphQL integration tests authenticate with a deterministic test key (`boject_test_key_for_integration_tests_only`) seeded via `apps/cms/prisma/seed.ts`.
