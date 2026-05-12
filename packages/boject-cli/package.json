@@ -28,7 +28,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run --project unit",
-    "test:e2e": "vitest run tests/e2e"
+    "test:e2e": "vitest run tests/e2e",
+    "test:integration": "vitest run --project integration"
   },
   "dependencies": {
     "pg": "^8.13.1",
@@ -36,6 +37,8 @@
     "yaml": "^2.6.1"
   },
   "devDependencies": {
+    "@prisma/adapter-pg": "^7.4.1",
+    "@prisma/client": "^7.4.1",
     "@types/node": "^24.12.2",
     "@types/pg": "^8.11.10",
     "@types/semver": "^7.5.8",

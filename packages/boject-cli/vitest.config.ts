@@ -25,6 +25,21 @@ export default defineConfig({
           fileParallelism: false,
         },
       },
+      {
+        extends: true,
+        test: {
+          name: 'integration',
+          include: ['tests/integration/**/*.integration.test.ts'],
+          environment: 'node',
+          // pg connect + migrate reset is slow on first run; allow headroom.
+          testTimeout: 30_000,
+          hookTimeout: 60_000,
+          globalSetup: ['./tests/integration/globalSetup.ts'],
+          // Serialise: tests share boject_perf_test; running in parallel
+          // races on TRUNCATE between beforeEach hooks.
+          fileParallelism: false,
+        },
+      },
     ],
   },
 });
