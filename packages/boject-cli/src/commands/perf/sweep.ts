@@ -2,7 +2,6 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runPreflight } from '../../perf/preflight.js';
-import type { probeContentWriteScope } from '../../perf/probeContentWriteScope.js';
 import { runK6 } from '../../perf/runK6.js';
 import { renderReport, type RunMetadata } from '../../perf/render.js';
 import { confirmHeavyRun } from '../../perf/confirm.js';
@@ -40,11 +39,9 @@ export interface PerfSweepFlags {
   // New (#159) — seed-then-run + read-only opt-in
   readOnly?: boolean;
   databaseUrl?: string;
-  httpSeed?: boolean;
   bundle?: string;
   size?: number;
   seed?: number;
-  concurrency?: number;
   reset?: boolean;
   allowDatabase?: string[];
 }
@@ -69,8 +66,6 @@ export interface PerfSweepParams {
   flags: PerfSweepFlags;
   stdout: (line: string) => void;
   stderr: (line: string) => void;
-  /** Test-only injection seam for the content:write probe. */
-  probeContentWrite?: typeof probeContentWriteScope;
   /** Test-only injection seam for the pg-sampler factory. */
   startPgSampler?: typeof startPgSampler;
 }
@@ -138,12 +133,11 @@ export async function runPerfSweep(
   const defaults = await loadDefaults(params.cwd, params.stderr);
   const effectiveDatabaseUrl = flags.databaseUrl ?? defaults.perfDatabaseUrl;
 
-  // #159: pre-flight requires either --read-only or a seed transport.
-  if (!flags.readOnly && !effectiveDatabaseUrl && !flags.httpSeed) {
+  // #159: pre-flight requires either --read-only or --database-url.
+  if (!flags.readOnly && !effectiveDatabaseUrl) {
     params.stderr(
-      'boject perf sweep without --read-only must provide a seed transport ' +
-        '(--database-url for SQL or --http-seed for HTTP). ' +
-        'Read-only mode is now opt-in via --read-only.'
+      'boject perf sweep without --read-only requires --database-url. ' +
+        'Re-run with --database-url to opt into target mutation.'
     );
     return { exitCode: 2 };
   }
@@ -210,7 +204,6 @@ export async function runPerfSweep(
           runMetadata: buildPartialMeta({
             mode: deriveMode({
               readOnly: flags.readOnly,
-              httpSeed: flags.httpSeed,
               databaseUrl: effectiveDatabaseUrl,
             }),
             contentType,
@@ -233,11 +226,9 @@ export async function runPerfSweep(
         size: flags.size ?? defaults.size ?? 10000,
         seed: flags.seed ?? defaults.seed,
         databaseUrl: effectiveDatabaseUrl,
-        httpSeed: flags.httpSeed,
         bundle: flags.bundle,
         url,
         apiKey,
-        concurrency: flags.concurrency,
         allowDatabase: flags.allowDatabase,
         yes: flags.yes,
       });
@@ -250,7 +241,6 @@ export async function runPerfSweep(
         runMetadata: buildPartialMeta({
           mode: deriveMode({
             readOnly: flags.readOnly,
-            httpSeed: flags.httpSeed,
             databaseUrl: effectiveDatabaseUrl,
           }),
           contentType,
@@ -274,8 +264,6 @@ export async function runPerfSweep(
     relationFieldOverride: flags.relationField ?? defaults.relationField,
     k6Available: defaultK6Available,
     fetchHealth: defaultFetchHealth,
-    requireContentWrite: !flags.readOnly && flags.httpSeed === true,
-    probeContentWrite: params.probeContentWrite,
   });
   if (!preflightResult.ok) {
     for (const e of preflightResult.errors) params.stderr(`Error: ${e}`);
@@ -329,7 +317,6 @@ export async function runPerfSweep(
   // so the CSV is fully flushed.
   const mode = deriveMode({
     readOnly: flags.readOnly,
-    httpSeed: flags.httpSeed,
     databaseUrl: effectiveDatabaseUrl,
   });
   const startSampler = params.startPgSampler ?? startPgSampler;

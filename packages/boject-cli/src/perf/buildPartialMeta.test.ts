@@ -34,7 +34,7 @@ describe('buildPartialMeta', () => {
 
   it("preserves the realised seed count when partialFailureSource is 'seed'", () => {
     const meta = buildPartialMeta({
-      mode: 'seed-http',
+      mode: 'seed-direct',
       contentType: 'Article',
       url: 'http://cms.local/api/graphql',
       cliVersion: '1.2.3',

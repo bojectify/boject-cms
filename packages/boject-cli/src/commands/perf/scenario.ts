@@ -2,7 +2,6 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runPreflight } from '../../perf/preflight.js';
-import type { probeContentWriteScope } from '../../perf/probeContentWriteScope.js';
 import { runK6 } from '../../perf/runK6.js';
 import { renderReport, type RunMetadata } from '../../perf/render.js';
 import { confirmHeavyRun } from '../../perf/confirm.js';
@@ -41,11 +40,9 @@ export interface PerfScenarioFlags {
   // New (#159) — seed-then-run + read-only opt-in
   readOnly?: boolean;
   databaseUrl?: string;
-  httpSeed?: boolean;
   bundle?: string;
   size?: number;
   seed?: number;
-  concurrency?: number;
   reset?: boolean;
   allowDatabase?: string[];
   // #179 — rest-crud-cycle iterations per phase.
@@ -72,8 +69,6 @@ export interface PerfScenarioParams {
   flags: PerfScenarioFlags;
   stdout: (line: string) => void;
   stderr: (line: string) => void;
-  /** Test-only injection seam for the content:write probe. */
-  probeContentWrite?: typeof probeContentWriteScope;
   /** Test-only injection seam for the pg-sampler factory. */
   startPgSampler?: typeof startPgSampler;
 }
@@ -211,7 +206,7 @@ export async function runPerfScenario(
   if (name === 'rest-crud-cycle' && flags.readOnly) {
     params.stderr(
       'Error: rest-crud-cycle mutates target state. ' +
-        'Re-run with --database-url or --http-seed to opt into target mutation.\n'
+        'Re-run with --database-url to opt into target mutation.\n'
     );
     return { exitCode: 2 };
   }
@@ -222,12 +217,11 @@ export async function runPerfScenario(
   const effectiveDatabaseUrl =
     flags.databaseUrl ?? configDefaults.perfDatabaseUrl;
 
-  // #159: pre-flight requires either --read-only or a seed transport.
-  if (!flags.readOnly && !effectiveDatabaseUrl && !flags.httpSeed) {
+  // #159: pre-flight requires either --read-only or --database-url.
+  if (!flags.readOnly && !effectiveDatabaseUrl) {
     params.stderr(
-      'boject perf scenario without --read-only must provide a seed transport ' +
-        '(--database-url for SQL or --http-seed for HTTP). ' +
-        'Read-only mode is now opt-in via --read-only.'
+      'boject perf scenario without --read-only requires --database-url. ' +
+        'Re-run with --database-url to opt into target mutation.'
     );
     return { exitCode: 2 };
   }
@@ -271,7 +265,6 @@ export async function runPerfScenario(
           runMetadata: buildPartialMeta({
             mode: deriveMode({
               readOnly: flags.readOnly,
-              httpSeed: flags.httpSeed,
               databaseUrl: effectiveDatabaseUrl,
             }),
             contentType: resolved.contentType,
@@ -303,11 +296,9 @@ export async function runPerfScenario(
           size: flags.size ?? configDefaults.size ?? 10000,
           seed: flags.seed ?? configDefaults.seed,
           databaseUrl: effectiveDatabaseUrl,
-          httpSeed: flags.httpSeed,
           bundle: flags.bundle,
           url: resolved.url,
           apiKey: flags.apiKey ?? params.apiKey,
-          concurrency: flags.concurrency,
           allowDatabase: flags.allowDatabase,
           yes: flags.yes,
         });
@@ -320,7 +311,6 @@ export async function runPerfScenario(
           runMetadata: buildPartialMeta({
             mode: deriveMode({
               readOnly: flags.readOnly,
-              httpSeed: flags.httpSeed,
               databaseUrl: effectiveDatabaseUrl,
             }),
             contentType: resolved.contentType,
@@ -345,8 +335,6 @@ export async function runPerfScenario(
     relationFieldOverride: resolved.relationField,
     k6Available: defaultK6Available,
     fetchHealth: defaultFetchHealth,
-    requireContentWrite: !flags.readOnly && flags.httpSeed === true,
-    probeContentWrite: params.probeContentWrite,
   });
 
   if (!preflightResult.ok) {
@@ -412,7 +400,6 @@ export async function runPerfScenario(
   // that ordering — renderReport sits outside both the try and finally.
   const mode = deriveMode({
     readOnly: flags.readOnly,
-    httpSeed: flags.httpSeed,
     databaseUrl: effectiveDatabaseUrl,
   });
   const startSampler = params.startPgSampler ?? startPgSampler;

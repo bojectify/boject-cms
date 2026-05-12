@@ -249,11 +249,6 @@ function buildModeBanner(mode: RunMode): string | null {
   switch (mode) {
     case 'seed-direct':
       return null;
-    case 'seed-http':
-      return (
-        'DB-side metrics unavailable — operator seeded via REST and ' +
-        'has no DB access from this run.'
-      );
     case 'read-only':
       return (
         "Read-only run — DB-side metrics unavailable. Check your CMS host's " +
