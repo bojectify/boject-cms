@@ -103,11 +103,12 @@ export function generatePerfData(
   const publishedAtIso = new Date(window.from.getTime()).toISOString();
 
   // 1. Build the dependency graph rooted at the requested type.
-  const reachable = collectReachable(target, types);
-  const idToType = new Map<string, BundleContentType>(
-    types.filter((t) => t.id).map((t) => [t.id!, t])
+  const identifierToType = new Map<string, BundleContentType>(
+    types.map((t) => [t.identifier, t])
   );
-  const edges = buildEdges(reachable, idToType);
+  const idToIdentifier = buildIdToIdentifierMap(types);
+  const reachable = collectReachable(target, identifierToType, idToIdentifier);
+  const edges = buildEdges(reachable, identifierToType, idToIdentifier);
   const sorted = topoSort(
     reachable.map((t) => t.identifier),
     edges
@@ -121,8 +122,8 @@ export function generatePerfData(
   };
 
   // 3. Generate group-by-group, threading entry-id pools forward
-  // Map keyed by contentTypeId (UUID). Readers (RELATION/MULTIRELATION/RICHTEXT
-  // pool builders) match against UUIDs from field options, so this lookup is O(1).
+  // Map keyed by content-type identifier. Readers (RELATION/MULTIRELATION/RICHTEXT
+  // pool builders) resolve targets via resolveFieldTargetIdentifiers, so this lookup is O(1).
   const idPools = new Map<string, RelationTargetPool>();
   const groups: GeneratedSeedGroup[] = [];
   const rand = rng(seed);
@@ -134,10 +135,6 @@ export function generatePerfData(
     list.push(e);
     deferredByType.set(e.from, list);
   }
-
-  const identifierToType = new Map<string, BundleContentType>(
-    reachable.map((t) => [t.identifier, t])
-  );
 
   for (const identifier of sorted.order) {
     const ct = identifierToType.get(identifier)!;
@@ -169,6 +166,7 @@ export function generatePerfData(
           fanout,
           uniqueTrackers,
           idPools,
+          idToIdentifier,
           warnings,
           contentTypeIdentifier: ct.identifier,
         });
@@ -205,10 +203,11 @@ export function generatePerfData(
       });
     }
 
-    // Update the pool BEFORE deferred-field patches so self-references can use sibling IDs
-    const poolKey = ct.id ?? ct.identifier;
-    idPools.set(poolKey, {
-      contentTypeId: poolKey,
+    // Update the pool BEFORE deferred-field patches so self-references can use sibling IDs.
+    // Keyed by identifier — see the canonical-identifier convention used by
+    // applySchema.ts / planSchema.ts on the CMS server side.
+    idPools.set(ct.identifier, {
+      contentTypeId: ct.identifier,
       contentTypeIdentifier: ct.identifier,
       entryIds: entries.map((e) => e.id!),
     });
@@ -228,6 +227,7 @@ export function generatePerfData(
           fanout,
           uniqueTrackers,
           idPools,
+          idToIdentifier,
           warnings,
           contentTypeIdentifier: ct.identifier,
         });
@@ -249,13 +249,59 @@ export function generatePerfData(
   return { groups, warnings };
 }
 
+/**
+ * Builds a UUID → identifier map from the bundle's content type list.
+ * Empty for fully portable bundles (where every `ct.id` is null). Used
+ * by `resolveFieldTargetIdentifiers` to translate non-portable
+ * `targetContentTypeIds` arrays into the canonical identifier form.
+ */
+function buildIdToIdentifierMap(
+  types: BundleContentType[]
+): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const t of types) {
+    if (t.id) out.set(t.id, t.identifier);
+  }
+  return out;
+}
+
+/**
+ * Resolves a relation/embed field's target content-type list to a
+ * canonical identifier array, accepting both portable and non-portable
+ * bundle shapes:
+ *
+ *   - Portable: `targetContentTypeIdentifiers` is populated; UUIDs are null
+ *   - Non-portable: `targetContentTypeIds` carries UUIDs; identifiers
+ *     are derived via `idToIdentifier`
+ *
+ * Returns identifier strings only — never UUIDs, never nulls. Skips
+ * any UUID that's not in the map (lets the caller decide how to handle
+ * orphaned references; today every caller treats missing pools as
+ * empty, so the silent skip matches existing behaviour).
+ */
+function resolveFieldTargetIdentifiers(
+  targetIds: Array<string | null> | undefined,
+  targetIdentifiers: string[] | undefined,
+  idToIdentifier: Map<string, string>
+): string[] {
+  if (targetIdentifiers && targetIdentifiers.length > 0) {
+    return targetIdentifiers;
+  }
+  if (!targetIds) return [];
+  const out: string[] = [];
+  for (const id of targetIds) {
+    if (typeof id !== 'string') continue;
+    const ident = idToIdentifier.get(id);
+    if (ident) out.push(ident);
+  }
+  return out;
+}
+
 function collectReachable(
   root: BundleContentType,
-  all: BundleContentType[]
+  identifierToType: Map<string, BundleContentType>,
+  idToIdentifier: Map<string, string>
 ): BundleContentType[] {
-  const idToType = new Map<string, BundleContentType>(
-    all.filter((t) => t.id).map((t) => [t.id!, t])
-  );
   const seen = new Set<string>();
   const out: BundleContentType[] = [];
   const queue: BundleContentType[] = [root];
@@ -266,9 +312,13 @@ function collectReachable(
     out.push(t);
     for (const f of t.fields) {
       if (f.type !== 'RELATION' && f.type !== 'MULTIRELATION') continue;
-      const targets = (f.options?.targetContentTypeIds ?? []) as string[];
-      for (const tid of targets) {
-        const target = idToType.get(tid);
+      const targets = resolveFieldTargetIdentifiers(
+        f.options?.targetContentTypeIds as Array<string | null> | undefined,
+        f.options?.targetContentTypeIdentifiers,
+        idToIdentifier
+      );
+      for (const ident of targets) {
+        const target = identifierToType.get(ident);
         if (target && !seen.has(target.identifier)) queue.push(target);
       }
     }
@@ -278,15 +328,20 @@ function collectReachable(
 
 function buildEdges(
   types: BundleContentType[],
-  idToType: Map<string, BundleContentType>
+  identifierToType: Map<string, BundleContentType>,
+  idToIdentifier: Map<string, string>
 ): Edge[] {
   const edges: Edge[] = [];
   for (const t of types) {
     for (const f of t.fields) {
       if (f.type !== 'RELATION' && f.type !== 'MULTIRELATION') continue;
-      const targets = (f.options?.targetContentTypeIds ?? []) as string[];
-      for (const tid of targets) {
-        const target = idToType.get(tid);
+      const targets = resolveFieldTargetIdentifiers(
+        f.options?.targetContentTypeIds as Array<string | null> | undefined,
+        f.options?.targetContentTypeIdentifiers,
+        idToIdentifier
+      );
+      for (const ident of targets) {
+        const target = identifierToType.get(ident);
         if (!target) continue;
         // For MULTIRELATION the empty array satisfies any cardinality, so
         // treat as optional even when field.required is true.
@@ -311,6 +366,7 @@ interface FieldGenContext {
   fanout: { min: number; max: number };
   uniqueTrackers: Map<string, Set<string>>;
   idPools: Map<string, RelationTargetPool>;
+  idToIdentifier: Map<string, string>;
   warnings: string[];
   contentTypeIdentifier: string;
 }
@@ -357,15 +413,19 @@ function generateFieldValue(ctx: FieldGenContext): unknown {
         choices: (field.options?.choices ?? []) as string[],
       });
     case 'RICHTEXT': {
-      const refPool = buildRichtextRefPool(field, ctx.idPools);
+      const refPool = buildRichtextRefPool(
+        field,
+        ctx.idPools,
+        ctx.idToIdentifier
+      );
       return generateRichtext({ rand: ctx.rand, refPool });
     }
     case 'RELATION': {
-      const pool = buildRelationPool(field, ctx.idPools);
+      const pool = buildRelationPool(field, ctx.idPools, ctx.idToIdentifier);
       return generateRelation({ rand: ctx.rand, pool });
     }
     case 'MULTIRELATION': {
-      const pool = buildRelationPool(field, ctx.idPools);
+      const pool = buildRelationPool(field, ctx.idPools, ctx.idToIdentifier);
       return generateMultirelation({
         rand: ctx.rand,
         pool,
@@ -384,12 +444,17 @@ function generateFieldValue(ctx: FieldGenContext): unknown {
 
 function buildRelationPool(
   field: BundleField,
-  idPools: Map<string, RelationTargetPool>
+  idPools: Map<string, RelationTargetPool>,
+  idToIdentifier: Map<string, string>
 ): RelationTargetPool[] {
-  const targetIds = (field.options?.targetContentTypeIds ?? []) as string[];
+  const targetIdentifiers = resolveFieldTargetIdentifiers(
+    field.options?.targetContentTypeIds as Array<string | null> | undefined,
+    field.options?.targetContentTypeIdentifiers,
+    idToIdentifier
+  );
   const pool: RelationTargetPool[] = [];
-  for (const tid of targetIds) {
-    const entry = idPools.get(tid);
+  for (const ident of targetIdentifiers) {
+    const entry = idPools.get(ident);
     if (entry) pool.push(entry);
   }
   return pool;
@@ -397,11 +462,23 @@ function buildRelationPool(
 
 function buildRichtextRefPool(
   field: BundleField,
-  idPools: Map<string, RelationTargetPool>
+  idPools: Map<string, RelationTargetPool>,
+  idToIdentifier: Map<string, string>
 ): RichtextRefPool | null {
-  const embedTargets = (field.options?.targetContentTypeIds ?? []) as string[];
-  const linkTargets = (field.options?.linkTargetContentTypeIds ??
-    []) as string[];
+  const embedTargets = resolveFieldTargetIdentifiers(
+    field.options?.targetContentTypeIds as Array<string | null> | undefined,
+    field.options?.targetContentTypeIdentifiers,
+    idToIdentifier
+  );
+  // Link allow-list: portable form NOT yet emitted by the CMS (no
+  // `linkTargetContentTypeIdentifiers` field in BundleFieldOptions).
+  // Resolves via UUIDs only — link allow-lists in portable bundles are
+  // a separate CMS-side concern (see spec out-of-scope).
+  const linkTargets = resolveFieldTargetIdentifiers(
+    field.options?.linkTargetContentTypeIds as Array<string | null> | undefined,
+    undefined,
+    idToIdentifier
+  );
   if (embedTargets.length === 0 && linkTargets.length === 0) return null;
   return {
     embed: matchPools(embedTargets, idPools),
