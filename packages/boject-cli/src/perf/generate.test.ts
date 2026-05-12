@@ -121,7 +121,7 @@ describe('generatePerfData', () => {
     expect(JSON.stringify(a)).toBe(JSON.stringify(b));
   });
 
-  it('emits a warning and skips IMAGE fields', () => {
+  it('synthesises populated IMAGE field values', () => {
     const bundle: Bundle = {
       version: 2,
       exportedAt: '2026-05-07T00:00:00.000Z',
@@ -158,11 +158,26 @@ describe('generatePerfData', () => {
     };
     const r = generatePerfData(bundle, {
       contentTypeIdentifier: 'Page',
-      count: 1,
+      count: 3,
       seed: 1,
     });
-    expect(r.warnings.some((w) => /IMAGE/.test(w))).toBe(true);
-    expect(r.groups[0]!.entries[0]!.versions![0]!.data.cover).toBeUndefined();
+    // No IMAGE-related warnings should appear.
+    expect(r.warnings.some((w) => /IMAGE/.test(w))).toBe(false);
+    // Every entry's IMAGE field is populated with the ImageFile shape.
+    for (const entry of r.groups[0]!.entries) {
+      const cover = entry.versions![0]!.data.cover as Record<string, unknown>;
+      expect(cover).toBeDefined();
+      expect(cover.mimeType).toBe('image/jpeg');
+      expect(cover.storageKey).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+      );
+      expect(cover.focalPointX).toBe(0.5);
+      expect(cover.focalPointY).toBe(0.5);
+      expect(typeof cover.width).toBe('number');
+      expect(typeof cover.height).toBe('number');
+      expect(typeof cover.fileSize).toBe('number');
+      expect(typeof cover.originalName).toBe('string');
+    }
   });
 
   it('handles an optional self-relation cycle via patches', async () => {
