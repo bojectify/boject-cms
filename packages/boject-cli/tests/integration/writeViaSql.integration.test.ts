@@ -6,7 +6,11 @@ import {
   writeViaSql,
 } from '../../src/perf/writeViaSql.js';
 import { SeedMostlyDuplicateError } from '../../src/perf/seedErrors.js';
-import type { Bundle } from '../../src/vendor/contentBundleTypes.js';
+import type {
+  Bundle,
+  BundleEntry,
+} from '../../src/vendor/contentBundleTypes.js';
+import type { GeneratedSeed } from '../../src/perf/generate.js';
 import { PERF_TEST_DATABASE_URL } from './globalSetup.js';
 
 const PERF_ARTICLE_BUNDLE: Bundle = {
@@ -191,5 +195,137 @@ describe('writeViaSql against real Postgres', () => {
     // transaction open or a query in flight, this would hang or error.
     const probe = await client.query<{ ok: number }>('SELECT 1 AS ok');
     expect(probe.rows[0]!.ok).toBe(1);
+  });
+
+  it('persists relation contentTypeId fields as real UUIDs in JSONB', async () => {
+    // Seed two content types: Author (target) + Article (with `author`
+    // RELATION). Use distinct identifiers so we don't collide with the
+    // suite-wide PerfArticle type seeded in globalSetup. ContentType isn't
+    // touched by the per-test TRUNCATE, so we clean these up at the end.
+    const authorRow = await client.query<{ id: string }>(
+      `INSERT INTO "ContentType" ("id", "name", "identifier", "createdAt", "updatedAt")
+       VALUES (gen_random_uuid(), $1, $2, NOW(), NOW())
+       RETURNING id`,
+      ['PerfWriterAuthor', 'PerfWriterAuthor']
+    );
+    const authorCtId = authorRow.rows[0]!.id;
+    await client.query(
+      `INSERT INTO "ContentTypeField" ("id", "contentTypeId", "identifier", "name", "type", "required", "unique", "order", "createdAt", "updatedAt")
+       VALUES (gen_random_uuid(), $1, 'entryTitle', 'Title', 'ENTRY_TITLE', true, true, 0, NOW(), NOW())`,
+      [authorCtId]
+    );
+
+    const articleRow = await client.query<{ id: string }>(
+      `INSERT INTO "ContentType" ("id", "name", "identifier", "createdAt", "updatedAt")
+       VALUES (gen_random_uuid(), $1, $2, NOW(), NOW())
+       RETURNING id`,
+      ['PerfWriterArticle', 'PerfWriterArticle']
+    );
+    const articleCtId = articleRow.rows[0]!.id;
+    await client.query(
+      `INSERT INTO "ContentTypeField" ("id", "contentTypeId", "identifier", "name", "type", "required", "unique", "order", "createdAt", "updatedAt")
+       VALUES (gen_random_uuid(), $1, 'entryTitle', 'Title', 'ENTRY_TITLE', true, true, 0, NOW(), NOW())`,
+      [articleCtId]
+    );
+    await client.query(
+      `INSERT INTO "ContentTypeField" ("id", "contentTypeId", "identifier", "name", "type", "required", "unique", "order", "options", "createdAt", "updatedAt")
+       VALUES (gen_random_uuid(), $1, 'author', 'Author', 'RELATION', false, false, 1, $2::jsonb, NOW(), NOW())`,
+      [articleCtId, JSON.stringify({ targetContentTypeIds: [authorCtId] })]
+    );
+
+    try {
+      // Hand-build a portable-shape `generated` with one Author + one Article
+      // whose `author` ref uses identifier-form contentTypeId.
+      const authorEntry: BundleEntry = {
+        id: '00000000-0000-4000-8000-000000000001',
+        contentTypeId: null,
+        contentTypeIdentifier: 'PerfWriterAuthor',
+        entryTitle: 'Author One',
+        slug: 'author-one',
+        versions: [
+          {
+            status: 'PUBLISHED',
+            data: { entryTitle: 'Author One', slug: 'author-one' },
+            publishedAt: '2026-05-12T00:00:00.000Z',
+          },
+        ],
+      };
+      const articleEntry: BundleEntry = {
+        id: '00000000-0000-4000-8000-000000000002',
+        contentTypeId: null,
+        contentTypeIdentifier: 'PerfWriterArticle',
+        entryTitle: 'Article One',
+        slug: 'article-one',
+        versions: [
+          {
+            status: 'PUBLISHED',
+            data: {
+              entryTitle: 'Article One',
+              slug: 'article-one',
+              author: {
+                // Identifier-form contentTypeId — the writer must translate
+                // this to the real Author UUID before insert.
+                contentTypeId: 'PerfWriterAuthor',
+                contentTypeIdentifier: 'PerfWriterAuthor',
+                entryId: '00000000-0000-4000-8000-000000000001',
+              },
+            },
+            publishedAt: '2026-05-12T00:00:00.000Z',
+          },
+        ],
+      };
+      const generated: GeneratedSeed = {
+        warnings: [],
+        groups: [
+          {
+            contentTypeIdentifier: 'PerfWriterAuthor',
+            entries: [authorEntry],
+          },
+          {
+            contentTypeIdentifier: 'PerfWriterArticle',
+            entries: [articleEntry],
+          },
+        ],
+      };
+
+      await writeViaSql(client, generated);
+
+      // Query the persisted Article version's `author` field — contentTypeId
+      // must be the real Author content-type UUID, not the identifier string.
+      const result = await client.query<{
+        data: {
+          author: {
+            contentTypeId: string;
+            entryId: string;
+            contentTypeIdentifier: string;
+          };
+        };
+      }>(
+        `SELECT cev."data"
+         FROM "ContentEntryVersion" cev
+         JOIN "ContentEntry" ce ON ce.id = cev."entryId"
+         WHERE ce."contentTypeId" = $1`,
+        [articleCtId]
+      );
+      expect(result.rows.length).toBe(1);
+      const data = result.rows[0]!.data;
+      expect(data.author.contentTypeId).toBe(authorCtId);
+      expect(data.author.contentTypeId).not.toBe('PerfWriterAuthor');
+      expect(data.author.contentTypeIdentifier).toBe('PerfWriterAuthor');
+      expect(data.author.entryId).toBe('00000000-0000-4000-8000-000000000001');
+    } finally {
+      // Cleanup so the suite is idempotent across re-runs — ContentType is
+      // NOT truncated by the per-test hook. Drop the dependent ContentEntry
+      // (+ ContentEntryVersion via cascade) first so the FK lets us delete
+      // the ContentType rows. ContentTypeField cascades on ContentType delete.
+      await client.query(
+        `DELETE FROM "ContentEntry" WHERE "contentTypeId" IN ($1, $2)`,
+        [authorCtId, articleCtId]
+      );
+      await client.query(
+        `DELETE FROM "ContentType" WHERE "identifier" IN ($1, $2)`,
+        ['PerfWriterAuthor', 'PerfWriterArticle']
+      );
+    }
   });
 });
