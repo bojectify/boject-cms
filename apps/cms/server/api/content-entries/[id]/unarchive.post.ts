@@ -11,8 +11,8 @@ import {
 } from '../../../utils/entryTransitions';
 
 export default defineEventHandler(async (event) => {
-  enforceMutationRateLimit(event, 'content-entries.unarchive');
   assertApiKeyScope(event, 'content:write');
+  enforceMutationRateLimit(event, 'content-entries.unarchive');
   const id = assertUuid(getRouterParam(event, 'id'), 'id');
 
   const entry = await prisma.contentEntry.findUnique({
