@@ -26,6 +26,7 @@ import {
   generateRelation,
   type RelationTargetPool,
 } from './valueGen/relations.js';
+import { generateImage } from './valueGen/image.js';
 
 export interface GenerateOptions {
   contentTypeIdentifier: string;
@@ -371,15 +372,8 @@ function generateFieldValue(ctx: FieldGenContext): unknown {
         fanout: ctx.fanout,
       });
     }
-    case 'IMAGE': {
-      const message = `skipped IMAGE field "${field.identifier}" — generator does not synthesise images`;
-      if (!ctx.warnings.includes(message)) ctx.warnings.push(message);
-      if (field.required) {
-        const reqMessage = `WARNING: required IMAGE field "${field.identifier}" left unset — HTTP-mode runs will fail validation`;
-        if (!ctx.warnings.includes(reqMessage)) ctx.warnings.push(reqMessage);
-      }
-      return undefined;
-    }
+    case 'IMAGE':
+      return generateImage({ rand: ctx.rand, index: ctx.index });
     default:
       ctx.warnings.push(
         `unknown field type "${field.type}" on ${ctx.contentTypeIdentifier}.${field.identifier}`
