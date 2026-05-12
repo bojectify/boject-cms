@@ -12,7 +12,7 @@ export class SeedMostlyDuplicateError extends Error {
         `uniqueness conflicts. ` +
         `This likely means the target DB already contains entries with these titles/slugs. ` +
         `Pass --seed <n> for a different deterministic set, or reset the target DB first ` +
-        `(SQL: \`boject perf reset --database-url <url>\`; HTTP: no equivalent yet — see #184).`
+        `with \`boject perf reset --database-url <url>\`.`
     );
     this.name = 'SeedMostlyDuplicateError';
   }
