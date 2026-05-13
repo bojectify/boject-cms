@@ -183,10 +183,9 @@ describe('Content API filters', async () => {
     const { items } = await $fetch<{
       items: Array<ContentItem & { entryKey: string }>;
       total: number;
-    }>(
-      `/api/content?contentType=${blogPostType.identifier}&perPage=100`,
-      { headers: { cookie } }
-    );
+    }>(`/api/content?contentType=${blogPostType.identifier}&perPage=100`, {
+      headers: { cookie },
+    });
 
     expect(items.every((i) => typeof i.entryKey === 'string')).toBe(true);
     const found = items.find((i) => i.entryKey === expectedKey);
