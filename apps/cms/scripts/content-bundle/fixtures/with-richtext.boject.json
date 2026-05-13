@@ -36,6 +36,7 @@
       "contentTypeId": null,
       "contentTypeIdentifier": "Article",
       "entryTitle": "First Article",
+      "entryKey": "first-article",
       "slug": "first-article",
       "status": "PUBLISHED",
       "publishedAt": "2026-04-01T00:00:00.000Z",
