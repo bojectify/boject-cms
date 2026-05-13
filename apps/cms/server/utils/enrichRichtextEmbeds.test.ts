@@ -67,6 +67,13 @@ describe('collectEmbedContentTypeIds', () => {
     expect(collectEmbedContentTypeIds(null).size).toBe(0);
     expect(collectEmbedContentTypeIds(undefined).size).toBe(0);
   });
+
+  it('skips cmsEmbed / cmsLink nodes with no attrs key at all', () => {
+    const result = collectEmbedContentTypeIds(
+      doc([para([{ type: 'cmsEmbed' }, { type: 'cmsLink' }])])
+    );
+    expect(result.size).toBe(0);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -198,6 +205,26 @@ describe('enrichBodyWithContentTypeIdentifiers', () => {
     expect(result.content[0]!.content[0]!.attrs.contentTypeIdentifier).toBe(
       'Author'
     );
+  });
+
+  it('does not throw on cmsEmbed / cmsLink nodes with no attrs key', () => {
+    const input = doc([para([{ type: 'cmsEmbed' }, { type: 'cmsLink' }])]);
+    const result = enrichBodyWithContentTypeIdentifiers(input, map) as {
+      content: {
+        content: { type: string; attrs?: Record<string, unknown> }[];
+      }[];
+    };
+    const embedNode = result.content[0]!.content[0]!;
+    const linkNode = result.content[0]!.content[1]!;
+    expect(embedNode.type).toBe('cmsEmbed');
+    expect(linkNode.type).toBe('cmsLink');
+    // attrs may be {} (post-enrich) or undefined — either way no identifier was stamped
+    expect(
+      embedNode.attrs && 'contentTypeIdentifier' in embedNode.attrs
+    ).toBeFalsy();
+    expect(
+      linkNode.attrs && 'contentTypeIdentifier' in linkNode.attrs
+    ).toBeFalsy();
   });
 });
 

@@ -1665,8 +1665,9 @@ describe('Content Entry endpoints', async () => {
       expect(res.status).toBe(400);
     });
 
-    it('rejects RELATION with disallowed contentTypeId', async () => {
+    it('rejects RELATION with disallowed contentTypeId and surfaces the offending id', async () => {
       const cookie = await getSessionCookie();
+      const offending = '11111111-1111-4111-8111-111111111111';
       const res = await fetch('/api/content-entries', {
         method: 'POST',
         headers: { cookie, 'Content-Type': 'application/json' },
@@ -1675,13 +1676,16 @@ describe('Content Entry endpoints', async () => {
           data: {
             title: `Wrong Type ${Date.now()}`,
             link: {
-              contentTypeId: '00000000-0000-0000-0000-000000000000',
+              contentTypeId: offending,
               entryId: targetEntry.id,
             },
           },
         }),
       });
       expect(res.status).toBe(400);
+      const body = await res.json();
+      const message = body.statusMessage || body.message || '';
+      expect(message).toContain(`contentTypeId: ${offending}`);
     });
 
     it('rejects MULTIRELATION with duplicate entryIds', async () => {

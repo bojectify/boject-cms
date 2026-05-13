@@ -155,7 +155,7 @@ export async function validateEntryData(
         ) {
           throw createError({
             statusCode: 400,
-            statusMessage: `${field.name} references a content type that is not allowed for this field`,
+            statusMessage: `${field.name} references a content type that is not allowed for this field (contentTypeId: ${rel.contentTypeId})`,
           });
         }
         const entryExists = await prisma.contentEntry.findFirst({
@@ -219,7 +219,7 @@ export async function validateEntryData(
           ) {
             throw createError({
               statusCode: 400,
-              statusMessage: `${field.name} references a content type that is not allowed for this field`,
+              statusMessage: `${field.name} references a content type that is not allowed for this field (contentTypeId: ${rel.contentTypeId})`,
             });
           }
           if (seenEntryIds.has(rel.entryId as string)) {
@@ -371,7 +371,9 @@ function validateRichtextReferences(
       const attrs = (n.attrs ?? {}) as Record<string, unknown>;
       if (
         typeof attrs.contentTypeId !== 'string' ||
-        typeof attrs.entryId !== 'string'
+        attrs.contentTypeId === '' ||
+        typeof attrs.entryId !== 'string' ||
+        attrs.entryId === ''
       ) {
         throw createError({
           statusCode: 400,
@@ -381,13 +383,13 @@ function validateRichtextReferences(
       if (allowedEmbedTypes.length === 0) {
         throw createError({
           statusCode: 400,
-          statusMessage: `${fieldName}: Inline embeds are not allowed in this field.`,
+          statusMessage: `${fieldName}: Inline embeds are not allowed in this field (contentTypeId: ${attrs.contentTypeId}).`,
         });
       }
       if (!allowedEmbedTypes.includes(attrs.contentTypeId)) {
         throw createError({
           statusCode: 400,
-          statusMessage: `${fieldName}: Inline embed references a content type that is not allowed for this field.`,
+          statusMessage: `${fieldName}: Inline embed references a content type that is not allowed for this field (contentTypeId: ${attrs.contentTypeId}).`,
         });
       }
     }
@@ -396,7 +398,9 @@ function validateRichtextReferences(
       const attrs = (n.attrs ?? {}) as Record<string, unknown>;
       if (
         typeof attrs.contentTypeId !== 'string' ||
-        typeof attrs.entryId !== 'string'
+        attrs.contentTypeId === '' ||
+        typeof attrs.entryId !== 'string' ||
+        attrs.entryId === ''
       ) {
         throw createError({
           statusCode: 400,
@@ -406,13 +410,13 @@ function validateRichtextReferences(
       if (allowedLinkTypes.length === 0) {
         throw createError({
           statusCode: 400,
-          statusMessage: `${fieldName}: Entry links are not allowed in this field.`,
+          statusMessage: `${fieldName}: Entry links are not allowed in this field (contentTypeId: ${attrs.contentTypeId}).`,
         });
       }
       if (!allowedLinkTypes.includes(attrs.contentTypeId)) {
         throw createError({
           statusCode: 400,
-          statusMessage: `${fieldName}: Entry link references a content type that is not allowed for this field.`,
+          statusMessage: `${fieldName}: Entry link references a content type that is not allowed for this field (contentTypeId: ${attrs.contentTypeId}).`,
         });
       }
     }

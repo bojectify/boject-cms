@@ -197,6 +197,13 @@ describe('collectRichtextReferences', () => {
     ).toEqual([]);
   });
 
+  it('skips cmsEmbed / cmsLink nodes with no attrs key at all (not just empty attrs)', () => {
+    const refs = collectRichtextReferences(
+      doc([para([{ type: 'cmsEmbed' }, { type: 'cmsLink' }])])
+    );
+    expect(refs).toEqual([]);
+  });
+
   it('caps recursion depth and silently drops deeper references', () => {
     // Build a deeply nested doc whose innermost paragraph contains an embed.
     // Wrap the embed paragraph in 1100 nested blockquotes so it sits below
