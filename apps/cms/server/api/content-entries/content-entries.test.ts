@@ -108,7 +108,8 @@ let testContentType: ContentTypeResponse;
  *   .50-.59   pre-existing republish lifecycle tests
  *   .60-.69   archiveFilter tests
  *   .180-.199 ad-hoc / one-off IPs (currently: .99, .183,
- *             .184-.186 entryKey derivation tests (#205))
+ *             .184-.186 entryKey derivation tests (#205),
+ *             .187-.188 entryKey immutability tests (#205))
  *
  * When adding a new rate-limited test:
  *  1. Find the describe block your test will live in
@@ -481,6 +482,141 @@ describe('Content Entry endpoints', async () => {
       expect(res.status).toBe(400);
       const payload = (await res.json()) as { data?: { error: string } };
       expect(payload.data?.error).toBe('ENTRY_KEY_EMPTY');
+    });
+  });
+
+  describe('entryKey is immutable after create (#205)', () => {
+    it('does not change when entryTitle is renamed via PUT', async () => {
+      const cookie = await getSessionCookie();
+      const suffix = Date.now();
+      const originalTitle = `Original Title ${suffix}`;
+      const renamedTitle = `Renamed Title ${suffix}`;
+      const expectedKey = `original-title-${suffix}`;
+
+      const createRes = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': '203.0.113.187',
+        },
+        body: JSON.stringify({
+          contentTypeId: testContentType.id,
+          data: { title: originalTitle },
+          status: 'DRAFT',
+        }),
+      });
+      expect(createRes.status).toBe(201);
+      const created = (await createRes.json()) as EntryResponse & {
+        entryKey: string;
+      };
+      expect(created.entryKey).toBe(expectedKey);
+
+      const putRes = await fetch(`/api/content-entries/${created.id}`, {
+        method: 'PUT',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': '203.0.113.187',
+        },
+        body: JSON.stringify({
+          data: { title: renamedTitle },
+        }),
+      });
+      expect(putRes.status).toBe(200);
+      const updated = (await putRes.json()) as EntryResponse & {
+        entryKey: string;
+        entryTitle: string;
+      };
+      expect(updated.entryTitle).toBe(renamedTitle);
+      expect(updated.data.title).toBe(renamedTitle);
+      // entryKey must remain the original slugify(originalTitle) value
+      expect(updated.entryKey).toBe(expectedKey);
+
+      // Defence-in-depth: confirm the persisted envelope row also has the
+      // original key — the response shape is built via flattenEntryWithVersion
+      // so this catches any future flatten-helper regression too.
+      const dbRow = await prisma.contentEntry.findUniqueOrThrow({
+        where: { id: created.id },
+        select: { entryKey: true, entryTitle: true },
+      });
+      expect(dbRow.entryKey).toBe(expectedKey);
+      expect(dbRow.entryTitle).toBe(renamedTitle);
+    });
+
+    it('is preserved through archive then unarchive', async () => {
+      const cookie = await getSessionCookie();
+      const suffix = Date.now();
+      const title = `Lifecycle Target ${suffix}`;
+      const expectedKey = `lifecycle-target-${suffix}`;
+
+      // Create entry as DRAFT then publish so archive is legal.
+      const createRes = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': '203.0.113.188',
+        },
+        body: JSON.stringify({
+          contentTypeId: testContentType.id,
+          data: { title },
+          status: 'DRAFT',
+        }),
+      });
+      expect(createRes.status).toBe(201);
+      const created = (await createRes.json()) as EntryResponse & {
+        entryKey: string;
+      };
+      expect(created.entryKey).toBe(expectedKey);
+
+      const publishRes = await fetch(`/api/content-entries/${created.id}`, {
+        method: 'PUT',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': '203.0.113.188',
+        },
+        body: JSON.stringify({
+          status: 'PUBLISHED',
+          data: { title },
+        }),
+      });
+      expect(publishRes.status).toBe(200);
+
+      const archiveRes = await fetch(
+        `/api/content-entries/${created.id}/archive`,
+        {
+          method: 'POST',
+          headers: { cookie, 'X-Forwarded-For': '203.0.113.188' },
+        }
+      );
+      expect(archiveRes.status).toBe(200);
+
+      const unarchiveRes = await fetch(
+        `/api/content-entries/${created.id}/unarchive`,
+        {
+          method: 'POST',
+          headers: { cookie, 'X-Forwarded-For': '203.0.113.188' },
+        }
+      );
+      expect(unarchiveRes.status).toBe(200);
+
+      const getRes = await fetch(`/api/content-entries/${created.id}`, {
+        headers: { cookie, 'X-Forwarded-For': '203.0.113.188' },
+      });
+      expect(getRes.status).toBe(200);
+      const fetched = (await getRes.json()) as EntryResponse & {
+        entryKey: string;
+      };
+      expect(fetched.entryKey).toBe(expectedKey);
+
+      // Defence-in-depth: confirm DB row directly.
+      const dbRow = await prisma.contentEntry.findUniqueOrThrow({
+        where: { id: created.id },
+        select: { entryKey: true },
+      });
+      expect(dbRow.entryKey).toBe(expectedKey);
     });
   });
 
