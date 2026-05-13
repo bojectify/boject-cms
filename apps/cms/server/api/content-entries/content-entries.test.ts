@@ -107,7 +107,8 @@ let testContentType: ContentTypeResponse;
  *   .40-.49   pre-existing unarchive lifecycle tests
  *   .50-.59   pre-existing republish lifecycle tests
  *   .60-.69   archiveFilter tests
- *   .180-.199 ad-hoc / one-off IPs (currently: .99, .183)
+ *   .180-.199 ad-hoc / one-off IPs (currently: .99, .183,
+ *             .184-.186 entryKey derivation tests (#205))
  *
  * When adding a new rate-limited test:
  *  1. Find the describe block your test will live in
