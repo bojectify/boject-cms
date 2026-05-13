@@ -8,6 +8,12 @@ import {
 } from '~/composables/paneOrchestrator';
 import EntryEditorPane from './EntryEditorPane.vue';
 
+// Story fixtures use real UUIDs because parseFieldOptions validates via zod
+const CT_AUTHOR_UUID = '11111111-1111-4111-8111-111111111111';
+const CT_ORG_UUID = '22222222-2222-4222-8222-222222222222';
+const CT_ARTICLE_UUID = '33333333-3333-4333-8333-333333333333';
+const CT_TAG_UUID = '44444444-4444-4444-8444-444444444444';
+
 const fakeOrchestrator = {
   openPicker: () => {},
   openPane: () => {},
@@ -32,9 +38,9 @@ const meta: Meta<typeof EntryEditorPane> = {
         http.get('/api/content-entries/:id', ({ params }) =>
           HttpResponse.json({
             id: params.id,
-            contentTypeId: 'ct-author',
+            contentTypeId: CT_AUTHOR_UUID,
             contentType: {
-              id: 'ct-author',
+              id: CT_AUTHOR_UUID,
               name: 'Author',
               identifier: 'Author',
               fields: [
@@ -167,9 +173,9 @@ export const OpensRelationAtDepth: Story = {
     layout: 'fullscreen',
     msw: {
       handlers: [
-        http.get('/api/content-types/ct-author', () =>
+        http.get(`/api/content-types/${CT_AUTHOR_UUID}`, () =>
           HttpResponse.json({
-            id: 'ct-author',
+            id: CT_AUTHOR_UUID,
             name: 'Author',
             identifier: 'Author',
             fields: [
@@ -205,9 +211,9 @@ export const OpensRelationAtDepth: Story = {
           }
           return HttpResponse.json({
             id: params.id,
-            contentTypeId: 'ct-article',
+            contentTypeId: CT_ARTICLE_UUID,
             contentType: {
-              id: 'ct-article',
+              id: CT_ARTICLE_UUID,
               name: 'Article',
               identifier: 'Article',
               fields: [
@@ -223,14 +229,14 @@ export const OpensRelationAtDepth: Story = {
                   name: 'Author',
                   type: 'RELATION',
                   required: false,
-                  options: { targetContentTypeIds: ['ct-author'] },
+                  options: { targetContentTypeIds: [CT_AUTHOR_UUID] },
                 },
               ],
             },
             status: 'DRAFT',
             data: {
               title: 'Intro to Vue',
-              author: { contentTypeId: 'ct-author', entryId: 'a1' },
+              author: { contentTypeId: CT_AUTHOR_UUID, entryId: 'a1' },
             },
             publishedAt: null,
             createdAt: '2026-04-21T00:00:00.000Z',
@@ -250,7 +256,12 @@ export const OpensRelationAtDepth: Story = {
     const orch = (
       window as unknown as { __orch__: { openPane: ReturnType<typeof fn> } }
     ).__orch__;
-    expect(orch.openPane).toHaveBeenCalledWith('ct-author', 'a1', 'author', 1);
+    expect(orch.openPane).toHaveBeenCalledWith(
+      CT_AUTHOR_UUID,
+      'a1',
+      'author',
+      1
+    );
   },
 };
 
@@ -279,16 +290,16 @@ export const EmitsSavedOnPublish: Story = {
   args: {
     open: true,
     entryId: null,
-    contentTypeId: 'ct-tag',
+    contentTypeId: CT_TAG_UUID,
     depth: 2,
   },
   parameters: {
     layout: 'fullscreen',
     msw: {
       handlers: [
-        http.get('/api/content-types/ct-tag', () =>
+        http.get(`/api/content-types/${CT_TAG_UUID}`, () =>
           HttpResponse.json({
-            id: 'ct-tag',
+            id: CT_TAG_UUID,
             name: 'Tag',
             identifier: 'Tag',
             fields: [
@@ -305,7 +316,7 @@ export const EmitsSavedOnPublish: Story = {
         http.post('/api/content-entries', () =>
           HttpResponse.json({
             id: 'new-tag-1',
-            contentTypeId: 'ct-tag',
+            contentTypeId: CT_TAG_UUID,
             status: 'DRAFT',
             data: { title: 'TypeScript' },
           })
@@ -326,7 +337,7 @@ export const EmitsSavedOnPublish: Story = {
       .__saved__;
     await waitFor(() => expect(saved).toHaveBeenCalled(), { timeout: 3000 });
     expect(saved).toHaveBeenCalledWith({
-      contentTypeId: 'ct-tag',
+      contentTypeId: CT_TAG_UUID,
       entryId: 'new-tag-1',
       entryTitle: 'TypeScript',
     });
@@ -337,8 +348,8 @@ export const EmitsSavedOnPublish: Story = {
 // so the three-deep pane-within-pane flow can be exercised without real data.
 // Article → Author → Organisation.
 const demoContentTypes: Record<string, unknown> = {
-  'ct-article': {
-    id: 'ct-article',
+  [CT_ARTICLE_UUID]: {
+    id: CT_ARTICLE_UUID,
     name: 'Article',
     identifier: 'Article',
     fields: [
@@ -354,12 +365,12 @@ const demoContentTypes: Record<string, unknown> = {
         name: 'Author',
         type: 'RELATION',
         required: false,
-        options: { targetContentTypeIds: ['ct-author'] },
+        options: { targetContentTypeIds: [CT_AUTHOR_UUID] },
       },
     ],
   },
-  'ct-author': {
-    id: 'ct-author',
+  [CT_AUTHOR_UUID]: {
+    id: CT_AUTHOR_UUID,
     name: 'Author',
     identifier: 'Author',
     fields: [
@@ -375,12 +386,12 @@ const demoContentTypes: Record<string, unknown> = {
         name: 'Organisation',
         type: 'RELATION',
         required: false,
-        options: { targetContentTypeIds: ['ct-org'] },
+        options: { targetContentTypeIds: [CT_ORG_UUID] },
       },
     ],
   },
-  'ct-org': {
-    id: 'ct-org',
+  [CT_ORG_UUID]: {
+    id: CT_ORG_UUID,
     name: 'Organisation',
     identifier: 'Organisation',
     fields: [
@@ -404,17 +415,17 @@ const demoEntries: Record<
   }
 > = {
   'article-1': {
-    contentTypeId: 'ct-article',
+    contentTypeId: CT_ARTICLE_UUID,
     title: 'Intro to Vue',
-    relation: { ct: 'ct-author', id: 'author-1' },
+    relation: { ct: CT_AUTHOR_UUID, id: 'author-1' },
   },
   'author-1': {
-    contentTypeId: 'ct-author',
+    contentTypeId: CT_AUTHOR_UUID,
     title: 'Ada Lovelace',
-    relation: { ct: 'ct-org', id: 'org-1' },
+    relation: { ct: CT_ORG_UUID, id: 'org-1' },
   },
   'org-1': {
-    contentTypeId: 'ct-org',
+    contentTypeId: CT_ORG_UUID,
     title: 'Analytical Engine Co.',
   },
 };
@@ -480,7 +491,11 @@ export const StackedPanesDemo: Story = {
       type Seg = { contentTypeId: string; entryId: string; key: number };
       let nextKey = 1;
       const stack = ref<Seg[]>([
-        { contentTypeId: 'ct-article', entryId: 'article-1', key: nextKey++ },
+        {
+          contentTypeId: CT_ARTICLE_UUID,
+          entryId: 'article-1',
+          key: nextKey++,
+        },
       ]);
 
       const orchestrator: PaneOrchestrator = {

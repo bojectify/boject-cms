@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { setup, $fetch, fetch } from '@nuxt/test-utils/e2e';
 import { TEST_USERNAME, TEST_PASSWORD } from '../../test/credentials';
 import { resetRateLimitStore } from '../../utils/rateLimit';
+import { parseFieldOptions } from '../../../utils/fieldOptions';
 
 const TEST_API_KEY = 'boject_test_key_for_integration_tests_only';
 
@@ -751,9 +752,9 @@ describe('Content Type endpoints', async () => {
 
       const relField = ct.fields.find((f) => f.type === 'RELATION');
       expect(relField).toBeDefined();
+      const relOpts = parseFieldOptions(relField!);
       expect(
-        (relField!.options as { targetContentTypeIds: string[] })
-          .targetContentTypeIds
+        relOpts.type === 'RELATION' ? relOpts.targetContentTypeIds : []
       ).toContain(target.id);
     });
 
