@@ -15,7 +15,7 @@ DECLARE
   conflicts TEXT;
 BEGIN
   SELECT string_agg(
-    format('  contentTypeId=%I entryKey=%L titles=[%s]',
+    format('  contentTypeId=%L entryKey=%L titles=[%s]',
            "contentTypeId", "entryKey", titles),
     E'\n'
   )
