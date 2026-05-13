@@ -267,6 +267,64 @@ describe('Content Type endpoints', async () => {
       expect(res.status).toBe(400);
     });
 
+    it('rejects RELATION field with non-array targetContentTypeIds (Site 1a)', async () => {
+      const cookie = await getSessionCookie();
+      const res = await fetch('/api/content-types', {
+        method: 'POST',
+        headers: { cookie, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: `Relation Non-Array ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+            {
+              identifier: 'link',
+              name: 'Link',
+              type: 'RELATION',
+              options: { targetContentTypeIds: 'not-an-array' },
+            },
+          ],
+        }),
+      });
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      const message = body.statusMessage ?? body.message ?? '';
+      expect(message).toContain('must be an array');
+    });
+
+    it('rejects RICHTEXT field with non-array targetContentTypeIds (Site 1b)', async () => {
+      const cookie = await getSessionCookie();
+      const res = await fetch('/api/content-types', {
+        method: 'POST',
+        headers: { cookie, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: `Richtext Non-Array ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+            {
+              identifier: 'body',
+              name: 'Body',
+              type: 'RICHTEXT',
+              options: { targetContentTypeIds: 'not-an-array' },
+            },
+          ],
+        }),
+      });
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      const message = body.statusMessage ?? body.message ?? '';
+      expect(message).toContain('must be an array');
+    });
+
     it('rejects more than one SLUG field', async () => {
       const cookie = await getSessionCookie();
       const res = await fetch('/api/content-types', {

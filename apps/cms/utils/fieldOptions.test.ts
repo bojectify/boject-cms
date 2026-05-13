@@ -4,6 +4,7 @@ import {
   SelectOptionsSchema,
   RelationOptionsSchema,
   RichtextOptionsSchema,
+  getFieldOptionsErrorShape,
 } from './fieldOptions';
 
 const UUID_A = '11111111-1111-4111-8111-111111111111';
@@ -156,6 +157,47 @@ describe('parseFieldOptions', () => {
       expect(() =>
         parseFieldOptions({ type: 'NONSENSE', options: null })
       ).toThrow(/unknown field type/);
+    });
+  });
+
+  describe('getFieldOptionsErrorShape', () => {
+    it('returns invalid_type for shape mismatches', () => {
+      try {
+        RelationOptionsSchema.parse({ targetContentTypeIds: 'not-an-array' });
+      } catch (e) {
+        expect(getFieldOptionsErrorShape(e)).toEqual({
+          key: 'targetContentTypeIds',
+          code: 'invalid_type',
+        });
+      }
+    });
+
+    it('returns invalid_uuid for malformed UUIDs', () => {
+      try {
+        RelationOptionsSchema.parse({ targetContentTypeIds: ['not-a-uuid'] });
+      } catch (e) {
+        expect(getFieldOptionsErrorShape(e)).toEqual({
+          key: 'targetContentTypeIds',
+          code: 'invalid_uuid',
+        });
+      }
+    });
+
+    it('picks linkTargetContentTypeIds when that key is the first issue', () => {
+      try {
+        RichtextOptionsSchema.parse({
+          targetContentTypeIds: [],
+          linkTargetContentTypeIds: ['not-a-uuid'],
+        });
+      } catch (e) {
+        expect(getFieldOptionsErrorShape(e)?.key).toBe(
+          'linkTargetContentTypeIds'
+        );
+      }
+    });
+
+    it('returns undefined for non-zod errors', () => {
+      expect(getFieldOptionsErrorShape(new Error('not zod'))).toBeUndefined();
     });
   });
 

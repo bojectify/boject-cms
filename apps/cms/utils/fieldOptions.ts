@@ -94,6 +94,39 @@ function assertNoPayloadFieldType(type: string): NoPayloadFieldType {
  * Tolerates `null` and `undefined` `options` by treating them as `{}`,
  * which then lets the per-branch schema defaults kick in.
  */
+/**
+ * Inspect a thrown error from `parseFieldOptions` and extract the
+ * structural information CRUD endpoints need to map zod failures back
+ * to their existing status-message format:
+ * - `key`: which allow-list key the first issue is on, defaulting to
+ *   `'targetContentTypeIds'` when not pinpointable.
+ * - `code`: `'invalid_type'` if the failure is a shape mismatch
+ *   (e.g. non-array), `'invalid_uuid'` otherwise.
+ *
+ * Returns `undefined` if the error doesn't look like a zod ZodError.
+ * Callers should treat that as "unexpected — rethrow or surface as-is".
+ */
+export function getFieldOptionsErrorShape(e: unknown):
+  | {
+      key: 'targetContentTypeIds' | 'linkTargetContentTypeIds';
+      code: 'invalid_type' | 'invalid_uuid';
+    }
+  | undefined {
+  const issues = (
+    e as { issues?: Array<{ path: (string | number)[]; code?: string }> }
+  ).issues;
+  if (!Array.isArray(issues) || issues.length === 0) return undefined;
+  const firstPath = issues[0]?.path[0];
+  const key =
+    firstPath === 'targetContentTypeIds' ||
+    firstPath === 'linkTargetContentTypeIds'
+      ? firstPath
+      : 'targetContentTypeIds';
+  const code =
+    issues[0]?.code === 'invalid_type' ? 'invalid_type' : 'invalid_uuid';
+  return { key, code };
+}
+
 export function parseFieldOptions(field: {
   type: FieldType | string;
   options: unknown;

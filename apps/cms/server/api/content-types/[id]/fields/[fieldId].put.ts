@@ -5,7 +5,10 @@ import { enforceMutationRateLimit } from '../../../../utils/rateLimitEndpoint';
 import { invalidateSchema } from '../../../../graphql/schema';
 import { resolveUniqueFlag } from '../../../../utils/validateFieldUnique';
 import { assertSchemaEditable } from '../../../../utils/schemaReadOnly';
-import { parseFieldOptions } from '../../../../../utils/fieldOptions';
+import {
+  parseFieldOptions,
+  getFieldOptionsErrorShape,
+} from '../../../../../utils/fieldOptions';
 
 const VALID_FIELD_TYPES = new Set<string>([
   'ENTRY_TITLE',
@@ -63,23 +66,12 @@ export default defineEventHandler(async (event) => {
       try {
         parseFieldOptions({ type: 'RICHTEXT', options: body.options });
       } catch (e) {
-        const issues =
-          (
-            e as {
-              issues?: Array<{ path: (string | number)[]; code?: string }>;
-            }
-          ).issues ?? [];
-        const firstPath = issues[0]?.path[0];
-        const key =
-          firstPath === 'targetContentTypeIds' ||
-          firstPath === 'linkTargetContentTypeIds'
-            ? firstPath
-            : 'targetContentTypeIds';
-        const code = issues[0]?.code;
+        const shape = getFieldOptionsErrorShape(e);
+        const key = shape?.key ?? 'targetContentTypeIds';
         throw createError({
           statusCode: 400,
           statusMessage:
-            code === 'invalid_type'
+            shape?.code === 'invalid_type'
               ? `options.${key} must be an array`
               : `Invalid UUID in ${key}`,
         });
