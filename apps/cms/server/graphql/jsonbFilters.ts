@@ -17,6 +17,13 @@ export function registerDynamicFilterInputs(
     }),
   });
 
+  const DynEntryKeyFilter = builder.inputType('DynEntryKeyFilter', {
+    fields: (t) => ({
+      equals: t.string(),
+      in: t.stringList(),
+    }),
+  });
+
   const DynFloatFilter = builder.inputType('DynFloatFilter', {
     fields: (t) => ({
       equals: t.float(),
@@ -68,6 +75,7 @@ export function registerDynamicFilterInputs(
 
   return {
     DynStringFilter,
+    DynEntryKeyFilter,
     DynFloatFilter,
     DynBooleanFilter,
     DynDateTimeFilter,
@@ -105,6 +113,7 @@ interface JsonbCondition {
 
 interface WhereArgs {
   status?: { equals?: string } | null;
+  entryKey?: { equals?: string; in?: string[] } | null;
   createdAt?: Record<string, unknown> | null;
   updatedAt?: Record<string, unknown> | null;
   [key: string]: unknown;
@@ -200,9 +209,31 @@ export function buildEntryConditions(
   if (!whereArgs) return conditions;
 
   const v = Prisma.raw(`"${alias.version}"`);
+  const e = Prisma.raw(`"${alias.entry}"`);
 
   if (whereArgs.status?.equals) {
     conditions.push(Prisma.sql`${v}."status" = ${whereArgs.status.equals}`);
+  }
+
+  if (whereArgs.entryKey) {
+    if (typeof whereArgs.entryKey.equals === 'string') {
+      conditions.push(
+        Prisma.sql`${e}."entryKey" = ${whereArgs.entryKey.equals}`
+      );
+    }
+    if (
+      Array.isArray(whereArgs.entryKey.in) &&
+      whereArgs.entryKey.in.length > 0
+    ) {
+      const keys = whereArgs.entryKey.in.filter(
+        (x): x is string => typeof x === 'string' && x.length > 0
+      );
+      if (keys.length === 0) {
+        conditions.push(Prisma.sql`FALSE`);
+      } else {
+        conditions.push(Prisma.sql`${e}."entryKey" = ANY(${keys}::text[])`);
+      }
+    }
   }
 
   for (const sysField of ['createdAt', 'updatedAt'] as const) {
@@ -447,7 +478,7 @@ export async function queryDynamicEntries(
   const whereClause = Prisma.join(conditions, ' AND ');
 
   return prisma.$queryRaw`
-    SELECT e."id", e."contentTypeId", v."data", e."slug",
+    SELECT e."id", e."contentTypeId", v."data", e."slug", e."entryKey",
            v."status", v."publishedAt", v."createdAt", v."updatedAt"
     FROM "ContentEntry" e
     JOIN "ContentEntryVersion" v ON v."entryId" = e."id"

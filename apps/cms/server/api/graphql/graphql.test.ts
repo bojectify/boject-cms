@@ -2504,4 +2504,250 @@ describe('GraphQL API', async () => {
       expect(node!.photo.storageKey).toBe('abc-123.jpeg');
     });
   });
+
+  describe('entryKey GraphQL surface (#205)', () => {
+    it('exposes entryKey on the ContentEntry interface and per-type field', async () => {
+      const cookie = await getSessionCookie();
+      const created = await $fetch<{ id: string }>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: 'Post I',
+          identifier: 'PostI',
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+          ],
+        },
+      });
+
+      const entry = await $fetch<{ id: string }>('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: created.id,
+          data: { title: 'GraphQL Read' },
+          status: 'PUBLISHED',
+        },
+      });
+
+      try {
+        const { data, errors } = await gql<{
+          postIList: Connection<{ id: string; entryKey: string }>;
+        }>('{ postIList(first: 10) { edges { node { id entryKey } } } }');
+        expect(errors).toBeUndefined();
+        expect(data.postIList.edges.length).toBe(1);
+        expect(data.postIList.edges[0]!.node.entryKey).toBe('graphql-read');
+
+        // Cross-type contentEntryList exposes entryKey on the interface
+        const { data: crossData, errors: crossErrors } = await gql<{
+          contentEntryList: Connection<{ id: string; entryKey: string }>;
+        }>(
+          '{ contentEntryList(first: 50, where: { contentType: { equals: "PostI" } }) { edges { node { id entryKey } } } }'
+        );
+        expect(crossErrors).toBeUndefined();
+        const node = crossData.contentEntryList.edges.find(
+          (e) => e.node.id === entry.id
+        )?.node;
+        expect(node).toBeTruthy();
+        expect(node!.entryKey).toBe('graphql-read');
+      } finally {
+        await $fetch<unknown>(`/api/content-entries/${entry.id}`, {
+          method: 'DELETE',
+          headers: { cookie },
+        }).catch(() => {});
+        await $fetch<unknown>(`/api/content-types/${created.id}`, {
+          method: 'DELETE',
+          headers: { cookie },
+        }).catch(() => {});
+      }
+    });
+
+    it('filters by entryKey equals', async () => {
+      const cookie = await getSessionCookie();
+      const created = await $fetch<{ id: string }>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: 'Post J',
+          identifier: 'PostJ',
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+          ],
+        },
+      });
+
+      const alpha = await $fetch<{ id: string }>('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: created.id,
+          data: { title: 'Alpha' },
+          status: 'PUBLISHED',
+        },
+      });
+      const beta = await $fetch<{ id: string }>('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: created.id,
+          data: { title: 'Beta' },
+          status: 'PUBLISHED',
+        },
+      });
+
+      try {
+        const { data, errors } = await gql<{
+          postJList: Connection<{ id: string; entryKey: string }>;
+        }>(
+          '{ postJList(first: 10, where: { entryKey: { equals: "beta" } }) { edges { node { id entryKey } } } }'
+        );
+        expect(errors).toBeUndefined();
+        expect(data.postJList.edges.length).toBe(1);
+        expect(data.postJList.edges[0]!.node.entryKey).toBe('beta');
+      } finally {
+        for (const id of [alpha.id, beta.id]) {
+          await $fetch<unknown>(`/api/content-entries/${id}`, {
+            method: 'DELETE',
+            headers: { cookie },
+          }).catch(() => {});
+        }
+        await $fetch<unknown>(`/api/content-types/${created.id}`, {
+          method: 'DELETE',
+          headers: { cookie },
+        }).catch(() => {});
+      }
+    });
+
+    it('filters by entryKey in', async () => {
+      const cookie = await getSessionCookie();
+      const created = await $fetch<{ id: string }>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: 'Post K',
+          identifier: 'PostK',
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+          ],
+        },
+      });
+
+      const e1 = await $fetch<{ id: string }>('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: created.id,
+          data: { title: 'X One' },
+          status: 'PUBLISHED',
+        },
+      });
+      const e2 = await $fetch<{ id: string }>('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: created.id,
+          data: { title: 'X Two' },
+          status: 'PUBLISHED',
+        },
+      });
+      const e3 = await $fetch<{ id: string }>('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: created.id,
+          data: { title: 'X Three' },
+          status: 'PUBLISHED',
+        },
+      });
+
+      try {
+        const { data, errors } = await gql<{
+          postKList: Connection<{ id: string; entryKey: string }>;
+        }>(
+          '{ postKList(first: 10, where: { entryKey: { in: ["x-one", "x-three"] } }) { edges { node { id entryKey } } } }'
+        );
+        expect(errors).toBeUndefined();
+        const keys = data.postKList.edges.map((e) => e.node.entryKey).sort();
+        expect(keys).toEqual(['x-one', 'x-three']);
+      } finally {
+        for (const id of [e1.id, e2.id, e3.id]) {
+          await $fetch<unknown>(`/api/content-entries/${id}`, {
+            method: 'DELETE',
+            headers: { cookie },
+          }).catch(() => {});
+        }
+        await $fetch<unknown>(`/api/content-types/${created.id}`, {
+          method: 'DELETE',
+          headers: { cookie },
+        }).catch(() => {});
+      }
+    });
+
+    it('exposes ByEntryKey lookup', async () => {
+      const cookie = await getSessionCookie();
+      const created = await $fetch<{ id: string }>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: 'Post L',
+          identifier: 'PostL',
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+          ],
+        },
+      });
+
+      const entry = await $fetch<{ id: string }>('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: created.id,
+          data: { title: 'Look Me Up' },
+          status: 'PUBLISHED',
+        },
+      });
+
+      try {
+        const { data, errors } = await gql<{
+          found: { entryKey: string } | null;
+          missing: { entryKey: string } | null;
+        }>(
+          '{ found: postLByEntryKey(entryKey: "look-me-up") { entryKey } missing: postLByEntryKey(entryKey: "nope") { entryKey } }'
+        );
+        expect(errors).toBeUndefined();
+        expect(data.found).not.toBeNull();
+        expect(data.found!.entryKey).toBe('look-me-up');
+        expect(data.missing).toBeNull();
+      } finally {
+        await $fetch<unknown>(`/api/content-entries/${entry.id}`, {
+          method: 'DELETE',
+          headers: { cookie },
+        }).catch(() => {});
+        await $fetch<unknown>(`/api/content-types/${created.id}`, {
+          method: 'DELETE',
+          headers: { cookie },
+        }).catch(() => {});
+      }
+    });
+  });
 });
