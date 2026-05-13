@@ -1,5 +1,6 @@
 import { createError } from 'h3';
 import type { FieldType } from '#prisma';
+import { parseFieldOptions } from '../../utils/fieldOptions';
 import { isUuid } from './validation';
 
 interface FieldDef {
@@ -88,8 +89,8 @@ export async function validateEntryData(
             statusMessage: `${field.name} must be a string`,
           });
         }
-        const opts = field.options as { choices?: string[] } | null;
-        const choices = opts?.choices ?? [];
+        const opts = parseFieldOptions(field);
+        const choices = opts.type === 'SELECT' ? opts.choices : [];
         if (choices.length > 0 && !choices.includes(value)) {
           throw createError({
             statusCode: 400,
@@ -111,12 +112,11 @@ export async function validateEntryData(
             statusMessage: `${field.name} must be a JSON object`,
           });
         }
-        const rtOpts = field.options as {
-          targetContentTypeIds?: string[];
-          linkTargetContentTypeIds?: string[];
-        } | null;
-        const allowedEmbedTypes = rtOpts?.targetContentTypeIds ?? [];
-        const allowedLinkTypes = rtOpts?.linkTargetContentTypeIds ?? [];
+        const rtOpts = parseFieldOptions(field);
+        const allowedEmbedTypes =
+          rtOpts.type === 'RICHTEXT' ? rtOpts.targetContentTypeIds : [];
+        const allowedLinkTypes =
+          rtOpts.type === 'RICHTEXT' ? rtOpts.linkTargetContentTypeIds : [];
         validateRichtextReferences(
           value,
           allowedEmbedTypes,
@@ -145,10 +145,9 @@ export async function validateEntryData(
             statusMessage: `${field.name} must have valid contentTypeId and entryId UUIDs`,
           });
         }
-        const opts = field.options as {
-          targetContentTypeIds?: string[];
-        } | null;
-        const allowedTypes = opts?.targetContentTypeIds ?? [];
+        const opts = parseFieldOptions(field);
+        const allowedTypes =
+          opts.type === 'RELATION' ? opts.targetContentTypeIds : [];
         if (
           allowedTypes.length > 0 &&
           !allowedTypes.includes(rel.contentTypeId as string)
@@ -185,10 +184,9 @@ export async function validateEntryData(
             statusMessage: `${field.name} must be an array`,
           });
         }
-        const opts = field.options as {
-          targetContentTypeIds?: string[];
-        } | null;
-        const allowedTypes = opts?.targetContentTypeIds ?? [];
+        const opts = parseFieldOptions(field);
+        const allowedTypes =
+          opts.type === 'MULTIRELATION' ? opts.targetContentTypeIds : [];
         const seenEntryIds = new Set<string>();
         const validatedRefs: Array<{
           contentTypeId: string;
