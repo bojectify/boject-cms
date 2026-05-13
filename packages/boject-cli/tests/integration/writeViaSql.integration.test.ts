@@ -11,6 +11,7 @@ import type {
   BundleEntry,
 } from '../../src/vendor/contentBundleTypes.js';
 import type { GeneratedSeed } from '../../src/perf/generate.js';
+import { slugify } from '../../src/vendor/slugify.js';
 import { PERF_TEST_DATABASE_URL } from './globalSetup.js';
 
 const PERF_ARTICLE_BUNDLE: Bundle = {
@@ -141,6 +142,28 @@ describe('writeViaSql against real Postgres', () => {
     );
     const actualIds = new Set(r.rows.map((row) => row.id));
     expect(actualIds).toEqual(expectedIds);
+  });
+
+  it('preserves entryKey through bulk insert (#205)', async () => {
+    const generated = generatePerfData(PERF_ARTICLE_BUNDLE, {
+      contentTypeIdentifier: 'PerfArticle',
+      count: 10,
+      seed: 99,
+    });
+
+    await writeViaSql(client, generated);
+
+    const { rows } = await client.query<{
+      id: string;
+      entryKey: string;
+      entryTitle: string;
+    }>(`SELECT id, "entryKey", "entryTitle" FROM "ContentEntry" ORDER BY id`);
+
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      expect(row.entryKey).toBeTruthy();
+      expect(row.entryKey).toBe(slugify(row.entryTitle));
+    }
   });
 
   it('re-running the same seed trips SeedMostlyDuplicateError via ON CONFLICT', async () => {
