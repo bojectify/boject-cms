@@ -188,9 +188,9 @@ function handleEntryPickerInsert(data: EntryPickerSelection) {
   editor.value
     .chain()
     .focus()
-    .insertContent({
-      type: 'cmsEmbed',
-      attrs: { contentTypeId: data.contentTypeId, entryId: data.entryId },
+    .insertCmsEmbed({
+      contentTypeId: data.contentTypeId,
+      entryId: data.entryId,
     })
     .run();
   entryPickerState.value.open = false;
@@ -221,8 +221,32 @@ function handleEntryPickerSave(data: EntryPickerUpdatePayload) {
       .deleteSelection()
       .insertContentAt(pos, { type: nodeType, attrs })
       .run();
+  } else if (nodeType === 'cmsLink') {
+    editor.value
+      .chain()
+      .focus()
+      .insertCmsLink(
+        attrs as {
+          contentTypeId: string;
+          entryId: string;
+          label?: string | null;
+          target?: '_self' | '_blank' | null;
+          rel?: 'nofollow' | null;
+        }
+      )
+      .run();
   } else {
-    editor.value.chain().focus().insertContent({ type: nodeType, attrs }).run();
+    editor.value
+      .chain()
+      .focus()
+      .insertCmsEmbed(
+        attrs as {
+          contentTypeId: string;
+          entryId: string;
+          label?: string | null;
+        }
+      )
+      .run();
   }
   entryPickerState.value.open = false;
 }

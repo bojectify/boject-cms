@@ -13,6 +13,7 @@ declare module '@tiptap/core' {
       insertCmsEmbed: (attrs: {
         contentTypeId: string;
         entryId: string;
+        label?: string | null;
       }) => ReturnType;
     };
   }
