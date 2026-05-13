@@ -10,10 +10,7 @@ export interface PortableRelationRef {
   entryKey: string;
 }
 
-export type EntryKeyMap = Map<
-  string,
-  { slug: string | null; entryTitle: string }
->;
+export type EntryKeyMap = Map<string, string>;
 
 export function encodeRelationRef(
   ref: UuidRelationRef,
@@ -27,16 +24,10 @@ export function encodeRelationRef(
     );
   }
   const entryMap = typeIdentifierToEntryKeys.get(identifier);
-  const keys = entryMap?.get(ref.entryId);
-  if (!keys) {
-    throw new Error(
-      `Cannot encode relation ref: entry ${ref.entryId} not found for ${identifier}`
-    );
-  }
-  const entryKey = keys.slug || keys.entryTitle;
+  const entryKey = entryMap?.get(ref.entryId);
   if (!entryKey) {
     throw new Error(
-      `Cannot encode relation ref: entry ${ref.entryId} has no slug or entryTitle`
+      `Cannot encode relation ref: entry ${ref.entryId} has no entryKey under content type ${identifier}`
     );
   }
   return { contentTypeIdentifier: identifier, entryKey };

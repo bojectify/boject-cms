@@ -8,10 +8,7 @@ import {
 
 const typeIdToIdent = new Map([['aaa-uuid-ct', 'BlogPost']]);
 const typeIdentToEntryKeys = new Map([
-  [
-    'BlogPost',
-    new Map([['post-uuid-1', { slug: 'hello', entryTitle: 'Hello' }]]),
-  ],
+  ['BlogPost', new Map([['post-uuid-1', 'hello']])],
 ]);
 
 const identToTypeId = new Map([['BlogPost', 'aaa-uuid-ct']]);
@@ -38,18 +35,14 @@ describe('encodeRelationRef', () => {
     });
   });
 
-  it('falls back to entryTitle when no slug is set', () => {
-    const ref = encodeRelationRef(
-      { contentTypeId: 'aaa-uuid-ct', entryId: 'post-uuid-1' },
-      typeIdToIdent,
-      new Map([
-        [
-          'BlogPost',
-          new Map([['post-uuid-1', { slug: null, entryTitle: 'Hello' }]]),
-        ],
-      ])
-    );
-    expect(ref.entryKey).toBe('Hello');
+  it('throws when the entry has no entryKey registered', () => {
+    expect(() =>
+      encodeRelationRef(
+        { contentTypeId: 'aaa-uuid-ct', entryId: 'post-uuid-1' },
+        typeIdToIdent,
+        new Map([['BlogPost', new Map()]])
+      )
+    ).toThrow(/has no entryKey/);
   });
 
   it('throws when ref cannot be resolved', () => {
