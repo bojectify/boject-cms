@@ -241,6 +241,7 @@ describe('writeViaSql against real Postgres', () => {
         contentTypeId: null,
         contentTypeIdentifier: 'PerfWriterAuthor',
         entryTitle: 'Author One',
+        entryKey: 'author-one',
         slug: 'author-one',
         versions: [
           {
@@ -255,6 +256,7 @@ describe('writeViaSql against real Postgres', () => {
         contentTypeId: null,
         contentTypeIdentifier: 'PerfWriterArticle',
         entryTitle: 'Article One',
+        entryKey: 'article-one',
         slug: 'article-one',
         versions: [
           {
