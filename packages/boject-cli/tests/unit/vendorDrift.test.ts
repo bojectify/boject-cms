@@ -41,6 +41,10 @@ const PAIRS: Array<{ canonical: string; vendored: string }> = [
     canonical: 'apps/cms/utils/apiKeyScopes.ts',
     vendored: 'packages/boject-cli/src/vendor/apiKeyScopes.ts',
   },
+  {
+    canonical: 'apps/cms/utils/slugify.ts',
+    vendored: 'packages/boject-cli/src/vendor/slugify.ts',
+  },
 ];
 
 describe('vendored files are byte-identical to canonicals', () => {
