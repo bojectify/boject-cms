@@ -27,6 +27,7 @@ import {
   type RelationTargetPool,
 } from './valueGen/relations.js';
 import { generateImage } from './valueGen/image.js';
+import { slugify } from '../vendor/slugify.js';
 
 export interface GenerateOptions {
   contentTypeIdentifier: string;
@@ -192,6 +193,7 @@ export function generatePerfData(
         contentTypeId: ct.id,
         contentTypeIdentifier: ct.identifier,
         entryTitle,
+        entryKey: slugify(entryTitle),
         slug: slugForEnvelope ?? null,
         versions: [
           {
