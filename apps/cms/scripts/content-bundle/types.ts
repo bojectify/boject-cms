@@ -1,5 +1,9 @@
 import type { ContentStatus, FieldType } from '#prisma';
 
+// V2 was redefined in #205: entries are now REQUIRED to carry an `entryKey`
+// string. The version number was deliberately not bumped (clean cutover —
+// no real-world v1/v2 entry-bearing bundles exist outside this repo).
+// Validation enforces the new requirement at validate.ts.
 export const BUNDLE_VERSION = 2;
 
 export type BundleFieldOptions = {
