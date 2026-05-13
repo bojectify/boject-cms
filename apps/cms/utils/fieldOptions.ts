@@ -84,17 +84,6 @@ function assertNoPayloadFieldType(type: string): NoPayloadFieldType {
 }
 
 /**
- * Parse a field row's `options` blob into a typed discriminated union.
- *
- * Replaces the `field.options as { ... }` cast pattern scattered across
- * the validator, CRUD endpoints, GraphQL resolvers, and UI mapper.
- * Throws on shape violations (malformed UUIDs, non-string choices) so
- * data corruption surfaces loudly rather than silently filtering.
- *
- * Tolerates `null` and `undefined` `options` by treating them as `{}`,
- * which then lets the per-branch schema defaults kick in.
- */
-/**
  * Inspect a thrown error from `parseFieldOptions` and extract the
  * structural information CRUD endpoints need to map zod failures back
  * to their existing status-message format:
@@ -105,6 +94,11 @@ function assertNoPayloadFieldType(type: string): NoPayloadFieldType {
  *
  * Returns `undefined` if the error doesn't look like a zod ZodError.
  * Callers should treat that as "unexpected — rethrow or surface as-is".
+ *
+ * Only valid for RELATION / MULTIRELATION / RICHTEXT error shapes — the
+ * `key` default of `targetContentTypeIds` doesn't apply to SELECT (whose
+ * only allow-list-shaped key is `choices`); SELECT CRUD paths don't use
+ * this helper.
  */
 export function getFieldOptionsErrorShape(e: unknown):
   | {
@@ -127,6 +121,17 @@ export function getFieldOptionsErrorShape(e: unknown):
   return { key, code };
 }
 
+/**
+ * Parse a field row's `options` blob into a typed discriminated union.
+ *
+ * Replaces the `field.options as { ... }` cast pattern scattered across
+ * the validator, CRUD endpoints, GraphQL resolvers, and UI mapper.
+ * Throws on shape violations (malformed UUIDs, non-string choices) so
+ * data corruption surfaces loudly rather than silently filtering.
+ *
+ * Tolerates `null` and `undefined` `options` by treating them as `{}`,
+ * which then lets the per-branch schema defaults kick in.
+ */
 export function parseFieldOptions(field: {
   type: FieldType | string;
   options: unknown;
