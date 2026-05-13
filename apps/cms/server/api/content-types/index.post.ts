@@ -4,13 +4,13 @@ import {
   assertIdentifier,
   assertFieldIdentifier,
   toPascalCase,
-  isUuid,
 } from '../../utils/validation';
 import { withPrismaErrors } from '../../utils/prismaErrors';
 import { enforceMutationRateLimit } from '../../utils/rateLimitEndpoint';
 import { invalidateSchema } from '../../graphql/schema';
 import { resolveUniqueFlag } from '../../utils/validateFieldUnique';
 import { assertSchemaEditable } from '../../utils/schemaReadOnly';
+import { parseFieldOptions } from '../../../utils/fieldOptions';
 
 const VALID_FIELD_TYPES = new Set<string>([
   'ENTRY_TITLE',
@@ -85,52 +85,51 @@ export default defineEventHandler(async (event) => {
     const type = f.type as FieldType;
 
     if (type === 'RELATION' || type === 'MULTIRELATION') {
-      const opts = f.options as { targetContentTypeIds?: unknown } | null;
-      if (
-        !opts ||
-        !Array.isArray(opts.targetContentTypeIds) ||
-        opts.targetContentTypeIds.length === 0
-      ) {
+      let opts;
+      try {
+        opts = parseFieldOptions({ type, options: f.options });
+      } catch {
+        throw createError({
+          statusCode: 400,
+          statusMessage: `Invalid UUID in fields[${idx}].options.targetContentTypeIds`,
+        });
+      }
+      const ids =
+        opts.type === 'RELATION' || opts.type === 'MULTIRELATION'
+          ? opts.targetContentTypeIds
+          : [];
+      if (ids.length === 0) {
         throw createError({
           statusCode: 400,
           statusMessage: `fields[${idx}].options.targetContentTypeIds is required for relation fields`,
         });
       }
-      for (const targetId of opts.targetContentTypeIds) {
-        if (!isUuid(targetId)) {
-          throw createError({
-            statusCode: 400,
-            statusMessage: `Invalid UUID in fields[${idx}].options.targetContentTypeIds`,
-          });
-        }
-      }
     }
 
     if (type === 'RICHTEXT' && f.options && typeof f.options === 'object') {
-      const opts = f.options as {
-        targetContentTypeIds?: unknown;
-        linkTargetContentTypeIds?: unknown;
-      };
-      for (const key of [
-        'targetContentTypeIds',
-        'linkTargetContentTypeIds',
-      ] as const) {
-        const val = opts[key];
-        if (val === undefined) continue;
-        if (!Array.isArray(val)) {
-          throw createError({
-            statusCode: 400,
-            statusMessage: `fields[${idx}].options.${key} must be an array`,
-          });
-        }
-        for (const targetId of val) {
-          if (typeof targetId !== 'string' || !isUuid(targetId)) {
-            throw createError({
-              statusCode: 400,
-              statusMessage: `Invalid UUID in fields[${idx}].options.${key}`,
-            });
-          }
-        }
+      try {
+        parseFieldOptions({ type, options: f.options });
+      } catch (e) {
+        const issues =
+          (
+            e as {
+              issues?: Array<{ path: (string | number)[]; code?: string }>;
+            }
+          ).issues ?? [];
+        const firstPath = issues[0]?.path[0];
+        const key =
+          firstPath === 'targetContentTypeIds' ||
+          firstPath === 'linkTargetContentTypeIds'
+            ? firstPath
+            : 'targetContentTypeIds';
+        const code = issues[0]?.code;
+        throw createError({
+          statusCode: 400,
+          statusMessage:
+            code === 'invalid_type'
+              ? `fields[${idx}].options.${key} must be an array`
+              : `Invalid UUID in fields[${idx}].options.${key}`,
+        });
       }
     }
 
