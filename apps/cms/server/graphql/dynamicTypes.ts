@@ -34,6 +34,7 @@ export interface ContentEntryShape {
   contentTypeId: string;
   data: unknown;
   slug: string | null;
+  entryKey: string;
   status: 'DRAFT' | 'PUBLISHED' | 'CHANGED' | 'ARCHIVED';
   publishedAt: Date | null;
   createdAt: Date;
@@ -50,6 +51,7 @@ function flattenToShape(
     id: string;
     contentTypeId: string;
     slug: string | null;
+    entryKey: string;
     createdAt: Date;
     updatedAt: Date;
   },
@@ -66,6 +68,7 @@ function flattenToShape(
     contentTypeId: entry.contentTypeId,
     data: version.data,
     slug: entry.slug,
+    entryKey: entry.entryKey,
     status: version.status as ContentEntryShape['status'],
     publishedAt: version.publishedAt,
     createdAt: version.createdAt,
@@ -105,6 +108,7 @@ export function registerDynamicTypes(
     .implement({
       fields: (t) => ({
         id: t.id({ resolve: (entry) => entry.id }),
+        entryKey: t.string({ resolve: (entry) => entry.entryKey }),
         contentType: t.string({
           resolve: (entry) =>
             typeIdToIdentifier.get(entry.contentTypeId) ?? 'ContentEntry',
@@ -317,6 +321,7 @@ export function registerDynamicTypes(
       fields: (t) => {
         const whereFields: Record<string, unknown> = {
           status: t.field({ type: dynFilters.DynContentStatusFilter }),
+          entryKey: t.field({ type: dynFilters.DynEntryKeyFilter }),
           createdAt: t.field({ type: dynFilters.DynDateTimeFilter }),
           updatedAt: t.field({ type: dynFilters.DynDateTimeFilter }),
         };
@@ -343,6 +348,7 @@ export function registerDynamicTypes(
       fields: (t) => {
         const fields: Record<string, unknown> = {
           id: t.id({ resolve: (entry) => entry.id }),
+          entryKey: t.string({ resolve: (entry) => entry.entryKey }),
           contentType: t.string({
             resolve: () => ct.identifier,
           }),
@@ -615,6 +621,23 @@ export function registerDynamicTypes(
         })
       );
     }
+
+    // entryKey lookup — unconditional, every entry has an entryKey (#205).
+    builder.queryField(`${camelName}ByEntryKey`, (t) =>
+      t.field({
+        type: ref,
+        nullable: true,
+        args: { entryKey: t.arg.string({ required: true }) },
+        resolve: async (_root, args) => {
+          const entry = await prisma.contentEntry.findFirst({
+            where: { contentTypeId: ct.id, entryKey: args.entryKey },
+            include: { versions: { where: { status: 'PUBLISHED' } } },
+          });
+          if (!entry || entry.versions.length === 0) return null;
+          return flattenToShape(entry, entry.versions[0]!);
+        },
+      })
+    );
   }
 
   // Cross-type root query: contentEntryList
@@ -687,7 +710,7 @@ export function registerDynamicTypes(
               : Prisma.sql`1=1`;
 
           return (await prisma.$queryRaw`
-            SELECT e."id", e."contentTypeId", v."data", e."slug",
+            SELECT e."id", e."contentTypeId", v."data", e."slug", e."entryKey",
                    v."status", v."publishedAt", v."createdAt", v."updatedAt"
             FROM "ContentEntry" e
             JOIN "ContentEntryVersion" v ON v."entryId" = e."id"

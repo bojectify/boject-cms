@@ -162,6 +162,36 @@ describe('Content API filters', async () => {
     });
   });
 
+  // ── entryKey (#205) ───────────────────────────────────────────
+
+  it('GET /api/content includes entryKey on every item (#205)', async () => {
+    const cookie = await getSessionCookie();
+    const suffix = Date.now();
+    const title = `Unified Listing ${suffix}`;
+    const expectedKey = `unified-listing-${suffix}`;
+
+    await $fetch<EntryResponse>('/api/content-entries', {
+      method: 'POST',
+      headers: { cookie },
+      body: {
+        contentTypeId: blogPostType.id,
+        data: { title },
+        status: 'PUBLISHED',
+      },
+    });
+
+    const { items } = await $fetch<{
+      items: Array<ContentItem & { entryKey: string }>;
+      total: number;
+    }>(`/api/content?contentType=${blogPostType.identifier}&perPage=100`, {
+      headers: { cookie },
+    });
+
+    expect(items.every((i) => typeof i.entryKey === 'string')).toBe(true);
+    const found = items.find((i) => i.entryKey === expectedKey);
+    expect(found).toBeDefined();
+  });
+
   // ── Default listing ───────────────────────────────────────────
 
   const UUID_RE =

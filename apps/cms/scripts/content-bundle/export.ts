@@ -47,7 +47,7 @@ export async function exportBundle(
       map = new Map();
       entryKeysByType.set(identifier, map);
     }
-    map.set(entry.id, { slug: entry.slug, entryTitle: entry.entryTitle });
+    map.set(entry.id, entry.entryKey);
   }
 
   const bundle: Bundle = {
@@ -122,6 +122,7 @@ export async function exportBundle(
         contentTypeId: portable ? null : entry.contentTypeId,
         contentTypeIdentifier: identifier,
         entryTitle: entry.entryTitle,
+        entryKey: entry.entryKey,
         slug: entry.slug,
         versions: entry.versions.map((v) => ({
           status: v.status,

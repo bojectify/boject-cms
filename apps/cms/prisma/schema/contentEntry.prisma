@@ -3,6 +3,7 @@ model ContentEntry {
   contentType   ContentType           @relation(fields: [contentTypeId], references: [id])
   contentTypeId String
   entryTitle    String
+  entryKey      String
   slug          String?
   createdAt     DateTime              @default(now())
   updatedAt     DateTime              @updatedAt
@@ -10,6 +11,7 @@ model ContentEntry {
 
   @@unique([contentTypeId, slug])
   @@unique([contentTypeId, entryTitle])
+  @@unique([contentTypeId, entryKey])
 }
 
 model ContentEntryVersion {

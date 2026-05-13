@@ -69,8 +69,7 @@ export async function importBundle(
         map = new Map();
         typeIdentifierToKeyToEntry.set(ident, map);
       }
-      if (entry.slug) map.set(entry.slug, entry.id);
-      map.set(entry.entryTitle, entry.id);
+      map.set(entry.entryKey, entry.id);
     }
 
     // Pending field-target resolutions — in portable mode, RELATION/
@@ -196,17 +195,11 @@ export async function importBundle(
           );
         }
         const existing = await tx.contentEntry.findFirst({
-          where: {
-            contentTypeId: typeId,
-            OR: [
-              e.slug ? { slug: e.slug } : {},
-              { entryTitle: e.entryTitle },
-            ].filter((w) => Object.keys(w).length > 0),
-          },
+          where: { contentTypeId: typeId, entryKey: e.entryKey },
         });
         if (existing) {
           throw new Error(
-            `Entry "${e.contentTypeIdentifier}:${e.slug ?? e.entryTitle}" already exists on target`
+            `Entry "${e.contentTypeIdentifier}:${e.entryKey}" already exists on target`
           );
         }
       }
@@ -251,6 +244,7 @@ export async function importBundle(
             id: bundle.portable ? undefined : (e.id ?? undefined),
             contentTypeId: typeId,
             entryTitle: e.entryTitle,
+            entryKey: e.entryKey,
             slug: e.slug,
             versions: {
               create: versionSpecs.map((v, i) => ({
@@ -272,8 +266,7 @@ export async function importBundle(
           map = new Map();
           typeIdentifierToKeyToEntry.set(e.contentTypeIdentifier, map);
         }
-        if (e.slug) map.set(e.slug, created.id);
-        map.set(e.entryTitle, created.id);
+        map.set(e.entryKey, created.id);
 
         pendingEntries.push({
           entryId: created.id,

@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "exportedAt": "2026-04-16T18:50:18.743Z",
+  "exportedAt": "2026-05-13T12:22:41.676Z",
   "portable": true,
   "contentTypes": [
     {
@@ -782,6 +782,7 @@
       "contentTypeId": null,
       "contentTypeIdentifier": "SiteSettings",
       "entryTitle": "Site Settings",
+      "entryKey": "site-settings",
       "slug": null,
       "versions": [
         {

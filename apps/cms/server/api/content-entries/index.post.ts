@@ -1,6 +1,6 @@
 import type { Prisma } from '#prisma';
 import { assertUuid } from '../../utils/validation';
-import { withPrismaErrors } from '../../utils/prismaErrors';
+import { translatePrismaError } from '../../utils/prismaErrors';
 import { enforceMutationRateLimit } from '../../utils/rateLimitEndpoint';
 import { assertApiKeyScope } from '../../utils/assertApiKeyScope';
 import { assertUniqueFieldValues } from '../../utils/assertUniqueFieldValues';
@@ -10,6 +10,7 @@ import {
   getPublishedVersion,
   isCmsRequest,
 } from '../../utils/resolveVersion';
+import { slugify } from '../../../utils/slugify';
 
 const VALID_STATUSES = new Set<string>([
   'DRAFT',
@@ -63,34 +64,100 @@ export default defineEventHandler(async (event) => {
   const slug = extractSlug(enrichedData, contentType.fields);
   const entryTitle = extractEntryTitle(enrichedData, contentType.fields);
 
+  const entryKey = slugify(entryTitle);
+  if (entryKey === '') {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'entryTitle contains no slug-safe characters',
+      data: {
+        error: 'ENTRY_KEY_EMPTY',
+        message:
+          'entryTitle must contain at least one alphanumeric character to derive an entryKey.',
+      },
+    });
+  }
+
+  const conflict = await prisma.contentEntry.findFirst({
+    where: { contentTypeId, entryKey },
+    select: { id: true, entryTitle: true },
+  });
+  if (conflict) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'entryKey conflict',
+      data: {
+        error: 'ENTRY_KEY_CONFLICT',
+        entryKey,
+        conflictingEntryId: conflict.id,
+        conflictingEntryTitle: conflict.entryTitle,
+        message: 'Adjust entryTitle to produce a different entryKey.',
+      },
+    });
+  }
+
   let status = 'DRAFT';
   if (typeof body.status === 'string' && VALID_STATUSES.has(body.status)) {
     status = body.status;
   }
 
-  const created = await withPrismaErrors(
-    () =>
-      prisma.contentEntry.create({
-        data: {
-          contentTypeId,
-          entryTitle,
-          slug,
-          versions: {
-            create: {
-              data: enrichedData as Prisma.InputJsonValue,
-              entryTitle,
-              status: status as 'DRAFT',
-              publishedAt: status === 'PUBLISHED' ? new Date() : undefined,
-            },
+  let created;
+  try {
+    created = await prisma.contentEntry.create({
+      data: {
+        contentTypeId,
+        entryTitle,
+        entryKey,
+        slug,
+        versions: {
+          create: {
+            data: enrichedData as Prisma.InputJsonValue,
+            entryTitle,
+            status: status as 'DRAFT',
+            publishedAt: status === 'PUBLISHED' ? new Date() : undefined,
           },
         },
-        include: { versions: true },
-      }),
-    {
-      uniqueMessage:
-        'An entry with this slug or title already exists for this content type',
+      },
+      include: { versions: true },
+    });
+  } catch (err) {
+    // Race: another request inserted the same entryKey between our pre-check
+    // and create. Surface the same structured 409 the pre-check would have.
+    if (
+      typeof err === 'object' &&
+      err !== null &&
+      'code' in err &&
+      (err as { code: string }).code === 'P2002'
+    ) {
+      const target = (err as { meta?: { target?: string[] | string } }).meta
+        ?.target;
+      const targets = Array.isArray(target)
+        ? target
+        : typeof target === 'string'
+          ? [target]
+          : [];
+      if (targets.includes('entryKey')) {
+        const raceConflict = await prisma.contentEntry.findFirst({
+          where: { contentTypeId, entryKey },
+          select: { id: true, entryTitle: true },
+        });
+        throw createError({
+          statusCode: 409,
+          statusMessage: 'entryKey conflict',
+          data: {
+            error: 'ENTRY_KEY_CONFLICT',
+            entryKey,
+            conflictingEntryId: raceConflict?.id ?? null,
+            conflictingEntryTitle: raceConflict?.entryTitle ?? null,
+            message: 'Adjust entryTitle to produce a different entryKey.',
+          },
+        });
+      }
     }
-  );
+    throw translatePrismaError(err, {
+      uniqueMessage:
+        'An entry with this slug, title, or entryKey already exists for this content type',
+    });
+  }
 
   setResponseStatus(event, 201);
 

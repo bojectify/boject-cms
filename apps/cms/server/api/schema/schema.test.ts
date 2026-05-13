@@ -246,6 +246,7 @@ describe('POST /api/schema/apply', () => {
       data: {
         contentTypeId: ct.id,
         entryTitle: 'X',
+        entryKey: 'x',
         slug: 'x',
         versions: {
           create: {

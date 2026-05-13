@@ -48,11 +48,11 @@ function fakeClient(
       sql.includes('INSERT INTO "ContentEntry"') &&
       sql.includes('RETURNING id')
     ) {
-      // Envelope insert sends params in groups of 6:
-      // (id, contentTypeId, entryTitle, slug, createdAt, updatedAt)
+      // Envelope insert sends params in groups of 7:
+      // (id, contentTypeId, entryTitle, entryKey, slug, createdAt, updatedAt)
       // The first slot of each group is the id we'd be persisting.
       const ids: string[] = [];
-      for (let i = 0; i < params.length; i += 6) {
+      for (let i = 0; i < params.length; i += 7) {
         ids.push(params[i] as string);
       }
       let returned: string[];
@@ -83,6 +83,7 @@ describe('writeViaSql', () => {
               contentTypeId: null,
               contentTypeIdentifier: 'Author',
               entryTitle: 'A',
+              entryKey: 'a',
               slug: null,
               versions: [
                 {
@@ -102,6 +103,7 @@ describe('writeViaSql', () => {
               contentTypeId: null,
               contentTypeIdentifier: 'Article',
               entryTitle: 'Art',
+              entryKey: 'art',
               slug: 'art-0',
               versions: [
                 {
@@ -137,6 +139,47 @@ describe('writeViaSql', () => {
     expect(tables).toContain('ContentEntryVersion');
   });
 
+  it('INSERT INTO "ContentEntry" column list includes entryKey (#205)', async () => {
+    const generated: GeneratedSeed = {
+      warnings: [],
+      groups: [
+        {
+          contentTypeIdentifier: 'TestType',
+          entries: [
+            {
+              id: 'entry-1',
+              contentTypeId: null,
+              contentTypeIdentifier: 'TestType',
+              entryTitle: 'A',
+              entryKey: 'a',
+              slug: 'a',
+              versions: [
+                {
+                  status: 'PUBLISHED',
+                  data: { title: 'A' },
+                  publishedAt: '2026-05-13T00:00:00.000Z',
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const client = fakeClient({
+      contentTypeLookup: [{ identifier: 'TestType', id: 'ct-test' }],
+    });
+    await writeViaSql(client as any, generated);
+    const envelopeInsert = client.calls.find((c) =>
+      c.sql.includes('INSERT INTO "ContentEntry" (')
+    );
+    expect(envelopeInsert).toBeDefined();
+    expect(envelopeInsert!.sql).toMatch(/"entryKey"/);
+    // 7 columns now: id, contentTypeId, entryTitle, entryKey, slug, createdAt, updatedAt
+    expect(envelopeInsert!.params.length).toBe(7);
+    // entryKey is the 4th param (after id, contentTypeId, entryTitle)
+    expect(envelopeInsert!.params[3]).toBe('a');
+  });
+
   it('rewrites cross-group synthetic IDs to real IDs before inserting versions', async () => {
     const generated: GeneratedSeed = {
       warnings: [],
@@ -149,6 +192,7 @@ describe('writeViaSql', () => {
               contentTypeId: null,
               contentTypeIdentifier: 'Author',
               entryTitle: 'A',
+              entryKey: 'a',
               slug: null,
               versions: [
                 {
@@ -168,6 +212,7 @@ describe('writeViaSql', () => {
               contentTypeId: null,
               contentTypeIdentifier: 'Article',
               entryTitle: 'Art',
+              entryKey: 'art',
               slug: null,
               versions: [
                 {
@@ -216,6 +261,7 @@ describe('writeViaSql', () => {
               contentTypeId: null,
               contentTypeIdentifier: 'Ghost',
               entryTitle: 'G',
+              entryKey: 'g',
               slug: null,
               versions: [
                 {
@@ -247,6 +293,7 @@ describe('writeViaSql', () => {
               contentTypeId: null,
               contentTypeIdentifier: 'Page',
               entryTitle: 'P1',
+              entryKey: 'p1',
               slug: null,
               versions: [
                 {
@@ -261,6 +308,7 @@ describe('writeViaSql', () => {
               contentTypeId: null,
               contentTypeIdentifier: 'Page',
               entryTitle: 'P2',
+              entryKey: 'p2',
               slug: null,
               versions: [
                 {
@@ -302,6 +350,7 @@ describe('writeViaSql', () => {
       contentTypeId: null,
       contentTypeIdentifier: 'Page',
       entryTitle: `P${i}`,
+      entryKey: `p${i}`,
       slug: null,
       versions: [
         {
@@ -335,6 +384,7 @@ describe('writeViaSql', () => {
       contentTypeId: null,
       contentTypeIdentifier: 'Page',
       entryTitle: `P${i}`,
+      entryKey: `p${i}`,
       slug: `p-${i}`,
       versions: [
         {
@@ -444,6 +494,7 @@ describe('writeViaSql', () => {
               contentTypeId: null,
               contentTypeIdentifier: 'Page',
               entryTitle: 'P1',
+              entryKey: 'p1',
               slug: null,
               versions: [
                 {
@@ -458,6 +509,7 @@ describe('writeViaSql', () => {
               contentTypeId: null,
               contentTypeIdentifier: 'Page',
               entryTitle: 'P2',
+              entryKey: 'p2',
               slug: null,
               versions: [
                 {
@@ -521,6 +573,7 @@ describe('writeViaSql', () => {
               contentTypeId: null,
               contentTypeIdentifier: 'Author',
               entryTitle: 'A0',
+              entryKey: 'a0',
               slug: null,
               versions: [
                 {
@@ -535,6 +588,7 @@ describe('writeViaSql', () => {
               contentTypeId: null,
               contentTypeIdentifier: 'Author',
               entryTitle: 'A1',
+              entryKey: 'a1',
               slug: null,
               versions: [
                 {
@@ -554,6 +608,7 @@ describe('writeViaSql', () => {
               contentTypeId: null,
               contentTypeIdentifier: 'Article',
               entryTitle: 'Art0',
+              entryKey: 'art0',
               slug: 'art-0',
               versions: [
                 {
@@ -574,6 +629,7 @@ describe('writeViaSql', () => {
               contentTypeId: null,
               contentTypeIdentifier: 'Article',
               entryTitle: 'Art1',
+              entryKey: 'art1',
               slug: 'art-1',
               versions: [
                 {
@@ -594,6 +650,7 @@ describe('writeViaSql', () => {
               contentTypeId: null,
               contentTypeIdentifier: 'Article',
               entryTitle: 'Art2',
+              entryKey: 'art2',
               slug: 'art-2',
               versions: [
                 {
@@ -659,6 +716,7 @@ describe('writeViaSql', () => {
       contentTypeId: null,
       contentTypeIdentifier: 'Author',
       entryTitle: `Author ${i}`,
+      entryKey: `author-${i}`,
       slug: `author-${i}`,
       versions: [
         {
@@ -676,6 +734,7 @@ describe('writeViaSql', () => {
       contentTypeId: null,
       contentTypeIdentifier: 'Article',
       entryTitle: `Article ${i}`,
+      entryKey: `article-${i}`,
       slug: `article-${i}`,
       versions: [
         {
@@ -751,6 +810,7 @@ describe('writeViaSql', () => {
               contentTypeId: null,
               contentTypeIdentifier: 'Category',
               entryTitle: 'Cat 0',
+              entryKey: 'cat-0',
               slug: 'cat-0',
               versions: [
                 {
@@ -770,6 +830,7 @@ describe('writeViaSql', () => {
               contentTypeId: null,
               contentTypeIdentifier: 'Article',
               entryTitle: 'Article 0',
+              entryKey: 'article-0',
               slug: 'article-0',
               versions: [
                 {
@@ -795,6 +856,7 @@ describe('writeViaSql', () => {
               contentTypeId: null,
               contentTypeIdentifier: 'Comment',
               entryTitle: 'Comment 0',
+              entryKey: 'comment-0',
               slug: 'comment-0',
               versions: [
                 {
@@ -853,6 +915,7 @@ describe('writeViaSql', () => {
               contentTypeId: null,
               contentTypeIdentifier: 'Article',
               entryTitle: 'Article 0',
+              entryKey: 'article-0',
               slug: 'article-0',
               versions: [
                 {
@@ -918,6 +981,7 @@ describe('writeViaSql', () => {
               contentTypeId: null,
               contentTypeIdentifier: 'Article',
               entryTitle: 'Article 0',
+              entryKey: 'article-0',
               slug: 'article-0',
               versions: [
                 {
@@ -1029,13 +1093,13 @@ describe('writeViaSql', () => {
     expect(r.skipped).toBe(2); // A1 + Art1 (cascade)
 
     // Collect all ContentEntry envelope INSERT calls and gather their first
-    // id-slot params (params[0], params[6], params[12], ...).
+    // id-slot params (params[0], params[7], params[14], ...).
     const envelopeInserts = client.calls.filter((c) =>
       c.sql.startsWith('INSERT INTO "ContentEntry"')
     );
     const allInsertedIds: string[] = [];
     for (const call of envelopeInserts) {
-      for (let i = 0; i < call.params.length; i += 6) {
+      for (let i = 0; i < call.params.length; i += 7) {
         allInsertedIds.push(call.params[i] as string);
       }
     }
@@ -1063,6 +1127,7 @@ describe('writeViaSql', () => {
               contentTypeId: null,
               contentTypeIdentifier: 'Page',
               entryTitle: 'P1',
+              entryKey: 'p1',
               slug: 'p1',
               versions: [
                 {
@@ -1077,6 +1142,7 @@ describe('writeViaSql', () => {
               contentTypeId: null,
               contentTypeIdentifier: 'Page',
               entryTitle: 'P2',
+              entryKey: 'p2',
               slug: 'p2',
               versions: [
                 {
@@ -1091,6 +1157,7 @@ describe('writeViaSql', () => {
               contentTypeId: null,
               contentTypeIdentifier: 'Page',
               entryTitle: 'P3',
+              entryKey: 'p3',
               slug: 'p3',
               versions: [
                 {
@@ -1153,6 +1220,7 @@ describe('writeViaSql', () => {
               contentTypeId: null,
               contentTypeIdentifier: 'Page',
               entryTitle: 'P1',
+              entryKey: 'p1',
               slug: 'p1',
               versions: [
                 {
@@ -1167,6 +1235,7 @@ describe('writeViaSql', () => {
               contentTypeId: null,
               contentTypeIdentifier: 'Page',
               entryTitle: 'P2',
+              entryKey: 'p2',
               slug: 'p2',
               versions: [
                 {
@@ -1230,6 +1299,7 @@ describe('writeViaSql', () => {
               contentTypeId: null,
               contentTypeIdentifier: 'Author',
               entryTitle: 'A',
+              entryKey: 'a',
               slug: 'a',
               versions: [
                 {
@@ -1249,6 +1319,7 @@ describe('writeViaSql', () => {
               contentTypeId: null,
               contentTypeIdentifier: 'Article',
               entryTitle: 'AR',
+              entryKey: 'ar',
               slug: 'ar',
               versions: [
                 {

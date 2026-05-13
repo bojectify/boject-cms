@@ -95,6 +95,7 @@ describe('exportBundle', () => {
       data: {
         contentTypeId: ct.id,
         entryTitle: 'Hello',
+        entryKey: 'hello-entry',
         slug: 'hello',
         versions: {
           create: {
@@ -112,6 +113,7 @@ describe('exportBundle', () => {
     expect(bundle.entries).toHaveLength(1);
     expect(bundle.entries![0]).toMatchObject({
       entryTitle: 'Hello',
+      entryKey: 'hello-entry',
       slug: 'hello',
     });
     expect(bundle.entries![0]?.versions).toHaveLength(1);
@@ -141,6 +143,7 @@ describe('exportBundle', () => {
       data: {
         contentTypeId: category.id,
         entryTitle: 'News',
+        entryKey: 'news',
         slug: 'news',
         versions: {
           create: {
@@ -180,6 +183,7 @@ describe('exportBundle', () => {
       data: {
         contentTypeId: blog.id,
         entryTitle: 'Hello',
+        entryKey: 'hello',
         slug: 'hello',
         versions: {
           create: {

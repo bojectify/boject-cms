@@ -114,6 +114,7 @@ describe('applySchema', () => {
         data: {
           contentTypeId: ct.id,
           entryTitle: 'X',
+          entryKey: 'x',
           slug: 'x',
           versions: {
             create: {
@@ -172,6 +173,7 @@ describe('applySchema', () => {
             })
           ).id,
           entryTitle: 'X',
+          entryKey: 'x',
           slug: 'x',
           versions: {
             create: {
@@ -583,6 +585,7 @@ describe('applySchema', () => {
         data: {
           contentTypeId: ct.id,
           entryTitle: 'A',
+          entryKey: 'a',
           slug: 'a',
           versions: {
             create: {
@@ -1200,6 +1203,7 @@ describe('applySchema', () => {
         data: {
           contentTypeId: ct.id,
           entryTitle: 'X',
+          entryKey: 'x',
           slug: 'x',
           versions: {
             create: {

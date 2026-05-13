@@ -34,6 +34,7 @@ async function seed() {
     data: {
       contentTypeId: category.id,
       entryTitle: 'News',
+      entryKey: 'news',
       slug: 'news',
       versions: {
         create: {
@@ -73,6 +74,7 @@ async function seed() {
     data: {
       contentTypeId: post.id,
       entryTitle: 'Welcome',
+      entryKey: 'welcome',
       slug: 'welcome',
       versions: {
         create: {

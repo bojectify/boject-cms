@@ -191,12 +191,12 @@ async function insertEnvelopes(
     }
     const ts = e.versions[0].publishedAt ?? new Date().toISOString();
     valuesPlaceholders.push(
-      `($${p++}, $${p++}, $${p++}, $${p++}, $${p++}, $${p++})`
+      `($${p++}, $${p++}, $${p++}, $${p++}, $${p++}, $${p++}, $${p++})`
     );
-    params.push(e.id, contentTypeId, e.entryTitle, e.slug, ts, ts);
+    params.push(e.id, contentTypeId, e.entryTitle, e.entryKey, e.slug, ts, ts);
   }
   const result = await client.query(
-    `INSERT INTO "ContentEntry" ("id", "contentTypeId", "entryTitle", "slug", "createdAt", "updatedAt") VALUES ${valuesPlaceholders.join(', ')} ON CONFLICT DO NOTHING RETURNING id`,
+    `INSERT INTO "ContentEntry" ("id", "contentTypeId", "entryTitle", "entryKey", "slug", "createdAt", "updatedAt") VALUES ${valuesPlaceholders.join(', ')} ON CONFLICT DO NOTHING RETURNING id`,
     params
   );
   const insertedIds = new Set(result.rows.map((r) => (r as { id: string }).id));

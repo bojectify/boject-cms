@@ -1,4 +1,5 @@
 import type { MaybeRefOrGetter } from 'vue';
+import { slugify } from '~/utils/slugify';
 
 export function useContentEntryEditor(
   contentTypeId: MaybeRefOrGetter<string>,
@@ -223,12 +224,9 @@ export function useContentEntryEditor(
     }
   }
 
-  function generateSlug(text: string): string {
-    return text
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '');
-  }
+  // Re-export the shared algorithm so the composable's public surface
+  // is unchanged. See apps/cms/utils/slugify.ts.
+  const generateSlug = slugify;
 
   return {
     isNew,

@@ -298,6 +298,58 @@ describe('generatePerfData', () => {
   });
 });
 
+describe('generatePerfData entryKey (#205)', () => {
+  it('emits entryKey via slugify(entryTitle) on every entry', async () => {
+    const bundle = await loadFixture('minimal');
+    const r = generatePerfData(bundle, {
+      contentTypeIdentifier: 'Page',
+      count: 5,
+      seed: 42,
+    });
+    for (const e of r.groups[0]!.entries) {
+      expect(e.entryKey).toBeTruthy();
+      expect(e.entryKey).toBe(
+        e.entryTitle
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-|-$/g, '')
+      );
+    }
+  });
+
+  it('produces unique entryKeys across the generated batch', async () => {
+    const bundle = await loadFixture('minimal');
+    const r = generatePerfData(bundle, {
+      contentTypeIdentifier: 'Page',
+      count: 50,
+      seed: 99,
+    });
+    const keys = new Set<string>();
+    for (const e of r.groups[0]!.entries) keys.add(e.entryKey);
+    expect(keys.size).toBe(r.groups[0]!.entries.length);
+  });
+
+  it('emits entryKey on entries from dependency groups too', async () => {
+    const bundle = await loadFixture('with-relations');
+    const r = generatePerfData(bundle, {
+      contentTypeIdentifier: 'Article',
+      count: 5,
+      seed: 1,
+    });
+    for (const group of r.groups) {
+      for (const e of group.entries) {
+        expect(e.entryKey).toBeTruthy();
+        expect(e.entryKey).toBe(
+          e.entryTitle
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-|-$/g, '')
+        );
+      }
+    }
+  });
+});
+
 describe('generatePerfData uniqueness at scale', () => {
   it('produces unique entry IDs across 5000 entries (no PRNG-period collisions)', async () => {
     const bundle = await loadFixture('minimal');
