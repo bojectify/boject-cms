@@ -10,6 +10,11 @@ import type { FieldType } from '#prisma';
  * configured." `z.string().uuid()` is intentional — persisted data is
  * UUID-validated on the write path, so malformed UUIDs at read-time mean
  * data corruption and we want to fail loudly.
+ *
+ * Extra keys not declared in the schema are silently dropped (z.object's
+ * default behavior). We favour forward-compatibility over stowaway
+ * detection here — a future field-options key can be added without
+ * breaking older readers.
  */
 export const SelectOptionsSchema = z.object({
   choices: z.array(z.string()).default([]),
@@ -50,6 +55,34 @@ export type FieldOptions =
         | 'SLUG';
     };
 
+const NO_PAYLOAD_FIELD_TYPES = [
+  'TEXT',
+  'TEXTAREA',
+  'NUMBER',
+  'BOOLEAN',
+  'DATETIME',
+  'IMAGE',
+  'ENTRY_TITLE',
+  'SLUG',
+] as const;
+
+type NoPayloadFieldType = (typeof NO_PAYLOAD_FIELD_TYPES)[number];
+
+function assertNoPayloadFieldType(type: string): NoPayloadFieldType {
+  if ((NO_PAYLOAD_FIELD_TYPES as readonly string[]).includes(type)) {
+    return type as NoPayloadFieldType;
+  }
+  throw new Error(
+    `parseFieldOptions: unknown field type '${type}' (expected one of ${[
+      'SELECT',
+      'RELATION',
+      'MULTIRELATION',
+      'RICHTEXT',
+      ...NO_PAYLOAD_FIELD_TYPES,
+    ].join(', ')})`
+  );
+}
+
 /**
  * Parse a field row's `options` blob into a typed discriminated union.
  *
@@ -76,11 +109,6 @@ export function parseFieldOptions(field: {
     case 'RICHTEXT':
       return { type: 'RICHTEXT', ...RichtextOptionsSchema.parse(raw) };
     default:
-      return {
-        type: field.type as Exclude<
-          FieldOptions,
-          { choices: unknown } | { targetContentTypeIds: unknown }
-        >['type'],
-      };
+      return { type: assertNoPayloadFieldType(field.type) };
   }
 }

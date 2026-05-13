@@ -151,6 +151,12 @@ describe('parseFieldOptions', () => {
         })
       ).toThrow();
     });
+
+    it('throws on an unknown field.type string', () => {
+      expect(() =>
+        parseFieldOptions({ type: 'NONSENSE', options: null })
+      ).toThrow(/unknown field type/);
+    });
   });
 
   describe('exported per-branch schemas', () => {
