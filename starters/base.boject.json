@@ -482,6 +482,7 @@
       "contentTypeId": null,
       "contentTypeIdentifier": "SiteSettings",
       "entryTitle": "Site Settings",
+      "entryKey": "site-settings",
       "slug": null,
       "versions": [
         {
