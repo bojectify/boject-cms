@@ -5,6 +5,7 @@ import { Prisma } from '#prisma';
 import { createError } from 'h3';
 import { GraphQLError } from 'graphql';
 import { prisma } from '../utils/prisma';
+import { parseFieldOptions } from '../../utils/fieldOptions';
 
 export function registerDynamicFilterInputs(
   builder: Builder,
@@ -122,7 +123,7 @@ interface WhereArgs {
 interface FieldDef {
   identifier: string;
   type: string;
-  options?: unknown;
+  options: unknown;
 }
 
 const COMPARISON_OPS = ['equals', 'gt', 'gte', 'lt', 'lte'] as const;
@@ -325,10 +326,9 @@ export function buildEntryConditions(
         );
       }
       if (filter.is && typeof filter.is === 'object') {
-        const opts = field.options as {
-          targetContentTypeIds?: string[];
-        } | null;
-        const targetIds = opts?.targetContentTypeIds ?? [];
+        const opts = parseFieldOptions(field);
+        const targetIds =
+          opts.type === 'RELATION' ? opts.targetContentTypeIds : [];
         if (targetIds.length === 1) {
           const targetType = contentTypes.find((c) => c.id === targetIds[0]);
           if (targetType) {
@@ -396,10 +396,9 @@ export function buildEntryConditions(
         }
       }
       if (filter.some && typeof filter.some === 'object') {
-        const opts = field.options as {
-          targetContentTypeIds?: string[];
-        } | null;
-        const targetIds = opts?.targetContentTypeIds ?? [];
+        const opts = parseFieldOptions(field);
+        const targetIds =
+          opts.type === 'MULTIRELATION' ? opts.targetContentTypeIds : [];
         if (targetIds.length === 1) {
           const targetType = contentTypes.find((c) => c.id === targetIds[0]);
           if (targetType) {

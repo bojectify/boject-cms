@@ -2,6 +2,7 @@ import type { Builder } from './builder';
 import type { ContentStatusEnumRef } from './types/contentStatus';
 import { resolveOffsetConnection } from '@pothos/plugin-relay';
 import { prisma } from '../utils/prisma';
+import { parseFieldOptions } from '../../utils/fieldOptions';
 import { collectRichtextReferences } from '../utils/collectRichtextReferences';
 import {
   registerDynamicFilterInputs,
@@ -297,8 +298,11 @@ export function registerDynamicTypes(
     >();
     for (const field of filterableFields) {
       if (field.type !== 'RELATION' && field.type !== 'MULTIRELATION') continue;
-      const opts = field.options as { targetContentTypeIds?: string[] } | null;
-      const targetIds = opts?.targetContentTypeIds ?? [];
+      const opts = parseFieldOptions(field);
+      const targetIds =
+        opts.type === 'RELATION' || opts.type === 'MULTIRELATION'
+          ? opts.targetContentTypeIds
+          : [];
       if (targetIds.length !== 1) continue;
       const targetRef = whereInputRefs.get(targetIds[0]!);
       if (!targetRef) continue;
@@ -435,10 +439,9 @@ export function registerDynamicTypes(
         // RELATION fields (single polymorphic reference)
         const relationFields = ct.fields.filter((f) => f.type === 'RELATION');
         for (const field of relationFields) {
-          const opts = field.options as {
-            targetContentTypeIds?: string[];
-          } | null;
-          const targetIds = opts?.targetContentTypeIds ?? [];
+          const opts = parseFieldOptions(field);
+          const targetIds =
+            opts.type === 'RELATION' ? opts.targetContentTypeIds : [];
 
           const resolveRef = async (entry: ContentEntryShape) => {
             const data = parseEntryData(entry);
@@ -497,10 +500,9 @@ export function registerDynamicTypes(
           (f) => f.type === 'MULTIRELATION'
         );
         for (const field of multiRelationFields) {
-          const opts = field.options as {
-            targetContentTypeIds?: string[];
-          } | null;
-          const targetIds = opts?.targetContentTypeIds ?? [];
+          const opts = parseFieldOptions(field);
+          const targetIds =
+            opts.type === 'MULTIRELATION' ? opts.targetContentTypeIds : [];
 
           let nodeType: ReturnType<Builder['objectRef']> | undefined;
           if (targetIds.length === 1) {
