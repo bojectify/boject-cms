@@ -172,6 +172,10 @@ export function registerContentEntryWhere(
 ) {
   return builder.inputType('ContentEntryWhere', {
     fields: (t) => ({
+      // entryKey is intentionally NOT exposed on the cross-type filter — it's
+      // per-content-type unique, so a global `entryKey: "news"` filter would
+      // surface ambiguous matches across content types. Per-type Where inputs
+      // expose entryKey (see registerDynamicTypes).
       status: t.field({ type: dynFilters.DynContentStatusFilter }),
       contentType: t.field({ type: dynFilters.DynStringFilter }),
       createdAt: t.field({ type: dynFilters.DynDateTimeFilter }),
