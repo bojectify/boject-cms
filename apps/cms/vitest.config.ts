@@ -52,6 +52,9 @@ export default defineConfig({
             // needs a real Postgres connection so it runs in the integration
             // project (and is excluded from the unit project below).
             'utils/slugify.pg-parity.test.ts',
+            // Migration tests use raw pg.Client to create ad-hoc DBs and
+            // exercise migration.sql against them. Requires a live Postgres.
+            'prisma/migrations/**/*.test.ts',
           ],
           globals: true,
           globalSetup: fileURLToPath(
