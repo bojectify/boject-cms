@@ -48,6 +48,10 @@ export default defineConfig({
           include: [
             'server/api/**/*.test.ts',
             'server/middleware/**/*.test.ts',
+            // DB-backed parity test for slugify; lives next to slugify.ts but
+            // needs a real Postgres connection so it runs in the integration
+            // project (and is excluded from the unit project below).
+            'utils/slugify.pg-parity.test.ts',
           ],
           globals: true,
           globalSetup: fileURLToPath(
@@ -64,6 +68,7 @@ export default defineConfig({
             'server/utils/**/*.test.ts',
             'utils/**/*.test.ts',
           ],
+          exclude: ['utils/slugify.pg-parity.test.ts'],
           globals: true,
         },
       },
