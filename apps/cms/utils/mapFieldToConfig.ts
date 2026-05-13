@@ -45,8 +45,8 @@ export function mapFieldToConfig(field: {
         required: field.required,
       };
     case 'SELECT': {
-      const opts = field.options as { choices?: string[] } | null;
-      const choices = opts?.choices ?? [];
+      const opts = parseFieldOptions(field);
+      const choices = opts.type === 'SELECT' ? opts.choices : [];
       return {
         type: 'select',
         key: field.identifier,
@@ -56,39 +56,40 @@ export function mapFieldToConfig(field: {
       };
     }
     case 'RICHTEXT': {
-      const opts = field.options as {
-        targetContentTypeIds?: string[];
-        linkTargetContentTypeIds?: string[];
-      } | null;
+      const opts = parseFieldOptions(field);
+      const targetIds =
+        opts.type === 'RICHTEXT' ? opts.targetContentTypeIds : [];
+      const linkTargetIds =
+        opts.type === 'RICHTEXT' ? opts.linkTargetContentTypeIds : [];
       return {
         type: 'richtext',
         key: field.identifier,
         label: field.name,
-        targetContentTypeIds: opts?.targetContentTypeIds ?? [],
-        linkTargetContentTypeIds: opts?.linkTargetContentTypeIds ?? [],
+        targetContentTypeIds: targetIds,
+        linkTargetContentTypeIds: linkTargetIds,
       };
     }
     case 'RELATION': {
-      const opts = field.options as {
-        targetContentTypeIds?: string[];
-      } | null;
+      const opts = parseFieldOptions(field);
+      const targetContentTypeIds =
+        opts.type === 'RELATION' ? opts.targetContentTypeIds : [];
       return {
         type: 'dynamic-relation' as const,
         key: field.identifier,
         label: field.name,
         required: field.required,
-        targetContentTypeIds: opts?.targetContentTypeIds ?? [],
+        targetContentTypeIds,
       };
     }
     case 'MULTIRELATION': {
-      const opts = field.options as {
-        targetContentTypeIds?: string[];
-      } | null;
+      const opts = parseFieldOptions(field);
+      const targetContentTypeIds =
+        opts.type === 'MULTIRELATION' ? opts.targetContentTypeIds : [];
       return {
         type: 'dynamic-multirelation' as const,
         key: field.identifier,
         label: field.name,
-        targetContentTypeIds: opts?.targetContentTypeIds ?? [],
+        targetContentTypeIds,
       };
     }
     case 'IMAGE':
