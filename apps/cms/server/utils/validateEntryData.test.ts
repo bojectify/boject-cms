@@ -182,6 +182,61 @@ describe('validateEntryData — RICHTEXT embeds (cmsEmbed nodes)', () => {
       statusMessage: expect.stringContaining('not allowed for this field'),
     });
   });
+
+  it('rejects an embed with empty-string contentTypeId via the "missing ids" message (not the misleading "not allowed" message)', async () => {
+    await expect(
+      validateEntryData(
+        {
+          body: doc([para([embed('', 'entry-1')])]),
+        },
+        [richtextFieldWithAllowList]
+      )
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      statusMessage: expect.stringContaining(
+        'Invalid inline embed (missing contentTypeId or entryId)'
+      ),
+    });
+  });
+
+  it('rejects an embed with empty-string entryId via the "missing ids" message', async () => {
+    await expect(
+      validateEntryData(
+        {
+          body: doc([para([embed('allowed-ct-uuid', '')])]),
+        },
+        [richtextFieldWithAllowList]
+      )
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      statusMessage: expect.stringContaining(
+        'Invalid inline embed (missing contentTypeId or entryId)'
+      ),
+    });
+  });
+
+  it('surfaces the offending contentTypeId in the "not allowed for this field" error', async () => {
+    await expect(
+      validateEntryData(
+        { body: doc([para([embed('disallowed-ct', 'entry-1')])]) },
+        [richtextFieldWithAllowList]
+      )
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      statusMessage: expect.stringContaining('contentTypeId: disallowed-ct'),
+    });
+  });
+
+  it('surfaces the offending contentTypeId in the "embeds are not allowed in this field" error', async () => {
+    await expect(
+      validateEntryData({ body: doc([para([embed('any-ct', 'entry-1')])]) }, [
+        richtextFieldNoEmbeds,
+      ])
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      statusMessage: expect.stringContaining('contentTypeId: any-ct'),
+    });
+  });
 });
 
 describe('validateEntryData — IMAGE', () => {
@@ -371,6 +426,65 @@ describe('validateEntryData — RICHTEXT entry links (cmsLink nodes)', () => {
       statusMessage: expect.stringContaining(
         'Body: Invalid entry link (missing contentTypeId or entryId)'
       ),
+    });
+  });
+
+  it('rejects a cmsLink node with no attrs key at all', async () => {
+    const data = {
+      body: {
+        type: 'doc',
+        content: [{ type: 'paragraph', content: [{ type: 'cmsLink' }] }],
+      },
+    };
+    await expect(
+      validateEntryData(data, fields(['ct-page']))
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      statusMessage: expect.stringContaining(
+        'Body: Invalid entry link (missing contentTypeId or entryId)'
+      ),
+    });
+  });
+
+  it('rejects a cmsLink with empty-string contentTypeId via the "missing ids" message', async () => {
+    const data = { body: docWithLink('', 'e-1') };
+    await expect(
+      validateEntryData(data, fields(['ct-page']))
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      statusMessage: expect.stringContaining(
+        'Body: Invalid entry link (missing contentTypeId or entryId)'
+      ),
+    });
+  });
+
+  it('rejects a cmsLink with empty-string entryId via the "missing ids" message', async () => {
+    const data = { body: docWithLink('ct-page', '') };
+    await expect(
+      validateEntryData(data, fields(['ct-page']))
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      statusMessage: expect.stringContaining(
+        'Body: Invalid entry link (missing contentTypeId or entryId)'
+      ),
+    });
+  });
+
+  it('surfaces the offending contentTypeId in the "not allowed for this field" error', async () => {
+    const data = { body: docWithLink('ct-other', 'e-1') };
+    await expect(
+      validateEntryData(data, fields(['ct-page']))
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      statusMessage: expect.stringContaining('contentTypeId: ct-other'),
+    });
+  });
+
+  it('surfaces the offending contentTypeId in the "links are not allowed in this field" error', async () => {
+    const data = { body: docWithLink('ct-page', 'e-1') };
+    await expect(validateEntryData(data, fields([]))).rejects.toMatchObject({
+      statusCode: 400,
+      statusMessage: expect.stringContaining('contentTypeId: ct-page'),
     });
   });
 });
