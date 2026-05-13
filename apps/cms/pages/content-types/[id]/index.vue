@@ -501,83 +501,12 @@ async function onFieldReorder() {
       @delete="handleFieldDelete"
     >
       <template #type-options="{ type, options, updateOptions }">
-        <UFormField v-if="type === 'SELECT'" label="Choices (comma-separated)">
-          <UInput
-            :model-value="
-              options && typeof options === 'object' && 'choices' in options
-                ? (options as { choices: string[] }).choices.join(', ')
-                : ''
-            "
-            placeholder="e.g. option_a, option_b, option_c"
-            class="w-full"
-            @update:model-value="
-              (val: string) =>
-                updateOptions({
-                  choices: val
-                    .split(',')
-                    .map((c: string) => c.trim())
-                    .filter(Boolean),
-                })
-            "
-          />
-        </UFormField>
-        <UFormField
-          v-else-if="type === 'RELATION' || type === 'MULTIRELATION'"
-          label="Target Content Types"
-          required
-        >
-          <ContentTypeChipPicker
-            :model-value="
-              options &&
-              typeof options === 'object' &&
-              'targetContentTypeIds' in options
-                ? (options as { targetContentTypeIds: string[] })
-                    .targetContentTypeIds
-                : []
-            "
-            :options="contentTypeOptions ?? []"
-            @update:model-value="
-              (val: string[]) => updateOptions({ targetContentTypeIds: val })
-            "
-          />
-        </UFormField>
-        <template v-else-if="type === 'RICHTEXT'">
-          <UFormField label="Allowed inline embed types">
-            <ContentTypeChipPicker
-              :model-value="
-                options &&
-                typeof options === 'object' &&
-                'targetContentTypeIds' in options
-                  ? (options as { targetContentTypeIds: string[] })
-                      .targetContentTypeIds
-                  : []
-              "
-              :options="contentTypeOptions ?? []"
-              empty-hint="No inline embeds will be allowed in this field. Add a content type to enable inline embeds."
-              @update:model-value="
-                (val: string[]) => updateOptions({ targetContentTypeIds: val })
-              "
-            />
-          </UFormField>
-          <UFormField label="Allowed entry-link target types">
-            <ContentTypeChipPicker
-              :model-value="
-                options &&
-                typeof options === 'object' &&
-                'linkTargetContentTypeIds' in options
-                  ? (options as { linkTargetContentTypeIds: string[] })
-                      .linkTargetContentTypeIds
-                  : []
-              "
-              :options="contentTypeOptions ?? []"
-              empty-hint="No entry links will be allowed in this field. Add a content type to enable entry links."
-              @update:model-value="
-                (val: string[]) =>
-                  updateOptions({ linkTargetContentTypeIds: val })
-              "
-            />
-          </UFormField>
-        </template>
+        <FieldTypeOptions
+          :type="type"
+          :options="options"
+          :update-options="updateOptions"
+          :content-type-options="contentTypeOptions ?? []"
+        />
       </template>
     </FieldModal>
   </div>

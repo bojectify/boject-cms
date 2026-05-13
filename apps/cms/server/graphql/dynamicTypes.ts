@@ -76,6 +76,25 @@ function flattenToShape(
   };
 }
 
+/**
+ * Read an entry's `data` JSONB as a plain object.
+ *
+ * Resolvers reach `data` via two paths with different shapes:
+ * - `prisma.contentEntry.findFirst/Unique/Many` returns the JSONB column
+ *   already parsed (typed as Prisma.JsonValue, but at runtime an object).
+ * - `prisma.$queryRaw` returns the JSONB column as a JSON string.
+ *
+ * This helper hides that fork so resolvers can just call
+ * `parseEntryData(entry)?.[identifier]`.
+ */
+function parseEntryData(
+  entry: ContentEntryShape
+): Record<string, unknown> | null {
+  return typeof entry.data === 'string'
+    ? (JSON.parse(entry.data) as Record<string, unknown>)
+    : (entry.data as Record<string, unknown> | null);
+}
+
 type ScalarTypeName = 'String' | 'Float' | 'Boolean' | 'DateTime' | 'JSON';
 
 const FIELD_TYPE_TO_SCALAR: Record<string, ScalarTypeName | undefined> = {
@@ -172,10 +191,7 @@ export function registerDynamicTypes(
     entry: ContentEntryShape,
     identifier: string
   ): ImageFileShape | null {
-    const data =
-      typeof entry.data === 'string'
-        ? (JSON.parse(entry.data) as Record<string, unknown>)
-        : (entry.data as Record<string, unknown> | null);
+    const data = parseEntryData(entry);
     const raw = data?.[identifier];
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
     const obj = raw as Record<string, unknown>;
@@ -376,10 +392,7 @@ export function registerDynamicTypes(
           const isRequired = field.required || field.type === 'ENTRY_TITLE';
 
           const resolver = (entry: ContentEntryShape) => {
-            const data =
-              typeof entry.data === 'string'
-                ? (JSON.parse(entry.data) as Record<string, unknown>)
-                : (entry.data as Record<string, unknown> | null);
+            const data = parseEntryData(entry);
             return data?.[field.identifier] ?? null;
           };
 
@@ -400,10 +413,7 @@ export function registerDynamicTypes(
             type: RichTextRef,
             nullable: !field.required,
             resolve: (entry: ContentEntryShape) => {
-              const data =
-                typeof entry.data === 'string'
-                  ? (JSON.parse(entry.data) as Record<string, unknown>)
-                  : (entry.data as Record<string, unknown> | null);
+              const data = parseEntryData(entry);
               const json = data?.[field.identifier];
               if (json == null) return null;
               return { json };
@@ -431,10 +441,7 @@ export function registerDynamicTypes(
           const targetIds = opts?.targetContentTypeIds ?? [];
 
           const resolveRef = async (entry: ContentEntryShape) => {
-            const data =
-              typeof entry.data === 'string'
-                ? (JSON.parse(entry.data) as Record<string, unknown>)
-                : (entry.data as Record<string, unknown> | null);
+            const data = parseEntryData(entry);
             const ref = data?.[field.identifier] as {
               entryId?: string;
             } | null;
@@ -533,10 +540,7 @@ export function registerDynamicTypes(
                   >[0]['args'],
                 },
                 async ({ limit, offset }) => {
-                  const data =
-                    typeof entry.data === 'string'
-                      ? (JSON.parse(entry.data) as Record<string, unknown>)
-                      : (entry.data as Record<string, unknown> | null);
+                  const data = parseEntryData(entry);
                   const refs = data?.[field.identifier];
                   if (!Array.isArray(refs) || refs.length === 0) return [];
                   const entryIds = refs
