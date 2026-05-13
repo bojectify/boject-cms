@@ -66,6 +66,28 @@ export function validateBundle(bundle: unknown): ValidationResult {
       b.entries.forEach((e, i) =>
         validateEntry(e, `entries[${i}]`, b.portable === true, errors)
       );
+
+      // Dedupe entryKey within each contentTypeIdentifier (#205).
+      const seenKeys = new Map<string, Set<string>>();
+      for (let i = 0; i < b.entries.length; i++) {
+        const entry = b.entries[i];
+        if (!isObject(entry)) continue;
+        const e = entry as Partial<BundleEntry>;
+        if (typeof e.entryKey !== 'string' || e.entryKey.length === 0) continue;
+        if (typeof e.contentTypeIdentifier !== 'string') continue;
+        let set = seenKeys.get(e.contentTypeIdentifier);
+        if (!set) {
+          set = new Set();
+          seenKeys.set(e.contentTypeIdentifier, set);
+        }
+        if (set.has(e.entryKey)) {
+          errors.push({
+            path: `entries[${i}].entryKey`,
+            message: `duplicate entryKey "${e.entryKey}" within contentTypeIdentifier "${e.contentTypeIdentifier}"`,
+          });
+        }
+        set.add(e.entryKey);
+      }
     }
   }
 
@@ -208,6 +230,12 @@ function validateEntry(
     errors.push({
       path: `${path}.entryTitle`,
       message: 'must be a non-empty string',
+    });
+  }
+  if (typeof e.entryKey !== 'string' || e.entryKey.length === 0) {
+    errors.push({
+      path: `${path}.entryKey`,
+      message: 'required (non-empty string)',
     });
   }
 

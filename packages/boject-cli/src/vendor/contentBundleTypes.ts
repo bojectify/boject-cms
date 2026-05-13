@@ -57,6 +57,7 @@ export interface BundleEntry {
   contentTypeId: string | null;
   contentTypeIdentifier: string;
   entryTitle: string;
+  entryKey: string;
   slug: string | null;
   // V1 flat fields (kept for backward compat on import)
   status?: ContentStatus;

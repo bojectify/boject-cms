@@ -139,3 +139,120 @@ describe('validateBundle', () => {
     expect(result.errors[0]?.path).toMatch(/entryTitle/);
   });
 });
+
+describe('entryKey validation (#205)', () => {
+  it('rejects a bundle with an entry missing entryKey', () => {
+    const bundle = {
+      version: 2,
+      exportedAt: '2026-05-13T00:00:00.000Z',
+      portable: true,
+      entries: [
+        {
+          id: null,
+          contentTypeId: null,
+          contentTypeIdentifier: 'Post',
+          entryTitle: 'Hello',
+          slug: 'hello',
+          versions: [{ status: 'PUBLISHED', data: {}, publishedAt: null }],
+        },
+      ],
+    };
+    const result = validateBundle(bundle as never);
+    expect(result.ok).toBe(false);
+    expect(
+      result.errors.find((e) => e.path === 'entries[0].entryKey')
+    ).toBeDefined();
+  });
+
+  it('rejects a bundle with an entry whose entryKey is an empty string', () => {
+    const bundle = {
+      version: 2,
+      exportedAt: '2026-05-13T00:00:00.000Z',
+      portable: true,
+      entries: [
+        {
+          id: null,
+          contentTypeId: null,
+          contentTypeIdentifier: 'Post',
+          entryTitle: 'Hello',
+          entryKey: '',
+          slug: 'hello',
+          versions: [{ status: 'PUBLISHED', data: {}, publishedAt: null }],
+        },
+      ],
+    };
+    const result = validateBundle(bundle as never);
+    expect(result.ok).toBe(false);
+    expect(
+      result.errors.find((e) => e.path === 'entries[0].entryKey')
+    ).toBeDefined();
+  });
+
+  it('rejects a bundle with duplicate entryKey within a contentTypeIdentifier', () => {
+    const bundle = {
+      version: 2,
+      exportedAt: '2026-05-13T00:00:00.000Z',
+      portable: true,
+      entries: [
+        {
+          id: null,
+          contentTypeId: null,
+          contentTypeIdentifier: 'Post',
+          entryTitle: 'A',
+          entryKey: 'a',
+          slug: null,
+          versions: [{ status: 'PUBLISHED', data: {}, publishedAt: null }],
+        },
+        {
+          id: null,
+          contentTypeId: null,
+          contentTypeIdentifier: 'Post',
+          entryTitle: 'B',
+          entryKey: 'a',
+          slug: null,
+          versions: [{ status: 'PUBLISHED', data: {}, publishedAt: null }],
+        },
+      ],
+    };
+    const result = validateBundle(bundle as never);
+    expect(result.ok).toBe(false);
+    expect(
+      result.errors.find((e) => e.message.includes('duplicate entryKey'))
+    ).toBeDefined();
+  });
+
+  it('allows the same entryKey across different contentTypeIdentifiers', () => {
+    const bundle = {
+      version: 2,
+      exportedAt: '2026-05-13T00:00:00.000Z',
+      portable: true,
+      entries: [
+        {
+          id: null,
+          contentTypeId: null,
+          contentTypeIdentifier: 'Post',
+          entryTitle: 'A',
+          entryKey: 'shared',
+          slug: null,
+          versions: [{ status: 'PUBLISHED', data: {}, publishedAt: null }],
+        },
+        {
+          id: null,
+          contentTypeId: null,
+          contentTypeIdentifier: 'Author',
+          entryTitle: 'A',
+          entryKey: 'shared',
+          slug: null,
+          versions: [{ status: 'PUBLISHED', data: {}, publishedAt: null }],
+        },
+      ],
+    };
+    const result = validateBundle(bundle as never);
+    // ContentTypes are absent (this bundle is entries-only and references types
+    // by identifier — the validator may surface that as a separate failure
+    // unrelated to entryKey). What we care about: NO duplicate-entryKey error.
+    expect(
+      result.errors.find((e) => e.message.includes('duplicate entryKey'))
+    ).toBeUndefined();
+  });
+});
