@@ -81,7 +81,18 @@ export const CmsLink = Node.create({
   },
 
   parseHTML() {
-    return [{ tag: 'span[data-cms-link]' }];
+    return [
+      {
+        tag: 'span[data-cms-link]',
+        getAttrs: (el) => {
+          if (!(el instanceof HTMLElement)) return false;
+          const contentTypeId = el.getAttribute('data-content-type-id');
+          const entryId = el.getAttribute('data-entry-id');
+          if (!contentTypeId || !entryId) return false;
+          return null;
+        },
+      },
+    ];
   },
 
   renderHTML({ HTMLAttributes }) {
