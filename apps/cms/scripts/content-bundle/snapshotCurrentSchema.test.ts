@@ -57,6 +57,7 @@ describe('snapshotCurrentSchema', () => {
       data: {
         contentTypeId: author.id,
         entryTitle: 'Dave',
+        entryKey: 'dave',
         slug: 'dave',
         versions: {
           create: [
@@ -120,6 +121,7 @@ describe('snapshotCurrentSchema', () => {
       data: {
         contentTypeId: article.id,
         entryTitle: 'First',
+        entryKey: 'first',
         slug: 'first',
         versions: {
           create: [
@@ -143,6 +145,7 @@ describe('snapshotCurrentSchema', () => {
       data: {
         contentTypeId: article.id,
         entryTitle: 'Second',
+        entryKey: 'second',
         slug: 'second',
         versions: {
           create: [

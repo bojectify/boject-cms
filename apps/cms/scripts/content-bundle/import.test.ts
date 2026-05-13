@@ -131,6 +131,7 @@ describe('importBundle', () => {
           contentTypeId: null,
           contentTypeIdentifier: 'Category',
           entryTitle: 'News',
+          entryKey: 'news',
           slug: 'news',
           status: 'PUBLISHED',
           publishedAt: null,
@@ -141,6 +142,7 @@ describe('importBundle', () => {
           contentTypeId: null,
           contentTypeIdentifier: 'BlogPost',
           entryTitle: 'Hello',
+          entryKey: 'hello',
           slug: 'hello',
           status: 'DRAFT',
           publishedAt: null,
@@ -294,6 +296,227 @@ describe('importBundle', () => {
     ).rejects.toThrow(
       /RELATION field "ref" targets unknown content type "DoesNotExist"/
     );
+  });
+
+  describe('entryKey handling on import (#205)', () => {
+    const baseTypeBundle: Bundle = {
+      version: 2,
+      exportedAt: '2026-05-13T10:00:00.000Z',
+      portable: true,
+      contentTypes: [
+        {
+          id: null,
+          identifier: 'KeyedType',
+          name: 'KeyedType',
+          description: null,
+          fields: [
+            {
+              id: null,
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+              order: 0,
+              options: null,
+            },
+          ],
+        },
+      ],
+    };
+
+    it('rejects a bundle whose entries lack entryKey', async () => {
+      const bundle = {
+        ...baseTypeBundle,
+        entries: [
+          {
+            id: null,
+            contentTypeId: null,
+            contentTypeIdentifier: 'KeyedType',
+            entryTitle: 'Imported',
+            // entryKey intentionally missing
+            slug: 'imported',
+            status: 'DRAFT',
+            publishedAt: null,
+            data: { title: 'Imported' },
+          },
+        ],
+      };
+      await expect(
+        importBundle(prisma, bundle as never, { mode: 'all' })
+      ).rejects.toThrow(/entryKey/);
+    });
+
+    it('writes entryKey straight from the bundle to the DB', async () => {
+      const bundle: Bundle = {
+        ...baseTypeBundle,
+        entries: [
+          {
+            id: null,
+            contentTypeId: null,
+            contentTypeIdentifier: 'KeyedType',
+            entryTitle: 'Imported',
+            entryKey: 'imported-key',
+            slug: 'imported',
+            status: 'DRAFT',
+            publishedAt: null,
+            data: { title: 'Imported' },
+          },
+        ],
+      };
+      await importBundle(prisma, bundle, { mode: 'all' });
+      const entry = await prisma.contentEntry.findFirstOrThrow({
+        where: { entryKey: 'imported-key' },
+      });
+      expect(entry.entryKey).toBe('imported-key');
+    });
+
+    it('resolves portable RELATION refs via entryKey', async () => {
+      const bundle: Bundle = {
+        version: 2,
+        exportedAt: '2026-05-13T10:00:00.000Z',
+        portable: true,
+        contentTypes: [
+          {
+            id: null,
+            identifier: 'Category',
+            name: 'Category',
+            description: null,
+            fields: [
+              {
+                id: null,
+                identifier: 'name',
+                name: 'Name',
+                type: 'ENTRY_TITLE',
+                required: true,
+                order: 0,
+                options: null,
+              },
+            ],
+          },
+          {
+            id: null,
+            identifier: 'Post',
+            name: 'Post',
+            description: null,
+            fields: [
+              {
+                id: null,
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                required: true,
+                order: 0,
+                options: null,
+              },
+              {
+                id: null,
+                identifier: 'category',
+                name: 'Category',
+                type: 'RELATION',
+                required: false,
+                order: 1,
+                options: {
+                  targetContentTypeIds: [null],
+                  targetContentTypeIdentifiers: ['Category'],
+                },
+              },
+            ],
+          },
+        ],
+        entries: [
+          {
+            id: null,
+            contentTypeId: null,
+            contentTypeIdentifier: 'Category',
+            entryTitle: 'News',
+            entryKey: 'news',
+            slug: 'news-cat',
+            status: 'PUBLISHED',
+            publishedAt: null,
+            data: { name: 'News' },
+          },
+          {
+            id: null,
+            contentTypeId: null,
+            contentTypeIdentifier: 'Post',
+            entryTitle: 'Hello',
+            entryKey: 'hello',
+            slug: 'hello-post',
+            status: 'DRAFT',
+            publishedAt: null,
+            data: {
+              title: 'Hello',
+              category: { contentTypeIdentifier: 'Category', entryKey: 'news' },
+            },
+          },
+        ],
+      };
+
+      await importBundle(prisma, bundle, { mode: 'all' });
+
+      const category = await prisma.contentType.findUniqueOrThrow({
+        where: { identifier: 'Category' },
+      });
+      const newsEntry = await prisma.contentEntry.findFirstOrThrow({
+        where: { contentTypeId: category.id, entryKey: 'news' },
+      });
+      const post = await prisma.contentType.findUniqueOrThrow({
+        where: { identifier: 'Post' },
+      });
+      const helloEntry = await prisma.contentEntry.findFirstOrThrow({
+        where: { contentTypeId: post.id, entryKey: 'hello' },
+        include: { versions: true },
+      });
+      const data = helloEntry.versions[0]!.data as Record<string, unknown>;
+      expect(data.category).toEqual({
+        contentTypeId: category.id,
+        entryId: newsEntry.id,
+      });
+    });
+
+    it('rejects bundle with conflicting entryKey on target', async () => {
+      // First import creates a KeyedType + an entry with entryKey 'foo'.
+      const first: Bundle = {
+        ...baseTypeBundle,
+        entries: [
+          {
+            id: null,
+            contentTypeId: null,
+            contentTypeIdentifier: 'KeyedType',
+            entryTitle: 'Foo',
+            entryKey: 'foo',
+            slug: 'foo',
+            status: 'DRAFT',
+            publishedAt: null,
+            data: { title: 'Foo' },
+          },
+        ],
+      };
+      await importBundle(prisma, first, { mode: 'all' });
+
+      // Second import targets the existing type and reuses entryKey 'foo'.
+      const second: Bundle = {
+        version: 2,
+        exportedAt: '2026-05-13T10:00:00.000Z',
+        portable: true,
+        entries: [
+          {
+            id: null,
+            contentTypeId: null,
+            contentTypeIdentifier: 'KeyedType',
+            entryTitle: 'Foo II',
+            entryKey: 'foo',
+            slug: 'foo-2',
+            status: 'DRAFT',
+            publishedAt: null,
+            data: { title: 'Foo II' },
+          },
+        ],
+      };
+      await expect(
+        importBundle(prisma, second, { mode: 'entries' })
+      ).rejects.toThrow(/KeyedType:foo.*already exists/);
+    });
   });
 
   it('rolls back on failure mid-import', async () => {

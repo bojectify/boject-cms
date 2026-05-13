@@ -202,6 +202,7 @@ describe('apply-schema (integration)', () => {
       data: {
         contentTypeId: ct.id,
         entryTitle: 'X',
+        entryKey: 'x',
         slug: 'x',
         versions: {
           create: {
