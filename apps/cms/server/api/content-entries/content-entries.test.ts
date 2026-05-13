@@ -109,7 +109,8 @@ let testContentType: ContentTypeResponse;
  *   .60-.69   archiveFilter tests
  *   .180-.199 ad-hoc / one-off IPs (currently: .99, .183,
  *             .184-.186 entryKey derivation tests (#205),
- *             .187-.188 entryKey immutability tests (#205))
+ *             .187-.188 entryKey immutability tests (#205),
+ *             .189-.190 entryKey in REST responses tests (#205))
  *
  * When adding a new rate-limited test:
  *  1. Find the describe block your test will live in
@@ -617,6 +618,80 @@ describe('Content Entry endpoints', async () => {
         select: { entryKey: true },
       });
       expect(dbRow.entryKey).toBe(expectedKey);
+    });
+  });
+
+  describe('entryKey in REST responses (#205)', () => {
+    it('GET /api/content-entries/:id includes entryKey', async () => {
+      const cookie = await getSessionCookie();
+      const suffix = Date.now();
+      const title = `Detail View ${suffix}`;
+      const expectedKey = `detail-view-${suffix}`;
+
+      const createRes = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': '203.0.113.189',
+        },
+        body: JSON.stringify({
+          contentTypeId: testContentType.id,
+          data: { title },
+          status: 'DRAFT',
+        }),
+      });
+      expect(createRes.status).toBe(201);
+      const created = (await createRes.json()) as { id: string };
+
+      const getRes = await fetch(`/api/content-entries/${created.id}`, {
+        headers: { cookie, 'X-Forwarded-For': '203.0.113.189' },
+      });
+      expect(getRes.status).toBe(200);
+      const fetched = (await getRes.json()) as EntryResponse & {
+        entryKey: string;
+      };
+      expect(fetched.entryKey).toBe(expectedKey);
+    });
+
+    it('GET /api/content-entries (list) includes entryKey on every item', async () => {
+      const cookie = await getSessionCookie();
+      const suffix = Date.now();
+      const title = `List Item ${suffix}`;
+      const expectedKey = `list-item-${suffix}`;
+
+      const createRes = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': '203.0.113.190',
+        },
+        body: JSON.stringify({
+          contentTypeId: testContentType.id,
+          data: { title },
+          status: 'DRAFT',
+        }),
+      });
+      expect(createRes.status).toBe(201);
+
+      const listRes = await fetch(
+        `/api/content-entries?contentTypeId=${testContentType.id}&perPage=100`,
+        {
+          headers: { cookie, 'X-Forwarded-For': '203.0.113.190' },
+        }
+      );
+      expect(listRes.status).toBe(200);
+      const list = (await listRes.json()) as {
+        items: Array<EntryResponse & { entryKey: string }>;
+        total: number;
+      };
+      // Every item should carry entryKey
+      expect(list.items.every((i) => typeof i.entryKey === 'string')).toBe(
+        true
+      );
+      const found = list.items.find((i) => i.entryKey === expectedKey);
+      expect(found).toBeDefined();
     });
   });
 

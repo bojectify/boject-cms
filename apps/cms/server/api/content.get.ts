@@ -90,6 +90,7 @@ export default defineEventHandler(async (event) => {
       return {
         id: r.id,
         entryTitle: r.entryTitle,
+        entryKey: r.entryKey,
         status: version.status,
         createdAt: r.createdAt,
         updatedAt: r.updatedAt,
