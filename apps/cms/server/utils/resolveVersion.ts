@@ -41,6 +41,7 @@ export function flattenEntryWithVersion(
     contentTypeId: entry.contentTypeId,
     data: version.data,
     entryTitle: entry.entryTitle,
+    entryKey: entry.entryKey,
     slug: entry.slug,
     status: version.status,
     publishedAt: version.publishedAt,

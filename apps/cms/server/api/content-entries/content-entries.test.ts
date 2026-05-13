@@ -384,6 +384,105 @@ describe('Content Entry endpoints', async () => {
     });
   });
 
+  describe('entryKey derivation on create (#205)', () => {
+    // Distinct X-Forwarded-For per test isolates the mutation rate-limit
+    // bucket from the rest of the suite (see IP allocation legend).
+    it('derives entryKey from slugify(entryTitle) and returns it', async () => {
+      const cookie = await getSessionCookie();
+      const suffix = Date.now();
+      const title = `Hello World ${suffix}`;
+      const expectedKey = `hello-world-${suffix}`;
+      const res = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': '203.0.113.184',
+        },
+        body: JSON.stringify({
+          contentTypeId: testContentType.id,
+          data: { title },
+          status: 'DRAFT',
+        }),
+      });
+      expect(res.status).toBe(201);
+      const created = (await res.json()) as EntryResponse & {
+        entryKey: string;
+      };
+      expect(created.entryKey).toBe(expectedKey);
+    });
+
+    it('returns 409 ENTRY_KEY_CONFLICT when two titles slugify identically', async () => {
+      const cookie = await getSessionCookie();
+      const suffix = Date.now();
+      const firstTitle = `Hero Banner ${suffix}`;
+      const secondTitle = `Hero - Banner ${suffix}`;
+      const expectedKey = `hero-banner-${suffix}`;
+
+      const first = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': '203.0.113.185',
+        },
+        body: JSON.stringify({
+          contentTypeId: testContentType.id,
+          data: { title: firstTitle },
+          status: 'DRAFT',
+        }),
+      });
+      expect(first.status).toBe(201);
+
+      const res = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': '203.0.113.185',
+        },
+        body: JSON.stringify({
+          contentTypeId: testContentType.id,
+          data: { title: secondTitle },
+          status: 'DRAFT',
+        }),
+      });
+
+      expect(res.status).toBe(409);
+      const payload = (await res.json()) as {
+        data?: {
+          error: string;
+          entryKey: string;
+          conflictingEntryTitle: string;
+        };
+      };
+      expect(payload.data?.error).toBe('ENTRY_KEY_CONFLICT');
+      expect(payload.data?.entryKey).toBe(expectedKey);
+      expect(payload.data?.conflictingEntryTitle).toBe(firstTitle);
+    });
+
+    it('returns 400 ENTRY_KEY_EMPTY when entryTitle has no slug-safe chars', async () => {
+      const cookie = await getSessionCookie();
+      const res = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': '203.0.113.186',
+        },
+        body: JSON.stringify({
+          contentTypeId: testContentType.id,
+          data: { title: '!!!' },
+          status: 'DRAFT',
+        }),
+      });
+
+      expect(res.status).toBe(400);
+      const payload = (await res.json()) as { data?: { error: string } };
+      expect(payload.data?.error).toBe('ENTRY_KEY_EMPTY');
+    });
+  });
+
   describe('POST /api/content-entries — content:write scope (#172)', () => {
     it('allows API keys with content:write scope', async () => {
       // The seeded test key has both content:read and content:write (T3).
@@ -645,6 +744,13 @@ describe('Content Entry endpoints', async () => {
     // discardDraft requires a PUBLISHED fallback to exist.
     async function createWithDraft(ip: string): Promise<string> {
       const cookie = await getSessionCookie();
+      // Unique title per IP so the two tests in this describe don't
+      // collide on the immutable entryKey unique constraint (#205).
+      // Same reason 'Edited' is also IP-scoped — the CHANGED draft's
+      // PUT updates the envelope entryTitle, which has its own unique
+      // constraint.
+      const title = `Discard target ${ip}`;
+      const editedTitle = `Edited ${ip}`;
       const create = await fetch('/api/content-entries', {
         method: 'POST',
         headers: {
@@ -654,7 +760,7 @@ describe('Content Entry endpoints', async () => {
         },
         body: JSON.stringify({
           contentTypeId: testContentType.id,
-          data: { title: 'Discard target' },
+          data: { title },
         }),
       });
       const created = (await create.json()) as { id: string };
@@ -667,7 +773,7 @@ describe('Content Entry endpoints', async () => {
           'X-Forwarded-For': ip,
         },
         body: JSON.stringify({
-          data: { title: 'Discard target' },
+          data: { title },
           status: 'PUBLISHED',
         }),
       });
@@ -679,7 +785,7 @@ describe('Content Entry endpoints', async () => {
           'Content-Type': 'application/json',
           'X-Forwarded-For': ip,
         },
-        body: JSON.stringify({ data: { title: 'Edited' } }),
+        body: JSON.stringify({ data: { title: editedTitle } }),
       });
       return created.id;
     }
@@ -3213,6 +3319,7 @@ describe('Content Entry endpoints', async () => {
         data: {
           contentTypeId: targetCt.id,
           entryTitle: 'EmbedTarget',
+          entryKey: 'embedtarget',
           slug: null,
           versions: {
             create: {
@@ -3229,6 +3336,7 @@ describe('Content Entry endpoints', async () => {
         data: {
           contentTypeId: otherCt.id,
           entryTitle: 'EmbedOtherEntry',
+          entryKey: 'embedotherentry',
           slug: null,
           versions: {
             create: {

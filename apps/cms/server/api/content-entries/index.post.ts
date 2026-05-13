@@ -10,6 +10,7 @@ import {
   getPublishedVersion,
   isCmsRequest,
 } from '../../utils/resolveVersion';
+import { slugify } from '../../../utils/slugify';
 
 const VALID_STATUSES = new Set<string>([
   'DRAFT',
@@ -63,6 +64,37 @@ export default defineEventHandler(async (event) => {
   const slug = extractSlug(enrichedData, contentType.fields);
   const entryTitle = extractEntryTitle(enrichedData, contentType.fields);
 
+  const entryKey = slugify(entryTitle);
+  if (entryKey === '') {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'entryTitle contains no slug-safe characters',
+      data: {
+        error: 'ENTRY_KEY_EMPTY',
+        message:
+          'entryTitle must contain at least one alphanumeric character to derive an entryKey.',
+      },
+    });
+  }
+
+  const conflict = await prisma.contentEntry.findFirst({
+    where: { contentTypeId, entryKey },
+    select: { id: true, entryTitle: true },
+  });
+  if (conflict) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'entryKey conflict',
+      data: {
+        error: 'ENTRY_KEY_CONFLICT',
+        entryKey,
+        conflictingEntryId: conflict.id,
+        conflictingEntryTitle: conflict.entryTitle,
+        message: 'Adjust entryTitle to produce a different entryKey.',
+      },
+    });
+  }
+
   let status = 'DRAFT';
   if (typeof body.status === 'string' && VALID_STATUSES.has(body.status)) {
     status = body.status;
@@ -74,6 +106,7 @@ export default defineEventHandler(async (event) => {
         data: {
           contentTypeId,
           entryTitle,
+          entryKey,
           slug,
           versions: {
             create: {
@@ -88,7 +121,7 @@ export default defineEventHandler(async (event) => {
       }),
     {
       uniqueMessage:
-        'An entry with this slug or title already exists for this content type',
+        'An entry with this slug, title, or entryKey already exists for this content type',
     }
   );
 
