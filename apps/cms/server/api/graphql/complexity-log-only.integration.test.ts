@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { setup, fetch, $fetch } from '@nuxt/test-utils/e2e';
 import { TEST_USERNAME, TEST_PASSWORD } from '../../test/credentials';
+import { toCamelCase } from '../../../utils/casing';
 
 // Separate file because @nuxt/test-utils v4 stores its test context in a
 // module-level singleton — multiple setup() calls in one file have their
@@ -45,10 +46,6 @@ async function createComplexityTestCt(cookie: string): Promise<string> {
   return ct.identifier;
 }
 
-function camel(s: string): string {
-  return s[0]!.toLowerCase() + s.slice(1);
-}
-
 describe('GraphQL complexity scoring (#122) — log-only', async () => {
   await setup({
     dev: true,
@@ -63,7 +60,7 @@ describe('GraphQL complexity scoring (#122) — log-only', async () => {
   it('permits the same over-cap query when log-only is on', async () => {
     // Same shape as the default-cap test's over-cap query — would
     // normally reject at score ~2241 against the 1000 cap.
-    const query = `query { ${camel(identifier)}List(first: 5) { edges { node { body { references { id status entryKey createdAt updatedAt } } } } } }`;
+    const query = `query { ${toCamelCase(identifier)}List(first: 5) { edges { node { body { references { id status entryKey createdAt updatedAt } } } } } }`;
     const res = await fetch('/api/graphql', {
       method: 'POST',
       headers: {

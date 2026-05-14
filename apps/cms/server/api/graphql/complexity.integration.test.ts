@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { setup, fetch, $fetch } from '@nuxt/test-utils/e2e';
 import { TEST_USERNAME, TEST_PASSWORD } from '../../test/credentials';
+import { toCamelCase } from '../../../utils/casing';
 
 const TEST_API_KEY = 'boject_test_key_for_integration_tests_only';
 
@@ -42,10 +43,6 @@ async function createComplexityTestCt(cookie: string): Promise<string> {
   return ct.identifier;
 }
 
-function camel(s: string): string {
-  return s[0]!.toLowerCase() + s.slice(1);
-}
-
 function gqlPost(query: string) {
   return fetch('/api/graphql', {
     method: 'POST',
@@ -63,11 +60,11 @@ function gqlPost(query: string) {
 // node{body{...}} = 111+1 = 112;
 // edges{node{...}} = 112*20+1 = 2241. Comfortably > 1000.
 function overCapQuery(identifier: string): string {
-  return `query { ${camel(identifier)}List(first: 5) { edges { node { body { references { id status entryKey createdAt updatedAt } } } } } }`;
+  return `query { ${toCamelCase(identifier)}List(first: 5) { edges { node { body { references { id status entryKey createdAt updatedAt } } } } } }`;
 }
 
 function underCapQuery(identifier: string): string {
-  return `query { ${camel(identifier)}List(first: 5) { edges { node { id } } } }`;
+  return `query { ${toCamelCase(identifier)}List(first: 5) { edges { node { id } } } }`;
 }
 
 describe('GraphQL complexity scoring (#122) — default cap', async () => {
