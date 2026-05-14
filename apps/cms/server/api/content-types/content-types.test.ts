@@ -1364,6 +1364,371 @@ describe('Content Type endpoints', async () => {
       );
       expect(updated.unique).toBe(true);
     });
+
+    // Tests below run from a distinct X-Forwarded-For so they bucket separately
+    // from the rest of the suite under the in-memory mutation rate limiter.
+    // The dev server's bucket can't be reset from the test process, so without
+    // this header the new tests would push neighbouring tests over 50/60s.
+    it('rejects RELATION options PUT with non-array targetContentTypeIds (#214)', async () => {
+      const cookie = await getSessionCookie();
+      const target = await $fetch<ContentTypeResponse>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie, 'X-Forwarded-For': '203.0.113.214' },
+        body: {
+          name: `PUT Rel Target ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+          ],
+        },
+      });
+      const ct = await $fetch<ContentTypeResponse>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie, 'X-Forwarded-For': '203.0.113.214' },
+        body: {
+          name: `PUT Rel Source A ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+            {
+              identifier: 'link',
+              name: 'Link',
+              type: 'RELATION',
+              options: { targetContentTypeIds: [target.id] },
+            },
+          ],
+        },
+      });
+      const fieldId = ct.fields.find((f) => f.type === 'RELATION')!.id;
+
+      const res = await fetch(`/api/content-types/${ct.id}/fields/${fieldId}`, {
+        method: 'PUT',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': '203.0.113.214',
+        },
+        body: JSON.stringify({
+          options: { targetContentTypeIds: 'not-an-array' },
+        }),
+      });
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      const message = body.statusMessage ?? body.message ?? '';
+      expect(message).toContain('must be an array');
+    });
+
+    it('rejects RELATION options PUT with non-UUID targetContentTypeIds (#214)', async () => {
+      const cookie = await getSessionCookie();
+      const target = await $fetch<ContentTypeResponse>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie, 'X-Forwarded-For': '203.0.113.214' },
+        body: {
+          name: `PUT Rel Target ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+          ],
+        },
+      });
+      const ct = await $fetch<ContentTypeResponse>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie, 'X-Forwarded-For': '203.0.113.214' },
+        body: {
+          name: `PUT Rel Source B ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+            {
+              identifier: 'link',
+              name: 'Link',
+              type: 'RELATION',
+              options: { targetContentTypeIds: [target.id] },
+            },
+          ],
+        },
+      });
+      const fieldId = ct.fields.find((f) => f.type === 'RELATION')!.id;
+
+      const res = await fetch(`/api/content-types/${ct.id}/fields/${fieldId}`, {
+        method: 'PUT',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': '203.0.113.214',
+        },
+        body: JSON.stringify({
+          options: { targetContentTypeIds: ['not-a-uuid'] },
+        }),
+      });
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      const message = body.statusMessage ?? body.message ?? '';
+      expect(message).toContain('Invalid UUID');
+    });
+
+    it('rejects RELATION options PUT with empty targetContentTypeIds (#214)', async () => {
+      const cookie = await getSessionCookie();
+      const target = await $fetch<ContentTypeResponse>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie, 'X-Forwarded-For': '203.0.113.214' },
+        body: {
+          name: `PUT Rel Target ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+          ],
+        },
+      });
+      const ct = await $fetch<ContentTypeResponse>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie, 'X-Forwarded-For': '203.0.113.214' },
+        body: {
+          name: `PUT Rel Source C ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+            {
+              identifier: 'link',
+              name: 'Link',
+              type: 'RELATION',
+              options: { targetContentTypeIds: [target.id] },
+            },
+          ],
+        },
+      });
+      const fieldId = ct.fields.find((f) => f.type === 'RELATION')!.id;
+
+      const res = await fetch(`/api/content-types/${ct.id}/fields/${fieldId}`, {
+        method: 'PUT',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': '203.0.113.214',
+        },
+        body: JSON.stringify({
+          options: { targetContentTypeIds: [] },
+        }),
+      });
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      const message = body.statusMessage ?? body.message ?? '';
+      expect(message).toContain('non-empty array');
+    });
+
+    it('rejects RELATION options PUT referencing a non-existent content type (#214)', async () => {
+      const cookie = await getSessionCookie();
+      const target = await $fetch<ContentTypeResponse>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie, 'X-Forwarded-For': '203.0.113.214' },
+        body: {
+          name: `PUT Rel Target ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+          ],
+        },
+      });
+      const ct = await $fetch<ContentTypeResponse>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie, 'X-Forwarded-For': '203.0.113.214' },
+        body: {
+          name: `PUT Rel Source D ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+            {
+              identifier: 'link',
+              name: 'Link',
+              type: 'RELATION',
+              options: { targetContentTypeIds: [target.id] },
+            },
+          ],
+        },
+      });
+      const fieldId = ct.fields.find((f) => f.type === 'RELATION')!.id;
+
+      const res = await fetch(`/api/content-types/${ct.id}/fields/${fieldId}`, {
+        method: 'PUT',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': '203.0.113.214',
+        },
+        body: JSON.stringify({
+          options: {
+            targetContentTypeIds: ['00000000-0000-0000-0000-000000000000'],
+          },
+        }),
+      });
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      const message = body.statusMessage ?? body.message ?? '';
+      expect(message).toContain('do not reference existing');
+    });
+
+    it('rejects MULTIRELATION options PUT with non-array targetContentTypeIds (#214)', async () => {
+      const cookie = await getSessionCookie();
+      const target = await $fetch<ContentTypeResponse>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie, 'X-Forwarded-For': '203.0.113.214' },
+        body: {
+          name: `PUT MRel Target ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+          ],
+        },
+      });
+      const ct = await $fetch<ContentTypeResponse>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie, 'X-Forwarded-For': '203.0.113.214' },
+        body: {
+          name: `PUT MRel Source ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+            {
+              identifier: 'links',
+              name: 'Links',
+              type: 'MULTIRELATION',
+              options: { targetContentTypeIds: [target.id] },
+            },
+          ],
+        },
+      });
+      const fieldId = ct.fields.find((f) => f.type === 'MULTIRELATION')!.id;
+
+      const res = await fetch(`/api/content-types/${ct.id}/fields/${fieldId}`, {
+        method: 'PUT',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': '203.0.113.214',
+        },
+        body: JSON.stringify({
+          options: { targetContentTypeIds: 'not-an-array' },
+        }),
+      });
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      const message = body.statusMessage ?? body.message ?? '';
+      expect(message).toContain('must be an array');
+    });
+
+    it('accepts RELATION options PUT with valid existing targetContentTypeIds (#214)', async () => {
+      const cookie = await getSessionCookie();
+      const targetA = await $fetch<ContentTypeResponse>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie, 'X-Forwarded-For': '203.0.113.214' },
+        body: {
+          name: `PUT Rel TargetA ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+          ],
+        },
+      });
+      const targetB = await $fetch<ContentTypeResponse>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie, 'X-Forwarded-For': '203.0.113.214' },
+        body: {
+          name: `PUT Rel TargetB ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+          ],
+        },
+      });
+      const ct = await $fetch<ContentTypeResponse>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie, 'X-Forwarded-For': '203.0.113.214' },
+        body: {
+          name: `PUT Rel Source E ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+            },
+            {
+              identifier: 'link',
+              name: 'Link',
+              type: 'RELATION',
+              options: { targetContentTypeIds: [targetA.id] },
+            },
+          ],
+        },
+      });
+      const fieldId = ct.fields.find((f) => f.type === 'RELATION')!.id;
+
+      const updated = await $fetch<FieldResponse>(
+        `/api/content-types/${ct.id}/fields/${fieldId}`,
+        {
+          method: 'PUT',
+          headers: { cookie, 'X-Forwarded-For': '203.0.113.214' },
+          body: {
+            options: { targetContentTypeIds: [targetA.id, targetB.id] },
+          },
+        }
+      );
+      const opts = parseFieldOptions({
+        type: 'RELATION',
+        options: updated.options,
+      });
+      expect(opts.type === 'RELATION' ? opts.targetContentTypeIds : []).toEqual(
+        [targetA.id, targetB.id]
+      );
+    });
   });
 
   describe('DELETE /api/content-types/[id]/fields/[fieldId]', () => {
