@@ -77,6 +77,42 @@ export default defineEventHandler(async (event) => {
         });
       }
     }
+    if (field.type === 'RELATION' || field.type === 'MULTIRELATION') {
+      let opts;
+      try {
+        opts = parseFieldOptions({ type: field.type, options: body.options });
+      } catch (e) {
+        const shape = getFieldOptionsErrorShape(e);
+        throw createError({
+          statusCode: 400,
+          statusMessage:
+            shape?.code === 'invalid_type'
+              ? 'options.targetContentTypeIds must be an array'
+              : 'Invalid UUID in targetContentTypeIds (must be UUIDs of existing content types)',
+        });
+      }
+      const ids =
+        opts.type === 'RELATION' || opts.type === 'MULTIRELATION'
+          ? opts.targetContentTypeIds
+          : [];
+      if (ids.length === 0) {
+        throw createError({
+          statusCode: 400,
+          statusMessage:
+            'options.targetContentTypeIds is required for relation fields and must be a non-empty array',
+        });
+      }
+      const existingCount = await prisma.contentType.count({
+        where: { id: { in: ids } },
+      });
+      if (existingCount !== ids.length) {
+        throw createError({
+          statusCode: 400,
+          statusMessage:
+            'One or more targetContentTypeIds do not reference existing content types',
+        });
+      }
+    }
     data.options = body.options ?? undefined;
   }
   if ('unique' in body) {
