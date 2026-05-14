@@ -59,14 +59,6 @@ const fields = ref<FieldDraft[]>([
     unique: true,
     options: null,
   },
-  {
-    identifier: 'slug',
-    name: 'Slug',
-    type: 'SLUG',
-    required: false,
-    unique: true,
-    options: null,
-  },
 ]);
 
 // Modal state
