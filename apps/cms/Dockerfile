@@ -6,7 +6,7 @@
 FROM node:24-alpine AS build
 
 # pnpm via corepack (shipped with Node 24)
-RUN corepack enable && corepack prepare pnpm@10.30.1 --activate
+RUN corepack enable && corepack prepare pnpm@11.1.2 --activate
 
 WORKDIR /workspace
 
@@ -41,7 +41,7 @@ RUN pnpm nuxt build
 # ============================================================================
 FROM node:24-alpine AS runtime
 
-RUN corepack enable && corepack prepare pnpm@10.30.1 --activate
+RUN corepack enable && corepack prepare pnpm@11.1.2 --activate
 
 # bash for the entrypoint, curl for operator debugging
 RUN apk add --no-cache bash curl
