@@ -28,12 +28,16 @@ const richtextFieldNoEmbeds = {
   options: null,
 };
 
+const ALLOWED_CT_UUID = '11111111-1111-4111-8111-111111111111';
+const DISALLOWED_CT_UUID = '22222222-2222-4222-8222-222222222222';
+const ANY_CT_UUID = '33333333-3333-4333-8333-333333333333';
+
 const richtextFieldWithAllowList = {
   identifier: 'body',
   name: 'Body',
   type: 'RICHTEXT' as const,
   required: false,
-  options: { targetContentTypeIds: ['allowed-ct-uuid'] },
+  options: { targetContentTypeIds: [ALLOWED_CT_UUID] },
 };
 
 const doc = (content: unknown[]) => ({ type: 'doc', content });
@@ -69,7 +73,7 @@ describe('validateEntryData — RICHTEXT embeds (cmsEmbed nodes)', () => {
 
   it('accepts embed whose contentTypeId is in the allow-list', async () => {
     const value = doc([
-      para([text('see '), embed('allowed-ct-uuid', 'entry-1')]),
+      para([text('see '), embed(ALLOWED_CT_UUID, 'entry-1')]),
     ]);
     const result = await validateEntryData({ body: value }, [
       richtextFieldWithAllowList,
@@ -80,7 +84,7 @@ describe('validateEntryData — RICHTEXT embeds (cmsEmbed nodes)', () => {
   it('rejects embed whose contentTypeId is not in the allow-list', async () => {
     await expect(
       validateEntryData(
-        { body: doc([para([embed('disallowed-ct', 'entry-1')])]) },
+        { body: doc([para([embed(DISALLOWED_CT_UUID, 'entry-1')])]) },
         [richtextFieldWithAllowList]
       )
     ).rejects.toMatchObject({
@@ -107,7 +111,7 @@ describe('validateEntryData — RICHTEXT embeds (cmsEmbed nodes)', () => {
           body: doc([
             {
               type: 'blockquote',
-              content: [para([embed('disallowed-ct', 'e1')])],
+              content: [para([embed(DISALLOWED_CT_UUID, 'e1')])],
             },
           ]),
         },
@@ -126,7 +130,7 @@ describe('validateEntryData — RICHTEXT embeds (cmsEmbed nodes)', () => {
               content: [
                 {
                   type: 'listItem',
-                  content: [para([embed('disallowed-ct', 'e1')])],
+                  content: [para([embed(DISALLOWED_CT_UUID, 'e1')])],
                 },
               ],
             },
@@ -150,7 +154,7 @@ describe('validateEntryData — RICHTEXT embeds (cmsEmbed nodes)', () => {
                   content: [
                     {
                       type: 'tableCell',
-                      content: [para([embed('disallowed-ct', 'e1')])],
+                      content: [para([embed(DISALLOWED_CT_UUID, 'e1')])],
                     },
                   ],
                 },
@@ -169,9 +173,9 @@ describe('validateEntryData — RICHTEXT embeds (cmsEmbed nodes)', () => {
         {
           body: doc([
             para([
-              embed('allowed-ct-uuid', 'e1'),
+              embed(ALLOWED_CT_UUID, 'e1'),
               text(' and '),
-              embed('disallowed-ct', 'e2'),
+              embed(DISALLOWED_CT_UUID, 'e2'),
             ]),
           ]),
         },
@@ -203,7 +207,7 @@ describe('validateEntryData — RICHTEXT embeds (cmsEmbed nodes)', () => {
     await expect(
       validateEntryData(
         {
-          body: doc([para([embed('allowed-ct-uuid', '')])]),
+          body: doc([para([embed(ALLOWED_CT_UUID, '')])]),
         },
         [richtextFieldWithAllowList]
       )
@@ -218,23 +222,26 @@ describe('validateEntryData — RICHTEXT embeds (cmsEmbed nodes)', () => {
   it('surfaces the offending contentTypeId in the "not allowed for this field" error', async () => {
     await expect(
       validateEntryData(
-        { body: doc([para([embed('disallowed-ct', 'entry-1')])]) },
+        { body: doc([para([embed(DISALLOWED_CT_UUID, 'entry-1')])]) },
         [richtextFieldWithAllowList]
       )
     ).rejects.toMatchObject({
       statusCode: 400,
-      statusMessage: expect.stringContaining('contentTypeId: disallowed-ct'),
+      statusMessage: expect.stringContaining(
+        `contentTypeId: ${DISALLOWED_CT_UUID}`
+      ),
     });
   });
 
   it('surfaces the offending contentTypeId in the "embeds are not allowed in this field" error', async () => {
     await expect(
-      validateEntryData({ body: doc([para([embed('any-ct', 'entry-1')])]) }, [
-        richtextFieldNoEmbeds,
-      ])
+      validateEntryData(
+        { body: doc([para([embed(ANY_CT_UUID, 'entry-1')])]) },
+        [richtextFieldNoEmbeds]
+      )
     ).rejects.toMatchObject({
       statusCode: 400,
-      statusMessage: expect.stringContaining('contentTypeId: any-ct'),
+      statusMessage: expect.stringContaining(`contentTypeId: ${ANY_CT_UUID}`),
     });
   });
 });
@@ -306,6 +313,9 @@ describe('validateEntryData — IMAGE', () => {
 });
 
 describe('validateEntryData — RICHTEXT entry links (cmsLink nodes)', () => {
+  const CT_PAGE_UUID = '44444444-4444-4444-8444-444444444444';
+  const CT_OTHER_UUID = '55555555-5555-4555-8555-555555555555';
+
   const fields = (
     allowedLinks: string[]
   ): Parameters<typeof validateEntryData>[1] => [
@@ -336,15 +346,15 @@ describe('validateEntryData — RICHTEXT entry links (cmsLink nodes)', () => {
   });
 
   it('accepts a cmsLink node whose contentTypeId is in linkTargetContentTypeIds', async () => {
-    const data = { body: docWithLink('ct-page', 'e-1') };
-    const result = await validateEntryData(data, fields(['ct-page']));
+    const data = { body: docWithLink(CT_PAGE_UUID, 'e-1') };
+    const result = await validateEntryData(data, fields([CT_PAGE_UUID]));
     expect(result.body).toEqual(data.body);
   });
 
   it('rejects a cmsLink node whose contentTypeId is NOT in linkTargetContentTypeIds', async () => {
-    const data = { body: docWithLink('ct-other', 'e-1') };
+    const data = { body: docWithLink(CT_OTHER_UUID, 'e-1') };
     await expect(
-      validateEntryData(data, fields(['ct-page']))
+      validateEntryData(data, fields([CT_PAGE_UUID]))
     ).rejects.toMatchObject({
       statusCode: 400,
       statusMessage: expect.stringContaining(
@@ -354,7 +364,7 @@ describe('validateEntryData — RICHTEXT entry links (cmsLink nodes)', () => {
   });
 
   it('rejects any cmsLink node when linkTargetContentTypeIds is empty', async () => {
-    const data = { body: docWithLink('ct-page', 'e-1') };
+    const data = { body: docWithLink(CT_PAGE_UUID, 'e-1') };
     await expect(validateEntryData(data, fields([]))).rejects.toMatchObject({
       statusCode: 400,
       statusMessage: expect.stringContaining(
@@ -370,13 +380,15 @@ describe('validateEntryData — RICHTEXT entry links (cmsLink nodes)', () => {
         content: [
           {
             type: 'paragraph',
-            content: [{ type: 'cmsLink', attrs: { contentTypeId: 'ct-page' } }],
+            content: [
+              { type: 'cmsLink', attrs: { contentTypeId: CT_PAGE_UUID } },
+            ],
           },
         ],
       },
     };
     await expect(
-      validateEntryData(data, fields(['ct-page']))
+      validateEntryData(data, fields([CT_PAGE_UUID]))
     ).rejects.toMatchObject({
       statusCode: 400,
       statusMessage: expect.stringContaining(
@@ -420,7 +432,7 @@ describe('validateEntryData — RICHTEXT entry links (cmsLink nodes)', () => {
       },
     };
     await expect(
-      validateEntryData(data, fields(['ct-page']))
+      validateEntryData(data, fields([CT_PAGE_UUID]))
     ).rejects.toMatchObject({
       statusCode: 400,
       statusMessage: expect.stringContaining(
@@ -437,7 +449,7 @@ describe('validateEntryData — RICHTEXT entry links (cmsLink nodes)', () => {
       },
     };
     await expect(
-      validateEntryData(data, fields(['ct-page']))
+      validateEntryData(data, fields([CT_PAGE_UUID]))
     ).rejects.toMatchObject({
       statusCode: 400,
       statusMessage: expect.stringContaining(
@@ -449,7 +461,7 @@ describe('validateEntryData — RICHTEXT entry links (cmsLink nodes)', () => {
   it('rejects a cmsLink with empty-string contentTypeId via the "missing ids" message', async () => {
     const data = { body: docWithLink('', 'e-1') };
     await expect(
-      validateEntryData(data, fields(['ct-page']))
+      validateEntryData(data, fields([CT_PAGE_UUID]))
     ).rejects.toMatchObject({
       statusCode: 400,
       statusMessage: expect.stringContaining(
@@ -459,9 +471,9 @@ describe('validateEntryData — RICHTEXT entry links (cmsLink nodes)', () => {
   });
 
   it('rejects a cmsLink with empty-string entryId via the "missing ids" message', async () => {
-    const data = { body: docWithLink('ct-page', '') };
+    const data = { body: docWithLink(CT_PAGE_UUID, '') };
     await expect(
-      validateEntryData(data, fields(['ct-page']))
+      validateEntryData(data, fields([CT_PAGE_UUID]))
     ).rejects.toMatchObject({
       statusCode: 400,
       statusMessage: expect.stringContaining(
@@ -471,20 +483,20 @@ describe('validateEntryData — RICHTEXT entry links (cmsLink nodes)', () => {
   });
 
   it('surfaces the offending contentTypeId in the "not allowed for this field" error', async () => {
-    const data = { body: docWithLink('ct-other', 'e-1') };
+    const data = { body: docWithLink(CT_OTHER_UUID, 'e-1') };
     await expect(
-      validateEntryData(data, fields(['ct-page']))
+      validateEntryData(data, fields([CT_PAGE_UUID]))
     ).rejects.toMatchObject({
       statusCode: 400,
-      statusMessage: expect.stringContaining('contentTypeId: ct-other'),
+      statusMessage: expect.stringContaining(`contentTypeId: ${CT_OTHER_UUID}`),
     });
   });
 
   it('surfaces the offending contentTypeId in the "links are not allowed in this field" error', async () => {
-    const data = { body: docWithLink('ct-page', 'e-1') };
+    const data = { body: docWithLink(CT_PAGE_UUID, 'e-1') };
     await expect(validateEntryData(data, fields([]))).rejects.toMatchObject({
       statusCode: 400,
-      statusMessage: expect.stringContaining('contentTypeId: ct-page'),
+      statusMessage: expect.stringContaining(`contentTypeId: ${CT_PAGE_UUID}`),
     });
   });
 });

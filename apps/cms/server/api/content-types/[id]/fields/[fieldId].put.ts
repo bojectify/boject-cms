@@ -1,14 +1,14 @@
 import type { FieldType, Prisma } from '#prisma';
-import {
-  assertUuid,
-  assertStringLength,
-  isUuid,
-} from '../../../../utils/validation';
+import { assertUuid, assertStringLength } from '../../../../utils/validation';
 import { withPrismaErrors } from '../../../../utils/prismaErrors';
 import { enforceMutationRateLimit } from '../../../../utils/rateLimitEndpoint';
 import { invalidateSchema } from '../../../../graphql/schema';
 import { resolveUniqueFlag } from '../../../../utils/validateFieldUnique';
 import { assertSchemaEditable } from '../../../../utils/schemaReadOnly';
+import {
+  parseFieldOptions,
+  getFieldOptionsErrorShape,
+} from '../../../../../utils/fieldOptions';
 
 const VALID_FIELD_TYPES = new Set<string>([
   'ENTRY_TITLE',
@@ -63,30 +63,18 @@ export default defineEventHandler(async (event) => {
       body.options &&
       typeof body.options === 'object'
     ) {
-      const opts = body.options as {
-        targetContentTypeIds?: unknown;
-        linkTargetContentTypeIds?: unknown;
-      };
-      for (const key of [
-        'targetContentTypeIds',
-        'linkTargetContentTypeIds',
-      ] as const) {
-        const val = opts[key];
-        if (val === undefined) continue;
-        if (!Array.isArray(val)) {
-          throw createError({
-            statusCode: 400,
-            statusMessage: `options.${key} must be an array`,
-          });
-        }
-        for (const targetId of val) {
-          if (typeof targetId !== 'string' || !isUuid(targetId)) {
-            throw createError({
-              statusCode: 400,
-              statusMessage: `Invalid UUID in ${key}: ${targetId}`,
-            });
-          }
-        }
+      try {
+        parseFieldOptions({ type: 'RICHTEXT', options: body.options });
+      } catch (e) {
+        const shape = getFieldOptionsErrorShape(e);
+        const key = shape?.key ?? 'targetContentTypeIds';
+        throw createError({
+          statusCode: 400,
+          statusMessage:
+            shape?.code === 'invalid_type'
+              ? `options.${key} must be an array`
+              : `Invalid UUID in ${key}`,
+        });
       }
     }
     data.options = body.options ?? undefined;

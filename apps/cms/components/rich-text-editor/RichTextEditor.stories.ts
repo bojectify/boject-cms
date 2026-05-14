@@ -2,6 +2,9 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
 import RichTextEditor from './RichTextEditor.vue';
 
+// Story fixtures use real UUIDs because parseFieldOptions validates via zod
+const CT_AUTHOR_UUID = '11111111-1111-4111-8111-111111111111';
+
 const meta: Meta<typeof RichTextEditor> = {
   title: 'Components/RichTextEditor',
   component: RichTextEditor,
@@ -50,7 +53,7 @@ const sampleDoc = {
         {
           type: 'cmsLink',
           attrs: {
-            contentTypeId: 'ct-author',
+            contentTypeId: CT_AUTHOR_UUID,
             entryId: 'a1',
             contentTypeIdentifier: 'Author',
           },
@@ -65,7 +68,7 @@ const sampleDoc = {
         {
           type: 'cmsEmbed',
           attrs: {
-            contentTypeId: 'ct-author',
+            contentTypeId: CT_AUTHOR_UUID,
             entryId: 'a1',
             contentTypeIdentifier: 'Author',
           },
@@ -143,8 +146,8 @@ const sampleDoc = {
 export const AllStyledNodes: Story = {
   args: {
     modelValue: sampleDoc,
-    targetContentTypeIds: ['ct-author'],
-    linkTargetContentTypeIds: ['ct-author'],
+    targetContentTypeIds: [CT_AUTHOR_UUID],
+    linkTargetContentTypeIds: [CT_AUTHOR_UUID],
   },
 };
 
@@ -155,8 +158,8 @@ export const AllStyledNodes: Story = {
 export const ChipClickEdit: Story = {
   args: {
     modelValue: sampleDoc,
-    targetContentTypeIds: ['ct-author'],
-    linkTargetContentTypeIds: ['ct-author'],
+    targetContentTypeIds: [CT_AUTHOR_UUID],
+    linkTargetContentTypeIds: [CT_AUTHOR_UUID],
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);

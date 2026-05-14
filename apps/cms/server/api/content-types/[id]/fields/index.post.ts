@@ -3,13 +3,16 @@ import {
   assertUuid,
   assertStringLength,
   assertFieldIdentifier,
-  isUuid,
 } from '../../../../utils/validation';
 import { withPrismaErrors } from '../../../../utils/prismaErrors';
 import { enforceMutationRateLimit } from '../../../../utils/rateLimitEndpoint';
 import { invalidateSchema } from '../../../../graphql/schema';
 import { resolveUniqueFlag } from '../../../../utils/validateFieldUnique';
 import { assertSchemaEditable } from '../../../../utils/schemaReadOnly';
+import {
+  parseFieldOptions,
+  getFieldOptionsErrorShape,
+} from '../../../../../utils/fieldOptions';
 
 const VALID_FIELD_TYPES = new Set<string>([
   'ENTRY_TITLE',
@@ -46,30 +49,34 @@ export default defineEventHandler(async (event) => {
 
   // Validate targetContentTypeIds for relation fields
   if (type === 'RELATION' || type === 'MULTIRELATION') {
-    const opts = body.options as { targetContentTypeIds?: unknown } | null;
-    if (
-      !opts ||
-      !Array.isArray(opts.targetContentTypeIds) ||
-      opts.targetContentTypeIds.length === 0
-    ) {
+    let opts;
+    try {
+      opts = parseFieldOptions({ type, options: body.options });
+    } catch (e) {
+      const shape = getFieldOptionsErrorShape(e);
+      throw createError({
+        statusCode: 400,
+        statusMessage:
+          shape?.code === 'invalid_type'
+            ? 'options.targetContentTypeIds must be an array'
+            : 'Invalid UUID in targetContentTypeIds (must be UUIDs of existing content types)',
+      });
+    }
+    const ids =
+      opts.type === 'RELATION' || opts.type === 'MULTIRELATION'
+        ? opts.targetContentTypeIds
+        : [];
+    if (ids.length === 0) {
       throw createError({
         statusCode: 400,
         statusMessage:
           'options.targetContentTypeIds is required for relation fields and must be a non-empty array',
       });
     }
-    for (const targetId of opts.targetContentTypeIds) {
-      if (!isUuid(targetId)) {
-        throw createError({
-          statusCode: 400,
-          statusMessage: `Invalid UUID in targetContentTypeIds: ${targetId}`,
-        });
-      }
-    }
     const existingCount = await prisma.contentType.count({
-      where: { id: { in: opts.targetContentTypeIds as string[] } },
+      where: { id: { in: ids } },
     });
-    if (existingCount !== (opts.targetContentTypeIds as string[]).length) {
+    if (existingCount !== ids.length) {
       throw createError({
         statusCode: 400,
         statusMessage:
@@ -79,33 +86,30 @@ export default defineEventHandler(async (event) => {
   }
 
   if (type === 'RICHTEXT' && body.options && typeof body.options === 'object') {
-    const opts = body.options as { targetContentTypeIds?: unknown };
-    if (opts.targetContentTypeIds !== undefined) {
-      if (!Array.isArray(opts.targetContentTypeIds)) {
+    let opts;
+    try {
+      opts = parseFieldOptions({ type, options: body.options });
+    } catch (e) {
+      const shape = getFieldOptionsErrorShape(e);
+      const key = shape?.key ?? 'targetContentTypeIds';
+      throw createError({
+        statusCode: 400,
+        statusMessage:
+          shape?.code === 'invalid_type'
+            ? `options.${key} must be an array`
+            : `Invalid UUID in ${key}`,
+      });
+    }
+    if (opts.type === 'RICHTEXT' && opts.targetContentTypeIds.length > 0) {
+      const existingCount = await prisma.contentType.count({
+        where: { id: { in: opts.targetContentTypeIds } },
+      });
+      if (existingCount !== opts.targetContentTypeIds.length) {
         throw createError({
           statusCode: 400,
-          statusMessage: 'options.targetContentTypeIds must be an array',
+          statusMessage:
+            'One or more targetContentTypeIds do not reference existing content types',
         });
-      }
-      for (const targetId of opts.targetContentTypeIds) {
-        if (!isUuid(targetId)) {
-          throw createError({
-            statusCode: 400,
-            statusMessage: `Invalid UUID in targetContentTypeIds: ${targetId}`,
-          });
-        }
-      }
-      if (opts.targetContentTypeIds.length > 0) {
-        const existingCount = await prisma.contentType.count({
-          where: { id: { in: opts.targetContentTypeIds as string[] } },
-        });
-        if (existingCount !== opts.targetContentTypeIds.length) {
-          throw createError({
-            statusCode: 400,
-            statusMessage:
-              'One or more targetContentTypeIds do not reference existing content types',
-          });
-        }
       }
     }
   }

@@ -6,29 +6,32 @@ const props = withDefaults(defineProps<FieldTypeOptionsProps>(), {
   testId: QA_FIELD_TYPE_OPTIONS.COMPONENT,
 });
 
+// Tolerate work-in-progress options shape (user editing form): if the
+// current options blob fails strict parse (e.g. a half-typed UUID), fall
+// back to empty arrays so the UI doesn't blow up. The strict parse runs
+// on save via the CRUD endpoint.
+const parsed = computed(() => {
+  try {
+    return parseFieldOptions({ type: props.type, options: props.options });
+  } catch {
+    return null;
+  }
+});
+
 const choices = computed(() =>
-  props.options &&
-  typeof props.options === 'object' &&
-  'choices' in props.options
-    ? (props.options as { choices: string[] }).choices
-    : []
+  parsed.value?.type === 'SELECT' ? parsed.value.choices : []
 );
 
 const targetContentTypeIds = computed(() =>
-  props.options &&
-  typeof props.options === 'object' &&
-  'targetContentTypeIds' in props.options
-    ? (props.options as { targetContentTypeIds: string[] }).targetContentTypeIds
+  parsed.value?.type === 'RELATION' ||
+  parsed.value?.type === 'MULTIRELATION' ||
+  parsed.value?.type === 'RICHTEXT'
+    ? parsed.value.targetContentTypeIds
     : []
 );
 
 const linkTargetContentTypeIds = computed(() =>
-  props.options &&
-  typeof props.options === 'object' &&
-  'linkTargetContentTypeIds' in props.options
-    ? (props.options as { linkTargetContentTypeIds: string[] })
-        .linkTargetContentTypeIds
-    : []
+  parsed.value?.type === 'RICHTEXT' ? parsed.value.linkTargetContentTypeIds : []
 );
 
 function onChoicesUpdate(val: string) {
