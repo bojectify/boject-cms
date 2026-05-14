@@ -235,6 +235,17 @@ In production, all `/api/graphql` requests require an `Authorization: Bearer boj
 
 Key creation, listing, revocation, and the full scope catalogue are documented in [API key management](#api-key-management) below.
 
+### Query complexity
+
+The CMS rejects runaway GraphQL queries before they reach resolvers. Each query gets a per-field weighted score; if the total exceeds `BOJECT_GRAPHQL_COMPLEXITY_MAX_COST` (default `1000`), the response includes a GraphQL error with `extensions.code: "QUERY_TOO_COMPLEX"`.
+
+**Recalibrating for your hardware.** Run `boject perf scenario graphql-flat --database-url <perf_db>` and inspect the "GraphQL complexity cap" section in the rendered `summary.md`. Pass `--current-max-cost <n>` to compare the suggestion against your existing cap:
+
+- **Green-light:** your hardware sustained the current cap — you could raise it for more headroom.
+- **Warning:** your hardware did not sustain the current cap — scale up before lowering, because lowering is a breaking change to clients.
+
+**Log-only safe rollout.** Before changing the cap, set `BOJECT_GRAPHQL_COMPLEXITY_LOG_ONLY=true` and restart the CMS. Over-cap queries are still served but get logged with their score and the active cap, so you can identify which clients would break before any of them do. Switch back to enforcement once you've fixed the clients or accepted the risk.
+
 ## API key management
 
 The CMS supports API keys with scoped access for external consumers (GraphQL clients, schema-management CLIs, etc.).
@@ -389,14 +400,17 @@ pnpm format:fix    # Auto-fix formatting
 
 ## Environment Variables
 
-| Variable                          | Description                                                                                  | Default                                            |
-| --------------------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| `DATABASE_URL`                    | PostgreSQL connection string                                                                 | `postgresql://boject:boject@localhost:5432/boject` |
-| `NUXT_SESSION_PASSWORD`           | Session encryption key (required in prod)                                                    | Auto-generated in dev                              |
-| `BOJECT_SCHEMA_DIR`               | Directory of `*.boject.json` files applied on every container boot.                          | unset (skips the step)                             |
-| `BOJECT_SCHEMA_READONLY`          | Set to `true` to disable schema-editing endpoints + UI affordances.                          | unset                                              |
-| `BOJECT_ALLOW_DESTRUCTIVE_SCHEMA` | Set to `true` to let the entrypoint applier remove content types / fields on bundle changes. | unset                                              |
-| `BOJECT_API_KEY`                  | Used by [`@boject/cli`](packages/boject-cli/README.md). Not consumed by the running CMS.     | unset                                              |
+| Variable                             | Description                                                                                  | Default                                            |
+| ------------------------------------ | -------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| `DATABASE_URL`                       | PostgreSQL connection string                                                                 | `postgresql://boject:boject@localhost:5432/boject` |
+| `NUXT_SESSION_PASSWORD`              | Session encryption key (required in prod)                                                    | Auto-generated in dev                              |
+| `BOJECT_SCHEMA_DIR`                  | Directory of `*.boject.json` files applied on every container boot.                          | unset (skips the step)                             |
+| `BOJECT_SCHEMA_READONLY`             | Set to `true` to disable schema-editing endpoints + UI affordances.                          | unset                                              |
+| `BOJECT_ALLOW_DESTRUCTIVE_SCHEMA`    | Set to `true` to let the entrypoint applier remove content types / fields on bundle changes. | unset                                              |
+| `BOJECT_API_KEY`                     | Used by [`@boject/cli`](packages/boject-cli/README.md). Not consumed by the running CMS.     | unset                                              |
+| `BOJECT_GRAPHQL_COMPLEXITY_MAX_COST` | Per-query complexity cap on `/api/graphql`. See [Query complexity](#query-complexity).       | `1000`                                             |
+| `BOJECT_GRAPHQL_COMPLEXITY_LOG_ONLY` | Set to `true` to log over-cap queries without rejecting (safe rollout).                      | unset                                              |
+| `GRAPHQL_RATE_LIMIT_RPS`             | Per-API-key sliding-window rate cap on `/api/graphql`.                                       | `1000`                                             |
 
 Create a `.env` file in the project root. Nuxt loads it automatically in development.
 

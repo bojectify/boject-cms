@@ -4,12 +4,13 @@ import { maxDepthPlugin } from '@escape.tech/graphql-armor-max-depth';
 import { getSchema } from '../../graphql/schema';
 import { validateApiKey } from '../../utils/validateApiKey';
 import { enforceGraphqlRateLimit } from '../../utils/rateLimitEndpoint';
+import { complexityYogaPlugin } from '../../utils/graphqlComplexity';
 
 const yoga = createYoga({
   schema: () => getSchema(),
   graphqlEndpoint: '/api/graphql',
   graphiql: process.env.NODE_ENV !== 'production',
-  plugins: [maxDepthPlugin({ n: 15 })],
+  plugins: [maxDepthPlugin({ n: 15 }), complexityYogaPlugin],
 });
 
 export default defineEventHandler(async (event) => {

@@ -47,6 +47,9 @@ export interface PerfScenarioFlags {
   allowDatabase?: string[];
   // #179 — rest-crud-cycle iterations per phase.
   crudN?: number;
+  // #122 — operator's current BOJECT_GRAPHQL_COMPLEXITY_MAX_COST; the
+  // renderer pairs it with the suggested cap derived from this run.
+  currentMaxCost?: number;
 }
 
 // Mirrors the ramp `parseStages()` builds in
@@ -275,6 +278,7 @@ export async function runPerfScenario(
             seedSize: null,
             seedDeterministicSeed: flags.seed ?? configDefaults.seed ?? null,
           }),
+          currentMaxCost: flags.currentMaxCost,
         });
         return { exitCode: 1 };
       }
@@ -321,6 +325,7 @@ export async function runPerfScenario(
             seedSize: seedResult?.inserted ?? null,
             seedDeterministicSeed: flags.seed ?? configDefaults.seed ?? null,
           }),
+          currentMaxCost: flags.currentMaxCost,
         });
         return { exitCode: 1 };
       }
@@ -515,6 +520,7 @@ export async function runPerfScenario(
       outDir,
       runMetadata: meta,
       pgSamplesCsvPath: samplerHandle?.csvPath,
+      currentMaxCost: flags.currentMaxCost,
     });
     params.stdout(`Report written to ${sanitiseUrl(outDir)}`);
   }

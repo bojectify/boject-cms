@@ -240,6 +240,11 @@ export function registerDynamicTypes(
       references: t.field({
         type: [ContentEntryInterface],
         nullable: false,
+        // RICHTEXT references is a batched lookup over the body's
+        // dedup'd entry refs. Bump base cost to reflect the
+        // per-traversal Prisma round-trip; multiplier inherits the
+        // schema-level default for list-returning fields.
+        complexity: 10,
         resolve: async (rt) => {
           const refs = collectRichtextReferences(rt.json);
           if (refs.length === 0) return [];
@@ -463,6 +468,9 @@ export function registerDynamicTypes(
             fields[field.identifier] = t.field({
               type: targetRef,
               nullable: !field.required,
+              // RELATION traversal triggers a Prisma findUnique per
+              // resolution. Bump base cost to discourage deep chains.
+              complexity: 5,
               resolve: resolveRef as never,
             });
           } else if (targetIds.length > 1) {
@@ -490,6 +498,7 @@ export function registerDynamicTypes(
             fields[field.identifier] = t.field({
               type: unionRef,
               nullable: !field.required,
+              complexity: 5,
               resolve: resolveRef as never,
             });
           }
@@ -534,6 +543,11 @@ export function registerDynamicTypes(
 
           fields[field.identifier] = t.connection({
             type: nodeType,
+            // MULTIRELATION is a fan-out: each connection traversal
+            // hits Prisma for N rows. Base cost reflects the cross-
+            // entry boundary; the `edges` list inside the Connection
+            // picks up the schema-level defaultListMultiplier.
+            complexity: { field: 5 },
             resolve: (entry: ContentEntryShape, args: unknown) =>
               resolveOffsetConnection(
                 {
