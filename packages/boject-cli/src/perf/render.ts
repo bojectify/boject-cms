@@ -6,6 +6,7 @@ import {
   readSamplesIfPresent,
   renderConnectionPanel,
 } from './renderConnectionPanel.js';
+import { suggestMaxCost } from './suggestMaxCost.js';
 
 export interface RunMetadata {
   perfCalibratedAt: string;
@@ -37,6 +38,13 @@ export interface RenderParams {
   outDir: string;
   runMetadata: RunMetadata;
   pgSamplesCsvPath?: string;
+  /**
+   * Operator's current `BOJECT_GRAPHQL_COMPLEXITY_MAX_COST` value, used
+   * to compare against the renderer's suggested cap and pick the
+   * green-light / warning prose. Optional — when omitted the renderer
+   * emits the suggestion in info mode (no comparison).
+   */
+  currentMaxCost?: number;
 }
 
 interface RawPoint {
@@ -272,12 +280,30 @@ function buildPartialBanner(
   }
 }
 
+function buildCapBlock(
+  stats: ScenarioStats[],
+  currentMaxCost: number | undefined
+): string | null {
+  const r = suggestMaxCost(stats, { currentMaxCost });
+  if (!r) return null;
+  const header = '## GraphQL complexity cap';
+  switch (r.mode) {
+    case 'info':
+      return `${header}\n\n> **Suggested cap:** ${r.suggested}. Compare against your existing \`BOJECT_GRAPHQL_COMPLEXITY_MAX_COST\` to decide whether to raise or lower — see \`CLAUDE.md\` for the calibration story.\n`;
+    case 'green':
+      return `${header}\n\n> **Suggested cap:** ${r.suggested}. Your hardware sustained the current cap of ${currentMaxCost}. You could raise to ${r.suggested} for more headroom.\n`;
+    case 'warn':
+      return `${header}\n\n> **Warning — current cap exceeds measured sustain.** Your hardware sustained ~${r.suggested}; current cap is ${currentMaxCost}. **Lowering the cap is a breaking change to clients** — consider scaling hardware before dropping the cap.\n`;
+  }
+}
+
 function buildSummary(
   meta: RunMetadata,
   stats: ScenarioStats[],
   crudStats: CrudStats[],
   malformedCount: number,
-  connectionPanel: string | null
+  connectionPanel: string | null,
+  currentMaxCost?: number
 ): string {
   const flatScenario = meta.scenarios.find((s) => s.name === 'graphql-flat');
   const hasFlat = meta.scenarios.some((s) => s.name === 'graphql-flat');
@@ -335,6 +361,7 @@ function buildSummary(
     hasCrud ? '' : null,
     hasCrud ? crudTable(crudStats) : null,
     hasCrud ? '' : null,
+    buildCapBlock(stats, currentMaxCost),
     '## Run notes',
     '',
     `- Content type: ${meta.contentType}`,
@@ -392,7 +419,8 @@ export async function renderReport(params: RenderParams): Promise<void> {
     stats,
     crudStats,
     malformedCount,
-    connectionPanel
+    connectionPanel,
+    params.currentMaxCost
   );
   const metadata = buildMetadata(params.runMetadata);
   const csv = toCsv(stats, crudStats);

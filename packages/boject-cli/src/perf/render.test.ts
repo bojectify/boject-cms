@@ -492,4 +492,51 @@ describe('renderReport', () => {
     expect(meta.seedSize).toBe(10000);
     expect(meta.seedDeterministicSeed).toBe(7);
   });
+
+  describe('GraphQL complexity cap suggestion (#122)', () => {
+    it('emits the cap block in info mode when currentMaxCost is unset', async () => {
+      const out = await mkdtemp(join(tmpdir(), 'boject-render-'));
+      await renderReport({
+        rawJsonPath: FIXTURE,
+        outDir: out,
+        runMetadata: minimalMetadata(),
+      });
+      const md = await readFile(join(out, 'summary.md'), 'utf8');
+      expect(md).toContain('## GraphQL complexity cap');
+      expect(md).toContain('**Suggested cap:**');
+      expect(md).toContain('Compare against your existing');
+      expect(md).not.toContain('You could raise to');
+      expect(md).not.toContain('exceeds measured sustain');
+    });
+
+    it('emits green-light prose when currentMaxCost is below the suggestion', async () => {
+      const out = await mkdtemp(join(tmpdir(), 'boject-render-'));
+      await renderReport({
+        rawJsonPath: FIXTURE,
+        outDir: out,
+        runMetadata: minimalMetadata(),
+        currentMaxCost: 100,
+      });
+      const md = await readFile(join(out, 'summary.md'), 'utf8');
+      expect(md).toContain('## GraphQL complexity cap');
+      expect(md).toContain('Your hardware sustained the current cap of 100');
+      expect(md).toContain('You could raise to');
+    });
+
+    it('emits warning prose when currentMaxCost exceeds the suggestion', async () => {
+      const out = await mkdtemp(join(tmpdir(), 'boject-render-'));
+      await renderReport({
+        rawJsonPath: FIXTURE,
+        outDir: out,
+        runMetadata: minimalMetadata(),
+        currentMaxCost: 99999,
+      });
+      const md = await readFile(join(out, 'summary.md'), 'utf8');
+      expect(md).toContain('## GraphQL complexity cap');
+      expect(md).toContain('exceeds measured sustain');
+      expect(md).toContain(
+        '**Lowering the cap is a breaking change to clients**'
+      );
+    });
+  });
 });

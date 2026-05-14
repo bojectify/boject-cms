@@ -13,6 +13,8 @@ type PartialSource = (typeof PARTIAL_SOURCES)[number];
 export interface PerfReportFlags {
   from?: string;
   out?: string;
+  // #122 — operator's current BOJECT_GRAPHQL_COMPLEXITY_MAX_COST.
+  currentMaxCost?: number;
 }
 
 export interface PerfReportParams {
@@ -142,6 +144,7 @@ export async function runPerfReport(
       outDir: runDir,
       runMetadata: metadata,
       pgSamplesCsvPath,
+      currentMaxCost: params.flags.currentMaxCost,
     });
   } catch (err) {
     params.stderr(`Error re-rendering ${runDir}: ${(err as Error).message}`);

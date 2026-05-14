@@ -44,6 +44,8 @@ export interface PerfSweepFlags {
   seed?: number;
   reset?: boolean;
   allowDatabase?: string[];
+  // #122 — operator's current BOJECT_GRAPHQL_COMPLEXITY_MAX_COST.
+  currentMaxCost?: number;
 }
 
 // Mirrors the ramp `parseStages()` builds in
@@ -214,6 +216,7 @@ export async function runPerfSweep(
             seedSize: null,
             seedDeterministicSeed: flags.seed ?? defaults.seed ?? null,
           }),
+          currentMaxCost: flags.currentMaxCost,
         });
         return { exitCode: 1 };
       }
@@ -251,6 +254,7 @@ export async function runPerfSweep(
           seedSize: seedResult?.inserted ?? null,
           seedDeterministicSeed: flags.seed ?? defaults.seed ?? null,
         }),
+        currentMaxCost: flags.currentMaxCost,
       });
       return { exitCode: 1 };
     }
@@ -468,6 +472,7 @@ export async function runPerfSweep(
     outDir,
     runMetadata: meta,
     pgSamplesCsvPath: samplerHandle?.csvPath,
+    currentMaxCost: flags.currentMaxCost,
   });
   params.stdout(`Sweep report written to ${sanitiseUrl(outDir)}`);
   return { exitCode: partial ? 1 : 0 };

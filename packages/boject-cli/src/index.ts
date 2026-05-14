@@ -89,6 +89,10 @@ graphql-flat power-user overrides:
 rest-crud-cycle overrides:
   --crud-n <n>            Iterations per phase for rest-crud-cycle.
                           Default 10000 (matches canonical).
+
+GraphQL complexity calibration:
+  --current-max-cost <n>  Operator's current BOJECT_GRAPHQL_COMPLEXITY_MAX_COST.
+                          Renderer pairs it with the suggested cap (green/warn split).
 `;
 
 const PERF_SWEEP_USAGE = `Usage: boject perf sweep --content-type <id> [flags]
@@ -125,16 +129,22 @@ Sweep matrix:
 graphql-flat power-user overrides:
   --target-rps <n>        Override peak RPS (default 2000).
   --stages <csv>          Comma-separated RPS stages, e.g. 50,100,500,2000.
+
+GraphQL complexity calibration:
+  --current-max-cost <n>  Operator's current BOJECT_GRAPHQL_COMPLEXITY_MAX_COST.
+                          Renderer pairs it with the suggested cap (green/warn split).
 `;
 
-const PERF_REPORT_USAGE = `Usage: boject perf report [--from <dir>] [--out <dir>]
+const PERF_REPORT_USAGE = `Usage: boject perf report [--from <dir>] [--out <dir>] [--current-max-cost <n>]
 
 Re-renders summary.md, metadata.json, and metrics.csv from an existing run.
 With no flags, picks the latest run in ./perf-reports/ (or perf.out from
 .boject.config.json).
 
-  --from <dir>    Re-render this specific run dir.
-  --out <dir>     Override the search root (default ./perf-reports/).
+  --from <dir>            Re-render this specific run dir.
+  --out <dir>             Override the search root (default ./perf-reports/).
+  --current-max-cost <n>  Operator's current BOJECT_GRAPHQL_COMPLEXITY_MAX_COST.
+                          Renderer pairs it with the suggested cap (green/warn split).
 `;
 
 const PERF_SEED_USAGE = `Usage: boject perf seed --content-type <id> [flags]
@@ -492,6 +502,7 @@ async function dispatchPerf(args: string[]): Promise<number> {
           reset: { type: 'boolean', default: false },
           'allow-database': { type: 'string', multiple: true, default: [] },
           'crud-n': { type: 'string' },
+          'current-max-cost': { type: 'string' },
         },
       });
       if (values['crud-n'] !== undefined) {
@@ -529,6 +540,9 @@ async function dispatchPerf(args: string[]): Promise<number> {
           reset: values.reset === true,
           allowDatabase: values['allow-database'] as string[],
           crudN: values['crud-n'] ? Number(values['crud-n']) : undefined,
+          currentMaxCost: values['current-max-cost']
+            ? Number(values['current-max-cost'])
+            : undefined,
         },
         stdout,
         stderr,
@@ -562,6 +576,7 @@ async function dispatchPerf(args: string[]): Promise<number> {
           seed: { type: 'string' },
           reset: { type: 'boolean', default: false },
           'allow-database': { type: 'string', multiple: true, default: [] },
+          'current-max-cost': { type: 'string' },
         },
       });
       const r = await runPerfSweep({
@@ -594,6 +609,9 @@ async function dispatchPerf(args: string[]): Promise<number> {
           seed: values.seed ? Number(values.seed) : undefined,
           reset: values.reset === true,
           allowDatabase: values['allow-database'] as string[],
+          currentMaxCost: values['current-max-cost']
+            ? Number(values['current-max-cost'])
+            : undefined,
         },
         stdout,
         stderr,
@@ -611,11 +629,18 @@ async function dispatchPerf(args: string[]): Promise<number> {
         options: {
           from: { type: 'string' },
           out: { type: 'string' },
+          'current-max-cost': { type: 'string' },
         },
       });
       const r = await runPerfReport({
         cwd: process.cwd(),
-        flags: { from: values.from, out: values.out },
+        flags: {
+          from: values.from,
+          out: values.out,
+          currentMaxCost: values['current-max-cost']
+            ? Number(values['current-max-cost'])
+            : undefined,
+        },
         stdout,
         stderr,
       });
