@@ -3,13 +3,25 @@ packages:
   - 'packages/*'
   - 'perf'
 
-onlyBuiltDependencies:
-  - esbuild
-  - '@parcel/watcher'
-  - prisma
-  - lefthook
-  - sharp
-  - canvas
+minimumReleaseAge: 4320
 
 patchedDependencies:
   '@nuxt/test-utils@4.0.0': patches/@nuxt__test-utils@4.0.0.patch
+publicHoistPattern:
+  - vitest
+  - '@vitest/*'
+  - vite-node
+  - eslint
+  - '@typescript-eslint/*'
+  - semver
+allowBuilds:
+  esbuild: true
+  '@parcel/watcher': true
+  prisma: true
+  lefthook: true
+  sharp: true
+  canvas: true
+  '@prisma/engines': false
+  msw: false
+  unrs-resolver: false
+  vue-demi: true

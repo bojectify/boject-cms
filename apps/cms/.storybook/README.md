@@ -8,6 +8,16 @@ This app uses **Storybook 10** via `@storybook/vue3-vite` (not `@nuxtjs/storyboo
 - `pnpm --filter cms storybook:build` — static build into `apps/cms/storybook-static/`
 - `pnpm --filter cms test:storybook` — run `play` functions through Playwright (shares the Vitest config)
 
+## One-time setup: MSW service worker
+
+`apps/cms/public/mockServiceWorker.js` is gitignored and not auto-generated on install (msw is intentionally blocked in `pnpm-workspace.yaml`'s `allowBuilds` as a supply-chain hardening measure — see `pnpm-workspace.yaml`). After your first `pnpm install`, generate it once:
+
+```sh
+pnpm --filter cms exec msw init public --no-save
+```
+
+Regenerate after any `msw` upgrade so the worker matches the installed version.
+
 ## Three-layer mocking
 
 Each layer mocks at a different boundary. Pick the right one for what you're replacing.
