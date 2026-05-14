@@ -1,3 +1,7 @@
+import type { Plugin } from 'graphql-yoga';
+import { GraphQLError } from 'graphql';
+import { createComplexityRule } from '@pothos/plugin-complexity';
+
 /**
  * Default per-query complexity cap. Chosen from the 2026-04-28 perf
  * report scenario 1B: bare / filtered / relation shapes all sustained
@@ -39,3 +43,53 @@ export function isGraphqlComplexityLogOnly(): boolean {
   const raw = process.env.BOJECT_GRAPHQL_COMPLEXITY_LOG_ONLY;
   return raw === 'true' || raw === '1';
 }
+
+/**
+ * Yoga plugin that adds a per-request validation rule computing the
+ * operation's complexity. Over-cap queries either reject with a
+ * `QUERY_TOO_COMPLEX` GraphQL error (default) or are logged and
+ * permitted when `BOJECT_GRAPHQL_COMPLEXITY_LOG_ONLY=true`.
+ *
+ * Runs in the validate phase — after parse, before execution — so
+ * rejected queries never touch resolvers.
+ *
+ * Note: variable values aren't available at validate time. Pothos's
+ * complexity calculator falls back to argument literals (e.g.
+ * `first: 100` in the query) and field default values; queries that
+ * use variables (`first: $n`) compute against the field default. This
+ * is the same tradeoff every static complexity analyzer makes — and
+ * matches `maxDepthPlugin`'s contract.
+ */
+export const complexityYogaPlugin: Plugin = {
+  onValidate({ addValidationRule }) {
+    const cap = getGraphqlComplexityMaxCost();
+    const logOnly = isGraphqlComplexityLogOnly();
+    addValidationRule(
+      createComplexityRule({
+        context: {},
+        variableValues: {},
+        validate(result, reportError) {
+          if (result.complexity <= cap) return;
+          if (logOnly) {
+            console.warn(
+              `[graphql-complexity] over-cap query permitted (log-only): score=${result.complexity}, cap=${cap}`
+            );
+            return;
+          }
+          reportError(
+            new GraphQLError(
+              `Query exceeds complexity cap (score: ${result.complexity}, cap: ${cap}). Reduce nesting, page size, or relation traversal.`,
+              {
+                extensions: {
+                  code: 'QUERY_TOO_COMPLEX',
+                  score: result.complexity,
+                  cap,
+                },
+              }
+            )
+          );
+        },
+      })
+    );
+  },
+};
