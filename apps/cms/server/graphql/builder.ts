@@ -2,6 +2,7 @@ import SchemaBuilder from '@pothos/core';
 import PrismaPlugin from '@pothos/plugin-prisma';
 import PrismaUtilsPlugin from '@pothos/plugin-prisma-utils';
 import RelayPlugin from '@pothos/plugin-relay';
+import ComplexityPlugin from '@pothos/plugin-complexity';
 import type PrismaTypes from '#generated/pothos-types';
 import { getDatamodel } from '#generated/pothos-types';
 import { prisma } from '../utils/prisma';
@@ -21,12 +22,16 @@ type BuilderTypes = {
 
 export function createBuilder(): Builder {
   const builder = new SchemaBuilder<BuilderTypes>({
-    plugins: [PrismaPlugin, PrismaUtilsPlugin, RelayPlugin],
+    plugins: [PrismaPlugin, PrismaUtilsPlugin, RelayPlugin, ComplexityPlugin],
     prisma: {
       client: prisma,
       dmmf: getDatamodel(),
     },
     relay: {},
+    complexity: {
+      defaultComplexity: 1,
+      defaultListMultiplier: 20,
+    },
   });
 
   builder.scalarType('DateTime', {
