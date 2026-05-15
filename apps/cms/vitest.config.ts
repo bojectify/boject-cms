@@ -24,7 +24,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8', // or 'istanbul'
     },
-    reporters: ['verbose'],
+    // reporters: ['verbose'],
     // Using plain vitest config instead of @nuxt/test-utils/config because
     // defineVitestConfig's "nuxt" environment is incompatible with Nuxt 4.3.1
     // (publicAssetsURL build error). Our e2e tests only need the "node"
@@ -55,6 +55,7 @@ export default defineConfig({
             // Migration tests use raw pg.Client to create ad-hoc DBs and
             // exercise migration.sql against them. Requires a live Postgres.
             'prisma/migrations/**/*.test.ts',
+            '**/*.integration.test.ts',
           ],
           globals: true,
           globalSetup: fileURLToPath(
@@ -70,6 +71,7 @@ export default defineConfig({
             'scripts/**/*.test.ts',
             'server/utils/**/*.test.ts',
             'utils/**/*.test.ts',
+            '!**/*.integration.test.ts',
           ],
           exclude: ['utils/slugify.pg-parity.test.ts'],
           globals: true,

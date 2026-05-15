@@ -1,16 +1,23 @@
 # syntax=docker/dockerfile:1.7
 # Dev container for boject-cms.
 #
-# Mirrors apps/cms/Dockerfile's base for prod-parity, then layers on:
+# Debian-slim (glibc) so Playwright's bundled chromium-headless-shell can
+# actually launch — alpine/musl can't run those binaries even with gcompat
+# (posix_fallocate64, unsupported relocations).
+#
+# Layers on top of node:24-slim:
 #   - bash + git for interactive `dev` shells and lefthook
-#   - build-base + python3 as node-gyp fallbacks
-#   - chromium + fonts for Playwright (Storybook browser tests run headless here)
+#   - build-essential + python3 + pkg-config for node-gyp fallbacks
+#   - canvas system libs (cairo, pango, jpeg, giflib, pixman) used by
+#     chartjs-node-canvas (perf reports)
+#   - chromium runtime deps for Playwright (the browser binary itself
+#     downloads via `pnpm playwright install` on first use)
 #
 # Every `pnpm` and `pnpx` invocation on the dev machine routes into this
 # container via the host shims at scripts/host-shims/. See spec
 # docs/superpowers/specs/2026-05-14-dev-container-design.md (internal repo).
 
-FROM node:24-alpine
+FROM node:24-slim
 
 # Shared corepack cache: prepare runs as root during image build, but the
 # container runs as `node`. Without COREPACK_HOME pointing at a shared path,
@@ -23,15 +30,18 @@ RUN mkdir -p /opt/corepack \
  && corepack prepare pnpm@${PNPM_VERSION} --activate \
  && chmod -R a+rX /opt/corepack
 
-RUN apk add --no-cache \
-      bash git \
-      build-base python3 pkgconf \
-      cairo-dev pango-dev jpeg-dev giflib-dev pixman-dev \
-      chromium nss freetype harfbuzz ca-certificates ttf-freefont
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      bash git ca-certificates \
+      build-essential python3 pkg-config \
+      libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev libpixman-1-dev \
+      libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libxkbcommon0 \
+      libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2 \
+      libpangocairo-1.0-0 libxshmfence1 libdrm2 \
+      fonts-liberation fonts-noto-color-emoji \
+ && rm -rf /var/lib/apt/lists/*
 
-ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
-    PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium-browser \
-    PNPM_STORE_PATH=/pnpm-store
+ENV PNPM_STORE_PATH=/pnpm-store
 
 USER node
 WORKDIR /workspace

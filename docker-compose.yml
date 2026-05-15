@@ -2,8 +2,16 @@ services:
   db:
     image: postgres:17
     restart: unless-stopped
+    # All dev ports declared on db because `dev` shares db's network namespace
+    # (network_mode: service:db). That sharing means `localhost` inside the dev
+    # container == postgres, matching the host dev experience and avoiding
+    # rewriting `localhost`→`db` in .env, tests, perf:dev, etc.
     ports:
       - '127.0.0.1:5432:5432'
+      - '127.0.0.1:4000:4000' # Nuxt dev server (forwarded to dev)
+      - '127.0.0.1:6006:6006' # Storybook (forwarded to dev)
+      - '127.0.0.1:5555:5555' # Prisma Studio (forwarded to dev)
+      - '127.0.0.1:24678:24678' # Vite HMR websocket (forwarded to dev)
     environment:
       POSTGRES_USER: boject
       POSTGRES_PASSWORD: boject
@@ -17,6 +25,9 @@ services:
       context: .
       dockerfile: Dockerfile.dev
     init: true
+    # Share db's network namespace so `localhost:5432` resolves to postgres.
+    # Keeps .env, tests, and perf:dev working identically to host execution.
+    network_mode: 'service:db'
     depends_on:
       - db
     volumes:
@@ -26,13 +37,7 @@ services:
       # compromised dep can't rm -rf the local git history. Git ops stay on
       # host where they already have access.
       - /workspace/.git
-    ports:
-      - '127.0.0.1:4000:4000' # Nuxt dev server
-      - '127.0.0.1:6006:6006' # Storybook
-      - '127.0.0.1:5555:5555' # Prisma Studio
-      - '127.0.0.1:24678:24678' # Vite HMR websocket
     environment:
-      DATABASE_URL: postgresql://boject:boject@db:5432/boject
       NUXT_SESSION_PASSWORD: ${NUXT_SESSION_PASSWORD:-dev-only-placeholder-32-chars-long-xx}
 
 volumes:
