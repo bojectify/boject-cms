@@ -6,6 +6,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 boject-cms is a general-purpose TypeScript headless CMS built with Nuxt 4 (Vue) and Prisma v7 on PostgreSQL. Content is modelled entirely through user-defined ContentTypes — there are no hardcoded domain models.
 
+## Dev environment containerisation
+
+All `pnpm` and `pnpx` commands documented below route into a Docker container (the `dev` service in `docker-compose.yml`, built from `Dockerfile.dev`) via host shims at `scripts/host-shims/`. This is a supply-chain hardening measure — dependency code never executes with access to host secrets (`~/.ssh`, `~/.aws`, `~/.npmrc`, gh tokens, keychain).
+
+For your purposes as Claude: when you call `pnpm` or `pnpx` via the Bash tool, the host shim handles routing transparently — you don't need to prefix anything with `docker compose exec`. Non-pnpm commands (`git`, `gh`, file operations, `docker compose` itself) run on host as normal. **lefthook is installed on host via `brew install lefthook`** (not via pnpm) — git hooks fire on host and dispatch each job into the container via the shim.
+
+`.git` is hidden from the container via an anonymous-volume overlay. The root `package.json` `prepare` script guards its `lefthook install` call with a `git rev-parse --git-dir` probe so it no-ops in the container.
+
+If a `pnpm` command fails with "service 'dev' not running", the shim's auto-start has a problem; recover with `docker compose up -d dev`.
+
+If `pnpm exec` fails with "deps state check" trying to run install and you see `prepare: Failed` referencing `git rev-parse`, the prepare-script guard above has regressed. If you see `ECONNREFUSED 127.0.0.1:5432` from a test, that's the CLI integration tests hardcoding host-side postgres (tracked as a follow-up; postgres is reachable as `db:5432` from inside the container).
+
 ## Commands
 
 ```bash
