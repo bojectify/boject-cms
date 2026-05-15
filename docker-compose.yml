@@ -12,5 +12,29 @@ services:
       - pgdata:/var/lib/postgresql/data
       - ./docker/postgres-init:/docker-entrypoint-initdb.d:ro
 
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    init: true
+    depends_on:
+      - db
+    volumes:
+      - .:/workspace:cached
+      - pnpm-store:/pnpm-store
+      # Anonymous-volume overlay: hides host's .git from the container so a
+      # compromised dep can't rm -rf the local git history. Git ops stay on
+      # host where they already have access.
+      - /workspace/.git
+    ports:
+      - '127.0.0.1:4000:4000' # Nuxt dev server
+      - '127.0.0.1:6006:6006' # Storybook
+      - '127.0.0.1:5555:5555' # Prisma Studio
+      - '127.0.0.1:24678:24678' # Vite HMR websocket
+    environment:
+      DATABASE_URL: postgresql://boject:boject@db:5432/boject
+      NUXT_SESSION_PASSWORD: ${NUXT_SESSION_PASSWORD:-dev-only-placeholder-32-chars-long-xx}
+
 volumes:
   pgdata:
+  pnpm-store:
