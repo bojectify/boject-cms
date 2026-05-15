@@ -78,9 +78,14 @@ Every `pnpm` and `pnpx` invocation runs inside a Docker container that has no ac
    docker compose up -d
    pnpm install
    pnpm --filter cms exec msw init public --no-save
+   pnpm --filter cms exec playwright install chromium chromium-headless-shell
    pnpm prisma:migrate
    pnpm prisma:seed
    ```
+
+   The Playwright browsers are cached in a docker named volume
+   (`playwright-cache`) so this `playwright install` only runs once per
+   machine — subsequent container rebuilds reuse the cached binaries.
 
 9. **Smoke test**:
 

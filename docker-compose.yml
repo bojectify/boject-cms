@@ -33,6 +33,10 @@ services:
     volumes:
       - .:/workspace:cached
       - pnpm-store:/pnpm-store
+      # Persist Playwright's browser cache across container recreations.
+      # Without this, every image rebuild wipes /home/node/.cache and the
+      # next `pnpm test:storybook` errors with "headless_shell ENOENT".
+      - playwright-cache:/home/node/.cache/ms-playwright
       # Anonymous-volume overlay: hides host's .git from the container so a
       # compromised dep can't rm -rf the local git history. Git ops stay on
       # host where they already have access.
@@ -43,3 +47,4 @@ services:
 volumes:
   pgdata:
   pnpm-store:
+  playwright-cache:

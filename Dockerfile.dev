@@ -43,6 +43,13 @@ RUN apt-get update \
 
 ENV PNPM_STORE_PATH=/pnpm-store
 
+# Pre-create the Playwright cache target with node ownership so Docker
+# initialises the named volume mounted there with the correct perms
+# (without this, the empty volume gets created as root and the node
+# user can't write to it).
+RUN mkdir -p /home/node/.cache/ms-playwright \
+ && chown -R node:node /home/node/.cache
+
 USER node
 WORKDIR /workspace
 
