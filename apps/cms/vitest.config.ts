@@ -2,10 +2,10 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 import { storybookTest } from '@storybook/addon-vitest/vitest-plugin';
 import { playwright } from '@vitest/browser-playwright';
+import { getTestDatabaseUrl } from './test/dbUrl';
 
 // Tests use a separate database so dev data is never touched.
-process.env.DATABASE_URL =
-  'postgresql://boject:boject@localhost:5432/boject_test';
+process.env.DATABASE_URL = getTestDatabaseUrl();
 
 export default defineConfig({
   resolve: {
@@ -70,6 +70,7 @@ export default defineConfig({
           include: [
             'scripts/**/*.test.ts',
             'server/utils/**/*.test.ts',
+            'test/**/*.test.ts',
             'utils/**/*.test.ts',
             '!**/*.integration.test.ts',
           ],

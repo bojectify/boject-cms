@@ -13,8 +13,9 @@ import { applySchema } from './applySchema';
 import * as snapshotModule from './snapshotCurrentSchema';
 import * as schemaModule from '../../server/graphql/schema';
 import type { Bundle } from './types';
+import { getTestDatabaseUrl } from '../../test/dbUrl';
 
-const url = 'postgresql://boject:boject@localhost:5432/boject_test';
+const url = getTestDatabaseUrl();
 const adapter = new PrismaPg({ connectionString: url });
 const prisma = new PrismaClient({ adapter });
 

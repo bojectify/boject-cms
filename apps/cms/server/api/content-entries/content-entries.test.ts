@@ -5,8 +5,9 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../../../generated/prisma/client';
 import { TEST_USERNAME, TEST_PASSWORD } from '../../test/credentials';
 import { resetRateLimitStore } from '../../utils/rateLimit';
+import { getTestDatabaseUrl } from '../../../test/dbUrl';
 
-const prismaUrl = 'postgresql://boject:boject@localhost:5432/boject_test';
+const prismaUrl = getTestDatabaseUrl();
 const prismaAdapter = new PrismaPg({ connectionString: prismaUrl });
 const prisma = new PrismaClient({ adapter: prismaAdapter });
 

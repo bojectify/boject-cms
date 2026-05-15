@@ -8,17 +8,20 @@ import { PrismaPg } from '@prisma/adapter-pg';
 // import strategy — see apps/cms/scripts/docker-entrypoint/seed-admin.ts.
 import { PrismaClient } from '../../../../apps/cms/generated/prisma/client.js';
 import { seedPerfArticleContentType } from './seedPerfArticleContentType.js';
+import { getCliTestDatabaseUrl } from './dbUrl.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '../../../..');
 const CMS_DIR = resolve(REPO_ROOT, 'apps/cms');
 
-const PG_HOST = 'localhost';
-const PG_PORT = 5432;
-const PG_USER = 'boject';
-const PG_PASSWORD = 'boject';
-const TEST_DB = 'boject_perf_test';
-const TEST_DATABASE_URL = `postgresql://${PG_USER}:${PG_PASSWORD}@${PG_HOST}:${PG_PORT}/${TEST_DB}`;
+const TEST_DATABASE_URL = getCliTestDatabaseUrl();
+
+const parsed = new URL(TEST_DATABASE_URL);
+const PG_HOST = parsed.hostname;
+const PG_PORT = parsed.port ? Number(parsed.port) : 5432;
+const PG_USER = decodeURIComponent(parsed.username);
+const PG_PASSWORD = decodeURIComponent(parsed.password);
+const TEST_DB = decodeURIComponent(parsed.pathname.replace(/^\//, ''));
 
 export async function setup() {
   await ensureDatabaseExists();
@@ -44,7 +47,11 @@ async function ensureDatabaseExists(): Promise<void> {
       [TEST_DB]
     );
     if (r.rowCount === 0) {
-      // Identifier interpolation is safe here: TEST_DB is a hardcoded constant.
+      // Identifier interpolation is safe: TEST_DB comes from
+      // CLI_INTEGRATION_TEST_DATABASE_URL (operator-controlled), not
+      // request input. Postgres won't accept quoted identifiers with
+      // backslashes; any embedded quote in the database name surfaces
+      // as a parse error rather than an injection vector.
       await admin.query(`CREATE DATABASE "${TEST_DB}"`);
       console.log(`[integration:setup] Created database ${TEST_DB}`);
     }

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { setup, $fetch, fetch } from '@nuxt/test-utils/e2e';
 import { TEST_USERNAME, TEST_PASSWORD } from '../../test/credentials';
+import { getTestDatabaseUrl } from '../../../test/dbUrl';
 
 const TEST_API_KEY = 'boject_test_key_for_integration_tests_only';
 
@@ -185,7 +186,7 @@ describe('GraphQL API', async () => {
       const { PrismaPg } = await import('@prisma/adapter-pg');
       const { PrismaClient } = await import('../../../generated/prisma/client');
       const { generateApiKey } = await import('../../utils/apiKey');
-      const prismaUrl = 'postgresql://boject:boject@localhost:5432/boject_test';
+      const prismaUrl = getTestDatabaseUrl();
       const adapter = new PrismaPg({ connectionString: prismaUrl });
       const prisma = new PrismaClient({ adapter });
       const { raw, hash, prefix } = generateApiKey();
