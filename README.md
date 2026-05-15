@@ -19,7 +19,96 @@ A general-purpose TypeScript headless CMS built with Nuxt 4 and Prisma v7 on Pos
 
 - Node.js (LTS)
 - [pnpm](https://pnpm.io/)
-- [Docker](https://www.docker.com/)
+- [Docker](https://www.docker.com/) — [OrbStack](https://orbstack.dev/) recommended on macOS
+
+## Containerised dev environment
+
+Every `pnpm` and `pnpx` invocation runs inside a Docker container that has no access to your host's `~/.ssh`, `~/.aws`, `~/.npmrc`, or other secrets. This caps the blast radius of any compromised npm dependency. The routing is transparent — you type the same commands you always did, and a host shim relays them into the container.
+
+### One-time setup
+
+1. **Install OrbStack** (much faster than Docker Desktop for this workflow):
+
+   ```sh
+   brew install orbstack
+   open -a OrbStack
+   ```
+
+   Verify: `docker version` should mention "orbstack".
+
+2. **Install lefthook on host** (git hooks fire on host but dispatch jobs into the container — host needs its own lefthook binary, separate from the npm package):
+
+   ```sh
+   brew install lefthook
+   lefthook install
+   ```
+
+3. **Install the host shims**:
+
+   ```sh
+   mkdir -p ~/.local/bin
+   cp scripts/host-shims/pnpm scripts/host-shims/pnpx ~/.local/bin/
+   chmod +x ~/.local/bin/pnpm ~/.local/bin/pnpx
+   ```
+
+4. **Add `~/.local/bin` to PATH in `~/.zshenv`** (sourced by all shells, including non-interactive ones like lefthook):
+
+   ```sh
+   export PATH="$HOME/.local/bin:$PATH"
+   ```
+
+5. **Fix PATH order in `~/.zshrc`** — the standard pnpm setup block prepends `$PNPM_HOME` to PATH _after_ everything else, which would shadow the shim. Either delete the pnpm block (you don't need it any more — the shim handles pnpm) or move your `~/.local/bin` export to _after_ the `# pnpm end` marker so the shim wins PATH lookup.
+
+6. **Add the `dev` alias to `~/.zshrc`**:
+
+   ```sh
+   alias dev='docker compose exec dev'
+   ```
+
+7. **Restart your shell**, then verify:
+
+   ```sh
+   which pnpm     # must print ~/.local/bin/pnpm (NOT ~/Library/pnpm/pnpm)
+   pnpm --version # should print 11.x (takes ~1s; that's the container round-trip)
+   ```
+
+8. **Build and start the stack**:
+
+   ```sh
+   docker compose up -d
+   pnpm install
+   pnpm --filter cms exec msw init public --no-save
+   pnpm prisma:migrate
+   pnpm prisma:seed
+   ```
+
+9. **Smoke test**:
+
+   ```sh
+   pnpm dev
+   ```
+
+   Open http://localhost:4000.
+
+### Daily use
+
+You type `pnpm dev`, `pnpm test`, `pnpx whatever` exactly as you would without containers. The shim handles routing.
+
+- `dev` (the alias) opens a bash shell inside the container.
+- `dev <cmd>` runs a one-shot command inside the container.
+- `git`, `gh`, your editor, and your browser stay on the host.
+
+### Editor IntelliSense
+
+For VS Code, Cursor, JetBrains Gateway, or Codespaces: open the repo and choose "Reopen in Container". The editor's TypeScript / ESLint / Vue language servers attach into the same container, so IntelliSense sees the same `node_modules` as your terminal commands.
+
+For Vim / Neovim / Emacs users: the host editor will not be able to see `node_modules` correctly because the LSP runs on host. Workarounds: use `pnpm typecheck` and `pnpm lint` from the terminal for verification, or run your LSP inside the container via your editor's remote-development plugin if available.
+
+### Threat model
+
+Short version: the container has no host secrets mounted, `.git` is hidden from the container via an anonymous-volume overlay, ports are bound to `127.0.0.1` only.
+
+Residual risk: a compromised dep can still read/write the bind-mounted project files (except `.git`). Mitigation is commit-and-push frequently so uncommitted changes are the only at-risk surface.
 
 ## Getting Started
 
