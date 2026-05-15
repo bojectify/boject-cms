@@ -1,0 +1,56 @@
+# syntax=docker/dockerfile:1.7
+# Dev container for boject-cms.
+#
+# Debian-slim (glibc) so Playwright's bundled chromium-headless-shell can
+# actually launch — alpine/musl can't run those binaries even with gcompat
+# (posix_fallocate64, unsupported relocations).
+#
+# Layers on top of node:24-slim:
+#   - bash + git for interactive `dev` shells and lefthook
+#   - build-essential + python3 + pkg-config for node-gyp fallbacks
+#   - canvas system libs (cairo, pango, jpeg, giflib, pixman) used by
+#     chartjs-node-canvas (perf reports)
+#   - chromium runtime deps for Playwright (the browser binary itself
+#     downloads via `pnpm playwright install` on first use)
+#
+# Every `pnpm` and `pnpx` invocation on the dev machine routes into this
+# container via the host shims at scripts/host-shims/. See spec
+# docs/superpowers/specs/2026-05-14-dev-container-design.md (internal repo).
+
+FROM node:24-slim
+
+# Shared corepack cache: prepare runs as root during image build, but the
+# container runs as `node`. Without COREPACK_HOME pointing at a shared path,
+# node's cache is empty and corepack prompts to re-download pnpm on first use.
+ENV COREPACK_HOME=/opt/corepack
+
+ARG PNPM_VERSION=11.1.2
+RUN mkdir -p /opt/corepack \
+ && corepack enable \
+ && corepack prepare pnpm@${PNPM_VERSION} --activate \
+ && chmod -R a+rX /opt/corepack
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      bash git ca-certificates \
+      build-essential python3 pkg-config \
+      libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev libpixman-1-dev \
+      libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libxkbcommon0 \
+      libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2 \
+      libpangocairo-1.0-0 libxshmfence1 libdrm2 \
+      fonts-liberation fonts-noto-color-emoji \
+ && rm -rf /var/lib/apt/lists/*
+
+ENV PNPM_STORE_PATH=/pnpm-store
+
+# Pre-create the Playwright cache target with node ownership so Docker
+# initialises the named volume mounted there with the correct perms
+# (without this, the empty volume gets created as root and the node
+# user can't write to it).
+RUN mkdir -p /home/node/.cache/ms-playwright \
+ && chown -R node:node /home/node/.cache
+
+USER node
+WORKDIR /workspace
+
+CMD ["tail", "-f", "/dev/null"]

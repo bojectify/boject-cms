@@ -211,10 +211,20 @@ async function main(): Promise<void> {
 // CLI entry — pathToFileURL handles symlinks, spaces in paths, and
 // platform path separators. The naked `file://${argv[1]}` form silently
 // no-ops in those cases.
-if (
-  process.argv[1] &&
-  import.meta.url === pathToFileURL(process.argv[1]).href
-) {
+//
+// Also gate on the entry's basename: when this module is bundled into
+// the @boject/cli `dist/index.js`, `import.meta.url` is rewritten to the
+// bundle's URL, which equals argv[1] for every CLI invocation — making
+// the original conditional fire on `boject upgrade`, `boject schema *`,
+// etc. The basename check pins auto-run to literal pg-sampler entry.
+function isPgSamplerEntry(): boolean {
+  if (!process.argv[1]) return false;
+  if (import.meta.url !== pathToFileURL(process.argv[1]).href) return false;
+  const entryName = process.argv[1].split(/[\\/]/).pop() ?? '';
+  return /^pg-sampler\.(?:ts|js|mjs|cjs)$/i.test(entryName);
+}
+
+if (isPgSamplerEntry()) {
   main().catch((err: unknown) => {
     console.error('[pg-sampler] fatal', err);
     process.exit(1);

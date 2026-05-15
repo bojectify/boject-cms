@@ -18,7 +18,6 @@ allowBuilds:
   esbuild: true
   '@parcel/watcher': true
   prisma: true
-  lefthook: true
   sharp: true
   canvas: true
   '@prisma/engines': false

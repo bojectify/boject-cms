@@ -1,0 +1,44 @@
+#!/bin/sh
+# Transparent shim: route `pnpm` invocations into the project's `dev`
+# docker-compose service. Lives ahead of the standalone pnpm on PATH so
+# every caller (interactive shell, lefthook, Claude Code's Bash tool)
+# routes through the container without code-level awareness.
+#
+# Project-agnostic: walks up via `git rev-parse --show-toplevel`. Drop
+# this one shim into ~/.local/bin/pnpm and it serves every repo that
+# follows the convention "has a `dev` service in docker-compose.yml".
+
+set -e
+
+# Find the project root. Outside a git repo, fall through to host pnpm.
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+
+if [ -z "$PROJECT_ROOT" ] || [ ! -f "$PROJECT_ROOT/docker-compose.yml" ]; then
+  # Not a containerised project. Strip this script's directory from PATH
+  # and re-exec via PATH lookup to find the next pnpm.
+  SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+  NEW_PATH="$(echo "$PATH" | tr ':' '\n' | grep -vFx "$SCRIPT_DIR" | tr '\n' ':' | sed 's/:$//')"
+  exec env PATH="$NEW_PATH" pnpm "$@"
+fi
+
+# Confirm the project actually has a `dev` service. If not, fall through
+# (the project may use docker-compose for something unrelated).
+if ! grep -q '^  dev:' "$PROJECT_ROOT/docker-compose.yml" 2>/dev/null; then
+  SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+  NEW_PATH="$(echo "$PATH" | tr ':' '\n' | grep -vFx "$SCRIPT_DIR" | tr '\n' ':' | sed 's/:$//')"
+  exec env PATH="$NEW_PATH" pnpm "$@"
+fi
+
+# Auto-start the dev service if not running.
+if ! docker compose -f "$PROJECT_ROOT/docker-compose.yml" \
+       ps --status running --services 2>/dev/null | grep -q '^dev$'; then
+  docker compose -f "$PROJECT_ROOT/docker-compose.yml" up -d dev >&2
+fi
+
+# Drop -T for interactive callers so prompts/colours work; keep it for
+# non-interactive callers (lefthook, scripts).
+if [ -t 0 ] && [ -t 1 ]; then
+  exec docker compose -f "$PROJECT_ROOT/docker-compose.yml" exec dev pnpm "$@"
+else
+  exec docker compose -f "$PROJECT_ROOT/docker-compose.yml" exec -T dev pnpm "$@"
+fi

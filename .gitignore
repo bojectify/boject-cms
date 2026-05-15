@@ -1,6 +1,11 @@
 # Dependencies
 node_modules/
 
+# pnpm content-addressable store (host-side fallback when no global store
+# is configured — pnpm 11 creates this in the project dir if it can't
+# find ~/.local/share/pnpm/store or similar).
+.pnpm-store/
+
 # Environment variables (scoped to apps/cms now)
 apps/cms/.env
 apps/cms/.env.local
