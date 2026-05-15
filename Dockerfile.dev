@@ -12,8 +12,16 @@
 
 FROM node:24-alpine
 
+# Shared corepack cache: prepare runs as root during image build, but the
+# container runs as `node`. Without COREPACK_HOME pointing at a shared path,
+# node's cache is empty and corepack prompts to re-download pnpm on first use.
+ENV COREPACK_HOME=/opt/corepack
+
 ARG PNPM_VERSION=11.1.2
-RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
+RUN mkdir -p /opt/corepack \
+ && corepack enable \
+ && corepack prepare pnpm@${PNPM_VERSION} --activate \
+ && chmod -R a+rX /opt/corepack
 
 RUN apk add --no-cache \
       bash git \
