@@ -1,0 +1,33 @@
+#!/bin/sh
+# Transparent shim: route `pnpx` invocations into the project's `dev`
+# docker-compose service. See scripts/host-shims/pnpm for full notes.
+#
+# pnpx is the higher-risk command (fetches + runs arbitrary code), so
+# routing it through the container is the headline supply-chain win.
+
+set -e
+
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+
+if [ -z "$PROJECT_ROOT" ] || [ ! -f "$PROJECT_ROOT/docker-compose.yml" ]; then
+  SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+  NEW_PATH="$(echo "$PATH" | tr ':' '\n' | grep -vFx "$SCRIPT_DIR" | tr '\n' ':' | sed 's/:$//')"
+  exec env PATH="$NEW_PATH" pnpx "$@"
+fi
+
+if ! grep -q '^  dev:' "$PROJECT_ROOT/docker-compose.yml" 2>/dev/null; then
+  SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+  NEW_PATH="$(echo "$PATH" | tr ':' '\n' | grep -vFx "$SCRIPT_DIR" | tr '\n' ':' | sed 's/:$//')"
+  exec env PATH="$NEW_PATH" pnpx "$@"
+fi
+
+if ! docker compose -f "$PROJECT_ROOT/docker-compose.yml" \
+       ps --status running --services 2>/dev/null | grep -q '^dev$'; then
+  docker compose -f "$PROJECT_ROOT/docker-compose.yml" up -d dev >&2
+fi
+
+if [ -t 0 ] && [ -t 1 ]; then
+  exec docker compose -f "$PROJECT_ROOT/docker-compose.yml" exec dev pnpx "$@"
+else
+  exec docker compose -f "$PROJECT_ROOT/docker-compose.yml" exec -T dev pnpx "$@"
+fi
