@@ -5,7 +5,7 @@
   "type": "module",
   "packageManager": "pnpm@11.1.2",
   "scripts": {
-    "prepare": "lefthook install",
+    "prepare": "git rev-parse --git-dir >/dev/null 2>&1 && lefthook install || true",
     "dev": "pnpm --filter cms dev",
     "build": "pnpm --filter cms build",
     "preview": "pnpm --filter cms preview",

@@ -25,7 +25,8 @@ RUN mkdir -p /opt/corepack \
 
 RUN apk add --no-cache \
       bash git \
-      build-base python3 \
+      build-base python3 pkgconf \
+      cairo-dev pango-dev jpeg-dev giflib-dev pixman-dev \
       chromium nss freetype harfbuzz ca-certificates ttf-freefont
 
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
