@@ -11,6 +11,16 @@ describe('loadNodeConfig', () => {
     expect(cfg.apiKey).toBeUndefined();
   });
 
+  it('falls back to the default URL when PERF_DATABASE_URL is the empty string', () => {
+    // docker-compose's `${PERF_DATABASE_URL:-}` passthrough sets the var to
+    // '' inside the container when the host has it unset. The loader must
+    // treat that as "no override provided", not as a valid (empty) URL.
+    const cfg = loadNodeConfig({ PERF_DATABASE_URL: '' });
+    expect(cfg.perfDatabaseUrl).toBe(
+      'postgresql://boject:boject@localhost:5432/boject_perf'
+    );
+  });
+
   it('reads overrides from env', () => {
     const cfg = loadNodeConfig({
       PERF_BASE_URL: 'https://staging.example.com',

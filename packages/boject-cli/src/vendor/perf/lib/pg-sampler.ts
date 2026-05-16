@@ -145,8 +145,12 @@ export function parseIntervalMs(raw: string | undefined): number {
 async function main(): Promise<void> {
   const outPath = process.env.PERF_SAMPLER_OUT ?? 'pg-samples.csv';
   const intervalMs = parseIntervalMs(process.env.PERF_SAMPLER_INTERVAL_MS);
+  // `||` not `??`: docker-compose's `${PERF_DATABASE_URL:-}` passthrough sets
+  // the var to '' inside the container when the host has it unset; `??`
+  // would treat '' as a valid value and pg would reject the empty connection
+  // string. `||` falls back on unset AND empty.
   const databaseUrl =
-    process.env.PERF_DATABASE_URL ??
+    process.env.PERF_DATABASE_URL ||
     'postgresql://boject:boject@localhost:5432/boject_perf';
   mkdirSync(dirname(outPath), { recursive: true });
   appendFileSync(outPath, CSV_HEADER + '\n');
