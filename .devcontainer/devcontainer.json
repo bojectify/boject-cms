@@ -18,7 +18,7 @@
           { "pattern": "apps/*" },
           { "pattern": "packages/*" }
         ],
-        "typescript.tsdk": "apps/cms/node_modules/typescript/lib"
+        "js/ts.tsdk.path": "apps/cms/node_modules/typescript/lib"
       }
     }
   },
