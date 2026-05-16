@@ -14,7 +14,8 @@ const GRAPHQL_WINDOW_MS = 1_000;
 
 /**
  * Apply a per-IP, per-endpoint sliding-window rate limit for mutating
- * requests. Throws a 429 if the limit is exceeded.
+ * requests. Throws a 429 with the structured RATE_LIMITED body if the
+ * limit is exceeded.
  */
 export function enforceMutationRateLimit(event: H3Event, endpoint: string) {
   const ip =
@@ -28,11 +29,7 @@ export function enforceMutationRateLimit(event: H3Event, endpoint: string) {
     MUTATION_WINDOW_MS
   );
   if (!allowed) {
-    setResponseHeader(event, 'Retry-After', Math.ceil(retryAfterMs / 1000));
-    throw createError({
-      statusCode: 429,
-      statusMessage: 'Too many requests',
-    });
+    throwRateLimited(event, 'mutation', retryAfterMs);
   }
 }
 
