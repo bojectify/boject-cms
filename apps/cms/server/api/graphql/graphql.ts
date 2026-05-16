@@ -1,5 +1,4 @@
 import { createYoga } from 'graphql-yoga';
-import type { H3Event } from 'h3';
 import {
   defineEventHandler,
   getRequestHeader,
@@ -14,19 +13,9 @@ import {
   checkGraphqlRateLimit,
   setRateLimitHeaders,
 } from '../../utils/rateLimitEndpoint';
-import type { RateLimitSnapshot } from '../../utils/rateLimit';
 import { complexityYogaPlugin } from '../../utils/graphqlComplexity';
 import { rateLimitExtensionPlugin } from '../../utils/graphqlRateLimitExtensions';
-
-declare module 'h3' {
-  interface H3EventContext {
-    rateLimitSnapshot?: RateLimitSnapshot;
-  }
-}
-
-interface YogaServerContext {
-  event: H3Event;
-}
+import type { YogaServerContext } from '../../utils/yogaContext';
 
 const yoga = createYoga<YogaServerContext>({
   schema: () => getSchema(),
