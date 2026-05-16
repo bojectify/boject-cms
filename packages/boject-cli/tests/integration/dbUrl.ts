@@ -4,8 +4,16 @@
  * tests/integration/globalSetup.ts before the suite runs).
  *
  * Override via `CLI_INTEGRATION_TEST_DATABASE_URL` for CI / remote postgres
- * / parallel runners with non-default ports. With the env var unset, falls
- * back to the local-dev URL so the existing developer workflow is unchanged.
+ * / parallel runners with non-default ports. With the env var unset OR an
+ * empty string, falls back to the local-dev URL so the existing developer
+ * workflow is unchanged.
+ *
+ * Why `||` instead of `??`: docker-compose's passthrough syntax
+ * `${CLI_INTEGRATION_TEST_DATABASE_URL:-}` sets the env var to an empty
+ * string inside the container when the host has it unset (not to
+ * undefined). `??` only catches null/undefined and would return the empty
+ * string, which Prisma rejects as "Connection url is empty". `||` falls
+ * back on the empty-string case too.
  *
  * Kept separate from the cms-side helper (apps/cms/test/dbUrl.ts) because
  * the two suites target different databases (boject_test vs boject_perf_test)
@@ -17,7 +25,7 @@ export const DEFAULT_CLI_TEST_DATABASE_URL =
 
 export function getCliTestDatabaseUrl(): string {
   return (
-    process.env.CLI_INTEGRATION_TEST_DATABASE_URL ??
+    process.env.CLI_INTEGRATION_TEST_DATABASE_URL ||
     DEFAULT_CLI_TEST_DATABASE_URL
   );
 }
