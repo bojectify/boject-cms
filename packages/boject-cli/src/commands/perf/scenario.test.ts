@@ -12,6 +12,9 @@ import * as seedModule from './seed.js';
 
 import type { startPgSampler } from '../../perf/runPgSampler.js';
 
+const FAKE_PERF_DB_URL =
+  'postgresql://boject:boject@localhost:5432/boject_perf';
+
 function makeFakeSampler(
   opts: { csvPath?: string; stopMs?: number; callOrder?: string[] } = {}
 ) {
@@ -132,7 +135,7 @@ describe('runPerfScenario', () => {
         scenario: 'rest-crud-cycle',
         out: outDir,
         readOnly: false,
-        databaseUrl: 'postgresql://boject:boject@localhost:5432/boject_perf',
+        databaseUrl: FAKE_PERF_DB_URL,
         size: 1,
       },
       stdout: () => {},
@@ -174,7 +177,7 @@ describe('runPerfScenario', () => {
         scenario: 'rest-crud-cycle',
         out: outDir,
         readOnly: false,
-        databaseUrl: 'postgresql://boject:boject@localhost:5432/boject_perf',
+        databaseUrl: FAKE_PERF_DB_URL,
         reset: true,
         allowDatabase: ['boject_perf'],
       },
@@ -324,7 +327,7 @@ describe('runPerfScenario', () => {
         scenario: 'graphql-flat',
         out: outDir,
         readOnly: false,
-        databaseUrl: 'postgresql://boject:boject@localhost:5432/boject_perf',
+        databaseUrl: FAKE_PERF_DB_URL,
         reset: true,
         allowDatabase: ['boject_perf'],
         yes: true,
@@ -512,7 +515,7 @@ describe('runPerfScenario', () => {
           scenario: 'graphql-flat',
           out: outDir,
           readOnly: false,
-          databaseUrl: 'postgresql://boject:boject@localhost:5432/boject_perf',
+          databaseUrl: FAKE_PERF_DB_URL,
           size: 1,
         },
         stdout: () => {},
@@ -522,9 +525,7 @@ describe('runPerfScenario', () => {
       expect(r.exitCode).toBe(0);
       expect(factory).toHaveBeenCalledTimes(1);
       const arg = factory.mock.calls[0]?.[0];
-      expect(arg?.databaseUrl).toBe(
-        'postgresql://boject:boject@localhost:5432/boject_perf'
-      );
+      expect(arg?.databaseUrl).toBe(FAKE_PERF_DB_URL);
       expect(arg?.outDir).toContain(outDir);
     });
 
@@ -581,7 +582,7 @@ describe('runPerfScenario', () => {
           scenario: 'graphql-flat',
           out: outDir,
           readOnly: false,
-          databaseUrl: 'postgresql://boject:boject@localhost:5432/boject_perf',
+          databaseUrl: FAKE_PERF_DB_URL,
           size: 1,
         },
         stdout: () => {},
@@ -623,7 +624,7 @@ describe('runPerfScenario', () => {
           scenario: 'graphql-flat',
           out: outDir,
           readOnly: false,
-          databaseUrl: 'postgresql://boject:boject@localhost:5432/boject_perf',
+          databaseUrl: FAKE_PERF_DB_URL,
           size: 1,
         },
         stdout: () => {},
@@ -656,7 +657,7 @@ describe('runPerfScenario', () => {
           scenario: 'graphql-flat',
           out: outDir,
           readOnly: false,
-          databaseUrl: 'postgresql://boject:boject@localhost:5432/boject_perf',
+          databaseUrl: FAKE_PERF_DB_URL,
           size: 1,
         },
         stdout: () => {},

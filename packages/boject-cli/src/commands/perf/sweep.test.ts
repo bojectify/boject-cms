@@ -22,6 +22,9 @@ const okPreflight = {
 
 import type { startPgSampler } from '../../perf/runPgSampler.js';
 
+const FAKE_PERF_DB_URL =
+  'postgresql://boject:boject@localhost:5432/boject_perf';
+
 function makeFakeSampler(
   opts: { csvPath?: string; callOrder?: string[] } = {}
 ) {
@@ -292,7 +295,7 @@ describe('runPerfSweep', () => {
         contentType: 'Article',
         out: outDir,
         yes: true,
-        databaseUrl: 'postgresql://boject:boject@localhost:5432/boject_perf',
+        databaseUrl: FAKE_PERF_DB_URL,
         reset: true,
         allowDatabase: ['boject_perf'],
       },
@@ -431,7 +434,7 @@ describe('runPerfSweep', () => {
           pageSizes: [100],
           vus: [1],
           readOnly: false,
-          databaseUrl: 'postgresql://boject:boject@localhost:5432/boject_perf',
+          databaseUrl: FAKE_PERF_DB_URL,
           size: 1,
         },
         stdout: () => {},
@@ -442,9 +445,7 @@ describe('runPerfSweep', () => {
       // One sampler for the whole sweep — not one per scenario.
       expect(factory).toHaveBeenCalledTimes(1);
       const arg = factory.mock.calls[0]?.[0];
-      expect(arg?.databaseUrl).toBe(
-        'postgresql://boject:boject@localhost:5432/boject_perf'
-      );
+      expect(arg?.databaseUrl).toBe(FAKE_PERF_DB_URL);
       expect(arg?.outDir).toContain(outDir);
     });
 
@@ -512,7 +513,7 @@ describe('runPerfSweep', () => {
           pageSizes: [100],
           vus: [1],
           readOnly: false,
-          databaseUrl: 'postgresql://boject:boject@localhost:5432/boject_perf',
+          databaseUrl: FAKE_PERF_DB_URL,
           size: 1,
         },
         stdout: () => {},
@@ -556,7 +557,7 @@ describe('runPerfSweep', () => {
           pageSizes: [100],
           vus: [1],
           readOnly: false,
-          databaseUrl: 'postgresql://boject:boject@localhost:5432/boject_perf',
+          databaseUrl: FAKE_PERF_DB_URL,
           size: 1,
         },
         stdout: () => {},
@@ -592,7 +593,7 @@ describe('runPerfSweep', () => {
           pageSizes: [100],
           vus: [1],
           readOnly: false,
-          databaseUrl: 'postgresql://boject:boject@localhost:5432/boject_perf',
+          databaseUrl: FAKE_PERF_DB_URL,
           size: 1,
         },
         stdout: () => {},
