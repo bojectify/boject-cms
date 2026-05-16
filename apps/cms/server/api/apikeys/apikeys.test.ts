@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { TEST_USERNAME, TEST_PASSWORD } from '../../test/credentials';
 import { prisma } from '../../utils/prisma';
 import { generateApiKey, hashApiKey } from '../../utils/apiKey';
+import type { RateLimitedBody } from '../../utils/rateLimitEndpoint';
 
 await setup({
   rootDir: fileURLToPath(new URL('../../..', import.meta.url)),
@@ -301,17 +302,10 @@ describe('POST /api/apikeys', () => {
       }
       expect(limited).toBeDefined();
       expect(limited!.status).toBe(429);
-      const body = (await limited!.json()) as {
-        data?: {
-          error?: string;
-          message?: string;
-          retryAfter?: number;
-          suggestion?: string;
-        };
-      };
+      const body = (await limited!.json()) as { data?: RateLimitedBody };
       expect(body.data?.error).toBe('RATE_LIMITED');
       expect(body.data?.message).toBe('Too many requests');
-      expect(body.data?.retryAfter).toBeGreaterThanOrEqual(0);
+      expect(body.data?.retryAfter).toBeGreaterThanOrEqual(1);
       expect(body.data?.suggestion).toContain('write');
       expect(limited!.headers.get('retry-after')).toBeDefined();
     });

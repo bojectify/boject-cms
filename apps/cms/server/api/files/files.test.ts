@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { setup, $fetch, fetch } from '@nuxt/test-utils/e2e';
 import { TEST_USERNAME, TEST_PASSWORD } from '../../test/credentials';
+import type { RateLimitedBody } from '../../utils/rateLimitEndpoint';
 
 // 1x1 red PNG (68 bytes)
 const TINY_PNG = Buffer.from(
@@ -248,17 +249,10 @@ describe('Files Upload & Transform API', async () => {
       }
       expect(limited).toBeDefined();
       expect(limited!.status).toBe(429);
-      const body = (await limited!.json()) as {
-        data?: {
-          error?: string;
-          message?: string;
-          retryAfter?: number;
-          suggestion?: string;
-        };
-      };
+      const body = (await limited!.json()) as { data?: RateLimitedBody };
       expect(body.data?.error).toBe('RATE_LIMITED');
       expect(body.data?.message).toBe('Too many requests');
-      expect(body.data?.retryAfter).toBeGreaterThanOrEqual(0);
+      expect(body.data?.retryAfter).toBeGreaterThanOrEqual(1);
       expect(body.data?.suggestion).toContain('transform');
       expect(limited!.headers.get('retry-after')).toBeDefined();
     });
