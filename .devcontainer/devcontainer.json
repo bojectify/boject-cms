@@ -10,7 +10,8 @@
         "dbaeumer.vscode-eslint",
         "esbenp.prettier-vscode",
         "Prisma.prisma",
-        "bradlc.vscode-tailwindcss"
+        "bradlc.vscode-tailwindcss",
+        "WallabyJs.wallaby-vscode"
       ],
       "settings": {
         "eslint.workingDirectories": [
