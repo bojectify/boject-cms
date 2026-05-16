@@ -12,7 +12,7 @@ All `pnpm` and `pnpx` commands documented below route into a Docker container (t
 
 For your purposes as Claude: when you call `pnpm` or `pnpx` via the Bash tool, the host shim handles routing transparently — you don't need to prefix anything with `docker compose exec`. Non-pnpm commands (`git`, `gh`, file operations, `docker compose` itself) run on host as normal. **lefthook is installed on host via `brew install lefthook`** (not via pnpm) — git hooks fire on host and dispatch each job into the container via the shim.
 
-`.git` is hidden from the container via an anonymous-volume overlay so a compromised dep can't touch local git history.
+`.git` is bind-mounted into the container read-only so a compromised dep can read history (acceptable — repo is public) but cannot rewrite refs, amend commits, or stage anything. `GIT_OPTIONAL_LOCKS=0` is set in the dev service env so refresh-lock attempts on the read-only mount don't surface as warnings.
 
 If a `pnpm` command fails with "service 'dev' not running", the shim's auto-start has a problem; recover with `docker compose up -d dev`.
 

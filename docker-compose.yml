@@ -37,12 +37,28 @@ services:
       # Without this, every image rebuild wipes /home/node/.cache and the
       # next `pnpm test:storybook` errors with "headless_shell ENOENT".
       - playwright-cache:/home/node/.cache/ms-playwright
-      # Anonymous-volume overlay: hides host's .git from the container so a
-      # compromised dep can't rm -rf the local git history. Git ops stay on
-      # host where they already have access.
-      - /workspace/.git
+      # Read-only bind mount of the host's .git directory. The Docker
+      # filesystem layer rejects writes outright, so a compromised dep
+      # cannot rewrite history, mutate refs, or stage commits — the same
+      # write-blocking guarantee as the previous anonymous-volume overlay.
+      #
+      # The trade-off vs. the overlay: deps can now READ the full history.
+      # That's acceptable because this repo is intended to be publicly
+      # available on GitHub — anyone can clone the same history. The win
+      # is that VS Code's Source Control / blame / diff / GitLens work
+      # normally inside the container.
+      #
+      # GIT_OPTIONAL_LOCKS=0 in the environment block below tells git not
+      # to take refresh locks (e.g. updating .git/index for stat-cache
+      # repair on `git status`) — otherwise read-only ops can spuriously
+      # complain about unwritable locks.
+      - ./.git:/workspace/.git:ro
     environment:
       NUXT_SESSION_PASSWORD: ${NUXT_SESSION_PASSWORD:-dev-only-placeholder-32-chars-long-xx}
+      # `git status` etc. inside the container can spuriously try to take
+      # refresh locks on the read-only .git mount. Disabling optional
+      # locks keeps read-only operations clean.
+      GIT_OPTIONAL_LOCKS: '0'
       # Integration test database URLs. Unset by default; the test helpers
       # (apps/cms/test/dbUrl.ts + packages/boject-cli/tests/integration/dbUrl.ts)
       # fall back to the local-dev URLs. Set on host to point CI / a parallel
