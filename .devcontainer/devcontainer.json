@@ -6,12 +6,11 @@
   "customizations": {
     "vscode": {
       "extensions": [
-        "Vue.volar",
+        "nuxtr.nuxt-vscode-extentions",
         "dbaeumer.vscode-eslint",
         "esbenp.prettier-vscode",
-        "Prisma.prisma",
-        "bradlc.vscode-tailwindcss",
-        "WallabyJs.wallaby-vscode"
+        "prisma.prisma",
+        "bradlc.vscode-tailwindcss"
       ],
       "settings": {
         "eslint.workingDirectories": [

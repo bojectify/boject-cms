@@ -24,6 +24,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8', // or 'istanbul'
     },
+    silent: 'passed-only',
     // reporters: ['verbose'],
     // Using plain vitest config instead of @nuxt/test-utils/config because
     // defineVitestConfig's "nuxt" environment is incompatible with Nuxt 4.3.1
