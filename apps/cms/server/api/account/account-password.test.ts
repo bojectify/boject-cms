@@ -202,6 +202,19 @@ describe('POST /api/account/password', () => {
       headers,
     });
     expect(res.status).toBe(429);
+    const body = (await res.json()) as {
+      data?: {
+        error?: string;
+        message?: string;
+        retryAfter?: number;
+        suggestion?: string;
+      };
+    };
+    expect(body.data?.error).toBe('RATE_LIMITED');
+    expect(body.data?.message).toBe('Too many requests');
+    expect(body.data?.retryAfter).toBeGreaterThanOrEqual(0);
+    expect(body.data?.suggestion).toContain('password');
+    expect(res.headers.get('retry-after')).toBeDefined();
   });
 
   it('invalidates other devices on next request', async () => {

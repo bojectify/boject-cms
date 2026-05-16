@@ -230,13 +230,37 @@ describe('Files Upload & Transform API', async () => {
     });
 
     it('returns 429 when transform rate-limited', async () => {
-      const { rateLimit: rl, resetRateLimitStore: reset } =
-        await import('../../utils/rateLimit');
-      const testIp = 'files-transform-rate-limit-ip';
-      for (let i = 0; i < 100; i++) rl(`transform:${testIp}`);
-      const { allowed } = rl(`transform:${testIp}`);
-      expect(allowed).toBe(false);
-      reset();
+      // Use a unique simulated IP so this test's budget is isolated from
+      // other tests in the suite (the in-process rate limiter is per-IP).
+      const testIp = `198.51.100.${Math.floor(Math.random() * 254) + 1}`;
+      // The default per-IP cap is 100/60s. Drive 101 real HTTP calls with
+      // the same x-forwarded-for so the endpoint's own limiter trips and we
+      // can assert on the real 429 response body.
+      let limited: Response | undefined;
+      for (let i = 0; i < 101; i++) {
+        const res = await fetch(`/api/files/${uploadedStorageKey}/transform`, {
+          headers: { 'x-forwarded-for': testIp },
+        });
+        if (res.status === 429) {
+          limited = res;
+          break;
+        }
+      }
+      expect(limited).toBeDefined();
+      expect(limited!.status).toBe(429);
+      const body = (await limited!.json()) as {
+        data?: {
+          error?: string;
+          message?: string;
+          retryAfter?: number;
+          suggestion?: string;
+        };
+      };
+      expect(body.data?.error).toBe('RATE_LIMITED');
+      expect(body.data?.message).toBe('Too many requests');
+      expect(body.data?.retryAfter).toBeGreaterThanOrEqual(0);
+      expect(body.data?.suggestion).toContain('transform');
+      expect(limited!.headers.get('retry-after')).toBeDefined();
     });
   });
 });
