@@ -1,4 +1,5 @@
 import { createYoga } from 'graphql-yoga';
+import type { H3Event } from 'h3';
 import {
   defineEventHandler,
   getRequestHeader,
@@ -11,14 +12,31 @@ import { validateApiKey } from '../../utils/validateApiKey';
 import {
   buildRateLimitedExtensions,
   checkGraphqlRateLimit,
+  setRateLimitHeaders,
 } from '../../utils/rateLimitEndpoint';
+import type { RateLimitSnapshot } from '../../utils/rateLimit';
 import { complexityYogaPlugin } from '../../utils/graphqlComplexity';
+import { rateLimitExtensionPlugin } from '../../utils/graphqlRateLimitExtensions';
 
-const yoga = createYoga({
+declare module 'h3' {
+  interface H3EventContext {
+    rateLimitSnapshot?: RateLimitSnapshot;
+  }
+}
+
+interface YogaServerContext {
+  event: H3Event;
+}
+
+const yoga = createYoga<YogaServerContext>({
   schema: () => getSchema(),
   graphqlEndpoint: '/api/graphql',
   graphiql: process.env.NODE_ENV !== 'production',
-  plugins: [maxDepthPlugin({ n: 15 }), complexityYogaPlugin],
+  plugins: [
+    maxDepthPlugin({ n: 15 }),
+    complexityYogaPlugin,
+    rateLimitExtensionPlugin,
+  ],
 });
 
 export default defineEventHandler(async (event) => {
@@ -30,7 +48,7 @@ export default defineEventHandler(async (event) => {
   // Once a Bearer header is present (or in production) we always validate so
   // the scope gate below cannot be bypassed by sending a non-prod build.
   if (!isProduction && !authHeader) {
-    return yoga(req, res);
+    return yoga(req, res, { event });
   }
 
   const result = await validateApiKey(event);
@@ -49,19 +67,32 @@ export default defineEventHandler(async (event) => {
   }
 
   if (isProduction) {
-    const limit = checkGraphqlRateLimit(result.apiKeyId);
-    if (!limit.allowed) {
-      const extensions = buildRateLimitedExtensions(
-        'graphql',
-        limit.retryAfterMs
-      );
-      setResponseHeader(event, 'Retry-After', extensions.retryAfter);
+    const snapshot = checkGraphqlRateLimit(result.apiKeyId);
+    setRateLimitHeaders(event, snapshot);
+
+    if (!snapshot.allowed) {
+      const ext = buildRateLimitedExtensions('graphql', snapshot.retryAfterMs);
+      setResponseHeader(event, 'Retry-After', ext.retryAfter);
       setResponseStatus(event, 429);
       return {
-        errors: [{ message: 'Too many requests', extensions }],
+        errors: [
+          {
+            message: 'Too many requests',
+            extensions: {
+              ...ext,
+              rateLimit: {
+                limit: snapshot.limit,
+                remaining: snapshot.remaining,
+                reset: snapshot.resetSeconds,
+              },
+            },
+          },
+        ],
       };
     }
+
+    event.context.rateLimitSnapshot = snapshot;
   }
 
-  return yoga(req, res);
+  return yoga(req, res, { event });
 });
