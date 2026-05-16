@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { TEST_USERNAME, TEST_PASSWORD } from '../../test/credentials';
 import { prisma } from '../../utils/prisma';
 import { generateApiKey, hashApiKey } from '../../utils/apiKey';
+import type { RateLimitedBody } from '../../utils/rateLimitEndpoint';
 
 await setup({
   rootDir: fileURLToPath(new URL('../../..', import.meta.url)),
@@ -284,7 +285,7 @@ describe('POST /api/apikeys', () => {
     it('returns 429 after 50 mutations from the same IP within 60s', async () => {
       const cookie = await loginAsAdmin();
       // 50 successful calls, then 51st should be rate-limited.
-      let lastStatus = 0;
+      let limited: Response | undefined;
       for (let i = 0; i < 51; i++) {
         const res = await fetch('/api/apikeys', {
           method: 'POST',
@@ -294,10 +295,19 @@ describe('POST /api/apikeys', () => {
             scopes: ['content:read'],
           }),
         });
-        lastStatus = res.status;
-        if (res.status === 429) break;
+        if (res.status === 429) {
+          limited = res;
+          break;
+        }
       }
-      expect(lastStatus).toBe(429);
+      expect(limited).toBeDefined();
+      expect(limited!.status).toBe(429);
+      const body = (await limited!.json()) as { data?: RateLimitedBody };
+      expect(body.data?.error).toBe('RATE_LIMITED');
+      expect(body.data?.message).toBe('Too many requests');
+      expect(body.data?.retryAfter).toBeGreaterThanOrEqual(1);
+      expect(body.data?.suggestion).toContain('write');
+      expect(limited!.headers.get('retry-after')).toBeDefined();
     });
   });
 });

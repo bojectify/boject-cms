@@ -1,6 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { H3Event } from 'h3';
-import { enforceGraphqlRateLimit, getGraphqlMax } from './rateLimitEndpoint';
+import {
+  checkGraphqlRateLimit,
+  getGraphqlMax,
+  RATE_LIMIT_SUGGESTIONS,
+  buildRateLimitedBody,
+  buildRateLimitedExtensions,
+  throwRateLimited,
+} from './rateLimitEndpoint';
 import { resetRateLimitStore } from './rateLimit';
 
 type MockEvent = {
@@ -75,7 +82,7 @@ describe('getGraphqlMax', () => {
   });
 });
 
-describe('enforceGraphqlRateLimit', () => {
+describe('checkGraphqlRateLimit', () => {
   beforeEach(() => {
     resetRateLimitStore();
   });
@@ -84,56 +91,141 @@ describe('enforceGraphqlRateLimit', () => {
     vi.useRealTimers();
   });
 
-  it('honours the configured cap and throws 429 with Retry-After when exceeded', () => {
+  it('returns allowed=true under the configured cap', () => {
     vi.stubEnv('GRAPHQL_RATE_LIMIT_RPS', '5');
-    const { event, headers } = makeMockEvent();
-
     for (let i = 0; i < 5; i++) {
-      expect(() => enforceGraphqlRateLimit(event, 'key-1')).not.toThrow();
+      expect(checkGraphqlRateLimit('key-1').allowed).toBe(true);
     }
+  });
 
-    let thrown: unknown;
-    try {
-      enforceGraphqlRateLimit(event, 'key-1');
-    } catch (err) {
-      thrown = err;
+  it('returns allowed=false with positive retryAfterMs when the cap is exceeded', () => {
+    vi.stubEnv('GRAPHQL_RATE_LIMIT_RPS', '5');
+    for (let i = 0; i < 5; i++) {
+      checkGraphqlRateLimit('key-1');
     }
-    expect(thrown).toMatchObject({ statusCode: 429 });
-    expect(headers.get('retry-after')).toBeDefined();
+    const result = checkGraphqlRateLimit('key-1');
+    expect(result.allowed).toBe(false);
+    expect(result.retryAfterMs).toBeGreaterThan(0);
   });
 
   it('keeps independent buckets per apiKeyId', () => {
     vi.stubEnv('GRAPHQL_RATE_LIMIT_RPS', '3');
-    const { event } = makeMockEvent();
-
     for (let i = 0; i < 3; i++) {
-      enforceGraphqlRateLimit(event, 'key-a');
+      checkGraphqlRateLimit('key-a');
     }
-    expect(() => enforceGraphqlRateLimit(event, 'key-a')).toThrow();
-    expect(() => enforceGraphqlRateLimit(event, 'key-b')).not.toThrow();
+    expect(checkGraphqlRateLimit('key-a').allowed).toBe(false);
+    expect(checkGraphqlRateLimit('key-b').allowed).toBe(true);
   });
 
   it('lets traffic resume after the 1-second window expires', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-04-28T12:00:00.000Z'));
     vi.stubEnv('GRAPHQL_RATE_LIMIT_RPS', '2');
-    const { event } = makeMockEvent();
 
-    enforceGraphqlRateLimit(event, 'key-1');
-    enforceGraphqlRateLimit(event, 'key-1');
-    expect(() => enforceGraphqlRateLimit(event, 'key-1')).toThrow();
+    checkGraphqlRateLimit('key-1');
+    checkGraphqlRateLimit('key-1');
+    expect(checkGraphqlRateLimit('key-1').allowed).toBe(false);
 
-    // Advance past the 1s window
     vi.advanceTimersByTime(1_100);
-    expect(() => enforceGraphqlRateLimit(event, 'key-1')).not.toThrow();
+    expect(checkGraphqlRateLimit('key-1').allowed).toBe(true);
   });
 
   it('falls back to 1000 cap when env var is unset', () => {
     vi.stubEnv('GRAPHQL_RATE_LIMIT_RPS', '');
-    const { event } = makeMockEvent();
     for (let i = 0; i < 1000; i++) {
-      enforceGraphqlRateLimit(event, 'key-default');
+      checkGraphqlRateLimit('key-default');
     }
-    expect(() => enforceGraphqlRateLimit(event, 'key-default')).toThrow();
+    expect(checkGraphqlRateLimit('key-default').allowed).toBe(false);
+  });
+});
+
+describe('RATE_LIMIT_SUGGESTIONS', () => {
+  it('exposes a non-empty string for every kind', () => {
+    for (const kind of [
+      'graphql',
+      'mutation',
+      'login',
+      'password',
+      'transform',
+    ] as const) {
+      expect(RATE_LIMIT_SUGGESTIONS[kind]).toEqual(expect.any(String));
+      expect(RATE_LIMIT_SUGGESTIONS[kind].length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('buildRateLimitedBody', () => {
+  it('returns the RATE_LIMITED body with seconds-rounded retryAfter', () => {
+    expect(buildRateLimitedBody('login', 6_500)).toEqual({
+      error: 'RATE_LIMITED',
+      message: 'Too many requests',
+      retryAfter: 7,
+      suggestion: RATE_LIMIT_SUGGESTIONS.login,
+    });
+  });
+
+  it('rounds 0ms up to 0 seconds', () => {
+    expect(buildRateLimitedBody('mutation', 0).retryAfter).toBe(0);
+  });
+
+  it('rounds 1ms up to 1 second', () => {
+    expect(buildRateLimitedBody('mutation', 1).retryAfter).toBe(1);
+  });
+
+  it('picks the right suggestion per kind', () => {
+    expect(buildRateLimitedBody('graphql', 1000).suggestion).toBe(
+      RATE_LIMIT_SUGGESTIONS.graphql
+    );
+    expect(buildRateLimitedBody('transform', 1000).suggestion).toBe(
+      RATE_LIMIT_SUGGESTIONS.transform
+    );
+  });
+});
+
+describe('buildRateLimitedExtensions', () => {
+  it('returns the GraphQL extensions shape', () => {
+    expect(buildRateLimitedExtensions('graphql', 2_400)).toEqual({
+      code: 'RATE_LIMITED',
+      retryAfter: 3,
+      suggestion: RATE_LIMIT_SUGGESTIONS.graphql,
+    });
+  });
+});
+
+describe('throwRateLimited', () => {
+  it('sets Retry-After header and throws a 429 with the structured body', () => {
+    const { event, headers } = makeMockEvent();
+
+    let thrown: unknown;
+    try {
+      throwRateLimited(event, 'mutation', 4_200);
+    } catch (err) {
+      thrown = err;
+    }
+
+    expect(thrown).toMatchObject({
+      statusCode: 429,
+      statusMessage: 'Too many requests',
+      data: {
+        error: 'RATE_LIMITED',
+        message: 'Too many requests',
+        retryAfter: 5,
+        suggestion: RATE_LIMIT_SUGGESTIONS.mutation,
+      },
+    });
+    expect(headers.get('retry-after')).toBe('5');
+  });
+
+  it('matches the kind passed in', () => {
+    const { event } = makeMockEvent();
+    let thrown: unknown;
+    try {
+      throwRateLimited(event, 'login', 1_000);
+    } catch (err) {
+      thrown = err;
+    }
+    expect((thrown as { data: { suggestion: string } }).data.suggestion).toBe(
+      RATE_LIMIT_SUGGESTIONS.login
+    );
   });
 });

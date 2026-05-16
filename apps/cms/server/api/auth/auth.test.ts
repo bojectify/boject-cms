@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { setup, $fetch, fetch } from '@nuxt/test-utils/e2e';
 import { TEST_USERNAME, TEST_PASSWORD } from '../../test/credentials';
 import { prisma } from '../../utils/prisma';
+import type { RateLimitedBody } from '../../utils/rateLimitEndpoint';
 
 const TEST_API_KEY = 'boject_test_key_for_integration_tests_only';
 
@@ -78,6 +79,39 @@ describe('Authentication', async () => {
         { headers: { cookie } }
       );
       expect(me.user.passwordVersion).toBe(0);
+    });
+
+    it('rate-limits after 10 attempts in 60s and returns RATE_LIMITED body', async () => {
+      // Use a unique simulated IP so this test's budget is isolated from
+      // other tests in the suite (the in-process rate limiter is per-IP).
+      const ip = `192.0.2.${Math.floor(Math.random() * 254) + 1}`;
+      const headers = {
+        'content-type': 'application/json',
+        'x-forwarded-for': ip,
+      };
+      let limited: Response | undefined;
+      for (let i = 0; i < 11; i++) {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          body: JSON.stringify({
+            email: TEST_USERNAME,
+            password: 'wrong',
+          }),
+          headers,
+        });
+        if (res.status === 429) {
+          limited = res;
+          break;
+        }
+      }
+      expect(limited).toBeDefined();
+      expect(limited!.status).toBe(429);
+      const body = (await limited!.json()) as { data?: RateLimitedBody };
+      expect(body.data?.error).toBe('RATE_LIMITED');
+      expect(body.data?.message).toBe('Too many requests');
+      expect(body.data?.retryAfter).toBeGreaterThanOrEqual(1);
+      expect(body.data?.suggestion).toContain('login');
+      expect(limited!.headers.get('retry-after')).toBeDefined();
     });
   });
 

@@ -15,8 +15,7 @@ export default defineEventHandler(async (event) => {
     'unknown';
   const { allowed, retryAfterMs } = rateLimit(`transform:${ip}`);
   if (!allowed) {
-    setHeader(event, 'Retry-After', Math.ceil(retryAfterMs / 1000));
-    throw createError({ statusCode: 429, message: 'Too many requests' });
+    throwRateLimited(event, 'transform', retryAfterMs);
   }
 
   const storageKey = getRouterParam(event, 'storageKey');

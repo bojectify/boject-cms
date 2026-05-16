@@ -1,9 +1,17 @@
 import { createYoga } from 'graphql-yoga';
-import { defineEventHandler, getRequestHeader, setResponseStatus } from 'h3';
+import {
+  defineEventHandler,
+  getRequestHeader,
+  setResponseHeader,
+  setResponseStatus,
+} from 'h3';
 import { maxDepthPlugin } from '@escape.tech/graphql-armor-max-depth';
 import { getSchema } from '../../graphql/schema';
 import { validateApiKey } from '../../utils/validateApiKey';
-import { enforceGraphqlRateLimit } from '../../utils/rateLimitEndpoint';
+import {
+  buildRateLimitedExtensions,
+  checkGraphqlRateLimit,
+} from '../../utils/rateLimitEndpoint';
 import { complexityYogaPlugin } from '../../utils/graphqlComplexity';
 
 const yoga = createYoga({
@@ -41,7 +49,18 @@ export default defineEventHandler(async (event) => {
   }
 
   if (isProduction) {
-    enforceGraphqlRateLimit(event, result.apiKeyId);
+    const limit = checkGraphqlRateLimit(result.apiKeyId);
+    if (!limit.allowed) {
+      const extensions = buildRateLimitedExtensions(
+        'graphql',
+        limit.retryAfterMs
+      );
+      setResponseHeader(event, 'Retry-After', extensions.retryAfter);
+      setResponseStatus(event, 429);
+      return {
+        errors: [{ message: 'Too many requests', extensions }],
+      };
+    }
   }
 
   return yoga(req, res);

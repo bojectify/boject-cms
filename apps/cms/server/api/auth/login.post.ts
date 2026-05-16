@@ -6,11 +6,7 @@ export default defineEventHandler(async (event) => {
     'unknown';
   const { allowed, retryAfterMs } = rateLimit(`login:${ip}`, 10, 60_000);
   if (!allowed) {
-    setHeader(event, 'Retry-After', Math.ceil(retryAfterMs / 1000));
-    throw createError({
-      statusCode: 429,
-      message: 'Too many login attempts',
-    });
+    throwRateLimited(event, 'login', retryAfterMs);
   }
 
   const { email, password } = await readBody<{
