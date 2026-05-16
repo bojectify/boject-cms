@@ -1,6 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { H3Event } from 'h3';
-import { enforceGraphqlRateLimit, getGraphqlMax } from './rateLimitEndpoint';
+import {
+  enforceGraphqlRateLimit,
+  getGraphqlMax,
+  RATE_LIMIT_SUGGESTIONS,
+  buildRateLimitedBody,
+  buildRateLimitedExtensions,
+} from './rateLimitEndpoint';
 import { resetRateLimitStore } from './rateLimit';
 
 type MockEvent = {
@@ -135,5 +141,58 @@ describe('enforceGraphqlRateLimit', () => {
       enforceGraphqlRateLimit(event, 'key-default');
     }
     expect(() => enforceGraphqlRateLimit(event, 'key-default')).toThrow();
+  });
+});
+
+describe('RATE_LIMIT_SUGGESTIONS', () => {
+  it('exposes a non-empty string for every kind', () => {
+    for (const kind of [
+      'graphql',
+      'mutation',
+      'login',
+      'password',
+      'transform',
+    ] as const) {
+      expect(RATE_LIMIT_SUGGESTIONS[kind]).toEqual(expect.any(String));
+      expect(RATE_LIMIT_SUGGESTIONS[kind].length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('buildRateLimitedBody', () => {
+  it('returns the RATE_LIMITED body with seconds-rounded retryAfter', () => {
+    expect(buildRateLimitedBody('login', 6_500)).toEqual({
+      error: 'RATE_LIMITED',
+      message: 'Too many requests',
+      retryAfter: 7,
+      suggestion: RATE_LIMIT_SUGGESTIONS.login,
+    });
+  });
+
+  it('rounds 0ms up to 0 seconds', () => {
+    expect(buildRateLimitedBody('mutation', 0).retryAfter).toBe(0);
+  });
+
+  it('rounds 1ms up to 1 second', () => {
+    expect(buildRateLimitedBody('mutation', 1).retryAfter).toBe(1);
+  });
+
+  it('picks the right suggestion per kind', () => {
+    expect(buildRateLimitedBody('graphql', 1000).suggestion).toBe(
+      RATE_LIMIT_SUGGESTIONS.graphql
+    );
+    expect(buildRateLimitedBody('transform', 1000).suggestion).toBe(
+      RATE_LIMIT_SUGGESTIONS.transform
+    );
+  });
+});
+
+describe('buildRateLimitedExtensions', () => {
+  it('returns the GraphQL extensions shape', () => {
+    expect(buildRateLimitedExtensions('graphql', 2_400)).toEqual({
+      code: 'RATE_LIMITED',
+      retryAfter: 3,
+      suggestion: RATE_LIMIT_SUGGESTIONS.graphql,
+    });
   });
 });

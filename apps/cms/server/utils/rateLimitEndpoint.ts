@@ -76,3 +76,59 @@ export function enforceGraphqlRateLimit(event: H3Event, apiKeyId: string) {
     });
   }
 }
+
+export type RateLimitKind =
+  | 'graphql'
+  | 'mutation'
+  | 'login'
+  | 'password'
+  | 'transform';
+
+export const RATE_LIMIT_SUGGESTIONS: Record<RateLimitKind, string> = {
+  graphql:
+    'Honour Retry-After and back off. Sustained traffic above the per-key cap is throttled; batch where possible.',
+  mutation:
+    'Realistic write workloads must back off rather than retry tight. The write limit guards content endpoints from runaway clients.',
+  login:
+    'Wait before retrying. Repeated 429s on login usually indicate a credential problem rather than congestion.',
+  password:
+    'Wait before retrying. The password endpoint is heavily rate-limited per IP to deter brute-force.',
+  transform:
+    'Honour Retry-After. Cache transformed images at your edge; the public transform endpoint is not designed for hot-path serving.',
+};
+
+export interface RateLimitedBody {
+  error: 'RATE_LIMITED';
+  message: 'Too many requests';
+  retryAfter: number;
+  suggestion: string;
+}
+
+export interface RateLimitedExtensions {
+  code: 'RATE_LIMITED';
+  retryAfter: number;
+  suggestion: string;
+}
+
+export function buildRateLimitedBody(
+  kind: RateLimitKind,
+  retryAfterMs: number
+): RateLimitedBody {
+  return {
+    error: 'RATE_LIMITED',
+    message: 'Too many requests',
+    retryAfter: Math.ceil(retryAfterMs / 1000),
+    suggestion: RATE_LIMIT_SUGGESTIONS[kind],
+  };
+}
+
+export function buildRateLimitedExtensions(
+  kind: RateLimitKind,
+  retryAfterMs: number
+): RateLimitedExtensions {
+  return {
+    code: 'RATE_LIMITED',
+    retryAfter: Math.ceil(retryAfterMs / 1000),
+    suggestion: RATE_LIMIT_SUGGESTIONS[kind],
+  };
+}
