@@ -49,6 +49,11 @@ services:
       # runner at a remote postgres without editing source.
       INTEGRATION_TEST_DATABASE_URL: ${INTEGRATION_TEST_DATABASE_URL:-}
       CLI_INTEGRATION_TEST_DATABASE_URL: ${CLI_INTEGRATION_TEST_DATABASE_URL:-}
+      # Perf harness override. Unset by default; perf/lib/config-node.ts and
+      # the pg-sampler fall back to the local-dev boject_perf URL. Forward
+      # host-side `PERF_DATABASE_URL=... pnpm perf:sweep` so the override
+      # reaches the container.
+      PERF_DATABASE_URL: ${PERF_DATABASE_URL:-}
 
 volumes:
   pgdata:
