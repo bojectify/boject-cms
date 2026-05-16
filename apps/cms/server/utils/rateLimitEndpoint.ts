@@ -7,8 +7,6 @@ import {
 } from 'h3';
 import { rateLimit, type RateLimitSnapshot } from './rateLimit';
 
-export type { RateLimitSnapshot };
-
 const MUTATION_MAX = 50;
 const MUTATION_WINDOW_MS = 60_000;
 const GRAPHQL_DEFAULT_MAX = 1000;

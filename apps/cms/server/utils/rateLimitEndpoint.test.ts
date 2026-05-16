@@ -8,9 +8,9 @@ import {
   buildRateLimitedExtensions,
   throwRateLimited,
   setRateLimitHeaders,
-  type RateLimitSnapshot,
 } from './rateLimitEndpoint';
 import { resetRateLimitStore } from './rateLimit';
+import type { RateLimitSnapshot } from './rateLimit';
 
 type MockEvent = {
   headers: Map<string, string>;
@@ -246,7 +246,7 @@ describe('checkGraphqlRateLimit (snapshot fields)', () => {
     expect(r.allowed).toBe(true);
     expect(r.limit).toBe(4);
     expect(r.remaining).toBe(3);
-    expect(r.resetSeconds).toBeGreaterThan(0);
+    expect(r.resetSeconds).toBe(1);
     expect(r.retryAfterMs).toBe(0);
   });
 });
