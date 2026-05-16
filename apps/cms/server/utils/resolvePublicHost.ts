@@ -1,6 +1,6 @@
 import { promises as dnsPromises } from 'node:dns';
 import { isIP } from 'node:net';
-import { isPrivateHost } from './webhookUrl';
+import { isPrivateHost } from './isPrivateHost';
 
 export function clampTimeoutMs(raw: string | number | undefined): number {
   const parsed = typeof raw === 'number' ? raw : Number(raw);

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { assertWebhookUrl, isPrivateHost } from './webhookUrl';
+import { assertWebhookUrl } from './webhookUrl';
+import { isPrivateHost } from './isPrivateHost';
 import { WebhookDnsError } from './resolvePublicHost';
 
 vi.mock('./resolvePublicHost', async (importOriginal) => {
