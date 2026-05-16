@@ -62,7 +62,12 @@ async function ensureDatabaseExists(): Promise<void> {
 
 function resetSchema(): void {
   console.log(`[integration:setup] Resetting schema in ${TEST_DB}...`);
-  execSync('pnpx prisma migrate reset --force', {
+  // `pnpm exec` runs the locally-installed prisma (the version Prisma
+  // generated the client from). `pnpx` / `pnpm dlx` would download a fresh
+  // copy from the registry instead, hit the `allowBuilds` interactive
+  // prompt on a clean pnpm store, and risk version drift between the
+  // migrator and the generated client.
+  execSync('pnpm exec prisma migrate reset --force', {
     cwd: CMS_DIR,
     stdio: 'inherit',
     env: {

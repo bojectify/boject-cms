@@ -20,6 +20,14 @@ describe('getTestDatabaseUrl', () => {
     expect(getTestDatabaseUrl()).toBe(DEFAULT_TEST_DATABASE_URL);
   });
 
+  it('returns the local-dev fallback when the env var is the empty string', () => {
+    // docker-compose's `${VAR:-}` passthrough sets the var to '' inside the
+    // container when the host has it unset. The helper must treat that as
+    // "no override provided", not as a valid URL.
+    process.env.INTEGRATION_TEST_DATABASE_URL = '';
+    expect(getTestDatabaseUrl()).toBe(DEFAULT_TEST_DATABASE_URL);
+  });
+
   it('returns the env override when set', () => {
     process.env.INTEGRATION_TEST_DATABASE_URL =
       'postgresql://ci:ci@db.example.com:6543/ci_test';

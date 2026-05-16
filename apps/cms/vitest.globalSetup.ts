@@ -16,7 +16,15 @@ export function setup() {
   };
 
   console.log('[globalSetup] Resetting test database (boject_test)...');
-  execSync('pnpx prisma migrate reset --force', { stdio: 'inherit', env });
+  // `pnpm exec` runs the locally-installed prisma (the version Prisma
+  // generated the client from). `pnpx` / `pnpm dlx` would download a fresh
+  // copy from the registry instead, hit the `allowBuilds` interactive
+  // prompt on a clean pnpm store, and risk version drift between the
+  // migrator and the generated client.
+  execSync('pnpm exec prisma migrate reset --force', {
+    stdio: 'inherit',
+    env,
+  });
   console.log('[globalSetup] Running seed...');
   execSync('pnpm prisma:seed', { stdio: 'inherit', env });
   console.log('[globalSetup] Test database ready.');
