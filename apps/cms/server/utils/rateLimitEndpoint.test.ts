@@ -6,6 +6,7 @@ import {
   RATE_LIMIT_SUGGESTIONS,
   buildRateLimitedBody,
   buildRateLimitedExtensions,
+  throwRateLimited,
 } from './rateLimitEndpoint';
 import { resetRateLimitStore } from './rateLimit';
 
@@ -194,5 +195,43 @@ describe('buildRateLimitedExtensions', () => {
       retryAfter: 3,
       suggestion: RATE_LIMIT_SUGGESTIONS.graphql,
     });
+  });
+});
+
+describe('throwRateLimited', () => {
+  it('sets Retry-After header and throws a 429 with the structured body', () => {
+    const { event, headers } = makeMockEvent();
+
+    let thrown: unknown;
+    try {
+      throwRateLimited(event, 'mutation', 4_200);
+    } catch (err) {
+      thrown = err;
+    }
+
+    expect(thrown).toMatchObject({
+      statusCode: 429,
+      statusMessage: 'Too many requests',
+      data: {
+        error: 'RATE_LIMITED',
+        message: 'Too many requests',
+        retryAfter: 5,
+        suggestion: RATE_LIMIT_SUGGESTIONS.mutation,
+      },
+    });
+    expect(headers.get('retry-after')).toBe('5');
+  });
+
+  it('matches the kind passed in', () => {
+    const { event } = makeMockEvent();
+    let thrown: unknown;
+    try {
+      throwRateLimited(event, 'login', 1_000);
+    } catch (err) {
+      thrown = err;
+    }
+    expect((thrown as { data: { suggestion: string } }).data.suggestion).toBe(
+      RATE_LIMIT_SUGGESTIONS.login
+    );
   });
 });

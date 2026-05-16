@@ -132,3 +132,16 @@ export function buildRateLimitedExtensions(
     suggestion: RATE_LIMIT_SUGGESTIONS[kind],
   };
 }
+
+export function throwRateLimited(
+  event: H3Event,
+  kind: RateLimitKind,
+  retryAfterMs: number
+): never {
+  setResponseHeader(event, 'Retry-After', Math.ceil(retryAfterMs / 1000));
+  throw createError({
+    statusCode: 429,
+    statusMessage: 'Too many requests',
+    data: buildRateLimitedBody(kind, retryAfterMs),
+  });
+}
