@@ -183,12 +183,46 @@ describe('complexityYogaPlugin response surfacing', () => {
     const onDone = (onExec as { onExecuteDone: (a: unknown) => void })
       .onExecuteDone;
     onDone({
-      result: { stream: async function* () {} },
+      result: (async function* () {
+        yield { data: {} };
+      })(),
       setResult: () => {
         setResultCalled = true;
       },
     });
 
     expect(setResultCalled).toBe(false);
+  });
+
+  it('surfaces cost=0 as a real value (not falsy-skipped)', () => {
+    const document = parse(`{ hello }`);
+    __test__.setCostForDocument(document, 0);
+    const { event, headers } = makeMockEvent();
+
+    let captured: { result?: { extensions?: Record<string, unknown> } } = {};
+    const args = {
+      document,
+      contextValue: { event },
+      schema,
+    } as unknown as Parameters<
+      NonNullable<typeof complexityYogaPlugin.onExecute>
+    >[0]['args'];
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const onExec = complexityYogaPlugin.onExecute!({ args } as any);
+    const onDone = (onExec as { onExecuteDone: (a: unknown) => void })
+      .onExecuteDone;
+    onDone({
+      result: { data: { hello: 'world' } },
+      setResult: (r: { extensions?: Record<string, unknown> }) => {
+        captured = { result: r };
+      },
+    });
+
+    expect(headers.get('x-query-cost')).toBe('0');
+    expect(captured.result?.extensions?.queryCost).toEqual({
+      cost: 0,
+      cap: getGraphqlComplexityMaxCost(),
+    });
   });
 });

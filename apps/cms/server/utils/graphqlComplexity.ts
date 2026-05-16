@@ -1,5 +1,6 @@
 import type { Plugin } from 'graphql-yoga';
-import type { DocumentNode } from 'graphql';
+import { isAsyncIterable } from 'graphql-yoga';
+import type { DocumentNode, ExecutionResult } from 'graphql';
 import type { H3Event } from 'h3';
 import { setResponseHeader } from 'h3';
 import { GraphQLError } from 'graphql';
@@ -119,7 +120,7 @@ export const complexityYogaPlugin: Plugin = {
   onExecute({ args }) {
     return {
       onExecuteDone({ result, setResult }) {
-        if (!result || typeof result !== 'object' || 'stream' in result) return;
+        if (!result || isAsyncIterable(result)) return;
         const cost = costByDocument.get(args.document);
         if (cost === undefined) return;
         const cap = getGraphqlComplexityMaxCost();
@@ -127,11 +128,11 @@ export const complexityYogaPlugin: Plugin = {
         if (ctx.event) {
           setResponseHeader(ctx.event, 'X-Query-Cost', cost);
         }
+        const exec = result as ExecutionResult;
         setResult({
-          ...result,
+          ...exec,
           extensions: {
-            ...((result as { extensions?: Record<string, unknown> })
-              .extensions ?? {}),
+            ...(exec.extensions ?? {}),
             queryCost: { cost, cap },
           },
         });
