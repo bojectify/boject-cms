@@ -10,6 +10,7 @@
     "preview": "pnpm --filter cms preview",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
+    "nuke:packages": "rm -rf node_modules apps/*/node_modules packages/*/node_modules perf/node_modules && pnpm install",
     "dev:registries:up": "docker compose -f docker-compose.dev.yml up -d",
     "dev:registries:down": "docker compose -f docker-compose.dev.yml down",
     "dev:publish:image": "pnpm dev:publish:image:as 0.0.1-rc.1",

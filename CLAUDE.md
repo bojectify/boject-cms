@@ -48,6 +48,7 @@ pnpm content:import <path> [--schema|--entries|--all] [--apply] [--allow-destruc
 pnpm content:validate <path>                                                  # Validate a JSON bundle's shape without touching the DB
 pnpm starters:build           # Build sport.boject.json / rugby.boject.json from overlays in starters/src/
 pnpm starters:check           # Verify committed starter outputs are up to date (CI)
+pnpm nuke:packages            # Wipe every node_modules in the workspace and reinstall — recovery for "Could not resolve <pkg>" / orphaned symlink errors after dep churn
 ```
 
 Note: commands run from the repo root forward to `apps/cms` via `pnpm --filter cms`. The Nuxt app source, Prisma schema, and tests all live under `apps/cms/`. Starter bundle JSONs stay at the repo root's `starters/` directory (shared data, consumed by multiple packages).
