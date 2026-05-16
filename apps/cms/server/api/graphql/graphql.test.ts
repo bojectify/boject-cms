@@ -2751,4 +2751,32 @@ describe('GraphQL API', async () => {
       }
     });
   });
+
+  describe('response annotations', () => {
+    it('exposes X-Query-Cost header and extensions.queryCost on a successful query', async () => {
+      const res = await fetch('/api/graphql', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${TEST_API_KEY}`,
+        },
+        body: JSON.stringify({ query: `{ __typename }` }),
+      });
+      expect(res.status).toBe(200);
+
+      const costHeader = res.headers.get('x-query-cost');
+      expect(costHeader).not.toBeNull();
+      const cost = Number(costHeader);
+      expect(Number.isFinite(cost)).toBe(true);
+      expect(cost).toBeGreaterThanOrEqual(0);
+
+      const body = (await res.json()) as {
+        data?: { __typename?: string };
+        extensions?: { queryCost?: { cost?: number; cap?: number } };
+      };
+      expect(body.data?.__typename).toBe('Query');
+      expect(body.extensions?.queryCost?.cost).toBe(cost);
+      expect(body.extensions?.queryCost?.cap).toBeGreaterThan(0);
+    });
+  });
 });
