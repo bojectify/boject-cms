@@ -5,7 +5,9 @@ import {
   getRequestHeader,
   getRequestIP,
 } from 'h3';
-import { rateLimit } from './rateLimit';
+import { rateLimit, type RateLimitSnapshot } from './rateLimit';
+
+export type { RateLimitSnapshot };
 
 const MUTATION_MAX = 50;
 const MUTATION_WINDOW_MS = 60_000;
@@ -61,11 +63,25 @@ export function getGraphqlMax(): number {
  * effective cap is N × replicas; use a shared rate limiter (Redis /
  * postgres / external gateway) when scaling beyond one process.
  */
-export function checkGraphqlRateLimit(apiKeyId: string): {
-  allowed: boolean;
-  retryAfterMs: number;
-} {
+export function checkGraphqlRateLimit(apiKeyId: string): RateLimitSnapshot {
   return rateLimit(`gql:${apiKeyId}`, getGraphqlMax(), GRAPHQL_WINDOW_MS);
+}
+
+/**
+ * Write rate-limit observability headers in both IETF (RateLimit-*) and
+ * legacy (X-RateLimit-*) form. Called from /api/graphql on both 200 and
+ * 429 paths so consumers can pace themselves before they trip the limit.
+ */
+export function setRateLimitHeaders(
+  event: H3Event,
+  snapshot: RateLimitSnapshot
+): void {
+  setResponseHeader(event, 'RateLimit-Limit', snapshot.limit);
+  setResponseHeader(event, 'RateLimit-Remaining', snapshot.remaining);
+  setResponseHeader(event, 'RateLimit-Reset', snapshot.resetSeconds);
+  setResponseHeader(event, 'X-RateLimit-Limit', snapshot.limit);
+  setResponseHeader(event, 'X-RateLimit-Remaining', snapshot.remaining);
+  setResponseHeader(event, 'X-RateLimit-Reset', snapshot.resetSeconds);
 }
 
 export type RateLimitKind =
