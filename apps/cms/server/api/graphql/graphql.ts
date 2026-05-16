@@ -58,7 +58,6 @@ export default defineEventHandler(async (event) => {
       setResponseHeader(event, 'Retry-After', extensions.retryAfter);
       setResponseStatus(event, 429);
       return {
-        data: null,
         errors: [{ message: 'Too many requests', extensions }],
       };
     }
