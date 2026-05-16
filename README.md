@@ -113,9 +113,11 @@ For Vim / Neovim / Emacs users: the host editor will not be able to see `node_mo
 
 ### Threat model
 
-Short version: the container has no host secrets mounted, `.git` is hidden from the container via an anonymous-volume overlay, ports are bound to `127.0.0.1` only.
+Short version: the container has no host secrets mounted, `.git` is mounted read-only so a compromised dep cannot rewrite history or stage commits, ports are bound to `127.0.0.1` only.
 
-Residual risk: a compromised dep can still read/write the bind-mounted project files (except `.git`). Mitigation is commit-and-push frequently so uncommitted changes are the only at-risk surface.
+Reading `.git` is allowed so VS Code's Source Control / blame / diff / GitLens all work inside the container. The blast-radius assumption is that this repo is publicly available on GitHub — any dep that can read history could just clone it from there anyway. The write-blocking guarantee (no `git commit --amend`, no `update-ref`, no `git push` even if you had credentials) is unchanged from the prior anonymous-volume overlay.
+
+Residual risk: a compromised dep can still read/write the bind-mounted working tree (everything except `.git/`). Mitigation is commit-and-push frequently so uncommitted changes are the only at-risk surface.
 
 ## Getting Started
 
