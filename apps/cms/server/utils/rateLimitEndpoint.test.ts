@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { H3Event } from 'h3';
 import {
-  enforceGraphqlRateLimit,
+  checkGraphqlRateLimit,
   getGraphqlMax,
   RATE_LIMIT_SUGGESTIONS,
   buildRateLimitedBody,
@@ -82,7 +82,7 @@ describe('getGraphqlMax', () => {
   });
 });
 
-describe('enforceGraphqlRateLimit', () => {
+describe('checkGraphqlRateLimit', () => {
   beforeEach(() => {
     resetRateLimitStore();
   });
@@ -91,57 +91,51 @@ describe('enforceGraphqlRateLimit', () => {
     vi.useRealTimers();
   });
 
-  it('honours the configured cap and throws 429 with Retry-After when exceeded', () => {
+  it('returns allowed=true under the configured cap', () => {
     vi.stubEnv('GRAPHQL_RATE_LIMIT_RPS', '5');
-    const { event, headers } = makeMockEvent();
-
     for (let i = 0; i < 5; i++) {
-      expect(() => enforceGraphqlRateLimit(event, 'key-1')).not.toThrow();
+      expect(checkGraphqlRateLimit('key-1').allowed).toBe(true);
     }
+  });
 
-    let thrown: unknown;
-    try {
-      enforceGraphqlRateLimit(event, 'key-1');
-    } catch (err) {
-      thrown = err;
+  it('returns allowed=false with positive retryAfterMs when the cap is exceeded', () => {
+    vi.stubEnv('GRAPHQL_RATE_LIMIT_RPS', '5');
+    for (let i = 0; i < 5; i++) {
+      checkGraphqlRateLimit('key-1');
     }
-    expect(thrown).toMatchObject({ statusCode: 429 });
-    expect(headers.get('retry-after')).toBeDefined();
+    const result = checkGraphqlRateLimit('key-1');
+    expect(result.allowed).toBe(false);
+    expect(result.retryAfterMs).toBeGreaterThan(0);
   });
 
   it('keeps independent buckets per apiKeyId', () => {
     vi.stubEnv('GRAPHQL_RATE_LIMIT_RPS', '3');
-    const { event } = makeMockEvent();
-
     for (let i = 0; i < 3; i++) {
-      enforceGraphqlRateLimit(event, 'key-a');
+      checkGraphqlRateLimit('key-a');
     }
-    expect(() => enforceGraphqlRateLimit(event, 'key-a')).toThrow();
-    expect(() => enforceGraphqlRateLimit(event, 'key-b')).not.toThrow();
+    expect(checkGraphqlRateLimit('key-a').allowed).toBe(false);
+    expect(checkGraphqlRateLimit('key-b').allowed).toBe(true);
   });
 
   it('lets traffic resume after the 1-second window expires', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-04-28T12:00:00.000Z'));
     vi.stubEnv('GRAPHQL_RATE_LIMIT_RPS', '2');
-    const { event } = makeMockEvent();
 
-    enforceGraphqlRateLimit(event, 'key-1');
-    enforceGraphqlRateLimit(event, 'key-1');
-    expect(() => enforceGraphqlRateLimit(event, 'key-1')).toThrow();
+    checkGraphqlRateLimit('key-1');
+    checkGraphqlRateLimit('key-1');
+    expect(checkGraphqlRateLimit('key-1').allowed).toBe(false);
 
-    // Advance past the 1s window
     vi.advanceTimersByTime(1_100);
-    expect(() => enforceGraphqlRateLimit(event, 'key-1')).not.toThrow();
+    expect(checkGraphqlRateLimit('key-1').allowed).toBe(true);
   });
 
   it('falls back to 1000 cap when env var is unset', () => {
     vi.stubEnv('GRAPHQL_RATE_LIMIT_RPS', '');
-    const { event } = makeMockEvent();
     for (let i = 0; i < 1000; i++) {
-      enforceGraphqlRateLimit(event, 'key-default');
+      checkGraphqlRateLimit('key-default');
     }
-    expect(() => enforceGraphqlRateLimit(event, 'key-default')).toThrow();
+    expect(checkGraphqlRateLimit('key-default').allowed).toBe(false);
   });
 });
 

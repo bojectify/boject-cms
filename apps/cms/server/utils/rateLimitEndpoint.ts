@@ -54,27 +54,21 @@ export function getGraphqlMax(): number {
 }
 
 /**
- * Apply a per-API-key sliding-window rate limit on /api/graphql.
+ * Per-API-key sliding-window rate limit on /api/graphql.
  * Threshold defaults to 1000 RPS, override via GRAPHQL_RATE_LIMIT_RPS.
- * Throws a 429 with Retry-After if the limit is exceeded.
+ * Returns {allowed,retryAfterMs} — callers construct the GraphQL-shaped
+ * error envelope themselves so the response uses HTTP 429 with the
+ * canonical `errors[]` body rather than h3's default error JSON.
  *
  * The bucket is in-process. In horizontally-scaled deployments the
  * effective cap is N × replicas; use a shared rate limiter (Redis /
  * postgres / external gateway) when scaling beyond one process.
  */
-export function enforceGraphqlRateLimit(event: H3Event, apiKeyId: string) {
-  const { allowed, retryAfterMs } = rateLimit(
-    `gql:${apiKeyId}`,
-    getGraphqlMax(),
-    GRAPHQL_WINDOW_MS
-  );
-  if (!allowed) {
-    setResponseHeader(event, 'Retry-After', Math.ceil(retryAfterMs / 1000));
-    throw createError({
-      statusCode: 429,
-      statusMessage: 'Too many requests',
-    });
-  }
+export function checkGraphqlRateLimit(apiKeyId: string): {
+  allowed: boolean;
+  retryAfterMs: number;
+} {
+  return rateLimit(`gql:${apiKeyId}`, getGraphqlMax(), GRAPHQL_WINDOW_MS);
 }
 
 export type RateLimitKind =
