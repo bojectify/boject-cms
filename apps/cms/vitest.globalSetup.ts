@@ -1,7 +1,7 @@
 import { execSync } from 'node:child_process';
+import { getTestDatabaseUrl } from './test/dbUrl';
 
-const TEST_DATABASE_URL =
-  'postgresql://boject:boject@localhost:5432/boject_test';
+const TEST_DATABASE_URL = getTestDatabaseUrl();
 
 /**
  * Reset the test database to a clean seeded state before the suite runs.

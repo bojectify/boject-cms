@@ -43,6 +43,12 @@ services:
       - /workspace/.git
     environment:
       NUXT_SESSION_PASSWORD: ${NUXT_SESSION_PASSWORD:-dev-only-placeholder-32-chars-long-xx}
+      # Integration test database URLs. Unset by default; the test helpers
+      # (apps/cms/test/dbUrl.ts + packages/boject-cli/tests/integration/dbUrl.ts)
+      # fall back to the local-dev URLs. Set on host to point CI / a parallel
+      # runner at a remote postgres without editing source.
+      INTEGRATION_TEST_DATABASE_URL: ${INTEGRATION_TEST_DATABASE_URL:-}
+      CLI_INTEGRATION_TEST_DATABASE_URL: ${CLI_INTEGRATION_TEST_DATABASE_URL:-}
 
 volumes:
   pgdata:

@@ -3,8 +3,9 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../../generated/prisma/client';
 import { exportBundle } from './export';
 import { importBundle } from './import';
+import { getTestDatabaseUrl } from '../../test/dbUrl';
 
-const url = 'postgresql://boject:boject@localhost:5432/boject_test';
+const url = getTestDatabaseUrl();
 const adapter = new PrismaPg({ connectionString: url });
 const prisma = new PrismaClient({ adapter });
 

@@ -7,8 +7,9 @@ import { PrismaClient } from '../../generated/prisma/client';
 import { applySchema } from '../content-bundle/applySchema';
 import { SchemaApplyBlockedError } from '../content-bundle/applySchemaErrors';
 import { applySchemaIfConfigured } from './apply-schema';
+import { getTestDatabaseUrl } from '../../test/dbUrl';
 
-const url = 'postgresql://boject:boject@localhost:5432/boject_test';
+const url = getTestDatabaseUrl();
 const adapter = new PrismaPg({ connectionString: url });
 const prisma = new PrismaClient({ adapter });
 
