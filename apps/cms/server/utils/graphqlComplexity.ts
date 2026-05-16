@@ -1,10 +1,11 @@
 import type { Plugin } from 'graphql-yoga';
 import { isAsyncIterable } from 'graphql-yoga';
-import type { DocumentNode, ExecutionResult } from 'graphql';
+import type { DocumentNode } from 'graphql';
 import type { H3Event } from 'h3';
 import { setResponseHeader } from 'h3';
 import { GraphQLError } from 'graphql';
 import { createComplexityRule } from '@pothos/plugin-complexity';
+import { injectExtension } from './yogaExtensions';
 
 /**
  * Default per-query complexity cap. Chosen from the 2026-04-28 perf
@@ -128,14 +129,7 @@ export const complexityYogaPlugin: Plugin = {
         if (ctx.event) {
           setResponseHeader(ctx.event, 'X-Query-Cost', cost);
         }
-        const exec = result as ExecutionResult;
-        setResult({
-          ...exec,
-          extensions: {
-            ...(exec.extensions ?? {}),
-            queryCost: { cost, cap },
-          },
-        });
+        injectExtension(result, setResult, 'queryCost', { cost, cap });
       },
     };
   },

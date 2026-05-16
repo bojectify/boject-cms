@@ -1,8 +1,8 @@
 import type { Plugin } from 'graphql-yoga';
 import { isAsyncIterable } from 'graphql-yoga';
-import type { ExecutionResult } from 'graphql';
 import type { H3Event } from 'h3';
 import type { RateLimitSnapshot } from './rateLimit';
+import { injectExtension } from './yogaExtensions';
 
 /**
  * Yoga plugin that injects `extensions.rateLimit` on GraphQL responses
@@ -21,17 +21,10 @@ export const rateLimitExtensionPlugin: Plugin = {
           ctx.event?.context as { rateLimitSnapshot?: RateLimitSnapshot }
         )?.rateLimitSnapshot;
         if (!snapshot) return;
-        const exec = result as ExecutionResult;
-        setResult({
-          ...exec,
-          extensions: {
-            ...(exec.extensions ?? {}),
-            rateLimit: {
-              limit: snapshot.limit,
-              remaining: snapshot.remaining,
-              reset: snapshot.resetSeconds,
-            },
-          },
+        injectExtension(result, setResult, 'rateLimit', {
+          limit: snapshot.limit,
+          remaining: snapshot.remaining,
+          reset: snapshot.resetSeconds,
         });
       },
     };

@@ -113,4 +113,43 @@ describe('rateLimitExtensionPlugin', () => {
 
     expect(setResultCalled).toBe(false);
   });
+
+  it('injects extensions.rateLimit on errored queries (data: null) too', () => {
+    const event = makeEventWithSnapshot({
+      allowed: true,
+      limit: 1000,
+      remaining: 500,
+      resetSeconds: 1,
+      retryAfterMs: 0,
+    });
+
+    let captured: { extensions?: Record<string, unknown> } = {};
+    const document = parse(`{ hello }`);
+    const args = {
+      document,
+      contextValue: { event },
+      schema,
+    } as unknown as Parameters<
+      NonNullable<typeof rateLimitExtensionPlugin.onExecute>
+    >[0]['args'];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const onExec = rateLimitExtensionPlugin.onExecute!({ args } as any);
+    const onDone = (onExec as { onExecuteDone: (a: unknown) => void })
+      .onExecuteDone;
+    onDone({
+      result: {
+        data: null,
+        errors: [{ message: 'something broke' }],
+      },
+      setResult: (r: { extensions?: Record<string, unknown> }) => {
+        captured = r;
+      },
+    });
+
+    expect(captured.extensions?.rateLimit).toEqual({
+      limit: 1000,
+      remaining: 500,
+      reset: 1,
+    });
+  });
 });
