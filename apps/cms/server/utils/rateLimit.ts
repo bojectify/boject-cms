@@ -77,15 +77,11 @@ export function rateLimit(
 
   entry.timestamps.push(now);
   const oldest = entry.timestamps[0]!;
-  const resetSeconds =
-    entry.timestamps.length === 0
-      ? 0
-      : Math.max(1, Math.ceil((oldest + windowMs - now) / 1000));
   return {
     allowed: true,
     limit: maxRequests,
     remaining: Math.max(0, maxRequests - entry.timestamps.length),
-    resetSeconds,
+    resetSeconds: Math.max(1, Math.ceil((oldest + windowMs - now) / 1000)),
     retryAfterMs: 0,
   };
 }
