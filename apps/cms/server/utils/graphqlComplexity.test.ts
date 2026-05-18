@@ -97,7 +97,7 @@ function makeMockEvent(): MockEvent {
       },
     },
     context: {},
-  } as unknown as H3Event;
+  } as H3Event;
   return { headers, event };
 }
 
