@@ -31,6 +31,7 @@ describe('rateLimitExtensionPlugin', () => {
 
     let captured: { extensions?: Record<string, unknown> } = {};
     const document = parse(`{ hello }`);
+    // eslint-disable-next-line no-restricted-syntax -- Yoga TypedExecutionArgs requires params/request/waitUntil the mock omits
     const args = {
       document,
       contextValue: { event },
@@ -60,6 +61,7 @@ describe('rateLimitExtensionPlugin', () => {
     const event = makeEventWithSnapshot(undefined);
     let setResultCalled = false;
     const document = parse(`{ hello }`);
+    // eslint-disable-next-line no-restricted-syntax -- Yoga TypedExecutionArgs requires params/request/waitUntil the mock omits
     const args = {
       document,
       contextValue: { event },
@@ -91,6 +93,7 @@ describe('rateLimitExtensionPlugin', () => {
     });
     let setResultCalled = false;
     const document = parse(`{ hello }`);
+    // eslint-disable-next-line no-restricted-syntax -- Yoga TypedExecutionArgs requires params/request/waitUntil the mock omits
     const args = {
       document,
       contextValue: { event },
@@ -125,6 +128,7 @@ describe('rateLimitExtensionPlugin', () => {
 
     let captured: { extensions?: Record<string, unknown> } = {};
     const document = parse(`{ hello }`);
+    // eslint-disable-next-line no-restricted-syntax -- Yoga TypedExecutionArgs requires params/request/waitUntil the mock omits
     const args = {
       document,
       contextValue: { event },

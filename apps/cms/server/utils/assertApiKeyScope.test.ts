@@ -5,6 +5,7 @@ function fakeEvent(opts: {
   authMethod?: 'session' | 'apikey';
   scopes?: string[];
 }) {
+  // eslint-disable-next-line no-restricted-syntax -- H3Event requires node/__is_event__/etc. the mock omits
   return {
     context: {
       authMethod: opts.authMethod ?? 'apikey',

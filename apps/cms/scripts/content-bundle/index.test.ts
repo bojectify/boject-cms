@@ -44,15 +44,21 @@ vi.mock('node:fs', async (importActual) => {
 });
 
 vi.mock('@prisma/adapter-pg', () => ({
-  PrismaPg: vi.fn(function () {
-    return {};
-  } as unknown as new () => unknown),
+  PrismaPg: vi.fn(
+    // eslint-disable-next-line no-restricted-syntax -- plain function → constructor signature
+    function () {
+      return {};
+    } as unknown as new () => unknown
+  ),
 }));
 
 vi.mock('../../generated/prisma/client', () => ({
-  PrismaClient: vi.fn(function () {
-    return { $disconnect: async () => {} };
-  } as unknown as new () => unknown),
+  PrismaClient: vi.fn(
+    // eslint-disable-next-line no-restricted-syntax -- plain function → constructor signature
+    function () {
+      return { $disconnect: async () => {} };
+    } as unknown as new () => unknown
+  ),
 }));
 
 import { importBundle } from './import';

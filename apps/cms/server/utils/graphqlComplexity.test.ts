@@ -112,6 +112,7 @@ describe('complexityYogaPlugin response surfacing', () => {
     const { event, headers } = makeMockEvent();
 
     let captured: { result?: { extensions?: Record<string, unknown> } } = {};
+    // eslint-disable-next-line no-restricted-syntax -- Yoga TypedExecutionArgs requires params/request/waitUntil the mock omits
     const args = {
       document,
       contextValue: { event },
@@ -143,6 +144,7 @@ describe('complexityYogaPlugin response surfacing', () => {
     const { event, headers } = makeMockEvent();
 
     let setResultCalled = false;
+    // eslint-disable-next-line no-restricted-syntax -- Yoga TypedExecutionArgs requires params/request/waitUntil the mock omits
     const args = {
       document,
       contextValue: { event },
@@ -171,6 +173,7 @@ describe('complexityYogaPlugin response surfacing', () => {
     const { event } = makeMockEvent();
 
     let setResultCalled = false;
+    // eslint-disable-next-line no-restricted-syntax -- Yoga TypedExecutionArgs requires params/request/waitUntil the mock omits
     const args = {
       document,
       contextValue: { event },
@@ -200,6 +203,7 @@ describe('complexityYogaPlugin response surfacing', () => {
     const { event, headers } = makeMockEvent();
 
     let captured: { result?: { extensions?: Record<string, unknown> } } = {};
+    // eslint-disable-next-line no-restricted-syntax -- Yoga TypedExecutionArgs requires params/request/waitUntil the mock omits
     const args = {
       document,
       contextValue: { event },

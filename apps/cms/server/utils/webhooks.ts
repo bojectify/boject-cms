@@ -67,7 +67,10 @@ export async function enqueueWebhookDeliveries(
       });
       await tx.webhookDelivery.update({
         where: { id: placeholder.id },
-        data: { payload: payload as unknown as Prisma.InputJsonValue },
+        data: {
+          // eslint-disable-next-line no-restricted-syntax -- WebhookPayload lacks the string index signature InputJsonObject requires
+          payload: payload as unknown as Prisma.InputJsonValue,
+        },
       });
     })
   );

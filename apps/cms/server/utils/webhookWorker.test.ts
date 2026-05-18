@@ -206,10 +206,13 @@ describe('runWorkerTick — DNS resolution + IP pinning', () => {
 
     expect(mockResolve).not.toHaveBeenCalled();
     expect(fetchImpl).toHaveBeenCalledTimes(1);
-    const init = (
-      fetchImpl.mock.calls[0] as unknown as [string, { dispatcher?: unknown }]
-    )[1];
-    expect(init.dispatcher).toBeUndefined();
+    // fetch mock.calls[0] tuple doesn't expose the dispatcher arg shape
+    // eslint-disable-next-line no-restricted-syntax
+    const args = fetchImpl.mock.calls[0] as unknown as [
+      string,
+      { dispatcher?: unknown },
+    ];
+    expect(args[1].dispatcher).toBeUndefined();
     expect(deliveries[0]!.status).toBe('SUCCESS');
   });
 
@@ -225,10 +228,13 @@ describe('runWorkerTick — DNS resolution + IP pinning', () => {
     });
 
     expect(mockResolve).not.toHaveBeenCalled();
-    const init = (
-      fetchImpl.mock.calls[0]! as unknown as [string, { dispatcher?: unknown }]
-    )[1];
-    expect(init.dispatcher).toBeUndefined();
+    // fetch mock.calls[0] tuple doesn't expose the dispatcher arg shape
+    // eslint-disable-next-line no-restricted-syntax
+    const args = fetchImpl.mock.calls[0]! as unknown as [
+      string,
+      { dispatcher?: unknown },
+    ];
+    expect(args[1].dispatcher).toBeUndefined();
     expect(deliveries[0]!.status).toBe('SUCCESS');
   });
 
@@ -243,10 +249,13 @@ describe('runWorkerTick — DNS resolution + IP pinning', () => {
     });
 
     expect(mockResolve).toHaveBeenCalledWith('example.com');
-    const init = (
-      fetchImpl.mock.calls[0] as unknown as [string, { dispatcher?: unknown }]
-    )[1];
-    expect(init.dispatcher).toBeDefined();
+    // fetch mock.calls[0] tuple doesn't expose the dispatcher arg shape
+    // eslint-disable-next-line no-restricted-syntax
+    const args = fetchImpl.mock.calls[0] as unknown as [
+      string,
+      { dispatcher?: unknown },
+    ];
+    expect(args[1].dispatcher).toBeDefined();
     expect(deliveries[0]!.status).toBe('SUCCESS');
   });
 
