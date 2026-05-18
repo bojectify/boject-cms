@@ -37,11 +37,19 @@ function ensureCleanup() {
   }
 }
 
+export interface RateLimitSnapshot {
+  allowed: boolean;
+  limit: number;
+  remaining: number;
+  resetSeconds: number;
+  retryAfterMs: number;
+}
+
 export function rateLimit(
   key: string,
   maxRequests = DEFAULT_MAX_REQUESTS,
   windowMs = DEFAULT_WINDOW_MS
-): { allowed: boolean; retryAfterMs: number } {
+): RateLimitSnapshot {
   ensureCleanup();
 
   const now = Date.now();
@@ -58,11 +66,24 @@ export function rateLimit(
   if (entry.timestamps.length >= maxRequests) {
     const oldest = entry.timestamps[0]!;
     const retryAfterMs = oldest + windowMs - now;
-    return { allowed: false, retryAfterMs };
+    return {
+      allowed: false,
+      limit: maxRequests,
+      remaining: 0,
+      resetSeconds: Math.max(1, Math.ceil(retryAfterMs / 1000)),
+      retryAfterMs,
+    };
   }
 
   entry.timestamps.push(now);
-  return { allowed: true, retryAfterMs: 0 };
+  const oldest = entry.timestamps[0]!;
+  return {
+    allowed: true,
+    limit: maxRequests,
+    remaining: Math.max(0, maxRequests - entry.timestamps.length),
+    resetSeconds: Math.max(1, Math.ceil((oldest + windowMs - now) / 1000)),
+    retryAfterMs: 0,
+  };
 }
 
 /** Reset rate limit store (for testing) */

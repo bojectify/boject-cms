@@ -7,8 +7,10 @@ import {
   buildRateLimitedBody,
   buildRateLimitedExtensions,
   throwRateLimited,
+  setRateLimitHeaders,
 } from './rateLimitEndpoint';
 import { resetRateLimitStore } from './rateLimit';
+import type { RateLimitSnapshot } from './rateLimit';
 
 type MockEvent = {
   headers: Map<string, string>;
@@ -227,5 +229,44 @@ describe('throwRateLimited', () => {
     expect((thrown as { data: { suggestion: string } }).data.suggestion).toBe(
       RATE_LIMIT_SUGGESTIONS.login
     );
+  });
+});
+
+describe('checkGraphqlRateLimit (snapshot fields)', () => {
+  beforeEach(() => {
+    resetRateLimitStore();
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('exposes limit/remaining/resetSeconds alongside allowed/retryAfterMs', () => {
+    vi.stubEnv('GRAPHQL_RATE_LIMIT_RPS', '4');
+    const r = checkGraphqlRateLimit('key-snap');
+    expect(r.allowed).toBe(true);
+    expect(r.limit).toBe(4);
+    expect(r.remaining).toBe(3);
+    expect(r.resetSeconds).toBe(1);
+    expect(r.retryAfterMs).toBe(0);
+  });
+});
+
+describe('setRateLimitHeaders', () => {
+  it('writes IETF and legacy headers for every snapshot field', () => {
+    const { event, headers } = makeMockEvent();
+    const snapshot: RateLimitSnapshot = {
+      allowed: true,
+      limit: 1000,
+      remaining: 873,
+      resetSeconds: 1,
+      retryAfterMs: 0,
+    };
+    setRateLimitHeaders(event, snapshot);
+    expect(headers.get('ratelimit-limit')).toBe('1000');
+    expect(headers.get('ratelimit-remaining')).toBe('873');
+    expect(headers.get('ratelimit-reset')).toBe('1');
+    expect(headers.get('x-ratelimit-limit')).toBe('1000');
+    expect(headers.get('x-ratelimit-remaining')).toBe('873');
+    expect(headers.get('x-ratelimit-reset')).toBe('1');
   });
 });

@@ -1,6 +1,11 @@
 import type { Plugin } from 'graphql-yoga';
+import { isAsyncIterable } from 'graphql-yoga';
+import type { DocumentNode } from 'graphql';
+import { setResponseHeader } from 'h3';
 import { GraphQLError } from 'graphql';
 import { createComplexityRule } from '@pothos/plugin-complexity';
+import { injectExtension } from './yogaExtensions';
+import type { YogaServerContext } from './yogaContext';
 
 /**
  * Default per-query complexity cap. Chosen from the 2026-04-28 perf
@@ -45,6 +50,26 @@ export function isGraphqlComplexityLogOnly(): boolean {
 }
 
 /**
+ * Cost is computed at validate time but surfaced to the HTTP response /
+ * GraphQL extensions at execute time. WeakMap keyed on DocumentNode
+ * ferries the value between phases without leaking — entries are
+ * garbage-collected when the parsed document goes out of scope.
+ */
+const costByDocument = new WeakMap<DocumentNode, number>();
+
+/**
+ * Test-only hook. Not part of the public API. Lets unit tests seed a
+ * cost without going through the validation phase. WeakMap entries
+ * are keyed on DocumentNode, so each test's freshly-parsed document
+ * gets its own slot — no inter-test pollution to clean up.
+ */
+export const __test__ = {
+  setCostForDocument(doc: DocumentNode, cost: number) {
+    costByDocument.set(doc, cost);
+  },
+};
+
+/**
  * Yoga plugin that adds a per-request validation rule computing the
  * operation's complexity. Over-cap queries either reject with a
  * `QUERY_TOO_COMPLEX` GraphQL error (default) or are logged and
@@ -61,7 +86,7 @@ export function isGraphqlComplexityLogOnly(): boolean {
  * matches `maxDepthPlugin`'s contract.
  */
 export const complexityYogaPlugin: Plugin = {
-  onValidate({ addValidationRule }) {
+  onValidate({ params, addValidationRule }) {
     const cap = getGraphqlComplexityMaxCost();
     const logOnly = isGraphqlComplexityLogOnly();
     addValidationRule(
@@ -69,6 +94,7 @@ export const complexityYogaPlugin: Plugin = {
         context: {},
         variableValues: {},
         validate(result, reportError) {
+          costByDocument.set(params.documentAST, result.complexity);
           if (result.complexity <= cap) return;
           if (logOnly) {
             console.warn(
@@ -91,5 +117,20 @@ export const complexityYogaPlugin: Plugin = {
         },
       })
     );
+  },
+  onExecute({ args }) {
+    return {
+      onExecuteDone({ result, setResult }) {
+        if (!result || isAsyncIterable(result)) return;
+        const cost = costByDocument.get(args.document);
+        if (cost === undefined) return;
+        const cap = getGraphqlComplexityMaxCost();
+        const ctx = args.contextValue as Partial<YogaServerContext>;
+        if (ctx.event) {
+          setResponseHeader(ctx.event, 'X-Query-Cost', cost);
+        }
+        injectExtension(result, setResult, 'queryCost', { cost, cap });
+      },
+    };
   },
 };

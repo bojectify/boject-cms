@@ -1,8 +1,12 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
+import { parse, buildSchema } from 'graphql';
+import type { H3Event } from 'h3';
 import {
   DEFAULT_GRAPHQL_COMPLEXITY_MAX_COST,
   getGraphqlComplexityMaxCost,
   isGraphqlComplexityLogOnly,
+  complexityYogaPlugin,
+  __test__,
 } from './graphqlComplexity';
 
 describe('getGraphqlComplexityMaxCost', () => {
@@ -63,5 +67,162 @@ describe('isGraphqlComplexityLogOnly', () => {
   it('returns false on any other value', () => {
     vi.stubEnv('BOJECT_GRAPHQL_COMPLEXITY_LOG_ONLY', 'no');
     expect(isGraphqlComplexityLogOnly()).toBe(false);
+  });
+});
+
+const schema = buildSchema(/* GraphQL */ `
+  type Query {
+    hello: String
+  }
+`);
+
+type MockEvent = {
+  headers: Map<string, string>;
+  event: H3Event;
+};
+
+function makeMockEvent(): MockEvent {
+  const headers = new Map<string, string>();
+  const event = {
+    node: {
+      req: { headers: {} },
+      res: {
+        headersSent: false,
+        setHeader(name: string, value: string | number | string[]) {
+          headers.set(name.toLowerCase(), String(value));
+        },
+        getHeader(name: string) {
+          return headers.get(name.toLowerCase());
+        },
+      },
+    },
+    context: {},
+  } as H3Event;
+  return { headers, event };
+}
+
+describe('complexityYogaPlugin response surfacing', () => {
+  beforeEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('injects extensions.queryCost on the result and sets X-Query-Cost header', () => {
+    const document = parse(`{ hello }`);
+    __test__.setCostForDocument(document, 42);
+    const { event, headers } = makeMockEvent();
+
+    let captured: { result?: { extensions?: Record<string, unknown> } } = {};
+    const args = {
+      document,
+      contextValue: { event },
+      schema,
+    } as unknown as Parameters<
+      NonNullable<typeof complexityYogaPlugin.onExecute>
+    >[0]['args'];
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const onExec = complexityYogaPlugin.onExecute!({ args } as any);
+    const onDone = (onExec as { onExecuteDone: (a: unknown) => void })
+      .onExecuteDone;
+    onDone({
+      result: { data: { hello: 'world' } },
+      setResult: (r: { extensions?: Record<string, unknown> }) => {
+        captured = { result: r };
+      },
+    });
+
+    expect(headers.get('x-query-cost')).toBe('42');
+    expect(captured.result?.extensions?.queryCost).toEqual({
+      cost: 42,
+      cap: getGraphqlComplexityMaxCost(),
+    });
+  });
+
+  it('does nothing when no cost was recorded for this document', () => {
+    const document = parse(`{ hello }`);
+    const { event, headers } = makeMockEvent();
+
+    let setResultCalled = false;
+    const args = {
+      document,
+      contextValue: { event },
+      schema,
+    } as unknown as Parameters<
+      NonNullable<typeof complexityYogaPlugin.onExecute>
+    >[0]['args'];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const onExec = complexityYogaPlugin.onExecute!({ args } as any);
+    const onDone = (onExec as { onExecuteDone: (a: unknown) => void })
+      .onExecuteDone;
+    onDone({
+      result: { data: { hello: 'world' } },
+      setResult: () => {
+        setResultCalled = true;
+      },
+    });
+
+    expect(headers.get('x-query-cost')).toBeUndefined();
+    expect(setResultCalled).toBe(false);
+  });
+
+  it('skips streaming/multipart results gracefully', () => {
+    const document = parse(`{ hello }`);
+    __test__.setCostForDocument(document, 10);
+    const { event } = makeMockEvent();
+
+    let setResultCalled = false;
+    const args = {
+      document,
+      contextValue: { event },
+      schema,
+    } as unknown as Parameters<
+      NonNullable<typeof complexityYogaPlugin.onExecute>
+    >[0]['args'];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const onExec = complexityYogaPlugin.onExecute!({ args } as any);
+    const onDone = (onExec as { onExecuteDone: (a: unknown) => void })
+      .onExecuteDone;
+    onDone({
+      result: (async function* () {
+        yield { data: {} };
+      })(),
+      setResult: () => {
+        setResultCalled = true;
+      },
+    });
+
+    expect(setResultCalled).toBe(false);
+  });
+
+  it('surfaces cost=0 as a real value (not falsy-skipped)', () => {
+    const document = parse(`{ hello }`);
+    __test__.setCostForDocument(document, 0);
+    const { event, headers } = makeMockEvent();
+
+    let captured: { result?: { extensions?: Record<string, unknown> } } = {};
+    const args = {
+      document,
+      contextValue: { event },
+      schema,
+    } as unknown as Parameters<
+      NonNullable<typeof complexityYogaPlugin.onExecute>
+    >[0]['args'];
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const onExec = complexityYogaPlugin.onExecute!({ args } as any);
+    const onDone = (onExec as { onExecuteDone: (a: unknown) => void })
+      .onExecuteDone;
+    onDone({
+      result: { data: { hello: 'world' } },
+      setResult: (r: { extensions?: Record<string, unknown> }) => {
+        captured = { result: r };
+      },
+    });
+
+    expect(headers.get('x-query-cost')).toBe('0');
+    expect(captured.result?.extensions?.queryCost).toEqual({
+      cost: 0,
+      cap: getGraphqlComplexityMaxCost(),
+    });
   });
 });
