@@ -16,7 +16,7 @@ function makeEventWithSnapshot(
   return {
     node: { req: { headers: {} }, res: {} },
     context: snapshot ? { rateLimitSnapshot: snapshot } : {},
-  } as unknown as H3Event;
+  } as H3Event;
 }
 
 describe('rateLimitExtensionPlugin', () => {

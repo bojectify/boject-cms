@@ -2,11 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { translatePrismaError, withPrismaErrors } from './prismaErrors';
 
 function fakePrismaError(code: string, message: string, meta?: unknown) {
-  const err = new Error(message);
-  (err as unknown as { code: string; meta?: unknown; name: string }).code =
-    code;
-  (err as unknown as { meta?: unknown }).meta = meta;
-  (err as unknown as { name: string }).name = 'PrismaClientKnownRequestError';
+  const err = new Error(message) as Error & { code: string; meta?: unknown };
+  err.code = code;
+  err.meta = meta;
+  err.name = 'PrismaClientKnownRequestError';
   return err;
 }
 

@@ -184,7 +184,7 @@ describe('encode/decodeDataRefs — RICHTEXT embeds', () => {
       typeIdToIdent,
       typeIdentToEntryKeys
     );
-    const body = out.body as unknown as {
+    const body = out.body as {
       content: { content: { attrs: unknown }[] }[];
     };
     const embed = body.content[0]!.content[1]!;
@@ -218,7 +218,7 @@ describe('encode/decodeDataRefs — RICHTEXT embeds', () => {
       identToTypeId,
       typeIdentToKeyToEntry
     );
-    const body = out.body as unknown as {
+    const body = out.body as {
       content: { content: { attrs: unknown }[] }[];
     };
     const embed = body.content[0]!.content[0]!;

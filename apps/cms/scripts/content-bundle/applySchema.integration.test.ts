@@ -78,7 +78,7 @@ describe('applySchema', () => {
             // No fields array → validateBundle rejects "fields must be an array"
           },
         ],
-      } as unknown as Bundle;
+      } as Bundle;
 
       await expect(applySchema(prisma, malformedBundle)).rejects.toThrow(
         /Bundle validation failed/

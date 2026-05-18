@@ -199,7 +199,7 @@ async function dispatch(
       data: {
         status: 'SUCCESS',
         attempts,
-        lastRequestHeaders: requestHeaders as unknown as Prisma.InputJsonValue,
+        lastRequestHeaders: requestHeaders as Prisma.InputJsonValue,
         lastResponseCode: responseCode,
         lastResponseBody: responseBody,
         lastError: null,
@@ -217,7 +217,7 @@ async function dispatch(
       data: {
         status: 'DEAD_LETTERED',
         attempts,
-        lastRequestHeaders: requestHeaders as unknown as Prisma.InputJsonValue,
+        lastRequestHeaders: requestHeaders as Prisma.InputJsonValue,
         lastResponseCode: responseCode,
         lastResponseBody: responseBody,
         lastError: transportError,
@@ -236,7 +236,7 @@ async function dispatch(
       data: {
         status: 'PENDING',
         attempts,
-        lastRequestHeaders: requestHeaders as unknown as Prisma.InputJsonValue,
+        lastRequestHeaders: requestHeaders as Prisma.InputJsonValue,
         lastResponseCode: responseCode,
         lastResponseBody: responseBody,
         lastError: transportError,

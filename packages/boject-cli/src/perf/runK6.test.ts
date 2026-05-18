@@ -49,7 +49,7 @@ describe('runK6', () => {
         child.stderr.push(null);
         child.emit('close', 0);
       });
-      return child as unknown as ChildProcess;
+      return child as ChildProcess;
     });
 
     const stdoutLines: string[] = [];
@@ -100,7 +100,7 @@ describe('runK6', () => {
         child.stderr.push(null);
         child.emit('close', 99);
       });
-      return child as unknown as ChildProcess;
+      return child as ChildProcess;
     });
 
     const promise = runK6({
@@ -128,7 +128,7 @@ describe('runK6', () => {
         child.stderr.push(null);
         child.emit('close', 0);
       });
-      return child as unknown as ChildProcess;
+      return child as ChildProcess;
     });
 
     const stdoutLines: string[] = [];
@@ -155,7 +155,7 @@ describe('runK6', () => {
       queueMicrotask(() => {
         child.emit('error', new Error('ENOENT: k6 not found'));
       });
-      return child as unknown as ChildProcess;
+      return child as ChildProcess;
     });
 
     const promise = runK6({
@@ -182,7 +182,7 @@ describe('runK6', () => {
         child.stderr.push(null);
         child.emit('close', 0);
       });
-      return child as unknown as ChildProcess;
+      return child as ChildProcess;
     });
 
     const promise = runK6({
@@ -221,7 +221,7 @@ describe('runK6', () => {
         child.stderr.push(null);
         child.emit('close', 0);
       });
-      return child as unknown as ChildProcess;
+      return child as ChildProcess;
     });
 
     const stdoutLines: string[] = [];

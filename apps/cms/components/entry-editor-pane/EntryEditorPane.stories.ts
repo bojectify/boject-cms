@@ -116,8 +116,10 @@ export const EscapeClosesPane: Story = {
     components: { EntryEditorPane },
     setup() {
       const onClose = fn();
-      (window as unknown as { __close__: ReturnType<typeof fn> }).__close__ =
-        onClose;
+      (
+        window as Window &
+          typeof globalThis & { __close__: ReturnType<typeof fn> }
+      ).__close__ = onClose;
       return () => h(EntryEditorPane, { ...args, onClose });
     },
   }),
@@ -143,8 +145,10 @@ export const EscapeClosesPane: Story = {
         cancelable: true,
       })
     );
-    const close = (window as unknown as { __close__: ReturnType<typeof fn> })
-      .__close__;
+    const close = (
+      window as Window &
+        typeof globalThis & { __close__: ReturnType<typeof fn> }
+    ).__close__;
     await waitFor(() => expect(close).toHaveBeenCalled(), { timeout: 1000 });
   },
 };
@@ -158,8 +162,10 @@ export const OpensRelationAtDepth: Story = {
           openPane: fn(),
         };
         provide(paneOrchestratorKey, orchestrator);
-        (window as unknown as { __orch__: typeof orchestrator }).__orch__ =
-          orchestrator;
+        (
+          window as Window &
+            typeof globalThis & { __orch__: typeof orchestrator }
+        ).__orch__ = orchestrator;
         return () => h(story());
       },
     }),
@@ -254,7 +260,8 @@ export const OpensRelationAtDepth: Story = {
     });
     await userEvent.click(authorCard);
     const orch = (
-      window as unknown as { __orch__: { openPane: ReturnType<typeof fn> } }
+      window as Window &
+        typeof globalThis & { __orch__: { openPane: ReturnType<typeof fn> } }
     ).__orch__;
     expect(orch.openPane).toHaveBeenCalledWith(
       CT_AUTHOR_UUID,
@@ -270,8 +277,10 @@ export const EmitsSavedOnPublish: Story = {
     components: { EntryEditorPane },
     setup() {
       const saved = fn();
-      (window as unknown as { __saved__: ReturnType<typeof fn> }).__saved__ =
-        saved;
+      (
+        window as Window &
+          typeof globalThis & { __saved__: ReturnType<typeof fn> }
+      ).__saved__ = saved;
       return () =>
         h(EntryEditorPane, {
           ...args,
@@ -333,8 +342,10 @@ export const EmitsSavedOnPublish: Story = {
     const saveBtn = screen.getByRole('button', { name: /save draft/i });
     await userEvent.click(saveBtn);
 
-    const saved = (window as unknown as { __saved__: ReturnType<typeof fn> })
-      .__saved__;
+    const saved = (
+      window as Window &
+        typeof globalThis & { __saved__: ReturnType<typeof fn> }
+    ).__saved__;
     await waitFor(() => expect(saved).toHaveBeenCalled(), { timeout: 3000 });
     expect(saved).toHaveBeenCalledWith({
       contentTypeId: CT_TAG_UUID,

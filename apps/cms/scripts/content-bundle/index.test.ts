@@ -110,9 +110,7 @@ describe('content-bundle CLI — --apply flag dispatch', () => {
       '--allow-destructive',
     ]);
     expect(applySchema).toHaveBeenCalledTimes(1);
-    expect(
-      (applySchema as unknown as ReturnType<typeof vi.fn>).mock.calls[0]![2]
-    ).toEqual({
+    expect(vi.mocked(applySchema).mock.calls[0]![2]).toEqual({
       allowDestructive: true,
     });
   });

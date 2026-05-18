@@ -12,7 +12,7 @@ vi.mock('./resolvePublicHost', async (importOriginal) => {
   };
 });
 
-const mockResolve = resolvePublicHost as unknown as ReturnType<typeof vi.fn>;
+const mockResolve = vi.mocked(resolvePublicHost);
 
 type DeliveryRow = {
   id: string;
