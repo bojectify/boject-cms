@@ -2,21 +2,8 @@
 // The CLI is published standalone and cannot import from apps/cms/.
 // Keep this file in sync when the canonical version changes.
 
-export type FieldType =
-  | 'ENTRY_TITLE'
-  | 'SLUG'
-  | 'TEXT'
-  | 'TEXTAREA'
-  | 'NUMBER'
-  | 'BOOLEAN'
-  | 'DATETIME'
-  | 'SELECT'
-  | 'RICHTEXT'
-  | 'RELATION'
-  | 'MULTIRELATION'
-  | 'IMAGE';
-
-export type ContentStatus = 'DRAFT' | 'PUBLISHED' | 'CHANGED' | 'ARCHIVED';
+import type { FieldTypeName } from './fieldTypes.js';
+import type { ContentStatusName } from './contentStatus.js';
 
 export const BUNDLE_VERSION = 2;
 
@@ -31,7 +18,7 @@ export interface BundleField {
   id: string | null;
   identifier: string;
   name: string;
-  type: FieldType;
+  type: FieldTypeName;
   required: boolean;
   unique?: boolean;
   order: number;
@@ -47,7 +34,7 @@ export interface BundleContentType {
 }
 
 export interface BundleEntryVersion {
-  status: ContentStatus;
+  status: ContentStatusName;
   data: Record<string, unknown>;
   publishedAt: string | null;
 }
@@ -60,7 +47,7 @@ export interface BundleEntry {
   entryKey: string;
   slug: string | null;
   // V1 flat fields (kept for backward compat on import)
-  status?: ContentStatus;
+  status?: ContentStatusName;
   publishedAt?: string | null;
   data?: Record<string, unknown>;
   // V2 versioned

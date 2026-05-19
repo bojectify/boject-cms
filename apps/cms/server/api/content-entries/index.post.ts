@@ -11,13 +11,13 @@ import {
   isCmsRequest,
 } from '../../utils/resolveVersion';
 import { slugify } from '../../../utils/slugify';
+import {
+  CONTENT_STATUSES,
+  CONTENT_STATUS_NAMES,
+  type ContentStatusName,
+} from '../../../utils/contentStatus';
 
-const VALID_STATUSES = new Set<string>([
-  'DRAFT',
-  'PUBLISHED',
-  'CHANGED',
-  'ARCHIVED',
-]);
+const VALID_STATUSES = new Set<string>(CONTENT_STATUS_NAMES);
 
 export default defineEventHandler(async (event) => {
   assertApiKeyScope(event, 'content:write');
@@ -95,9 +95,9 @@ export default defineEventHandler(async (event) => {
     });
   }
 
-  let status = 'DRAFT';
+  let status: ContentStatusName = CONTENT_STATUSES.DRAFT;
   if (typeof body.status === 'string' && VALID_STATUSES.has(body.status)) {
-    status = body.status;
+    status = body.status as ContentStatusName;
   }
 
   let created;
@@ -112,8 +112,9 @@ export default defineEventHandler(async (event) => {
           create: {
             data: enrichedData as Prisma.InputJsonValue,
             entryTitle,
-            status: status as 'DRAFT',
-            publishedAt: status === 'PUBLISHED' ? new Date() : undefined,
+            status,
+            publishedAt:
+              status === CONTENT_STATUSES.PUBLISHED ? new Date() : undefined,
           },
         },
       },

@@ -14,6 +14,7 @@ import type { GeneratedSeed } from '../../src/perf/generate.js';
 import { slugify } from '../../src/vendor/slugify.js';
 import { PERF_TEST_DATABASE_URL } from './globalSetup.js';
 import { FIELD_TYPES } from '../../src/vendor/fieldTypes.js';
+import { CONTENT_STATUSES } from '../../src/vendor/contentStatus.js';
 
 const PERF_ARTICLE_BUNDLE: Bundle = {
   version: 2,
@@ -269,7 +270,7 @@ describe('writeViaSql against real Postgres', () => {
         slug: 'author-one',
         versions: [
           {
-            status: 'PUBLISHED',
+            status: CONTENT_STATUSES.PUBLISHED,
             data: { entryTitle: 'Author One', slug: 'author-one' },
             publishedAt: '2026-05-12T00:00:00.000Z',
           },
@@ -284,7 +285,7 @@ describe('writeViaSql against real Postgres', () => {
         slug: 'article-one',
         versions: [
           {
-            status: 'PUBLISHED',
+            status: CONTENT_STATUSES.PUBLISHED,
             data: {
               entryTitle: 'Article One',
               slug: 'article-one',

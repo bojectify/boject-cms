@@ -9,6 +9,7 @@ import { SchemaApplyBlockedError } from '../content-bundle/applySchemaErrors';
 import { applySchemaIfConfigured } from './apply-schema';
 import { getTestDatabaseUrl } from '../../test/dbUrl';
 import { FIELD_TYPES } from '../../utils/fieldTypes';
+import { CONTENT_STATUSES } from '../../utils/contentStatus';
 
 const url = getTestDatabaseUrl();
 const adapter = new PrismaPg({ connectionString: url });
@@ -210,7 +211,7 @@ describe('apply-schema (integration)', () => {
           create: {
             data: { title: 'X' },
             entryTitle: 'X',
-            status: 'PUBLISHED',
+            status: CONTENT_STATUSES.PUBLISHED,
           },
         },
       },

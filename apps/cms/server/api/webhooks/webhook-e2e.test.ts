@@ -7,6 +7,7 @@ import { prisma } from '../../utils/prisma';
 import { resetRateLimitStore } from '../../utils/rateLimit';
 import { runWorkerTick } from '../../utils/webhookWorker';
 import { FIELD_TYPES } from '../../../utils/fieldTypes';
+import { CONTENT_STATUSES } from '../../../utils/contentStatus';
 
 // This test relies on the symmetric escape hatch from issue #103: when
 // `NODE_ENV !== 'production'` (or `WEBHOOK_ALLOW_PRIVATE_URLS=true`), both
@@ -154,7 +155,10 @@ describe('Webhook delivery E2E', async () => {
       await fetch(`/api/content-entries/${entry.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Cookie: cookie },
-        body: JSON.stringify({ status: 'PUBLISHED', data: entry.data }),
+        body: JSON.stringify({
+          status: CONTENT_STATUSES.PUBLISHED,
+          data: entry.data,
+        }),
       });
 
       // Manually invoke one worker tick in-process.
@@ -176,7 +180,7 @@ describe('Webhook delivery E2E', async () => {
         entry: { status: string; data: { title: string } };
       };
       expect(parsed.event).toBe('ENTRY_PUBLISHED');
-      expect(parsed.entry.status).toBe('PUBLISHED');
+      expect(parsed.entry.status).toBe(CONTENT_STATUSES.PUBLISHED);
       expect(parsed.entry.data.title).toBe(entry.data.title);
 
       const row = await prisma.webhookDelivery.findFirstOrThrow({
@@ -309,7 +313,10 @@ describe('Webhook delivery E2E', async () => {
       await fetch(`/api/content-entries/${entry.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Cookie: cookie },
-        body: JSON.stringify({ status: 'PUBLISHED', data: entry.data }),
+        body: JSON.stringify({
+          status: CONTENT_STATUSES.PUBLISHED,
+          data: entry.data,
+        }),
       });
       await fetch(`/api/content-entries/${entry.id}/unpublish`, {
         method: 'POST',
@@ -324,7 +331,7 @@ describe('Webhook delivery E2E', async () => {
         entry: { status: string; data: { title: string } };
       };
       expect(parsed.event).toBe('ENTRY_UNPUBLISHED');
-      expect(parsed.entry.status).toBe('PUBLISHED'); // snapshot of pre-demotion state
+      expect(parsed.entry.status).toBe(CONTENT_STATUSES.PUBLISHED); // snapshot of pre-demotion state
       expect(parsed.entry.data.title).toBe(entry.data.title);
     } finally {
       server.close();

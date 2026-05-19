@@ -1,12 +1,10 @@
 import type { Prisma, ContentEntryVersion } from '#prisma';
 import { isCmsRequest, getVersionForContext } from '../utils/resolveVersion';
-
-const VALID_STATUSES = new Set<string>([
-  'DRAFT',
-  'PUBLISHED',
-  'CHANGED',
-  'ARCHIVED',
-]);
+import {
+  CONTENT_STATUSES,
+  CONTENT_STATUSES_SET,
+  type ContentStatusName,
+} from '../../utils/contentStatus';
 
 const VALID_ARCHIVE_FILTERS = ['active', 'archived', 'all'] as const;
 type ArchiveFilter = (typeof VALID_ARCHIVE_FILTERS)[number];
@@ -41,24 +39,25 @@ export default defineEventHandler(async (event) => {
   if (isCms) {
     // CMS: filter by status on versions if requested
     const status =
-      typeof query.status === 'string' && VALID_STATUSES.has(query.status)
-        ? query.status
+      typeof query.status === 'string' &&
+      CONTENT_STATUSES_SET.has(query.status as ContentStatusName)
+        ? (query.status as ContentStatusName)
         : null;
     if (status) {
       where.versions = {
         some: {
-          status: status as 'DRAFT' | 'PUBLISHED' | 'CHANGED' | 'ARCHIVED',
+          status,
         },
       };
     } else if (archiveFilter === 'archived') {
-      where.versions = { some: { status: 'ARCHIVED' } };
+      where.versions = { some: { status: CONTENT_STATUSES.ARCHIVED } };
     } else if (archiveFilter === 'active') {
-      where.versions = { none: { status: 'ARCHIVED' } };
+      where.versions = { none: { status: CONTENT_STATUSES.ARCHIVED } };
     }
     // 'all': leave where.versions alone
   } else {
     // API key: only show entries with a PUBLISHED version
-    where.versions = { some: { status: 'PUBLISHED' } };
+    where.versions = { some: { status: CONTENT_STATUSES.PUBLISHED } };
   }
 
   const [rows, total] = await Promise.all([
@@ -79,11 +78,15 @@ export default defineEventHandler(async (event) => {
     .map((r) => {
       let version: ContentEntryVersion | undefined;
       if (isCms && archiveFilter === 'archived') {
-        version = r.versions.find((v) => v.status === 'ARCHIVED');
+        version = r.versions.find(
+          (v) => v.status === CONTENT_STATUSES.ARCHIVED
+        );
       } else {
         version = getVersionForContext(r.versions, isCms) ?? undefined;
         if (!version && isCms && archiveFilter === 'all') {
-          version = r.versions.find((v) => v.status === 'ARCHIVED');
+          version = r.versions.find(
+            (v) => v.status === CONTENT_STATUSES.ARCHIVED
+          );
         }
       }
       if (!version) return null;

@@ -3,6 +3,7 @@ import { setup, $fetch, fetch } from '@nuxt/test-utils/e2e';
 import { TEST_USERNAME, TEST_PASSWORD } from '../../test/credentials';
 import { getTestDatabaseUrl } from '../../../test/dbUrl';
 import { FIELD_TYPES } from '../../../utils/fieldTypes';
+import { CONTENT_STATUSES } from '../../../utils/contentStatus';
 
 const TEST_API_KEY = 'boject_test_key_for_integration_tests_only';
 
@@ -128,7 +129,7 @@ describe('GraphQL API', async () => {
           featured: true,
           category: 'community',
         },
-        status: 'PUBLISHED',
+        status: CONTENT_STATUSES.PUBLISHED,
       },
     });
     blogEntryIds.push(a.id);
@@ -146,7 +147,7 @@ describe('GraphQL API', async () => {
           featured: false,
           category: 'news',
         },
-        status: 'PUBLISHED',
+        status: CONTENT_STATUSES.PUBLISHED,
       },
     });
     blogEntryIds.push(b.id);
@@ -258,7 +259,7 @@ describe('GraphQL API', async () => {
       const node = data.blogPostList.edges[0]!.node;
       expect(node.contentType).toBe('BlogPost');
       expect(node.title).toBeTruthy();
-      expect(node.status).toBe('PUBLISHED');
+      expect(node.status).toBe(CONTENT_STATUSES.PUBLISHED);
     });
 
     it('fetches a single dynamic entry by ID', async () => {
@@ -337,7 +338,7 @@ describe('GraphQL API', async () => {
       }`);
       expect(data.blogPostList.edges.length).toBe(2);
       data.blogPostList.edges.forEach((edge) => {
-        expect(edge.node.status).toBe('PUBLISHED');
+        expect(edge.node.status).toBe(CONTENT_STATUSES.PUBLISHED);
       });
     });
 
@@ -468,7 +469,7 @@ describe('GraphQL API', async () => {
         body: {
           contentTypeId: tagTypeId,
           data: { name: 'GraphQL', slug: 'graphql' },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         },
       });
       tagEntryId = tag1.id;
@@ -479,7 +480,7 @@ describe('GraphQL API', async () => {
         body: {
           contentTypeId: tagTypeId,
           data: { name: 'TypeScript', slug: 'typescript' },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         },
       });
 
@@ -496,7 +497,7 @@ describe('GraphQL API', async () => {
               { contentTypeId: tagTypeId, entryId: tag2.id },
             ],
           },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         },
       });
       postEntryId = post.id;
@@ -638,7 +639,7 @@ describe('GraphQL API', async () => {
         body: {
           contentTypeId: created.id,
           data: { title: 'Test', description: 'A description' },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         },
       });
 
@@ -751,7 +752,7 @@ describe('GraphQL API', async () => {
         }
       }`);
       data.contentEntryList.edges.forEach((edge) => {
-        expect(edge.node.status).toBe('PUBLISHED');
+        expect(edge.node.status).toBe(CONTENT_STATUSES.PUBLISHED);
       });
     });
   });
@@ -771,7 +772,7 @@ describe('GraphQL API', async () => {
             slug: `gql-draft-${Date.now()}`,
             summary: 'Should be invisible',
           },
-          status: 'DRAFT',
+          status: CONTENT_STATUSES.DRAFT,
         },
       });
 
@@ -803,7 +804,7 @@ describe('GraphQL API', async () => {
             slug: `gql-version-${ts}`,
             summary: 'Original published',
           },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         },
       });
 
@@ -838,7 +839,7 @@ describe('GraphQL API', async () => {
       await $fetch(`/api/content-entries/${entry.id}`, {
         method: 'PUT',
         headers: { cookie },
-        body: { status: 'PUBLISHED' },
+        body: { status: CONTENT_STATUSES.PUBLISHED },
       });
 
       // GraphQL should now serve the updated content
@@ -917,7 +918,7 @@ describe('GraphQL API', async () => {
         body: {
           contentTypeId: tagTypeId,
           data: { title: 'News', slug: 'news' },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         },
       });
       tag1Id = tag1.id;
@@ -927,7 +928,7 @@ describe('GraphQL API', async () => {
         body: {
           contentTypeId: tagTypeId,
           data: { title: 'Sport', slug: 'sport' },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         },
       });
       tag2Id = tag2.id;
@@ -996,7 +997,7 @@ describe('GraphQL API', async () => {
               ],
             },
           },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         },
       });
       articleEntryId = article.id;
@@ -1068,7 +1069,7 @@ describe('GraphQL API', async () => {
               ],
             },
           },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         },
       });
 
@@ -1128,7 +1129,7 @@ describe('GraphQL API', async () => {
               ],
             },
           },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         },
       });
 
@@ -1219,7 +1220,7 @@ describe('GraphQL API', async () => {
               ],
             },
           },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         },
       });
 
@@ -1312,7 +1313,7 @@ describe('GraphQL API', async () => {
         body: {
           contentTypeId: other.id,
           data: { title: 'Other' },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         },
       });
 
@@ -1490,7 +1491,7 @@ describe('GraphQL API', async () => {
         body: {
           contentTypeId: teamTypeId,
           data: { name: 'Team A' },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         },
       });
       teamA = ta.id;
@@ -1500,7 +1501,7 @@ describe('GraphQL API', async () => {
         body: {
           contentTypeId: teamTypeId,
           data: { name: 'Team B' },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         },
       });
       teamB = tb.id;
@@ -1510,7 +1511,7 @@ describe('GraphQL API', async () => {
         body: {
           contentTypeId: tagTypeId,
           data: { name: 'X' },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         },
       });
       tagX = tx.id;
@@ -1520,7 +1521,7 @@ describe('GraphQL API', async () => {
         body: {
           contentTypeId: tagTypeId,
           data: { name: 'Y' },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         },
       });
       tagY = ty.id;
@@ -1534,7 +1535,7 @@ describe('GraphQL API', async () => {
             name: 'P-OnA',
             team: { contentTypeId: teamTypeId, entryId: teamA },
           },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         },
       });
       playerOnA = pA.id;
@@ -1547,7 +1548,7 @@ describe('GraphQL API', async () => {
             name: 'P-OnB',
             team: { contentTypeId: teamTypeId, entryId: teamB },
           },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         },
       });
       playerOnB = pB.id;
@@ -1557,7 +1558,7 @@ describe('GraphQL API', async () => {
         body: {
           contentTypeId: playerTypeId,
           data: { name: 'P-Unassigned' },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         },
       });
       unassignedPlayer = pU.id;
@@ -1574,7 +1575,7 @@ describe('GraphQL API', async () => {
               { contentTypeId: tagTypeId, entryId: tagY },
             ],
           },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         },
       });
       articleTaggedXY = aXY.id;
@@ -1587,7 +1588,7 @@ describe('GraphQL API', async () => {
             title: 'A-X',
             tags: [{ contentTypeId: tagTypeId, entryId: tagX }],
           },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         },
       });
       articleTaggedX = aX.id;
@@ -1597,7 +1598,7 @@ describe('GraphQL API', async () => {
         body: {
           contentTypeId: articleTypeId,
           data: { title: 'A-U' },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         },
       });
       articleUntagged = aU.id;
@@ -1963,7 +1964,7 @@ describe('GraphQL API', async () => {
         body: {
           contentTypeId: teamTypeId,
           data: { name: 'Team A 2', slug: 'team-a' },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         },
       });
       teamA = ta.id;
@@ -1973,7 +1974,7 @@ describe('GraphQL API', async () => {
         body: {
           contentTypeId: teamTypeId,
           data: { name: 'Team B 2', slug: 'team-b' },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         },
       });
       teamB = tb.id;
@@ -1983,7 +1984,7 @@ describe('GraphQL API', async () => {
         body: {
           contentTypeId: tagTypeId,
           data: { name: 'Rugby', slug: 'rugby' },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         },
       });
       tagX = tx.id;
@@ -1993,7 +1994,7 @@ describe('GraphQL API', async () => {
         body: {
           contentTypeId: tagTypeId,
           data: { name: 'Football', slug: 'football' },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         },
       });
       tagY = ty.id;
@@ -2007,7 +2008,7 @@ describe('GraphQL API', async () => {
             name: 'P2-OnA',
             team: { contentTypeId: teamTypeId, entryId: teamA },
           },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         },
       });
       playerOnA = pA.id;
@@ -2020,7 +2021,7 @@ describe('GraphQL API', async () => {
             name: 'P2-OnB',
             team: { contentTypeId: teamTypeId, entryId: teamB },
           },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         },
       });
       playerOnB = pB.id;
@@ -2037,7 +2038,7 @@ describe('GraphQL API', async () => {
               { contentTypeId: tagTypeId, entryId: tagY },
             ],
           },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         },
       });
       articleTaggedXY = aXY.id;
@@ -2050,7 +2051,7 @@ describe('GraphQL API', async () => {
             title: 'A2-X',
             tags: [{ contentTypeId: tagTypeId, entryId: tagX }],
           },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         },
       });
       articleTaggedX = aX.id;
@@ -2376,7 +2377,7 @@ describe('GraphQL API', async () => {
               focalPointY: 0.75,
             },
           },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         },
       });
       imageEntryId = withImage.id;
@@ -2403,7 +2404,7 @@ describe('GraphQL API', async () => {
                 focalPointY: 0.5,
               },
             },
-            status: 'PUBLISHED',
+            status: CONTENT_STATUSES.PUBLISHED,
           },
         }
       );
@@ -2545,7 +2546,7 @@ describe('GraphQL API', async () => {
         body: {
           contentTypeId: created.id,
           data: { title: 'GraphQL Read' },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         },
       });
 
@@ -2606,7 +2607,7 @@ describe('GraphQL API', async () => {
         body: {
           contentTypeId: created.id,
           data: { title: 'Alpha' },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         },
       });
       const beta = await $fetch<{ id: string }>('/api/content-entries', {
@@ -2615,7 +2616,7 @@ describe('GraphQL API', async () => {
         body: {
           contentTypeId: created.id,
           data: { title: 'Beta' },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         },
       });
 
@@ -2667,7 +2668,7 @@ describe('GraphQL API', async () => {
         body: {
           contentTypeId: created.id,
           data: { title: 'X One' },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         },
       });
       const e2 = await $fetch<{ id: string }>('/api/content-entries', {
@@ -2676,7 +2677,7 @@ describe('GraphQL API', async () => {
         body: {
           contentTypeId: created.id,
           data: { title: 'X Two' },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         },
       });
       const e3 = await $fetch<{ id: string }>('/api/content-entries', {
@@ -2685,7 +2686,7 @@ describe('GraphQL API', async () => {
         body: {
           contentTypeId: created.id,
           data: { title: 'X Three' },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         },
       });
 
@@ -2737,7 +2738,7 @@ describe('GraphQL API', async () => {
         body: {
           contentTypeId: created.id,
           data: { title: 'Look Me Up' },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         },
       });
 

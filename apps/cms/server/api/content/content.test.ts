@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { setup, $fetch, fetch } from '@nuxt/test-utils/e2e';
 import { TEST_USERNAME, TEST_PASSWORD } from '../../test/credentials';
 import { FIELD_TYPES } from '../../../utils/fieldTypes';
+import { CONTENT_STATUSES } from '../../../utils/contentStatus';
 
 const TEST_API_KEY = 'boject_test_key_for_integration_tests_only';
 
@@ -129,7 +130,7 @@ describe('Content API filters', async () => {
       body: {
         contentTypeId: blogPostType.id,
         data: { title: `Published Blog 1 ${Date.now()}` },
-        status: 'PUBLISHED',
+        status: CONTENT_STATUSES.PUBLISHED,
       },
     });
     await $fetch<EntryResponse>('/api/content-entries', {
@@ -138,7 +139,7 @@ describe('Content API filters', async () => {
       body: {
         contentTypeId: blogPostType.id,
         data: { title: `Published Blog 2 ${Date.now()}` },
-        status: 'PUBLISHED',
+        status: CONTENT_STATUSES.PUBLISHED,
       },
     });
     await $fetch<EntryResponse>('/api/content-entries', {
@@ -147,7 +148,7 @@ describe('Content API filters', async () => {
       body: {
         contentTypeId: blogPostType.id,
         data: { title: `Draft Blog ${Date.now()}` },
-        status: 'DRAFT',
+        status: CONTENT_STATUSES.DRAFT,
       },
     });
 
@@ -158,7 +159,7 @@ describe('Content API filters', async () => {
       body: {
         contentTypeId: secondType.id,
         data: { title: `Published News ${Date.now()}` },
-        status: 'PUBLISHED',
+        status: CONTENT_STATUSES.PUBLISHED,
       },
     });
   });
@@ -177,7 +178,7 @@ describe('Content API filters', async () => {
       body: {
         contentTypeId: blogPostType.id,
         data: { title },
-        status: 'PUBLISHED',
+        status: CONTENT_STATUSES.PUBLISHED,
       },
     });
 
@@ -203,7 +204,9 @@ describe('Content API filters', async () => {
     const { items, total } = await getContent({ perPage: 50 });
     expect(total).toBeGreaterThanOrEqual(3);
     expect(items.length).toBeGreaterThanOrEqual(3);
-    expect(items.every((i) => i.status === 'PUBLISHED')).toBe(true);
+    expect(items.every((i) => i.status === CONTENT_STATUSES.PUBLISHED)).toBe(
+      true
+    );
     expect(items[0]).toHaveProperty('contentType');
     expect(items[0]).toHaveProperty('contentTypeId');
     expect(items[0]).toHaveProperty('entryTitle');
@@ -241,7 +244,9 @@ describe('Content API filters', async () => {
       expect(items.every((i) => i.contentType === blogPostType.name)).toBe(
         true
       );
-      expect(items.every((i) => i.status === 'PUBLISHED')).toBe(true);
+      expect(items.every((i) => i.status === CONTENT_STATUSES.PUBLISHED)).toBe(
+        true
+      );
     });
 
     it('filters by dynamic identifier (session sees all)', async () => {
@@ -272,11 +277,13 @@ describe('Content API filters', async () => {
   describe('status filter', () => {
     it('filters by status=PUBLISHED and all items have a string contentType', async () => {
       const { items, total } = await getContent({
-        status: 'PUBLISHED',
+        status: CONTENT_STATUSES.PUBLISHED,
         perPage: 100,
       });
       expect(total).toBeGreaterThanOrEqual(3);
-      expect(items.every((i) => i.status === 'PUBLISHED')).toBe(true);
+      expect(items.every((i) => i.status === CONTENT_STATUSES.PUBLISHED)).toBe(
+        true
+      );
       expect(items.every((i) => typeof i.contentType === 'string')).toBe(true);
       expect(
         items.every(
@@ -290,11 +297,13 @@ describe('Content API filters', async () => {
       // API key only sees PUBLISHED, so DRAFT filter via API key returns empty.
       // Use session auth to verify DRAFT filter works.
       const { items } = await getContent(
-        { status: 'DRAFT', perPage: 100 },
+        { status: CONTENT_STATUSES.DRAFT, perPage: 100 },
         'session'
       );
       expect(items.length).toBeGreaterThanOrEqual(1);
-      expect(items.every((i) => i.status === 'DRAFT')).toBe(true);
+      expect(items.every((i) => i.status === CONTENT_STATUSES.DRAFT)).toBe(
+        true
+      );
     });
 
     it('API key ignores invalid status values and returns only published', async () => {
@@ -304,7 +313,9 @@ describe('Content API filters', async () => {
       });
       // API key sees only published entries; invalid status is ignored
       expect(total).toBeGreaterThanOrEqual(3);
-      expect(items.every((i) => i.status === 'PUBLISHED')).toBe(true);
+      expect(items.every((i) => i.status === CONTENT_STATUSES.PUBLISHED)).toBe(
+        true
+      );
     });
   });
 
@@ -314,12 +325,14 @@ describe('Content API filters', async () => {
     it('filters by contentType and status together', async () => {
       const { items, total } = await getContent({
         contentType: blogPostType.identifier,
-        status: 'PUBLISHED',
+        status: CONTENT_STATUSES.PUBLISHED,
       });
       expect(total).toBeGreaterThanOrEqual(2);
       expect(
         items.every(
-          (i) => i.contentType === blogPostType.name && i.status === 'PUBLISHED'
+          (i) =>
+            i.contentType === blogPostType.name &&
+            i.status === CONTENT_STATUSES.PUBLISHED
         )
       ).toBe(true);
     });
@@ -329,13 +342,15 @@ describe('Content API filters', async () => {
       const { items } = await getContent(
         {
           contentType: blogPostType.identifier,
-          status: 'DRAFT',
+          status: CONTENT_STATUSES.DRAFT,
         },
         'session'
       );
       expect(
         items.every(
-          (i) => i.contentType === blogPostType.name && i.status === 'DRAFT'
+          (i) =>
+            i.contentType === blogPostType.name &&
+            i.status === CONTENT_STATUSES.DRAFT
         )
       ).toBe(true);
     });

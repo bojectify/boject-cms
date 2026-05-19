@@ -1,5 +1,9 @@
 import type { MaybeRefOrGetter } from 'vue';
 import { slugify } from '~/utils/slugify';
+import {
+  CONTENT_STATUSES,
+  type ContentStatusName,
+} from '~/utils/contentStatus';
 
 export function useContentEntryEditor(
   contentTypeId: MaybeRefOrGetter<string>,
@@ -41,7 +45,7 @@ export function useContentEntryEditor(
   const isSaving = ref(false);
   const saveError = ref<string | null>(null);
   const fieldErrors = ref<Record<string, string>>({});
-  const status = ref<'DRAFT' | 'PUBLISHED' | 'CHANGED' | 'ARCHIVED'>('DRAFT');
+  const status = ref<ContentStatusName>(CONTENT_STATUSES.DRAFT);
   const hasPublishedVersion = ref(false);
   const hasArchivedVersion = ref(false);
   const publishedAt = ref<string | null>(null);
@@ -75,8 +79,7 @@ export function useContentEntryEditor(
         }
         Object.assign(formState, data);
         status.value =
-          (val.status as 'DRAFT' | 'PUBLISHED' | 'CHANGED' | 'ARCHIVED') ??
-          'DRAFT';
+          (val.status as ContentStatusName) ?? CONTENT_STATUSES.DRAFT;
         hasPublishedVersion.value =
           (val.hasPublishedVersion as boolean) ?? false;
         hasArchivedVersion.value = (val.hasArchivedVersion as boolean) ?? false;
@@ -155,7 +158,7 @@ export function useContentEntryEditor(
           body: {
             contentTypeId: contentTypeIdRef.value,
             data,
-            status: 'PUBLISHED',
+            status: CONTENT_STATUSES.PUBLISHED,
           },
         });
         toast.add({
@@ -167,7 +170,7 @@ export function useContentEntryEditor(
       } else {
         await $fetch(`/api/content-entries/${entryIdRef.value}`, {
           method: 'PUT',
-          body: { data, status: 'PUBLISHED' },
+          body: { data, status: CONTENT_STATUSES.PUBLISHED },
         });
         await refresh();
         takeSnapshot();

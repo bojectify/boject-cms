@@ -29,6 +29,7 @@ import {
 import { generateImage } from './valueGen/image.js';
 import { slugify } from '../vendor/slugify.js';
 import { FIELD_TYPES } from '../vendor/fieldTypes.js';
+import { CONTENT_STATUSES } from '../vendor/contentStatus.js';
 
 export interface GenerateOptions {
   contentTypeIdentifier: string;
@@ -199,7 +200,7 @@ export function generatePerfData(
         slug: slugForEnvelope ?? null,
         versions: [
           {
-            status: 'PUBLISHED',
+            status: CONTENT_STATUSES.PUBLISHED,
             data,
             publishedAt: publishedAtIso,
           },

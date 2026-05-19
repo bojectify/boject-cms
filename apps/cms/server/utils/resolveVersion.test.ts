@@ -4,6 +4,8 @@ import {
   getPublishedVersion,
   getVersionForContext,
 } from './resolveVersion';
+import type { ContentStatusName } from '../../utils/contentStatus';
+import { CONTENT_STATUSES } from '../../utils/contentStatus';
 
 const makeVersion = (
   status: string,
@@ -13,8 +15,8 @@ const makeVersion = (
   entryId: 'entry-1',
   data: {},
   entryTitle: 'Test',
-  status: status as 'DRAFT' | 'PUBLISHED' | 'CHANGED' | 'ARCHIVED',
-  publishedAt: status === 'PUBLISHED' ? new Date() : null,
+  status: status as ContentStatusName,
+  publishedAt: status === CONTENT_STATUSES.PUBLISHED ? new Date() : null,
   createdBy: null,
   updatedBy: null,
   createdAt: new Date(),
@@ -24,51 +26,74 @@ const makeVersion = (
 
 describe('getDraftVersion', () => {
   it('returns CHANGED over DRAFT', () => {
-    const versions = [makeVersion('DRAFT'), makeVersion('CHANGED')];
-    expect(getDraftVersion(versions)?.status).toBe('CHANGED');
+    const versions = [
+      makeVersion(CONTENT_STATUSES.DRAFT),
+      makeVersion(CONTENT_STATUSES.CHANGED),
+    ];
+    expect(getDraftVersion(versions)?.status).toBe(CONTENT_STATUSES.CHANGED);
   });
 
   it('returns DRAFT when no CHANGED', () => {
-    const versions = [makeVersion('DRAFT'), makeVersion('PUBLISHED')];
-    expect(getDraftVersion(versions)?.status).toBe('DRAFT');
+    const versions = [
+      makeVersion(CONTENT_STATUSES.DRAFT),
+      makeVersion(CONTENT_STATUSES.PUBLISHED),
+    ];
+    expect(getDraftVersion(versions)?.status).toBe(CONTENT_STATUSES.DRAFT);
   });
 
   it('returns null when no draft versions', () => {
-    const versions = [makeVersion('PUBLISHED')];
+    const versions = [makeVersion(CONTENT_STATUSES.PUBLISHED)];
     expect(getDraftVersion(versions)).toBeNull();
   });
 });
 
 describe('getPublishedVersion', () => {
   it('returns PUBLISHED version', () => {
-    const versions = [makeVersion('DRAFT'), makeVersion('PUBLISHED')];
-    expect(getPublishedVersion(versions)?.status).toBe('PUBLISHED');
+    const versions = [
+      makeVersion(CONTENT_STATUSES.DRAFT),
+      makeVersion(CONTENT_STATUSES.PUBLISHED),
+    ];
+    expect(getPublishedVersion(versions)?.status).toBe(
+      CONTENT_STATUSES.PUBLISHED
+    );
   });
 
   it('returns null when no PUBLISHED', () => {
-    const versions = [makeVersion('DRAFT')];
+    const versions = [makeVersion(CONTENT_STATUSES.DRAFT)];
     expect(getPublishedVersion(versions)).toBeNull();
   });
 });
 
 describe('getVersionForContext', () => {
   it('CMS: returns draft version, fallback to published', () => {
-    const versions = [makeVersion('CHANGED'), makeVersion('PUBLISHED')];
-    expect(getVersionForContext(versions, true)?.status).toBe('CHANGED');
+    const versions = [
+      makeVersion(CONTENT_STATUSES.CHANGED),
+      makeVersion(CONTENT_STATUSES.PUBLISHED),
+    ];
+    expect(getVersionForContext(versions, true)?.status).toBe(
+      CONTENT_STATUSES.CHANGED
+    );
   });
 
   it('CMS: returns published when no draft', () => {
-    const versions = [makeVersion('PUBLISHED')];
-    expect(getVersionForContext(versions, true)?.status).toBe('PUBLISHED');
+    const versions = [makeVersion(CONTENT_STATUSES.PUBLISHED)];
+    expect(getVersionForContext(versions, true)?.status).toBe(
+      CONTENT_STATUSES.PUBLISHED
+    );
   });
 
   it('external: returns published only', () => {
-    const versions = [makeVersion('CHANGED'), makeVersion('PUBLISHED')];
-    expect(getVersionForContext(versions, false)?.status).toBe('PUBLISHED');
+    const versions = [
+      makeVersion(CONTENT_STATUSES.CHANGED),
+      makeVersion(CONTENT_STATUSES.PUBLISHED),
+    ];
+    expect(getVersionForContext(versions, false)?.status).toBe(
+      CONTENT_STATUSES.PUBLISHED
+    );
   });
 
   it('external: returns null when no published', () => {
-    const versions = [makeVersion('DRAFT')];
+    const versions = [makeVersion(CONTENT_STATUSES.DRAFT)];
     expect(getVersionForContext(versions, false)).toBeNull();
   });
 });

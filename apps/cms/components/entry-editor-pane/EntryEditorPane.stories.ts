@@ -8,6 +8,7 @@ import {
 } from '~/composables/paneOrchestrator';
 import EntryEditorPane from './EntryEditorPane.vue';
 import { FIELD_TYPES } from '../../utils/fieldTypes';
+import { CONTENT_STATUSES } from '../../utils/contentStatus';
 
 // Story fixtures use real UUIDs because parseFieldOptions validates via zod
 const CT_AUTHOR_UUID = '11111111-1111-4111-8111-111111111111';
@@ -54,7 +55,7 @@ const meta: Meta<typeof EntryEditorPane> = {
                 },
               ],
             },
-            status: 'DRAFT',
+            status: CONTENT_STATUSES.DRAFT,
             data: { title: 'Ada Lovelace' },
             publishedAt: null,
             createdAt: '2026-04-21T00:00:00.000Z',
@@ -240,7 +241,7 @@ export const OpensRelationAtDepth: Story = {
                 },
               ],
             },
-            status: 'DRAFT',
+            status: CONTENT_STATUSES.DRAFT,
             data: {
               title: 'Intro to Vue',
               author: { contentTypeId: CT_AUTHOR_UUID, entryId: 'a1' },
@@ -327,7 +328,7 @@ export const EmitsSavedOnPublish: Story = {
           HttpResponse.json({
             id: 'new-tag-1',
             contentTypeId: CT_TAG_UUID,
-            status: 'DRAFT',
+            status: CONTENT_STATUSES.DRAFT,
             data: { title: 'TypeScript' },
           })
         ),
@@ -467,7 +468,7 @@ function buildDemoEntryResponse(entryId: string) {
     contentTypeId: entry.contentTypeId,
     contentType,
     entryTitle: entry.title,
-    status: 'DRAFT',
+    status: CONTENT_STATUSES.DRAFT,
     data,
     publishedAt: null,
     createdAt: '2026-04-21T00:00:00.000Z',

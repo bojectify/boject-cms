@@ -7,6 +7,7 @@ import { TEST_USERNAME, TEST_PASSWORD } from '../../test/credentials';
 import { resetRateLimitStore } from '../../utils/rateLimit';
 import { getTestDatabaseUrl } from '../../../test/dbUrl';
 import { FIELD_TYPES } from '../../../utils/fieldTypes';
+import { CONTENT_STATUSES } from '../../../utils/contentStatus';
 
 const prismaUrl = getTestDatabaseUrl();
 const prismaAdapter = new PrismaPg({ connectionString: prismaUrl });
@@ -200,7 +201,7 @@ describe('Content Entry endpoints', async () => {
       expect(body.data.featured).toBe(true);
       expect(body.data.category).toBe('news');
       expect(body.slug).toBe('first-entry');
-      expect(body.status).toBe('DRAFT');
+      expect(body.status).toBe(CONTENT_STATUSES.DRAFT);
       expect(body.publishedAt).toBeNull();
     });
 
@@ -309,7 +310,7 @@ describe('Content Entry endpoints', async () => {
           body: {
             contentTypeId: testContentType.id,
             data: { title: 'Hello entryTitle', summary: 'x' },
-            status: 'DRAFT',
+            status: CONTENT_STATUSES.DRAFT,
           },
           headers: { cookie },
         }
@@ -324,7 +325,7 @@ describe('Content Entry endpoints', async () => {
         body: {
           contentTypeId: testContentType.id,
           data: { title: 'Unique Title', summary: 'x' },
-          status: 'DRAFT',
+          status: CONTENT_STATUSES.DRAFT,
         },
         headers: { cookie },
       });
@@ -335,7 +336,7 @@ describe('Content Entry endpoints', async () => {
           body: {
             contentTypeId: testContentType.id,
             data: { title: 'Unique Title', summary: 'x' },
-            status: 'DRAFT',
+            status: CONTENT_STATUSES.DRAFT,
           },
           headers: { cookie },
         })
@@ -349,7 +350,7 @@ describe('Content Entry endpoints', async () => {
         body: {
           contentTypeId: testContentType.id,
           data: { title: 'Original', summary: 'x' },
-          status: 'DRAFT',
+          status: CONTENT_STATUSES.DRAFT,
         },
         headers: { cookie },
       });
@@ -415,7 +416,7 @@ describe('Content Entry endpoints', async () => {
         body: JSON.stringify({
           contentTypeId: testContentType.id,
           data: { title },
-          status: 'DRAFT',
+          status: CONTENT_STATUSES.DRAFT,
         }),
       });
       expect(res.status).toBe(201);
@@ -442,7 +443,7 @@ describe('Content Entry endpoints', async () => {
         body: JSON.stringify({
           contentTypeId: testContentType.id,
           data: { title: firstTitle },
-          status: 'DRAFT',
+          status: CONTENT_STATUSES.DRAFT,
         }),
       });
       expect(first.status).toBe(201);
@@ -457,7 +458,7 @@ describe('Content Entry endpoints', async () => {
         body: JSON.stringify({
           contentTypeId: testContentType.id,
           data: { title: secondTitle },
-          status: 'DRAFT',
+          status: CONTENT_STATUSES.DRAFT,
         }),
       });
 
@@ -486,7 +487,7 @@ describe('Content Entry endpoints', async () => {
         body: JSON.stringify({
           contentTypeId: testContentType.id,
           data: { title: '!!!' },
-          status: 'DRAFT',
+          status: CONTENT_STATUSES.DRAFT,
         }),
       });
 
@@ -514,7 +515,7 @@ describe('Content Entry endpoints', async () => {
         body: JSON.stringify({
           contentTypeId: testContentType.id,
           data: { title: originalTitle },
-          status: 'DRAFT',
+          status: CONTENT_STATUSES.DRAFT,
         }),
       });
       expect(createRes.status).toBe(201);
@@ -572,7 +573,7 @@ describe('Content Entry endpoints', async () => {
         body: JSON.stringify({
           contentTypeId: testContentType.id,
           data: { title },
-          status: 'DRAFT',
+          status: CONTENT_STATUSES.DRAFT,
         }),
       });
       expect(createRes.status).toBe(201);
@@ -589,7 +590,7 @@ describe('Content Entry endpoints', async () => {
           'X-Forwarded-For': '203.0.113.188',
         },
         body: JSON.stringify({
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
           data: { title },
         }),
       });
@@ -648,7 +649,7 @@ describe('Content Entry endpoints', async () => {
         body: JSON.stringify({
           contentTypeId: testContentType.id,
           data: { title },
-          status: 'DRAFT',
+          status: CONTENT_STATUSES.DRAFT,
         }),
       });
       expect(createRes.status).toBe(201);
@@ -680,7 +681,7 @@ describe('Content Entry endpoints', async () => {
         body: JSON.stringify({
           contentTypeId: testContentType.id,
           data: { title },
-          status: 'DRAFT',
+          status: CONTENT_STATUSES.DRAFT,
         }),
       });
       expect(createRes.status).toBe(201);
@@ -838,7 +839,7 @@ describe('Content Entry endpoints', async () => {
         },
         body: JSON.stringify({
           data: { title: 'Updated by API key' },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         }),
       });
       expect(res.status).toBe(200);
@@ -996,7 +997,7 @@ describe('Content Entry endpoints', async () => {
         },
         body: JSON.stringify({
           data: { title },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         }),
       });
       // Update (creates a CHANGED draft)
@@ -1082,7 +1083,7 @@ describe('Content Entry endpoints', async () => {
         },
         body: JSON.stringify({
           data: { title: 'Archive target' },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         }),
       });
       return created.id;
@@ -1157,7 +1158,7 @@ describe('Content Entry endpoints', async () => {
         },
         body: JSON.stringify({
           data: { title: 'Unarchive target' },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         }),
       });
       await fetch(`/api/content-entries/${created.id}/archive`, {
@@ -1238,7 +1239,7 @@ describe('Content Entry endpoints', async () => {
         },
         body: JSON.stringify({
           data: { title },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         }),
       });
       return created.id;
@@ -1318,7 +1319,7 @@ describe('Content Entry endpoints', async () => {
             title: `API Key Visible ${Date.now()}`,
             slug: `api-key-visible-${Date.now()}`,
           },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         },
       });
 
@@ -1329,7 +1330,9 @@ describe('Content Entry endpoints', async () => {
         }
       );
       expect(items.length).toBeGreaterThanOrEqual(1);
-      expect(items.every((i) => i.status === 'PUBLISHED')).toBe(true);
+      expect(items.every((i) => i.status === CONTENT_STATUSES.PUBLISHED)).toBe(
+        true
+      );
     });
 
     it('requires contentTypeId (400)', async () => {
@@ -1352,7 +1355,7 @@ describe('Content Entry endpoints', async () => {
             title: `Published Entry ${Date.now()}`,
             slug: `published-entry-${Date.now()}`,
           },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         },
       });
 
@@ -1363,7 +1366,9 @@ describe('Content Entry endpoints', async () => {
         }
       );
       expect(items.length).toBeGreaterThanOrEqual(1);
-      expect(items.every((i) => i.status === 'PUBLISHED')).toBe(true);
+      expect(items.every((i) => i.status === CONTENT_STATUSES.PUBLISHED)).toBe(
+        true
+      );
     });
   });
 
@@ -1399,7 +1404,7 @@ describe('Content Entry endpoints', async () => {
           data: { title: `Draft Only ${Date.now()}` },
         },
       });
-      expect(created.status).toBe('DRAFT');
+      expect(created.status).toBe(CONTENT_STATUSES.DRAFT);
 
       const res = await fetch(`/api/content-entries/${created.id}`, {
         headers: { Authorization: `Bearer ${TEST_API_KEY}` },
@@ -1415,7 +1420,7 @@ describe('Content Entry endpoints', async () => {
         body: {
           contentTypeId: testContentType.id,
           data: { title: `Published For API ${Date.now()}` },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         },
       });
 
@@ -1426,7 +1431,7 @@ describe('Content Entry endpoints', async () => {
         }
       );
       expect(entry.id).toBe(created.id);
-      expect(entry.status).toBe('PUBLISHED');
+      expect(entry.status).toBe(CONTENT_STATUSES.PUBLISHED);
     });
 
     it('returns 404 for unknown id', async () => {
@@ -1500,10 +1505,10 @@ describe('Content Entry endpoints', async () => {
         {
           method: 'PUT',
           headers: { cookie },
-          body: { status: 'PUBLISHED' },
+          body: { status: CONTENT_STATUSES.PUBLISHED },
         }
       );
-      expect(published.status).toBe('PUBLISHED');
+      expect(published.status).toBe(CONTENT_STATUSES.PUBLISHED);
       expect(published.publishedAt).not.toBeNull();
     });
   });
@@ -1783,7 +1788,7 @@ describe('Content Entry endpoints', async () => {
             title: 'IMAGE field test entry',
             hero: sampleImage,
           },
-          status: 'DRAFT',
+          status: CONTENT_STATUSES.DRAFT,
         },
       });
       expect(entry.data.hero).toEqual(sampleImage);
@@ -1877,10 +1882,10 @@ describe('Content Entry endpoints', async () => {
             title: `Version Test ${Date.now()}`,
             summary: 'Original',
           },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         },
       });
-      expect(created.status).toBe('PUBLISHED');
+      expect(created.status).toBe(CONTENT_STATUSES.PUBLISHED);
 
       // Save a draft edit (no status: 'PUBLISHED' in body)
       const updated = await $fetch<EntryResponse>(
@@ -1898,7 +1903,7 @@ describe('Content Entry endpoints', async () => {
       );
 
       // CMS session sees the draft version with CHANGED status
-      expect(updated.status).toBe('CHANGED');
+      expect(updated.status).toBe(CONTENT_STATUSES.CHANGED);
       expect(updated.data.summary).toBe('Edited draft');
     });
 
@@ -1913,7 +1918,7 @@ describe('Content Entry endpoints', async () => {
         body: {
           contentTypeId: testContentType.id,
           data: { title: `Promote Test ${ts}`, summary: 'Original' },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         },
       });
 
@@ -1932,11 +1937,11 @@ describe('Content Entry endpoints', async () => {
         {
           method: 'PUT',
           headers: { cookie },
-          body: { status: 'PUBLISHED' },
+          body: { status: CONTENT_STATUSES.PUBLISHED },
         }
       );
 
-      expect(published.status).toBe('PUBLISHED');
+      expect(published.status).toBe(CONTENT_STATUSES.PUBLISHED);
       expect(published.data.summary).toBe('Changed content');
 
       // API key should now see the updated content
@@ -1946,7 +1951,7 @@ describe('Content Entry endpoints', async () => {
           headers: { Authorization: `Bearer ${TEST_API_KEY}` },
         }
       );
-      expect(apiView.status).toBe('PUBLISHED');
+      expect(apiView.status).toBe(CONTENT_STATUSES.PUBLISHED);
       expect(apiView.data.summary).toBe('Changed content');
     });
 
@@ -1975,7 +1980,7 @@ describe('Content Entry endpoints', async () => {
       await $fetch(`/api/content-entries/${draft.id}`, {
         method: 'PUT',
         headers: { cookie },
-        body: { status: 'PUBLISHED' },
+        body: { status: CONTENT_STATUSES.PUBLISHED },
       });
 
       const fetchedPublished = await $fetch<
@@ -2009,7 +2014,7 @@ describe('Content Entry endpoints', async () => {
         {
           method: 'PUT',
           headers: { cookie },
-          body: { status: 'PUBLISHED' },
+          body: { status: CONTENT_STATUSES.PUBLISHED },
         }
       );
       expect(published.publishedVersionPublishedAt).not.toBeNull();
@@ -2030,7 +2035,7 @@ describe('Content Entry endpoints', async () => {
           },
         }
       );
-      expect(changed.status).toBe('CHANGED');
+      expect(changed.status).toBe(CONTENT_STATUSES.CHANGED);
       expect(changed.publishedVersionPublishedAt).toBe(originalPublishedAt);
     });
 
@@ -2043,7 +2048,7 @@ describe('Content Entry endpoints', async () => {
         body: {
           contentTypeId: testContentType.id,
           data: { title: `PubTS ApiKey ${Date.now()}` },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         },
       });
 
@@ -2092,7 +2097,7 @@ describe('Content Entry endpoints', async () => {
         body: {
           contentTypeId: testContentType.id,
           data: { title: `Discard Draft ${ts}`, summary: 'Published content' },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         },
       });
 
@@ -2113,7 +2118,7 @@ describe('Content Entry endpoints', async () => {
         `/api/content-entries/${created.id}`,
         { headers: { cookie } }
       );
-      expect(changed.status).toBe('CHANGED');
+      expect(changed.status).toBe(CONTENT_STATUSES.CHANGED);
 
       // Discard the draft
       const discarded = await $fetch<EntryResponse>(
@@ -2125,7 +2130,7 @@ describe('Content Entry endpoints', async () => {
       );
 
       // Should return the published version
-      expect(discarded.status).toBe('PUBLISHED');
+      expect(discarded.status).toBe(CONTENT_STATUSES.PUBLISHED);
       expect(discarded.data.summary).toBe('Published content');
     });
 
@@ -2139,7 +2144,7 @@ describe('Content Entry endpoints', async () => {
         body: {
           contentTypeId: testContentType.id,
           data: { title: `No Draft ${Date.now()}` },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         },
       });
 
@@ -2162,7 +2167,7 @@ describe('Content Entry endpoints', async () => {
           data: { title: `Only Version ${Date.now()}` },
         },
       });
-      expect(created.status).toBe('DRAFT');
+      expect(created.status).toBe(CONTENT_STATUSES.DRAFT);
 
       const res = await fetch(`/api/content-entries/${created.id}/draft`, {
         method: 'DELETE',
@@ -2334,7 +2339,7 @@ describe('Content Entry endpoints', async () => {
         body: {
           contentTypeId: ct.id,
           data: { title: `Draft A ${ts}`, sku: 'SKU-DRAFT' },
-          status: 'DRAFT',
+          status: CONTENT_STATUSES.DRAFT,
         },
       });
 
@@ -2344,7 +2349,7 @@ describe('Content Entry endpoints', async () => {
         body: JSON.stringify({
           contentTypeId: ct.id,
           data: { title: `Draft B ${ts}`, sku: 'SKU-DRAFT' },
-          status: 'DRAFT',
+          status: CONTENT_STATUSES.DRAFT,
         }),
       });
       expect(res.status).toBe(409);
@@ -2418,7 +2423,10 @@ describe('Content Entry endpoints', async () => {
       const publishRes = await fetch(`/api/content-entries/${created.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Cookie: cookie },
-        body: JSON.stringify({ status: 'PUBLISHED', data: created.data }),
+        body: JSON.stringify({
+          status: CONTENT_STATUSES.PUBLISHED,
+          data: created.data,
+        }),
       });
       expect(publishRes.status).toBe(200);
 
@@ -2446,7 +2454,7 @@ describe('Content Entry endpoints', async () => {
         };
       };
       expect(payload.event).toBe('ENTRY_PUBLISHED');
-      expect(payload.entry.status).toBe('PUBLISHED');
+      expect(payload.entry.status).toBe(CONTENT_STATUSES.PUBLISHED);
       expect(payload.entry.data.title).toBe(created.data.title);
       expect(payload.entry.publishedAt).not.toBeNull();
     });
@@ -2503,7 +2511,10 @@ describe('Content Entry endpoints', async () => {
       await fetch(`/api/content-entries/${created.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Cookie: cookie },
-        body: JSON.stringify({ status: 'PUBLISHED', data: created.data }),
+        body: JSON.stringify({
+          status: CONTENT_STATUSES.PUBLISHED,
+          data: created.data,
+        }),
       });
 
       const deliveries = await prisma.webhookDelivery.findMany({
@@ -2541,7 +2552,10 @@ describe('Content Entry endpoints', async () => {
       await fetch(`/api/content-entries/${created.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Cookie: cookie },
-        body: JSON.stringify({ status: 'PUBLISHED', data: created.data }),
+        body: JSON.stringify({
+          status: CONTENT_STATUSES.PUBLISHED,
+          data: created.data,
+        }),
       });
 
       const deliveries = await prisma.webhookDelivery.findMany({
@@ -2579,7 +2593,10 @@ describe('Content Entry endpoints', async () => {
       await fetch(`/api/content-entries/${created.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Cookie: cookie },
-        body: JSON.stringify({ status: 'PUBLISHED', data: created.data }),
+        body: JSON.stringify({
+          status: CONTENT_STATUSES.PUBLISHED,
+          data: created.data,
+        }),
       });
 
       const deliveries = await prisma.webhookDelivery.findMany({
@@ -2631,7 +2648,10 @@ describe('Content Entry endpoints', async () => {
           Cookie: cookie,
           ...ip,
         },
-        body: JSON.stringify({ status: 'PUBLISHED', data: created.data }),
+        body: JSON.stringify({
+          status: CONTENT_STATUSES.PUBLISHED,
+          data: created.data,
+        }),
       });
 
       const delRes = await fetch(`/api/content-entries/${created.id}`, {
@@ -2654,7 +2674,7 @@ describe('Content Entry endpoints', async () => {
         entry: { status: string; data: { title: string } };
       };
       expect(payload.event).toBe('ENTRY_DELETED');
-      expect(payload.entry.status).toBe('PUBLISHED');
+      expect(payload.entry.status).toBe(CONTENT_STATUSES.PUBLISHED);
       expect(payload.entry.data.title).toBe(created.data.title);
     });
 
@@ -2740,7 +2760,10 @@ describe('Content Entry endpoints', async () => {
           Cookie: cookie,
           'X-Forwarded-For': ip,
         },
-        body: JSON.stringify({ status: 'PUBLISHED', data: created.data }),
+        body: JSON.stringify({
+          status: CONTENT_STATUSES.PUBLISHED,
+          data: created.data,
+        }),
       });
 
       const res = await fetch(`/api/content-entries/${created.id}/unpublish`, {
@@ -2749,7 +2772,7 @@ describe('Content Entry endpoints', async () => {
       });
       expect(res.status).toBe(200);
       const body = (await res.json()) as { status: string };
-      expect(body.status).toBe('DRAFT');
+      expect(body.status).toBe(CONTENT_STATUSES.DRAFT);
 
       const deliveries = await prisma.webhookDelivery.findMany({
         where: { webhookId: hook.id },
@@ -2763,7 +2786,7 @@ describe('Content Entry endpoints', async () => {
         entry: { status: string; data: { title: string } };
       };
       expect(payload.event).toBe('ENTRY_UNPUBLISHED');
-      expect(payload.entry.status).toBe('PUBLISHED');
+      expect(payload.entry.status).toBe(CONTENT_STATUSES.PUBLISHED);
       expect(payload.entry.data.title).toBe(created.data.title);
     });
 
@@ -2793,7 +2816,10 @@ describe('Content Entry endpoints', async () => {
           Cookie: cookie,
           'X-Forwarded-For': ip,
         },
-        body: JSON.stringify({ status: 'PUBLISHED', data: created.data }),
+        body: JSON.stringify({
+          status: CONTENT_STATUSES.PUBLISHED,
+          data: created.data,
+        }),
       });
       // Save a CHANGED draft with different text
       await fetch(`/api/content-entries/${created.id}`, {
@@ -2817,7 +2843,7 @@ describe('Content Entry endpoints', async () => {
         status: string;
         data: { title: string };
       };
-      expect(body.status).toBe('DRAFT');
+      expect(body.status).toBe(CONTENT_STATUSES.DRAFT);
       expect(body.data.title).toBe(`${created.data.title} — edited`);
     });
 
@@ -2889,7 +2915,10 @@ describe('Content Entry endpoints', async () => {
           Cookie: cookie,
           'X-Forwarded-For': ip,
         },
-        body: JSON.stringify({ status: 'PUBLISHED', data: created.data }),
+        body: JSON.stringify({
+          status: CONTENT_STATUSES.PUBLISHED,
+          data: created.data,
+        }),
       });
 
       const res = await fetch(`/api/content-entries/${created.id}/archive`, {
@@ -2898,7 +2927,7 @@ describe('Content Entry endpoints', async () => {
       });
       expect(res.status).toBe(200);
       const body = (await res.json()) as { status: string };
-      expect(body.status).toBe('ARCHIVED');
+      expect(body.status).toBe(CONTENT_STATUSES.ARCHIVED);
 
       const deliveries = await prisma.webhookDelivery.findMany({
         where: { webhookId: hook.id },
@@ -2912,7 +2941,7 @@ describe('Content Entry endpoints', async () => {
         entry: { status: string; data: { title: string } };
       };
       expect(payload.event).toBe('ENTRY_UNPUBLISHED');
-      expect(payload.entry.status).toBe('PUBLISHED');
+      expect(payload.entry.status).toBe(CONTENT_STATUSES.PUBLISHED);
       expect(payload.entry.data.title).toBe(created.data.title);
     });
 
@@ -2942,12 +2971,15 @@ describe('Content Entry endpoints', async () => {
           Cookie: cookie,
           'X-Forwarded-For': ip,
         },
-        body: JSON.stringify({ status: 'PUBLISHED', data: created.data }),
+        body: JSON.stringify({
+          status: CONTENT_STATUSES.PUBLISHED,
+          data: created.data,
+        }),
       });
 
       // Capture publishedAt before archive
       const pub = await prisma.contentEntryVersion.findFirstOrThrow({
-        where: { entryId: created.id, status: 'PUBLISHED' },
+        where: { entryId: created.id, status: CONTENT_STATUSES.PUBLISHED },
       });
       expect(pub.publishedAt).not.toBeNull();
 
@@ -2957,7 +2989,7 @@ describe('Content Entry endpoints', async () => {
       });
 
       const archived = await prisma.contentEntryVersion.findFirstOrThrow({
-        where: { entryId: created.id, status: 'ARCHIVED' },
+        where: { entryId: created.id, status: CONTENT_STATUSES.ARCHIVED },
       });
       expect(archived.publishedAt?.toISOString()).toBe(
         pub.publishedAt!.toISOString()
@@ -2990,7 +3022,10 @@ describe('Content Entry endpoints', async () => {
           Cookie: cookie,
           'X-Forwarded-For': ip,
         },
-        body: JSON.stringify({ status: 'PUBLISHED', data: created.data }),
+        body: JSON.stringify({
+          status: CONTENT_STATUSES.PUBLISHED,
+          data: created.data,
+        }),
       });
       await fetch(`/api/content-entries/${created.id}`, {
         method: 'PUT',
@@ -3052,7 +3087,10 @@ describe('Content Entry endpoints', async () => {
           Cookie: cookie,
           'X-Forwarded-For': ip,
         },
-        body: JSON.stringify({ status: 'PUBLISHED', data: created.data }),
+        body: JSON.stringify({
+          status: CONTENT_STATUSES.PUBLISHED,
+          data: created.data,
+        }),
       });
       await fetch(`/api/content-entries/${created.id}/archive`, {
         method: 'POST',
@@ -3069,7 +3107,7 @@ describe('Content Entry endpoints', async () => {
       });
       expect(res.status).toBe(200);
       const body = (await res.json()) as { status: string };
-      expect(body.status).toBe('DRAFT');
+      expect(body.status).toBe(CONTENT_STATUSES.DRAFT);
 
       const afterCount = await prisma.webhookDelivery.count({
         where: { webhookId: hook.id },
@@ -3144,7 +3182,10 @@ describe('Content Entry endpoints', async () => {
           Cookie: cookie,
           'X-Forwarded-For': ip,
         },
-        body: JSON.stringify({ status: 'PUBLISHED', data: created.data }),
+        body: JSON.stringify({
+          status: CONTENT_STATUSES.PUBLISHED,
+          data: created.data,
+        }),
       });
 
       const beforeCount = await prisma.webhookDelivery.count({
@@ -3157,7 +3198,7 @@ describe('Content Entry endpoints', async () => {
 
       // Capture the published version's id before republish
       const pubBefore = await prisma.contentEntryVersion.findFirstOrThrow({
-        where: { entryId: created.id, status: 'PUBLISHED' },
+        where: { entryId: created.id, status: CONTENT_STATUSES.PUBLISHED },
       });
 
       const res = await fetch(`/api/content-entries/${created.id}/republish`, {
@@ -3166,11 +3207,11 @@ describe('Content Entry endpoints', async () => {
       });
       expect(res.status).toBe(200);
       const body = (await res.json()) as { status: string };
-      expect(body.status).toBe('PUBLISHED');
+      expect(body.status).toBe(CONTENT_STATUSES.PUBLISHED);
 
       // Same PUBLISHED row still exists with the same id — no mutation
       const pubAfter = await prisma.contentEntryVersion.findFirstOrThrow({
-        where: { entryId: created.id, status: 'PUBLISHED' },
+        where: { entryId: created.id, status: CONTENT_STATUSES.PUBLISHED },
       });
       expect(pubAfter.id).toBe(pubBefore.id);
       expect(pubAfter.publishedAt?.toISOString()).toBe(
@@ -3242,7 +3283,10 @@ describe('Content Entry endpoints', async () => {
           Cookie: cookie,
           'X-Forwarded-For': ip,
         },
-        body: JSON.stringify({ status: 'PUBLISHED', data: created.data }),
+        body: JSON.stringify({
+          status: CONTENT_STATUSES.PUBLISHED,
+          data: created.data,
+        }),
       });
       await fetch(`/api/content-entries/${created.id}`, {
         method: 'PUT',
@@ -3260,7 +3304,7 @@ describe('Content Entry endpoints', async () => {
       });
       expect(res.status).toBe(200);
       const body = (await res.json()) as { status: string };
-      expect(body.status).toBe('PUBLISHED');
+      expect(body.status).toBe(CONTENT_STATUSES.PUBLISHED);
     });
   });
 
@@ -3290,7 +3334,7 @@ describe('Content Entry endpoints', async () => {
         },
         body: JSON.stringify({
           data: { title },
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         }),
       });
       return created.id;
@@ -3368,7 +3412,10 @@ describe('Content Entry endpoints', async () => {
           Cookie: cookie,
           'X-Forwarded-For': ip,
         },
-        body: JSON.stringify({ status: 'PUBLISHED', data: live.data }),
+        body: JSON.stringify({
+          status: CONTENT_STATUSES.PUBLISHED,
+          data: live.data,
+        }),
       });
 
       const archived = (await (
@@ -3392,7 +3439,10 @@ describe('Content Entry endpoints', async () => {
           Cookie: cookie,
           'X-Forwarded-For': ip,
         },
-        body: JSON.stringify({ status: 'PUBLISHED', data: archived.data }),
+        body: JSON.stringify({
+          status: CONTENT_STATUSES.PUBLISHED,
+          data: archived.data,
+        }),
       });
       await fetch(`/api/content-entries/${archived.id}/archive`, {
         method: 'POST',
@@ -3415,9 +3465,9 @@ describe('Content Entry endpoints', async () => {
       ).json()) as { items: Array<{ id: string; status: string }> };
       expect(archivedList.items.some((i) => i.id === archived.id)).toBe(true);
       expect(archivedList.items.some((i) => i.id === live.id)).toBe(false);
-      expect(archivedList.items.every((i) => i.status === 'ARCHIVED')).toBe(
-        true
-      );
+      expect(
+        archivedList.items.every((i) => i.status === CONTENT_STATUSES.ARCHIVED)
+      ).toBe(true);
 
       const allList = (await (
         await fetch(
@@ -3457,7 +3507,10 @@ describe('Content Entry endpoints', async () => {
           Cookie: cookie,
           'X-Forwarded-For': ip,
         },
-        body: JSON.stringify({ status: 'PUBLISHED', data: target.data }),
+        body: JSON.stringify({
+          status: CONTENT_STATUSES.PUBLISHED,
+          data: target.data,
+        }),
       });
       await fetch(`/api/content-entries/${target.id}/archive`, {
         method: 'POST',
@@ -3553,7 +3606,7 @@ describe('Content Entry endpoints', async () => {
           slug: null,
           versions: {
             create: {
-              status: 'DRAFT',
+              status: CONTENT_STATUSES.DRAFT,
               entryTitle: 'EmbedTarget',
               data: { title: 'EmbedTarget' },
             },
@@ -3570,7 +3623,7 @@ describe('Content Entry endpoints', async () => {
           slug: null,
           versions: {
             create: {
-              status: 'DRAFT',
+              status: CONTENT_STATUSES.DRAFT,
               entryTitle: 'EmbedOtherEntry',
               data: { title: 'EmbedOtherEntry' },
             },

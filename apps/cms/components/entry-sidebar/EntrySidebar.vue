@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { EntrySidebarProps } from './entrySidebar.types';
 import { QA_ENTRY_SIDEBAR } from './entrySidebar.config';
+import { CONTENT_STATUSES } from '~/utils/contentStatus';
 
 const props = withDefaults(defineProps<EntrySidebarProps>(), {
   testId: QA_ENTRY_SIDEBAR.COMPONENT,
@@ -10,12 +11,12 @@ const { formatDate } = useContentTable();
 const toast = useToast();
 
 const isPublishedClean = computed(
-  () => props.status === 'PUBLISHED' && !props.isDirty
+  () => props.status === CONTENT_STATUSES.PUBLISHED && !props.isDirty
 );
 const isPublishedDirty = computed(
-  () => props.status === 'PUBLISHED' && props.isDirty
+  () => props.status === CONTENT_STATUSES.PUBLISHED && props.isDirty
 );
-const isChanged = computed(() => props.status === 'CHANGED');
+const isChanged = computed(() => props.status === CONTENT_STATUSES.CHANGED);
 
 const primaryLabel = computed(() => {
   if (isChanged.value || isPublishedDirty.value) return 'Publish Changes';
@@ -34,13 +35,13 @@ const secondaryVisible = computed(() => !isPublishedClean.value);
 
 const statusBadgeColor = computed(() => {
   switch (props.status) {
-    case 'DRAFT':
+    case CONTENT_STATUSES.DRAFT:
       return 'info' as const;
-    case 'PUBLISHED':
+    case CONTENT_STATUSES.PUBLISHED:
       return 'success' as const;
-    case 'CHANGED':
+    case CONTENT_STATUSES.CHANGED:
       return 'warning' as const;
-    case 'ARCHIVED':
+    case CONTENT_STATUSES.ARCHIVED:
       return 'neutral' as const;
     default:
       return 'neutral' as const;
@@ -49,13 +50,13 @@ const statusBadgeColor = computed(() => {
 
 const statusBadgeLabel = computed(() => {
   switch (props.status) {
-    case 'DRAFT':
+    case CONTENT_STATUSES.DRAFT:
       return 'Draft';
-    case 'PUBLISHED':
+    case CONTENT_STATUSES.PUBLISHED:
       return 'Published';
-    case 'CHANGED':
+    case CONTENT_STATUSES.CHANGED:
       return 'Changed';
-    case 'ARCHIVED':
+    case CONTENT_STATUSES.ARCHIVED:
       return 'Archived';
     default:
       return props.status;

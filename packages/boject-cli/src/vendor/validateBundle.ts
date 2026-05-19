@@ -7,6 +7,7 @@ import {
   FIELD_TYPE_NAMES,
   isFieldTypeName,
 } from './fieldTypes.js';
+import { CONTENT_STATUS_NAMES, isContentStatusName } from './contentStatus.js';
 import type {
   Bundle,
   BundleContentType,
@@ -20,8 +21,6 @@ import type {
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
-
-const STATUSES = new Set(['DRAFT', 'PUBLISHED', 'CHANGED', 'ARCHIVED']);
 
 export function validateBundle(bundle: unknown): ValidationResult {
   const errors: ValidationError[] = [];
@@ -252,10 +251,10 @@ function validateEntry(
     );
   } else if (hasData) {
     // V1 format
-    if (typeof e.status !== 'string' || !STATUSES.has(e.status)) {
+    if (!isContentStatusName(e.status)) {
       errors.push({
         path: `${path}.status`,
-        message: `must be one of ${Array.from(STATUSES).join(', ')}`,
+        message: `must be one of ${CONTENT_STATUS_NAMES.join(', ')}`,
       });
     }
   } else {
@@ -285,10 +284,10 @@ function validateEntryVersion(
   }
   const v = version as Partial<BundleEntryVersion>;
 
-  if (typeof v.status !== 'string' || !STATUSES.has(v.status)) {
+  if (!isContentStatusName(v.status)) {
     errors.push({
       path: `${path}.status`,
-      message: `must be one of ${Array.from(STATUSES).join(', ')}`,
+      message: `must be one of ${CONTENT_STATUS_NAMES.join(', ')}`,
     });
   }
   if (!isObject(v.data)) {

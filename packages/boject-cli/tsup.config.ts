@@ -39,5 +39,8 @@ export default defineConfig({
     // Mirror fieldTypes.ts the same way so consumers can import
     // @boject/cli/vendor/fieldTypes.
     await cp('src/vendor/fieldTypes.ts', 'dist/vendor/fieldTypes.ts');
+    // Mirror contentStatus.ts the same way so consumers can import
+    // @boject/cli/vendor/contentStatus.
+    await cp('src/vendor/contentStatus.ts', 'dist/vendor/contentStatus.ts');
   },
 });

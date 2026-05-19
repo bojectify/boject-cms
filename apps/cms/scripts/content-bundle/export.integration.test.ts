@@ -4,6 +4,7 @@ import { PrismaClient } from '../../generated/prisma/client';
 import { exportBundle } from './export';
 import { getTestDatabaseUrl } from '../../test/dbUrl';
 import { FIELD_TYPES } from '../../utils/fieldTypes';
+import { CONTENT_STATUSES } from '../../utils/contentStatus';
 
 const url = getTestDatabaseUrl();
 const adapter = new PrismaPg({ connectionString: url });
@@ -103,7 +104,7 @@ describe('exportBundle', () => {
           create: {
             data: { title: 'Hello' },
             entryTitle: 'Hello',
-            status: 'PUBLISHED',
+            status: CONTENT_STATUSES.PUBLISHED,
             publishedAt: new Date('2026-04-01T00:00:00.000Z'),
           },
         },
@@ -120,7 +121,7 @@ describe('exportBundle', () => {
     });
     expect(bundle.entries![0]?.versions).toHaveLength(1);
     expect(bundle.entries![0]?.versions![0]).toMatchObject({
-      status: 'PUBLISHED',
+      status: CONTENT_STATUSES.PUBLISHED,
       publishedAt: '2026-04-01T00:00:00.000Z',
     });
   });
@@ -151,7 +152,7 @@ describe('exportBundle', () => {
           create: {
             data: { name: 'News' },
             entryTitle: 'News',
-            status: 'PUBLISHED',
+            status: CONTENT_STATUSES.PUBLISHED,
           },
         },
       },
@@ -197,7 +198,7 @@ describe('exportBundle', () => {
               },
             },
             entryTitle: 'Hello',
-            status: 'DRAFT',
+            status: CONTENT_STATUSES.DRAFT,
           },
         },
       },

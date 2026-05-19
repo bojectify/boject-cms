@@ -6,6 +6,7 @@ import type { Bundle } from '../vendor/contentBundleTypes.js';
 import { generatePerfData } from './generate.js';
 import { CycleRequiresNullError } from './topoSort.js';
 import { FIELD_TYPES } from '../vendor/fieldTypes.js';
+import { CONTENT_STATUSES } from '../vendor/contentStatus.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -28,7 +29,7 @@ describe('generatePerfData', () => {
     expect(r.groups[0]!.entries).toHaveLength(5);
     for (const e of r.groups[0]!.entries) {
       expect(e.versions).toHaveLength(1);
-      expect(e.versions![0]!.status).toBe('PUBLISHED');
+      expect(e.versions![0]!.status).toBe(CONTENT_STATUSES.PUBLISHED);
     }
   });
 

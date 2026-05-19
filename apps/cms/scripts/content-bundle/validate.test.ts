@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { validateBundle } from './validate';
 import type { Bundle } from './types';
 import { FIELD_TYPES } from '../../utils/fieldTypes';
+import { CONTENT_STATUSES } from '../../utils/contentStatus';
 
 const baseContentType = {
   id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
@@ -130,7 +131,7 @@ describe('validateBundle', () => {
           contentTypeIdentifier: 'BlogPost',
           entryTitle: '',
           slug: null,
-          status: 'DRAFT',
+          status: CONTENT_STATUSES.DRAFT,
           publishedAt: null,
           data: { title: 'x' },
         },
@@ -154,7 +155,9 @@ describe('entryKey validation (#205)', () => {
           contentTypeIdentifier: 'Post',
           entryTitle: 'Hello',
           slug: 'hello',
-          versions: [{ status: 'PUBLISHED', data: {}, publishedAt: null }],
+          versions: [
+            { status: CONTENT_STATUSES.PUBLISHED, data: {}, publishedAt: null },
+          ],
         },
       ],
     };
@@ -178,7 +181,9 @@ describe('entryKey validation (#205)', () => {
           entryTitle: 'Hello',
           entryKey: '',
           slug: 'hello',
-          versions: [{ status: 'PUBLISHED', data: {}, publishedAt: null }],
+          versions: [
+            { status: CONTENT_STATUSES.PUBLISHED, data: {}, publishedAt: null },
+          ],
         },
       ],
     };
@@ -202,7 +207,9 @@ describe('entryKey validation (#205)', () => {
           entryTitle: 'A',
           entryKey: 'a',
           slug: null,
-          versions: [{ status: 'PUBLISHED', data: {}, publishedAt: null }],
+          versions: [
+            { status: CONTENT_STATUSES.PUBLISHED, data: {}, publishedAt: null },
+          ],
         },
         {
           id: null,
@@ -211,7 +218,9 @@ describe('entryKey validation (#205)', () => {
           entryTitle: 'B',
           entryKey: 'a',
           slug: null,
-          versions: [{ status: 'PUBLISHED', data: {}, publishedAt: null }],
+          versions: [
+            { status: CONTENT_STATUSES.PUBLISHED, data: {}, publishedAt: null },
+          ],
         },
       ],
     };
@@ -235,7 +244,9 @@ describe('entryKey validation (#205)', () => {
           entryTitle: 'A',
           entryKey: 'shared',
           slug: null,
-          versions: [{ status: 'PUBLISHED', data: {}, publishedAt: null }],
+          versions: [
+            { status: CONTENT_STATUSES.PUBLISHED, data: {}, publishedAt: null },
+          ],
         },
         {
           id: null,
@@ -244,7 +255,9 @@ describe('entryKey validation (#205)', () => {
           entryTitle: 'A',
           entryKey: 'shared',
           slug: null,
-          versions: [{ status: 'PUBLISHED', data: {}, publishedAt: null }],
+          versions: [
+            { status: CONTENT_STATUSES.PUBLISHED, data: {}, publishedAt: null },
+          ],
         },
       ],
     };
