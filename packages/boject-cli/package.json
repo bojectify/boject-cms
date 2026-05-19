@@ -11,7 +11,8 @@
   "exports": {
     ".": "./dist/index.js",
     "./perf": "./dist/perf/index.js",
-    "./vendor/contentBundleTypes": "./dist/vendor/contentBundleTypes.ts"
+    "./vendor/contentBundleTypes": "./dist/vendor/contentBundleTypes.ts",
+    "./vendor/fieldTypes": "./dist/vendor/fieldTypes.ts"
   },
   "files": [
     "dist"

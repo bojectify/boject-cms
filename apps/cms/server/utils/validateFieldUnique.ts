@@ -1,8 +1,15 @@
 import type { FieldType } from '#prisma';
 import { createError } from 'h3';
+import { FIELD_TYPES } from '../../utils/fieldTypes';
 
-const USER_CONFIGURABLE_UNIQUE_TYPES = new Set<FieldType>(['TEXT', 'NUMBER']);
-const IMPLICIT_UNIQUE_TYPES = new Set<FieldType>(['ENTRY_TITLE', 'SLUG']);
+const USER_CONFIGURABLE_UNIQUE_TYPES = new Set<FieldType>([
+  FIELD_TYPES.TEXT,
+  FIELD_TYPES.NUMBER,
+]);
+const IMPLICIT_UNIQUE_TYPES = new Set<FieldType>([
+  FIELD_TYPES.ENTRY_TITLE,
+  FIELD_TYPES.SLUG,
+]);
 
 export function isUniqueAllowedForType(type: FieldType): boolean {
   return (

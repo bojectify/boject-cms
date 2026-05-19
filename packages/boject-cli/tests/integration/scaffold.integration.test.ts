@@ -2,6 +2,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../../../../apps/cms/generated/prisma/client.js';
 import { PERF_TEST_DATABASE_URL } from './globalSetup.js';
+import { FIELD_TYPES } from '../../src/vendor/fieldTypes.js';
 
 const adapter = new PrismaPg({ connectionString: PERF_TEST_DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
@@ -25,10 +26,10 @@ describe('integration scaffold', () => {
       'publishDate',
     ]);
     expect(ct!.fields.map((f) => f.type)).toEqual([
-      'ENTRY_TITLE',
-      'SLUG',
-      'TEXT',
-      'DATETIME',
+      FIELD_TYPES.ENTRY_TITLE,
+      FIELD_TYPES.SLUG,
+      FIELD_TYPES.TEXT,
+      FIELD_TYPES.DATETIME,
     ]);
   });
 });

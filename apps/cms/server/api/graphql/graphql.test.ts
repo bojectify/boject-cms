@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { setup, $fetch, fetch } from '@nuxt/test-utils/e2e';
 import { TEST_USERNAME, TEST_PASSWORD } from '../../test/credentials';
 import { getTestDatabaseUrl } from '../../../test/dbUrl';
+import { FIELD_TYPES } from '../../../utils/fieldTypes';
 
 const TEST_API_KEY = 'boject_test_key_for_integration_tests_only';
 
@@ -89,18 +90,26 @@ describe('GraphQL API', async () => {
           {
             identifier: 'title',
             name: 'Title',
-            type: 'ENTRY_TITLE',
+            type: FIELD_TYPES.ENTRY_TITLE,
             required: true,
           },
-          { identifier: 'slug', name: 'Slug', type: 'SLUG' },
-          { identifier: 'summary', name: 'Summary', type: 'TEXTAREA' },
+          { identifier: 'slug', name: 'Slug', type: FIELD_TYPES.SLUG },
+          {
+            identifier: 'summary',
+            name: 'Summary',
+            type: FIELD_TYPES.TEXTAREA,
+          },
           {
             identifier: 'publishDate',
             name: 'Publish Date',
-            type: 'DATETIME',
+            type: FIELD_TYPES.DATETIME,
           },
-          { identifier: 'featured', name: 'Featured', type: 'BOOLEAN' },
-          { identifier: 'category', name: 'Category', type: 'TEXT' },
+          {
+            identifier: 'featured',
+            name: 'Featured',
+            type: FIELD_TYPES.BOOLEAN,
+          },
+          { identifier: 'category', name: 'Category', type: FIELD_TYPES.TEXT },
         ],
       },
     });
@@ -414,10 +423,10 @@ describe('GraphQL API', async () => {
             {
               identifier: 'name',
               name: 'Name',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
-            { identifier: 'slug', name: 'Slug', type: 'SLUG' },
+            { identifier: 'slug', name: 'Slug', type: FIELD_TYPES.SLUG },
           ],
         },
       });
@@ -433,19 +442,19 @@ describe('GraphQL API', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
             {
               identifier: 'mainTag',
               name: 'Main Tag',
-              type: 'RELATION',
+              type: FIELD_TYPES.RELATION,
               options: { targetContentTypeIds: [tagTypeId] },
             },
             {
               identifier: 'tags',
               name: 'Tags',
-              type: 'MULTIRELATION',
+              type: FIELD_TYPES.MULTIRELATION,
               options: { targetContentTypeIds: [tagTypeId] },
             },
           ],
@@ -574,7 +583,7 @@ describe('GraphQL API', async () => {
             {
               identifier: 'label',
               name: 'Label',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
           ],
@@ -605,7 +614,7 @@ describe('GraphQL API', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
           ],
@@ -615,7 +624,11 @@ describe('GraphQL API', async () => {
       await $fetch(`/api/content-types/${created.id}/fields`, {
         method: 'POST',
         headers: { cookie },
-        body: { identifier: 'description', name: 'Description', type: 'TEXT' },
+        body: {
+          identifier: 'description',
+          name: 'Description',
+          type: FIELD_TYPES.TEXT,
+        },
       });
 
       // GraphQL only serves PUBLISHED versions, so create as PUBLISHED
@@ -660,7 +673,7 @@ describe('GraphQL API', async () => {
             {
               identifier: 'name',
               name: 'Name',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
           ],
@@ -889,10 +902,10 @@ describe('GraphQL API', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
-            { identifier: 'slug', name: 'Slug', type: 'SLUG' },
+            { identifier: 'slug', name: 'Slug', type: FIELD_TYPES.SLUG },
           ],
         },
       });
@@ -930,13 +943,13 @@ describe('GraphQL API', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
             {
               identifier: 'body',
               name: 'Body',
-              type: 'RICHTEXT',
+              type: FIELD_TYPES.RICHTEXT,
               options: { targetContentTypeIds: [tagTypeId] },
             },
           ],
@@ -1286,7 +1299,7 @@ describe('GraphQL API', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
           ],
@@ -1397,7 +1410,7 @@ describe('GraphQL API', async () => {
             {
               identifier: 'name',
               name: 'Name',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
           ],
@@ -1415,7 +1428,7 @@ describe('GraphQL API', async () => {
             {
               identifier: 'name',
               name: 'Name',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
           ],
@@ -1433,13 +1446,13 @@ describe('GraphQL API', async () => {
             {
               identifier: 'name',
               name: 'Name',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
             {
               identifier: 'team',
               name: 'Team',
-              type: 'RELATION',
+              type: FIELD_TYPES.RELATION,
               options: { targetContentTypeIds: [teamTypeId] },
             },
           ],
@@ -1457,13 +1470,13 @@ describe('GraphQL API', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
             {
               identifier: 'tags',
               name: 'Tags',
-              type: 'MULTIRELATION',
+              type: FIELD_TYPES.MULTIRELATION,
               options: { targetContentTypeIds: [tagTypeId] },
             },
           ],
@@ -1826,10 +1839,10 @@ describe('GraphQL API', async () => {
             {
               identifier: 'name',
               name: 'Name',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
-            { identifier: 'slug', name: 'Slug', type: 'SLUG' },
+            { identifier: 'slug', name: 'Slug', type: FIELD_TYPES.SLUG },
           ],
         },
       });
@@ -1843,7 +1856,7 @@ describe('GraphQL API', async () => {
         body: {
           identifier: 'parentTeam',
           name: 'Parent Team',
-          type: 'RELATION',
+          type: FIELD_TYPES.RELATION,
           options: { targetContentTypeIds: [teamTypeId] },
         },
       });
@@ -1858,10 +1871,10 @@ describe('GraphQL API', async () => {
             {
               identifier: 'name',
               name: 'Name',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
-            { identifier: 'slug', name: 'Slug', type: 'SLUG' },
+            { identifier: 'slug', name: 'Slug', type: FIELD_TYPES.SLUG },
           ],
         },
       });
@@ -1877,13 +1890,13 @@ describe('GraphQL API', async () => {
             {
               identifier: 'name',
               name: 'Name',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
             {
               identifier: 'team',
               name: 'Team',
-              type: 'RELATION',
+              type: FIELD_TYPES.RELATION,
               options: { targetContentTypeIds: [teamTypeId] },
             },
           ],
@@ -1901,13 +1914,13 @@ describe('GraphQL API', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
             {
               identifier: 'tags',
               name: 'Tags',
-              type: 'MULTIRELATION',
+              type: FIELD_TYPES.MULTIRELATION,
               options: { targetContentTypeIds: [tagTypeId] },
             },
           ],
@@ -1927,13 +1940,13 @@ describe('GraphQL API', async () => {
               {
                 identifier: 'name',
                 name: 'Name',
-                type: 'ENTRY_TITLE',
+                type: FIELD_TYPES.ENTRY_TITLE,
                 required: true,
               },
               {
                 identifier: 'ref',
                 name: 'Ref',
-                type: 'RELATION',
+                type: FIELD_TYPES.RELATION,
                 options: {
                   targetContentTypeIds: [teamTypeId, tagTypeId],
                 },
@@ -2325,19 +2338,19 @@ describe('GraphQL API', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
             {
               identifier: 'photo',
               name: 'Photo',
-              type: 'IMAGE',
+              type: FIELD_TYPES.IMAGE,
               required: true,
             },
             {
               identifier: 'cover',
               name: 'Cover',
-              type: 'IMAGE',
+              type: FIELD_TYPES.IMAGE,
               required: false,
             },
           ],
@@ -2519,7 +2532,7 @@ describe('GraphQL API', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
           ],
@@ -2580,7 +2593,7 @@ describe('GraphQL API', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
           ],
@@ -2641,7 +2654,7 @@ describe('GraphQL API', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
           ],
@@ -2711,7 +2724,7 @@ describe('GraphQL API', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
           ],

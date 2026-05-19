@@ -4,6 +4,7 @@ import { mkdtempSync, writeFileSync, readFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildAll } from './build';
+import { FIELD_TYPES } from '../../utils/fieldTypes';
 
 function makeWorkspace(): string {
   const root = mkdtempSync(join(tmpdir(), 'starters-build-'));
@@ -26,7 +27,7 @@ const baseBundle = {
           id: null,
           identifier: 'name',
           name: 'Name',
-          type: 'ENTRY_TITLE',
+          type: FIELD_TYPES.ENTRY_TITLE,
           required: true,
           order: 0,
           options: null,
@@ -63,7 +64,7 @@ describe('buildAll', () => {
                 id: null,
                 identifier: 'name',
                 name: 'Name',
-                type: 'ENTRY_TITLE',
+                type: FIELD_TYPES.ENTRY_TITLE,
                 required: true,
                 order: 0,
                 options: null,
@@ -101,7 +102,7 @@ describe('buildAll', () => {
                 id: null,
                 identifier: 'name',
                 name: 'Name',
-                type: 'ENTRY_TITLE',
+                type: FIELD_TYPES.ENTRY_TITLE,
                 required: true,
                 order: 0,
                 options: null,
@@ -126,7 +127,7 @@ describe('buildAll', () => {
                 id: null,
                 identifier: 'position',
                 name: 'Position',
-                type: 'TEXT',
+                type: FIELD_TYPES.TEXT,
                 required: false,
                 order: 5,
                 options: null,
@@ -194,7 +195,7 @@ describe('buildAll', () => {
                 id: null,
                 identifier: 'f',
                 name: 'F',
-                type: 'SELECT',
+                type: FIELD_TYPES.SELECT,
                 required: false,
                 order: 0,
                 options: null,

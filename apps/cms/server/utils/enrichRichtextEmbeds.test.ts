@@ -4,6 +4,7 @@ import {
   enrichBodyWithContentTypeIdentifiers,
   enrichEntryDataWithEmbedIdentifiers,
 } from './enrichRichtextEmbeds';
+import { FIELD_TYPES } from '../../utils/fieldTypes';
 
 // ---------------------------------------------------------------------------
 // Test factories (mirrored from validateEntryData.test.ts)
@@ -238,7 +239,7 @@ describe('enrichEntryDataWithEmbedIdentifiers', () => {
     const deps = { loadIdentifiers: vi.fn() };
     const result = await enrichEntryDataWithEmbedIdentifiers(
       data,
-      [{ identifier: 'title', type: 'ENTRY_TITLE' }],
+      [{ identifier: 'title', type: FIELD_TYPES.ENTRY_TITLE }],
       deps
     );
     expect(result).toBe(data);
@@ -250,7 +251,7 @@ describe('enrichEntryDataWithEmbedIdentifiers', () => {
     const deps = { loadIdentifiers: vi.fn() };
     const result = await enrichEntryDataWithEmbedIdentifiers(
       data,
-      [{ identifier: 'body', type: 'RICHTEXT' }],
+      [{ identifier: 'body', type: FIELD_TYPES.RICHTEXT }],
       deps
     );
     expect(result).toBe(data);
@@ -274,9 +275,9 @@ describe('enrichEntryDataWithEmbedIdentifiers', () => {
     const result = await enrichEntryDataWithEmbedIdentifiers(
       data,
       [
-        { identifier: 'title', type: 'ENTRY_TITLE' },
-        { identifier: 'body', type: 'RICHTEXT' },
-        { identifier: 'summary', type: 'RICHTEXT' },
+        { identifier: 'title', type: FIELD_TYPES.ENTRY_TITLE },
+        { identifier: 'body', type: FIELD_TYPES.RICHTEXT },
+        { identifier: 'summary', type: FIELD_TYPES.RICHTEXT },
       ],
       deps
     );
@@ -310,7 +311,7 @@ describe('enrichEntryDataWithEmbedIdentifiers', () => {
     const snapshot = JSON.parse(JSON.stringify(data));
     await enrichEntryDataWithEmbedIdentifiers(
       data,
-      [{ identifier: 'body', type: 'RICHTEXT' }],
+      [{ identifier: 'body', type: FIELD_TYPES.RICHTEXT }],
       {
         loadIdentifiers: vi
           .fn()
@@ -341,7 +342,7 @@ describe('enrichEntryDataWithEmbedIdentifiers', () => {
 
     const result = await enrichEntryDataWithEmbedIdentifiers(
       data,
-      [{ identifier: 'body', type: 'RICHTEXT' }],
+      [{ identifier: 'body', type: FIELD_TYPES.RICHTEXT }],
       { loadIdentifiers }
     );
 

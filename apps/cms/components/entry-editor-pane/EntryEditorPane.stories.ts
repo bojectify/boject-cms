@@ -7,6 +7,7 @@ import {
   type PaneOrchestrator,
 } from '~/composables/paneOrchestrator';
 import EntryEditorPane from './EntryEditorPane.vue';
+import { FIELD_TYPES } from '../../utils/fieldTypes';
 
 // Story fixtures use real UUIDs because parseFieldOptions validates via zod
 const CT_AUTHOR_UUID = '11111111-1111-4111-8111-111111111111';
@@ -47,7 +48,7 @@ const meta: Meta<typeof EntryEditorPane> = {
                 {
                   identifier: 'title',
                   name: 'Title',
-                  type: 'ENTRY_TITLE',
+                  type: FIELD_TYPES.ENTRY_TITLE,
                   required: true,
                   options: null,
                 },
@@ -188,7 +189,7 @@ export const OpensRelationAtDepth: Story = {
               {
                 identifier: 'title',
                 name: 'Title',
-                type: 'ENTRY_TITLE',
+                type: FIELD_TYPES.ENTRY_TITLE,
                 required: true,
                 options: null,
               },
@@ -206,7 +207,7 @@ export const OpensRelationAtDepth: Story = {
                   {
                     identifier: 'title',
                     name: 'Title',
-                    type: 'ENTRY_TITLE',
+                    type: FIELD_TYPES.ENTRY_TITLE,
                     required: true,
                     options: null,
                   },
@@ -226,14 +227,14 @@ export const OpensRelationAtDepth: Story = {
                 {
                   identifier: 'title',
                   name: 'Title',
-                  type: 'ENTRY_TITLE',
+                  type: FIELD_TYPES.ENTRY_TITLE,
                   required: true,
                   options: null,
                 },
                 {
                   identifier: 'author',
                   name: 'Author',
-                  type: 'RELATION',
+                  type: FIELD_TYPES.RELATION,
                   required: false,
                   options: { targetContentTypeIds: [CT_AUTHOR_UUID] },
                 },
@@ -315,7 +316,7 @@ export const EmitsSavedOnPublish: Story = {
               {
                 identifier: 'title',
                 name: 'Title',
-                type: 'ENTRY_TITLE',
+                type: FIELD_TYPES.ENTRY_TITLE,
                 required: true,
                 options: null,
               },
@@ -367,14 +368,14 @@ const demoContentTypes: Record<string, unknown> = {
       {
         identifier: 'title',
         name: 'Title',
-        type: 'ENTRY_TITLE',
+        type: FIELD_TYPES.ENTRY_TITLE,
         required: true,
         options: null,
       },
       {
         identifier: 'author',
         name: 'Author',
-        type: 'RELATION',
+        type: FIELD_TYPES.RELATION,
         required: false,
         options: { targetContentTypeIds: [CT_AUTHOR_UUID] },
       },
@@ -388,14 +389,14 @@ const demoContentTypes: Record<string, unknown> = {
       {
         identifier: 'title',
         name: 'Name',
-        type: 'ENTRY_TITLE',
+        type: FIELD_TYPES.ENTRY_TITLE,
         required: true,
         options: null,
       },
       {
         identifier: 'organisation',
         name: 'Organisation',
-        type: 'RELATION',
+        type: FIELD_TYPES.RELATION,
         required: false,
         options: { targetContentTypeIds: [CT_ORG_UUID] },
       },
@@ -409,7 +410,7 @@ const demoContentTypes: Record<string, unknown> = {
       {
         identifier: 'title',
         name: 'Name',
-        type: 'ENTRY_TITLE',
+        type: FIELD_TYPES.ENTRY_TITLE,
         required: true,
         options: null,
       },
@@ -451,7 +452,9 @@ function buildDemoEntryResponse(entryId: string) {
   };
   const data: Record<string, unknown> = { title: entry.title };
   if (entry.relation) {
-    const relationField = contentType.fields.find((f) => f.type === 'RELATION');
+    const relationField = contentType.fields.find(
+      (f) => f.type === FIELD_TYPES.RELATION
+    );
     if (relationField) {
       data[relationField.identifier] = {
         contentTypeId: entry.relation.ct,

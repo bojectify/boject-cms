@@ -6,6 +6,7 @@ import {
   RichtextOptionsSchema,
   getFieldOptionsErrorShape,
 } from './fieldOptions';
+import { FIELD_TYPES } from './fieldTypes';
 
 const UUID_A = '11111111-1111-4111-8111-111111111111';
 const UUID_B = '22222222-2222-4222-8222-222222222222';
@@ -13,36 +14,40 @@ const UUID_B = '22222222-2222-4222-8222-222222222222';
 describe('parseFieldOptions', () => {
   describe('null / missing / empty options', () => {
     it('returns empty defaults for SELECT when options is null', () => {
-      expect(parseFieldOptions({ type: 'SELECT', options: null })).toEqual({
-        type: 'SELECT',
+      expect(
+        parseFieldOptions({ type: FIELD_TYPES.SELECT, options: null })
+      ).toEqual({
+        type: FIELD_TYPES.SELECT,
         choices: [],
       });
     });
 
     it('returns empty defaults for RELATION when options is undefined', () => {
       expect(
-        parseFieldOptions({ type: 'RELATION', options: undefined })
+        parseFieldOptions({ type: FIELD_TYPES.RELATION, options: undefined })
       ).toEqual({
-        type: 'RELATION',
+        type: FIELD_TYPES.RELATION,
         targetContentTypeIds: [],
       });
     });
 
     it('returns empty defaults for RICHTEXT when options is {}', () => {
-      expect(parseFieldOptions({ type: 'RICHTEXT', options: {} })).toEqual({
-        type: 'RICHTEXT',
+      expect(
+        parseFieldOptions({ type: FIELD_TYPES.RICHTEXT, options: {} })
+      ).toEqual({
+        type: FIELD_TYPES.RICHTEXT,
         targetContentTypeIds: [],
         linkTargetContentTypeIds: [],
       });
     });
 
     it('returns empty defaults for MULTIRELATION when targetContentTypeIds key is missing', () => {
-      expect(parseFieldOptions({ type: 'MULTIRELATION', options: {} })).toEqual(
-        {
-          type: 'MULTIRELATION',
-          targetContentTypeIds: [],
-        }
-      );
+      expect(
+        parseFieldOptions({ type: FIELD_TYPES.MULTIRELATION, options: {} })
+      ).toEqual({
+        type: FIELD_TYPES.MULTIRELATION,
+        targetContentTypeIds: [],
+      });
     });
   });
 
@@ -50,20 +55,20 @@ describe('parseFieldOptions', () => {
     it('parses SELECT choices', () => {
       expect(
         parseFieldOptions({
-          type: 'SELECT',
+          type: FIELD_TYPES.SELECT,
           options: { choices: ['a', 'b', 'c'] },
         })
-      ).toEqual({ type: 'SELECT', choices: ['a', 'b', 'c'] });
+      ).toEqual({ type: FIELD_TYPES.SELECT, choices: ['a', 'b', 'c'] });
     });
 
     it('parses RELATION targetContentTypeIds', () => {
       expect(
         parseFieldOptions({
-          type: 'RELATION',
+          type: FIELD_TYPES.RELATION,
           options: { targetContentTypeIds: [UUID_A, UUID_B] },
         })
       ).toEqual({
-        type: 'RELATION',
+        type: FIELD_TYPES.RELATION,
         targetContentTypeIds: [UUID_A, UUID_B],
       });
     });
@@ -71,11 +76,11 @@ describe('parseFieldOptions', () => {
     it('parses MULTIRELATION targetContentTypeIds (same schema as RELATION)', () => {
       expect(
         parseFieldOptions({
-          type: 'MULTIRELATION',
+          type: FIELD_TYPES.MULTIRELATION,
           options: { targetContentTypeIds: [UUID_A] },
         })
       ).toEqual({
-        type: 'MULTIRELATION',
+        type: FIELD_TYPES.MULTIRELATION,
         targetContentTypeIds: [UUID_A],
       });
     });
@@ -83,36 +88,45 @@ describe('parseFieldOptions', () => {
     it('parses RICHTEXT with both allow-lists', () => {
       expect(
         parseFieldOptions({
-          type: 'RICHTEXT',
+          type: FIELD_TYPES.RICHTEXT,
           options: {
             targetContentTypeIds: [UUID_A],
             linkTargetContentTypeIds: [UUID_B],
           },
         })
       ).toEqual({
-        type: 'RICHTEXT',
+        type: FIELD_TYPES.RICHTEXT,
         targetContentTypeIds: [UUID_A],
         linkTargetContentTypeIds: [UUID_B],
       });
     });
 
     it('returns bare discriminator for no-payload types', () => {
-      expect(parseFieldOptions({ type: 'TEXT', options: null })).toEqual({
-        type: 'TEXT',
+      expect(
+        parseFieldOptions({ type: FIELD_TYPES.TEXT, options: null })
+      ).toEqual({
+        type: FIELD_TYPES.TEXT,
       });
-      expect(parseFieldOptions({ type: 'BOOLEAN', options: {} })).toEqual({
-        type: 'BOOLEAN',
+      expect(
+        parseFieldOptions({ type: FIELD_TYPES.BOOLEAN, options: {} })
+      ).toEqual({
+        type: FIELD_TYPES.BOOLEAN,
       });
-      expect(parseFieldOptions({ type: 'IMAGE', options: null })).toEqual({
-        type: 'IMAGE',
+      expect(
+        parseFieldOptions({ type: FIELD_TYPES.IMAGE, options: null })
+      ).toEqual({
+        type: FIELD_TYPES.IMAGE,
       });
     });
   });
 
   describe('discriminator', () => {
     it('returns opts.type matching field.type', () => {
-      const opts = parseFieldOptions({ type: 'SELECT', options: null });
-      expect(opts.type).toBe('SELECT');
+      const opts = parseFieldOptions({
+        type: FIELD_TYPES.SELECT,
+        options: null,
+      });
+      expect(opts.type).toBe(FIELD_TYPES.SELECT);
     });
   });
 
@@ -120,7 +134,7 @@ describe('parseFieldOptions', () => {
     it('throws on malformed UUID in RELATION targetContentTypeIds', () => {
       expect(() =>
         parseFieldOptions({
-          type: 'RELATION',
+          type: FIELD_TYPES.RELATION,
           options: { targetContentTypeIds: ['not-a-uuid'] },
         })
       ).toThrow();
@@ -129,7 +143,7 @@ describe('parseFieldOptions', () => {
     it('throws on malformed UUID in MULTIRELATION targetContentTypeIds', () => {
       expect(() =>
         parseFieldOptions({
-          type: 'MULTIRELATION',
+          type: FIELD_TYPES.MULTIRELATION,
           options: { targetContentTypeIds: ['not-a-uuid'] },
         })
       ).toThrow();
@@ -138,7 +152,7 @@ describe('parseFieldOptions', () => {
     it('throws on malformed UUID in RICHTEXT linkTargetContentTypeIds', () => {
       expect(() =>
         parseFieldOptions({
-          type: 'RICHTEXT',
+          type: FIELD_TYPES.RICHTEXT,
           options: { linkTargetContentTypeIds: ['not-a-uuid'] },
         })
       ).toThrow();
@@ -147,7 +161,7 @@ describe('parseFieldOptions', () => {
     it('throws on non-string SELECT choices', () => {
       expect(() =>
         parseFieldOptions({
-          type: 'SELECT',
+          type: FIELD_TYPES.SELECT,
           options: { choices: ['ok', 42] },
         })
       ).toThrow();

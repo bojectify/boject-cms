@@ -1,4 +1,5 @@
 import type { PrismaClient } from '../../../../apps/cms/generated/prisma/client.js';
+import { FIELD_TYPES } from '../../src/vendor/fieldTypes.js';
 
 export interface PerfArticleSeedResult {
   contentTypeId: string;
@@ -37,7 +38,7 @@ export async function seedPerfArticleContentType(
           {
             identifier: 'entryTitle',
             name: 'Title',
-            type: 'ENTRY_TITLE',
+            type: FIELD_TYPES.ENTRY_TITLE,
             required: true,
             unique: true,
             order: 0,
@@ -45,7 +46,7 @@ export async function seedPerfArticleContentType(
           {
             identifier: 'slug',
             name: 'Slug',
-            type: 'SLUG',
+            type: FIELD_TYPES.SLUG,
             required: false,
             unique: true,
             order: 1,
@@ -53,7 +54,7 @@ export async function seedPerfArticleContentType(
           {
             identifier: 'body',
             name: 'Body',
-            type: 'TEXT',
+            type: FIELD_TYPES.TEXT,
             required: false,
             unique: false,
             order: 2,
@@ -61,7 +62,7 @@ export async function seedPerfArticleContentType(
           {
             identifier: 'publishDate',
             name: 'Publish Date',
-            type: 'DATETIME',
+            type: FIELD_TYPES.DATETIME,
             required: false,
             unique: false,
             order: 3,

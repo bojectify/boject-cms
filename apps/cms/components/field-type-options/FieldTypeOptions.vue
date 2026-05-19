@@ -19,19 +19,21 @@ const parsed = computed(() => {
 });
 
 const choices = computed(() =>
-  parsed.value?.type === 'SELECT' ? parsed.value.choices : []
+  parsed.value?.type === FIELD_TYPES.SELECT ? parsed.value.choices : []
 );
 
 const targetContentTypeIds = computed(() =>
-  parsed.value?.type === 'RELATION' ||
-  parsed.value?.type === 'MULTIRELATION' ||
-  parsed.value?.type === 'RICHTEXT'
+  parsed.value?.type === FIELD_TYPES.RELATION ||
+  parsed.value?.type === FIELD_TYPES.MULTIRELATION ||
+  parsed.value?.type === FIELD_TYPES.RICHTEXT
     ? parsed.value.targetContentTypeIds
     : []
 );
 
 const linkTargetContentTypeIds = computed(() =>
-  parsed.value?.type === 'RICHTEXT' ? parsed.value.linkTargetContentTypeIds : []
+  parsed.value?.type === FIELD_TYPES.RICHTEXT
+    ? parsed.value.linkTargetContentTypeIds
+    : []
 );
 
 function onChoicesUpdate(val: string) {
@@ -45,7 +47,10 @@ function onChoicesUpdate(val: string) {
 </script>
 
 <template>
-  <UFormField v-if="type === 'SELECT'" label="Choices (comma-separated)">
+  <UFormField
+    v-if="type === FIELD_TYPES.SELECT"
+    label="Choices (comma-separated)"
+  >
     <UInput
       :model-value="choices.join(', ')"
       placeholder="e.g. option_a, option_b, option_c"
@@ -54,7 +59,9 @@ function onChoicesUpdate(val: string) {
     />
   </UFormField>
   <UFormField
-    v-else-if="type === 'RELATION' || type === 'MULTIRELATION'"
+    v-else-if="
+      type === FIELD_TYPES.RELATION || type === FIELD_TYPES.MULTIRELATION
+    "
     label="Target Content Types"
     required
   >
@@ -66,7 +73,7 @@ function onChoicesUpdate(val: string) {
       "
     />
   </UFormField>
-  <template v-else-if="type === 'RICHTEXT'">
+  <template v-else-if="type === FIELD_TYPES.RICHTEXT">
     <UFormField label="Allowed inline embed types">
       <ContentTypeChipPicker
         :model-value="targetContentTypeIds"

@@ -14,6 +14,7 @@ import {
   expect,
   it,
 } from 'vitest';
+import { FIELD_TYPES } from '../../src/vendor/fieldTypes.js';
 
 const run = promisify(execFile);
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -35,7 +36,7 @@ const BUNDLE = {
           id: null,
           identifier: 'title',
           name: 'Title',
-          type: 'ENTRY_TITLE',
+          type: FIELD_TYPES.ENTRY_TITLE,
           required: true,
           order: 0,
           options: null,

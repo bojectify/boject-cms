@@ -3,6 +3,7 @@ import { withPrismaErrors } from '../../../../utils/prismaErrors';
 import { enforceMutationRateLimit } from '../../../../utils/rateLimitEndpoint';
 import { invalidateSchema } from '../../../../graphql/schema';
 import { assertSchemaEditable } from '../../../../utils/schemaReadOnly';
+import { FIELD_TYPES } from '../../../../../utils/fieldTypes';
 
 export default defineEventHandler(async (event) => {
   assertSchemaEditable(event);
@@ -22,9 +23,9 @@ export default defineEventHandler(async (event) => {
   }
 
   // Block deleting the only ENTRY_TITLE field
-  if (field.type === 'ENTRY_TITLE') {
+  if (field.type === FIELD_TYPES.ENTRY_TITLE) {
     const entryTitleCount = await prisma.contentTypeField.count({
-      where: { contentTypeId, type: 'ENTRY_TITLE' },
+      where: { contentTypeId, type: FIELD_TYPES.ENTRY_TITLE },
     });
     if (entryTitleCount <= 1) {
       throw createError({

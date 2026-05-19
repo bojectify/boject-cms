@@ -3,6 +3,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../../generated/prisma/client';
 import { exportBundle } from './export';
 import { getTestDatabaseUrl } from '../../test/dbUrl';
+import { FIELD_TYPES } from '../../utils/fieldTypes';
 
 const url = getTestDatabaseUrl();
 const adapter = new PrismaPg({ connectionString: url });
@@ -27,7 +28,7 @@ describe('exportBundle', () => {
           create: {
             identifier: 'title',
             name: 'Title',
-            type: 'ENTRY_TITLE',
+            type: FIELD_TYPES.ENTRY_TITLE,
             required: true,
             order: 0,
           },
@@ -58,7 +59,7 @@ describe('exportBundle', () => {
           create: {
             identifier: 'title',
             name: 'Title',
-            type: 'ENTRY_TITLE',
+            type: FIELD_TYPES.ENTRY_TITLE,
             required: true,
             order: 0,
           },
@@ -85,7 +86,7 @@ describe('exportBundle', () => {
           create: {
             identifier: 'title',
             name: 'Title',
-            type: 'ENTRY_TITLE',
+            type: FIELD_TYPES.ENTRY_TITLE,
             required: true,
             order: 0,
           },
@@ -133,7 +134,7 @@ describe('exportBundle', () => {
           create: {
             identifier: 'name',
             name: 'Name',
-            type: 'ENTRY_TITLE',
+            type: FIELD_TYPES.ENTRY_TITLE,
             required: true,
             order: 0,
           },
@@ -164,14 +165,14 @@ describe('exportBundle', () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
               order: 0,
             },
             {
               identifier: 'category',
               name: 'Category',
-              type: 'RELATION',
+              type: FIELD_TYPES.RELATION,
               required: false,
               order: 1,
               options: { targetContentTypeIds: [category.id] },

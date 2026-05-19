@@ -15,7 +15,7 @@ const emit = defineEmits<{
 const formName = ref('');
 const formIdentifier = ref('');
 const identifierTouched = ref(false);
-const formType = ref('TEXT');
+const formType = ref<FieldTypeName>(FIELD_TYPES.TEXT);
 const formRequired = ref(false);
 const formUnique = ref(false);
 const formOptions = ref<unknown>(null);
@@ -27,7 +27,7 @@ watch(
       if (props.mode === 'edit' && props.field) {
         formName.value = props.field.name;
         formIdentifier.value = props.field.identifier;
-        formType.value = props.field.type;
+        formType.value = props.field.type as FieldTypeName;
         formRequired.value = props.field.required;
         formUnique.value = props.field.unique;
         formOptions.value = props.field.options ?? null;
@@ -35,7 +35,7 @@ watch(
       } else {
         formName.value = '';
         formIdentifier.value = '';
-        formType.value = 'TEXT';
+        formType.value = FIELD_TYPES.TEXT;
         formRequired.value = false;
         formUnique.value = false;
         formOptions.value = null;
@@ -60,14 +60,16 @@ const canSave = computed(() => {
 
 const showUniqueToggle = computed(
   () =>
-    formType.value === 'TEXT' ||
-    formType.value === 'NUMBER' ||
-    formType.value === 'ENTRY_TITLE' ||
-    formType.value === 'SLUG'
+    formType.value === FIELD_TYPES.TEXT ||
+    formType.value === FIELD_TYPES.NUMBER ||
+    formType.value === FIELD_TYPES.ENTRY_TITLE ||
+    formType.value === FIELD_TYPES.SLUG
 );
 
 const uniqueToggleReadonly = computed(
-  () => formType.value === 'ENTRY_TITLE' || formType.value === 'SLUG'
+  () =>
+    formType.value === FIELD_TYPES.ENTRY_TITLE ||
+    formType.value === FIELD_TYPES.SLUG
 );
 
 function handleSave() {
@@ -101,7 +103,7 @@ function updateOptions(val: unknown) {
 }
 
 const canDelete = computed(() => {
-  return props.mode === 'edit' && props.field?.type !== 'ENTRY_TITLE';
+  return props.mode === 'edit' && props.field?.type !== FIELD_TYPES.ENTRY_TITLE;
 });
 </script>
 

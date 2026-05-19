@@ -4,6 +4,7 @@ import { PrismaClient } from '../../generated/prisma/client';
 import { importBundle } from './import';
 import type { Bundle } from './types';
 import { getTestDatabaseUrl } from '../../test/dbUrl';
+import { FIELD_TYPES } from '../../utils/fieldTypes';
 
 const url = getTestDatabaseUrl();
 const adapter = new PrismaPg({ connectionString: url });
@@ -30,7 +31,7 @@ const schemaOnly: Bundle = {
           id: null,
           identifier: 'title',
           name: 'Title',
-          type: 'ENTRY_TITLE',
+          type: FIELD_TYPES.ENTRY_TITLE,
           required: true,
           order: 0,
           options: null,
@@ -39,7 +40,7 @@ const schemaOnly: Bundle = {
           id: null,
           identifier: 'body',
           name: 'Body',
-          type: 'TEXTAREA',
+          type: FIELD_TYPES.TEXTAREA,
           required: false,
           order: 1,
           options: null,
@@ -89,7 +90,7 @@ describe('importBundle', () => {
               id: null,
               identifier: 'name',
               name: 'Name',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
               order: 0,
               options: null,
@@ -106,7 +107,7 @@ describe('importBundle', () => {
               id: null,
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
               order: 0,
               options: null,
@@ -115,7 +116,7 @@ describe('importBundle', () => {
               id: null,
               identifier: 'category',
               name: 'Category',
-              type: 'RELATION',
+              type: FIELD_TYPES.RELATION,
               required: false,
               order: 1,
               options: {
@@ -194,7 +195,7 @@ describe('importBundle', () => {
               id: null,
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
               order: 0,
               options: null,
@@ -203,7 +204,7 @@ describe('importBundle', () => {
               id: null,
               identifier: 'bs',
               name: 'Bs',
-              type: 'MULTIRELATION',
+              type: FIELD_TYPES.MULTIRELATION,
               required: false,
               order: 1,
               options: {
@@ -223,7 +224,7 @@ describe('importBundle', () => {
               id: null,
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
               order: 0,
               options: null,
@@ -270,7 +271,7 @@ describe('importBundle', () => {
               id: null,
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
               order: 0,
               options: null,
@@ -279,7 +280,7 @@ describe('importBundle', () => {
               id: null,
               identifier: 'ref',
               name: 'Ref',
-              type: 'RELATION',
+              type: FIELD_TYPES.RELATION,
               required: false,
               order: 1,
               options: {
@@ -315,7 +316,7 @@ describe('importBundle', () => {
               id: null,
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
               order: 0,
               options: null,
@@ -387,7 +388,7 @@ describe('importBundle', () => {
                 id: null,
                 identifier: 'name',
                 name: 'Name',
-                type: 'ENTRY_TITLE',
+                type: FIELD_TYPES.ENTRY_TITLE,
                 required: true,
                 order: 0,
                 options: null,
@@ -404,7 +405,7 @@ describe('importBundle', () => {
                 id: null,
                 identifier: 'title',
                 name: 'Title',
-                type: 'ENTRY_TITLE',
+                type: FIELD_TYPES.ENTRY_TITLE,
                 required: true,
                 order: 0,
                 options: null,
@@ -413,7 +414,7 @@ describe('importBundle', () => {
                 id: null,
                 identifier: 'category',
                 name: 'Category',
-                type: 'RELATION',
+                type: FIELD_TYPES.RELATION,
                 required: false,
                 order: 1,
                 options: {

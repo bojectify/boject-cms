@@ -1,3 +1,4 @@
+import { FIELD_TYPES } from '~/utils/fieldTypes';
 interface RelationRef {
   contentTypeId: string;
   entryId: string;
@@ -54,7 +55,7 @@ export function useRelationResolver() {
     ]);
 
     const titleField = entry.contentType?.fields.find(
-      (f) => f.type === 'ENTRY_TITLE'
+      (f) => f.type === FIELD_TYPES.ENTRY_TITLE
     );
     const titleKey = titleField?.identifier ?? 'title';
     const entryTitle = (entry.data[titleKey] as string) ?? 'Untitled';

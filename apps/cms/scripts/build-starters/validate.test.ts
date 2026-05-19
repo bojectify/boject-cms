@@ -1,6 +1,7 @@
 // scripts/build-starters/validate.test.ts
 import { describe, expect, it } from 'vitest';
 import { validateOverlay } from './validate';
+import { FIELD_TYPES } from '../../utils/fieldTypes';
 
 const baseOverlay = {
   version: 1,
@@ -17,7 +18,7 @@ const baseOverlay = {
           id: null,
           identifier: 'name',
           name: 'Name',
-          type: 'ENTRY_TITLE',
+          type: FIELD_TYPES.ENTRY_TITLE,
           required: true,
           order: 0,
           options: null,
@@ -85,7 +86,7 @@ describe('validateOverlay', () => {
           id: null,
           identifier: 'position',
           name: 'Position',
-          type: 'RELATION',
+          type: FIELD_TYPES.RELATION,
           required: false,
           order: 10,
           options: {
@@ -108,7 +109,7 @@ describe('validateOverlay', () => {
           id: null,
           identifier: 'position',
           name: 'Position',
-          type: 'TEXT',
+          type: FIELD_TYPES.TEXT,
           required: false,
           order: 5,
           options: null,
@@ -130,7 +131,7 @@ describe('validateOverlay', () => {
           id: null,
           identifier: 'slug',
           name: 'Slug',
-          type: 'SLUG',
+          type: FIELD_TYPES.SLUG,
           required: false,
           order: 0,
           options: null,
@@ -140,7 +141,7 @@ describe('validateOverlay', () => {
     const res = validateOverlay({ ...baseOverlay, contentTypes: [ct] });
     expect(res.ok).toBe(false);
     expect(
-      res.errors.find((e) => e.message.includes('ENTRY_TITLE'))
+      res.errors.find((e) => e.message.includes(FIELD_TYPES.ENTRY_TITLE))
     ).toBeDefined();
   });
 });

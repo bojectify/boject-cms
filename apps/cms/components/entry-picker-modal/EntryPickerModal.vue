@@ -104,7 +104,7 @@ watch(
         fields: Array<{ identifier: string; type: string }>;
       }>(`/api/content-types/${typeId}`);
       const titleField = contentType.fields.find(
-        (f) => f.type === 'ENTRY_TITLE'
+        (f) => f.type === FIELD_TYPES.ENTRY_TITLE
       );
       const titleKey = titleField?.identifier ?? 'title';
 

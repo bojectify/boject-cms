@@ -4,6 +4,7 @@ import { PrismaClient } from '../../generated/prisma/client';
 import { exportBundle } from './export';
 import { importBundle } from './import';
 import { getTestDatabaseUrl } from '../../test/dbUrl';
+import { FIELD_TYPES } from '../../utils/fieldTypes';
 
 const url = getTestDatabaseUrl();
 const adapter = new PrismaPg({ connectionString: url });
@@ -24,7 +25,7 @@ async function seed() {
         create: {
           identifier: 'name',
           name: 'Name',
-          type: 'ENTRY_TITLE',
+          type: FIELD_TYPES.ENTRY_TITLE,
           required: true,
           order: 0,
         },
@@ -55,14 +56,14 @@ async function seed() {
           {
             identifier: 'title',
             name: 'Title',
-            type: 'ENTRY_TITLE',
+            type: FIELD_TYPES.ENTRY_TITLE,
             required: true,
             order: 0,
           },
           {
             identifier: 'category',
             name: 'Category',
-            type: 'RELATION',
+            type: FIELD_TYPES.RELATION,
             required: false,
             order: 1,
             options: { targetContentTypeIds: [category.id] },
@@ -139,7 +140,7 @@ describe('export → import round-trip', () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
               unique: true,
               order: 0,
@@ -147,7 +148,7 @@ describe('export → import round-trip', () => {
             {
               identifier: 'sku',
               name: 'SKU',
-              type: 'TEXT',
+              type: FIELD_TYPES.TEXT,
               required: false,
               unique: true,
               order: 1,
@@ -155,7 +156,7 @@ describe('export → import round-trip', () => {
             {
               identifier: 'tagline',
               name: 'Tagline',
-              type: 'TEXT',
+              type: FIELD_TYPES.TEXT,
               required: false,
               unique: false,
               order: 2,
@@ -219,7 +220,7 @@ describe('export → import round-trip', () => {
               id: null,
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE' as const,
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
               order: 0,
               options: null,
@@ -228,7 +229,7 @@ describe('export → import round-trip', () => {
               id: null,
               identifier: 'slug',
               name: 'Slug',
-              type: 'SLUG' as const,
+              type: FIELD_TYPES.SLUG,
               required: false,
               order: 1,
               options: null,
@@ -237,7 +238,7 @@ describe('export → import round-trip', () => {
               id: null,
               identifier: 'note',
               name: 'Note',
-              type: 'TEXT' as const,
+              type: FIELD_TYPES.TEXT,
               required: false,
               order: 2,
               options: null,

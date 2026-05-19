@@ -9,21 +9,7 @@ import {
   parseFieldOptions,
   getFieldOptionsErrorShape,
 } from '../../../../../utils/fieldOptions';
-
-const VALID_FIELD_TYPES = new Set<string>([
-  'ENTRY_TITLE',
-  'SLUG',
-  'TEXT',
-  'TEXTAREA',
-  'NUMBER',
-  'BOOLEAN',
-  'DATETIME',
-  'SELECT',
-  'RICHTEXT',
-  'RELATION',
-  'MULTIRELATION',
-  'IMAGE',
-]);
+import { FIELD_TYPES, isFieldTypeName } from '../../../../../utils/fieldTypes';
 
 export default defineEventHandler(async (event) => {
   assertSchemaEditable(event);
@@ -59,12 +45,15 @@ export default defineEventHandler(async (event) => {
   }
   if ('options' in body) {
     if (
-      field.type === 'RICHTEXT' &&
+      field.type === FIELD_TYPES.RICHTEXT &&
       body.options &&
       typeof body.options === 'object'
     ) {
       try {
-        parseFieldOptions({ type: 'RICHTEXT', options: body.options });
+        parseFieldOptions({
+          type: FIELD_TYPES.RICHTEXT,
+          options: body.options,
+        });
       } catch (e) {
         const shape = getFieldOptionsErrorShape(e);
         const key = shape?.key ?? 'targetContentTypeIds';
@@ -77,7 +66,10 @@ export default defineEventHandler(async (event) => {
         });
       }
     }
-    if (field.type === 'RELATION' || field.type === 'MULTIRELATION') {
+    if (
+      field.type === FIELD_TYPES.RELATION ||
+      field.type === FIELD_TYPES.MULTIRELATION
+    ) {
       let opts;
       try {
         opts = parseFieldOptions({ type: field.type, options: body.options });
@@ -92,7 +84,8 @@ export default defineEventHandler(async (event) => {
         });
       }
       const ids =
-        opts.type === 'RELATION' || opts.type === 'MULTIRELATION'
+        opts.type === FIELD_TYPES.RELATION ||
+        opts.type === FIELD_TYPES.MULTIRELATION
           ? opts.targetContentTypeIds
           : [];
       if (ids.length === 0) {
@@ -123,7 +116,8 @@ export default defineEventHandler(async (event) => {
       });
     }
     if (
-      (field.type === 'ENTRY_TITLE' || field.type === 'SLUG') &&
+      (field.type === FIELD_TYPES.ENTRY_TITLE ||
+        field.type === FIELD_TYPES.SLUG) &&
       body.unique === false
     ) {
       throw createError({
@@ -139,7 +133,7 @@ export default defineEventHandler(async (event) => {
     if (
       nextUnique &&
       !field.unique &&
-      (field.type === 'TEXT' || field.type === 'NUMBER')
+      (field.type === FIELD_TYPES.TEXT || field.type === FIELD_TYPES.NUMBER)
     ) {
       const conflicts = await findDuplicateGroups(
         contentTypeId,
@@ -166,7 +160,7 @@ export default defineEventHandler(async (event) => {
 
   // If updating type, block if entries exist
   if ('type' in body) {
-    if (typeof body.type !== 'string' || !VALID_FIELD_TYPES.has(body.type)) {
+    if (!isFieldTypeName(body.type)) {
       throw createError({
         statusCode: 400,
         statusMessage: 'type must be a valid FieldType',
@@ -217,11 +211,11 @@ export default defineEventHandler(async (event) => {
 async function findDuplicateGroups(
   contentTypeId: string,
   identifier: string,
-  type: 'TEXT' | 'NUMBER'
+  type: typeof FIELD_TYPES.TEXT | typeof FIELD_TYPES.NUMBER
 ): Promise<Array<{ value: unknown; entryIds: string[] }>> {
   // For each entry, pick the most-recent version's value at `identifier`. Group
   // entries by that value and return groups with COUNT > 1. Null/empty excluded.
-  if (type === 'NUMBER') {
+  if (type === FIELD_TYPES.NUMBER) {
     // Cast to double precision (not numeric) so @prisma/adapter-pg returns a JS
     // number rather than a string. NUMBER fields in this CMS hold ordinary
     // user-facing values (issue numbers, prices, counts) where double-precision

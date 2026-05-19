@@ -6,6 +6,7 @@ import type { AddressInfo } from 'node:net';
 import { prisma } from '../../utils/prisma';
 import { resetRateLimitStore } from '../../utils/rateLimit';
 import { runWorkerTick } from '../../utils/webhookWorker';
+import { FIELD_TYPES } from '../../../utils/fieldTypes';
 
 // This test relies on the symmetric escape hatch from issue #103: when
 // `NODE_ENV !== 'production'` (or `WEBHOOK_ALLOW_PRIVATE_URLS=true`), both
@@ -131,7 +132,7 @@ describe('Webhook delivery E2E', async () => {
               {
                 identifier: 'title',
                 name: 'Title',
-                type: 'ENTRY_TITLE',
+                type: FIELD_TYPES.ENTRY_TITLE,
                 order: 0,
                 required: true,
                 unique: true,
@@ -286,7 +287,7 @@ describe('Webhook delivery E2E', async () => {
               {
                 identifier: 'title',
                 name: 'Title',
-                type: 'ENTRY_TITLE',
+                type: FIELD_TYPES.ENTRY_TITLE,
                 order: 0,
                 required: true,
                 unique: true,

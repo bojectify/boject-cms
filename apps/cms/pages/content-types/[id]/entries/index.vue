@@ -24,7 +24,9 @@ const { data: contentType } = await useAuthedFetch<{
 }>(`/api/content-types/${contentTypeId}`);
 
 const entryTitleFieldIdentifier = computed(() => {
-  const field = contentType.value?.fields.find((f) => f.type === 'ENTRY_TITLE');
+  const field = contentType.value?.fields.find(
+    (f) => f.type === FIELD_TYPES.ENTRY_TITLE
+  );
   return field?.identifier ?? 'title';
 });
 

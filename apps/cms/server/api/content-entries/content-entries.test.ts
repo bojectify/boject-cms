@@ -6,6 +6,7 @@ import { PrismaClient } from '../../../generated/prisma/client';
 import { TEST_USERNAME, TEST_PASSWORD } from '../../test/credentials';
 import { resetRateLimitStore } from '../../utils/rateLimit';
 import { getTestDatabaseUrl } from '../../../test/dbUrl';
+import { FIELD_TYPES } from '../../../utils/fieldTypes';
 
 const prismaUrl = getTestDatabaseUrl();
 const prismaAdapter = new PrismaPg({ connectionString: prismaUrl });
@@ -25,7 +26,7 @@ async function ensureBlogContentType(): Promise<{ id: string }> {
           {
             identifier: 'title',
             name: 'Title',
-            type: 'ENTRY_TITLE',
+            type: FIELD_TYPES.ENTRY_TITLE,
             order: 0,
             required: true,
             unique: true,
@@ -138,24 +139,32 @@ describe('Content Entry endpoints', async () => {
           {
             identifier: 'title',
             name: 'Title',
-            type: 'ENTRY_TITLE',
+            type: FIELD_TYPES.ENTRY_TITLE,
             required: true,
           },
-          { identifier: 'slug', name: 'Slug', type: 'SLUG' },
-          { identifier: 'summary', name: 'Summary', type: 'TEXT' },
-          { identifier: 'count', name: 'Count', type: 'NUMBER' },
-          { identifier: 'featured', name: 'Featured', type: 'BOOLEAN' },
-          { identifier: 'publishDate', name: 'Publish Date', type: 'DATETIME' },
+          { identifier: 'slug', name: 'Slug', type: FIELD_TYPES.SLUG },
+          { identifier: 'summary', name: 'Summary', type: FIELD_TYPES.TEXT },
+          { identifier: 'count', name: 'Count', type: FIELD_TYPES.NUMBER },
+          {
+            identifier: 'featured',
+            name: 'Featured',
+            type: FIELD_TYPES.BOOLEAN,
+          },
+          {
+            identifier: 'publishDate',
+            name: 'Publish Date',
+            type: FIELD_TYPES.DATETIME,
+          },
           {
             identifier: 'category',
             name: 'Category',
-            type: 'SELECT',
+            type: FIELD_TYPES.SELECT,
             options: { choices: ['news', 'blog', 'update'] },
           },
           {
             identifier: 'content',
             name: 'Content',
-            type: 'RICHTEXT',
+            type: FIELD_TYPES.RICHTEXT,
           },
         ],
       },
@@ -1514,7 +1523,7 @@ describe('Content Entry endpoints', async () => {
           {
             identifier: 'title',
             name: 'Title',
-            type: 'ENTRY_TITLE',
+            type: FIELD_TYPES.ENTRY_TITLE,
             required: true,
           },
         ],
@@ -1542,19 +1551,19 @@ describe('Content Entry endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
             {
               identifier: 'link',
               name: 'Link',
-              type: 'RELATION',
+              type: FIELD_TYPES.RELATION,
               options: { targetContentTypeIds: [targetType.id] },
             },
             {
               identifier: 'relatedItems',
               name: 'Related Items',
-              type: 'MULTIRELATION',
+              type: FIELD_TYPES.MULTIRELATION,
               options: { targetContentTypeIds: [targetType.id] },
             },
           ],
@@ -1742,14 +1751,14 @@ describe('Content Entry endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
               order: 0,
             },
             {
               identifier: 'hero',
               name: 'Hero',
-              type: 'IMAGE',
+              type: FIELD_TYPES.IMAGE,
               required: false,
               order: 1,
             },
@@ -1757,7 +1766,9 @@ describe('Content Entry endpoints', async () => {
         },
       });
 
-      expect(created.fields.some((f) => f.type === 'IMAGE')).toBe(true);
+      expect(created.fields.some((f) => f.type === FIELD_TYPES.IMAGE)).toBe(
+        true
+      );
       imageTypeId = created.id;
     });
 
@@ -2165,7 +2176,9 @@ describe('Content Entry endpoints', async () => {
     async function createUniqueContentType(
       cookie: string,
       suffix: string,
-      fieldType: 'TEXT' | 'NUMBER' = 'TEXT',
+      fieldType:
+        | typeof FIELD_TYPES.TEXT
+        | typeof FIELD_TYPES.NUMBER = FIELD_TYPES.TEXT,
       fieldIdentifier = 'sku'
     ): Promise<ContentTypeResponse> {
       return await $fetch<ContentTypeResponse>('/api/content-types', {
@@ -2178,7 +2191,7 @@ describe('Content Entry endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
             {
@@ -2223,7 +2236,7 @@ describe('Content Entry endpoints', async () => {
       const ct = await createUniqueContentType(
         cookie,
         `number-${ts}`,
-        'NUMBER',
+        FIELD_TYPES.NUMBER,
         'issue'
       );
 
@@ -2455,7 +2468,7 @@ describe('Content Entry endpoints', async () => {
               {
                 identifier: 'title',
                 name: 'Title',
-                type: 'ENTRY_TITLE',
+                type: FIELD_TYPES.ENTRY_TITLE,
                 order: 0,
                 required: true,
                 unique: true,
@@ -3477,7 +3490,7 @@ describe('Content Entry endpoints', async () => {
               {
                 identifier: 'title',
                 name: 'Title',
-                type: 'ENTRY_TITLE',
+                type: FIELD_TYPES.ENTRY_TITLE,
                 order: 0,
                 required: true,
                 unique: true,
@@ -3495,7 +3508,7 @@ describe('Content Entry endpoints', async () => {
               {
                 identifier: 'title',
                 name: 'Title',
-                type: 'ENTRY_TITLE',
+                type: FIELD_TYPES.ENTRY_TITLE,
                 order: 0,
                 required: true,
                 unique: true,
@@ -3513,7 +3526,7 @@ describe('Content Entry endpoints', async () => {
               {
                 identifier: 'title',
                 name: 'Title',
-                type: 'ENTRY_TITLE',
+                type: FIELD_TYPES.ENTRY_TITLE,
                 order: 0,
                 required: true,
                 unique: true,
@@ -3521,7 +3534,7 @@ describe('Content Entry endpoints', async () => {
               {
                 identifier: 'body',
                 name: 'Body',
-                type: 'RICHTEXT',
+                type: FIELD_TYPES.RICHTEXT,
                 order: 1,
                 required: false,
                 unique: false,

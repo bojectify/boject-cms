@@ -88,20 +88,7 @@ async function handleSave() {
 }
 
 // Field management
-const fieldTypeOptions = [
-  { label: 'Entry Title', value: 'ENTRY_TITLE' },
-  { label: 'Slug', value: 'SLUG' },
-  { label: 'Text', value: 'TEXT' },
-  { label: 'Textarea', value: 'TEXTAREA' },
-  { label: 'Number', value: 'NUMBER' },
-  { label: 'Boolean', value: 'BOOLEAN' },
-  { label: 'Date/Time', value: 'DATETIME' },
-  { label: 'Select', value: 'SELECT' },
-  { label: 'Rich Text', value: 'RICHTEXT' },
-  { label: 'Relation', value: 'RELATION' },
-  { label: 'Multi Relation', value: 'MULTIRELATION' },
-  { label: 'Image', value: 'IMAGE' },
-];
+const fieldTypeOptions = FIELD_TYPE_OPTIONS;
 
 // Content type options for relation field target picker
 const { data: contentTypeOptions } = useAuthedFetch<

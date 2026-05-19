@@ -2,6 +2,7 @@ import { createError } from 'h3';
 import type { FieldType } from '#prisma';
 import { parseFieldOptions } from '../../utils/fieldOptions';
 import { isUuid } from './validation';
+import { FIELD_TYPES } from '../../utils/fieldTypes';
 
 interface FieldDef {
   identifier: string;
@@ -39,10 +40,10 @@ export async function validateEntryData(
     }
 
     switch (field.type) {
-      case 'ENTRY_TITLE':
-      case 'SLUG':
-      case 'TEXT':
-      case 'TEXTAREA':
+      case FIELD_TYPES.ENTRY_TITLE:
+      case FIELD_TYPES.SLUG:
+      case FIELD_TYPES.TEXT:
+      case FIELD_TYPES.TEXTAREA:
         if (typeof value !== 'string') {
           throw createError({
             statusCode: 400,
@@ -52,7 +53,7 @@ export async function validateEntryData(
         validated[field.identifier] = value;
         break;
 
-      case 'NUMBER':
+      case FIELD_TYPES.NUMBER:
         if (typeof value !== 'number' || !Number.isFinite(value)) {
           throw createError({
             statusCode: 400,
@@ -62,7 +63,7 @@ export async function validateEntryData(
         validated[field.identifier] = value;
         break;
 
-      case 'BOOLEAN':
+      case FIELD_TYPES.BOOLEAN:
         if (typeof value !== 'boolean') {
           throw createError({
             statusCode: 400,
@@ -72,7 +73,7 @@ export async function validateEntryData(
         validated[field.identifier] = value;
         break;
 
-      case 'DATETIME':
+      case FIELD_TYPES.DATETIME:
         if (typeof value !== 'string' || isNaN(Date.parse(value))) {
           throw createError({
             statusCode: 400,
@@ -82,7 +83,7 @@ export async function validateEntryData(
         validated[field.identifier] = value;
         break;
 
-      case 'SELECT': {
+      case FIELD_TYPES.SELECT: {
         if (typeof value !== 'string') {
           throw createError({
             statusCode: 400,
@@ -90,7 +91,7 @@ export async function validateEntryData(
           });
         }
         const opts = parseFieldOptions(field);
-        const choices = opts.type === 'SELECT' ? opts.choices : [];
+        const choices = opts.type === FIELD_TYPES.SELECT ? opts.choices : [];
         if (choices.length > 0 && !choices.includes(value)) {
           throw createError({
             statusCode: 400,
@@ -101,7 +102,7 @@ export async function validateEntryData(
         break;
       }
 
-      case 'RICHTEXT': {
+      case FIELD_TYPES.RICHTEXT: {
         if (
           typeof value !== 'object' ||
           value === null ||
@@ -114,9 +115,13 @@ export async function validateEntryData(
         }
         const rtOpts = parseFieldOptions(field);
         const allowedEmbedTypes =
-          rtOpts.type === 'RICHTEXT' ? rtOpts.targetContentTypeIds : [];
+          rtOpts.type === FIELD_TYPES.RICHTEXT
+            ? rtOpts.targetContentTypeIds
+            : [];
         const allowedLinkTypes =
-          rtOpts.type === 'RICHTEXT' ? rtOpts.linkTargetContentTypeIds : [];
+          rtOpts.type === FIELD_TYPES.RICHTEXT
+            ? rtOpts.linkTargetContentTypeIds
+            : [];
         validateRichtextReferences(
           value,
           allowedEmbedTypes,
@@ -127,7 +132,7 @@ export async function validateEntryData(
         break;
       }
 
-      case 'RELATION': {
+      case FIELD_TYPES.RELATION: {
         if (
           typeof value !== 'object' ||
           value === null ||
@@ -147,7 +152,7 @@ export async function validateEntryData(
         }
         const opts = parseFieldOptions(field);
         const allowedTypes =
-          opts.type === 'RELATION' ? opts.targetContentTypeIds : [];
+          opts.type === FIELD_TYPES.RELATION ? opts.targetContentTypeIds : [];
         if (
           allowedTypes.length > 0 &&
           !allowedTypes.includes(rel.contentTypeId as string)
@@ -177,7 +182,7 @@ export async function validateEntryData(
         break;
       }
 
-      case 'MULTIRELATION': {
+      case FIELD_TYPES.MULTIRELATION: {
         if (!Array.isArray(value)) {
           throw createError({
             statusCode: 400,
@@ -186,7 +191,9 @@ export async function validateEntryData(
         }
         const opts = parseFieldOptions(field);
         const allowedTypes =
-          opts.type === 'MULTIRELATION' ? opts.targetContentTypeIds : [];
+          opts.type === FIELD_TYPES.MULTIRELATION
+            ? opts.targetContentTypeIds
+            : [];
         const seenEntryIds = new Set<string>();
         const validatedRefs: Array<{
           contentTypeId: string;
@@ -249,7 +256,7 @@ export async function validateEntryData(
         break;
       }
 
-      case 'IMAGE': {
+      case FIELD_TYPES.IMAGE: {
         if (
           typeof value !== 'object' ||
           value === null ||
@@ -475,7 +482,7 @@ export function extractSlug(
   data: Record<string, unknown>,
   fields: FieldDef[]
 ): string | null {
-  const slugField = fields.find((f) => f.type === 'SLUG');
+  const slugField = fields.find((f) => f.type === FIELD_TYPES.SLUG);
   if (!slugField) return null;
   const val = data[slugField.identifier];
   return typeof val === 'string' && val.trim() ? val.trim() : null;
@@ -489,7 +496,7 @@ export function extractEntryTitle(
   data: Record<string, unknown>,
   fields: FieldDef[]
 ): string {
-  const titleField = fields.find((f) => f.type === 'ENTRY_TITLE');
+  const titleField = fields.find((f) => f.type === FIELD_TYPES.ENTRY_TITLE);
   if (!titleField) return 'Untitled';
   const val = data[titleField.identifier];
   return typeof val === 'string' && val.trim() ? val.trim() : 'Untitled';

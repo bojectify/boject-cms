@@ -12,6 +12,7 @@ import {
   registerContentEntryWhere,
 } from './jsonbFilters';
 import { Prisma } from '#prisma';
+import { FIELD_TYPES } from '../../utils/fieldTypes';
 
 interface ContentTypeWithFields {
   id: string;
@@ -302,10 +303,15 @@ export function registerDynamicTypes(
       ReturnType<Builder['inputType']>
     >();
     for (const field of filterableFields) {
-      if (field.type !== 'RELATION' && field.type !== 'MULTIRELATION') continue;
+      if (
+        field.type !== FIELD_TYPES.RELATION &&
+        field.type !== FIELD_TYPES.MULTIRELATION
+      )
+        continue;
       const opts = parseFieldOptions(field);
       const targetIds =
-        opts.type === 'RELATION' || opts.type === 'MULTIRELATION'
+        opts.type === FIELD_TYPES.RELATION ||
+        opts.type === FIELD_TYPES.MULTIRELATION
           ? opts.targetContentTypeIds
           : [];
       if (targetIds.length !== 1) continue;
@@ -315,13 +321,13 @@ export function registerDynamicTypes(
       const pascalField =
         field.identifier.charAt(0).toUpperCase() + field.identifier.slice(1);
       const inputName =
-        field.type === 'RELATION'
+        field.type === FIELD_TYPES.RELATION
           ? `${ct.identifier}${pascalField}RelationFilter`
           : `${ct.identifier}${pascalField}MultirelationFilter`;
 
       const ref = builder.inputType(inputName, {
         fields: (t) => {
-          if (field.type === 'RELATION') {
+          if (field.type === FIELD_TYPES.RELATION) {
             return {
               equals: t.id(),
               in: t.idList(),
@@ -398,7 +404,8 @@ export function registerDynamicTypes(
 
         for (const field of scalarFields) {
           const scalarType = FIELD_TYPE_TO_SCALAR[field.type]!;
-          const isRequired = field.required || field.type === 'ENTRY_TITLE';
+          const isRequired =
+            field.required || field.type === FIELD_TYPES.ENTRY_TITLE;
 
           const resolver = (entry: ContentEntryShape) => {
             const data = parseEntryData(entry);
@@ -416,7 +423,9 @@ export function registerDynamicTypes(
         }
 
         // RICHTEXT fields (object type with json + references)
-        const richtextFields = ct.fields.filter((f) => f.type === 'RICHTEXT');
+        const richtextFields = ct.fields.filter(
+          (f) => f.type === FIELD_TYPES.RICHTEXT
+        );
         for (const field of richtextFields) {
           fields[field.identifier] = t.field({
             type: RichTextRef,
@@ -431,7 +440,9 @@ export function registerDynamicTypes(
         }
 
         // IMAGE fields (object type with file metadata + derived url)
-        const imageFields = ct.fields.filter((f) => f.type === 'IMAGE');
+        const imageFields = ct.fields.filter(
+          (f) => f.type === FIELD_TYPES.IMAGE
+        );
         for (const field of imageFields) {
           fields[field.identifier] = t.field({
             type: ImageFileRef,
@@ -442,11 +453,13 @@ export function registerDynamicTypes(
         }
 
         // RELATION fields (single polymorphic reference)
-        const relationFields = ct.fields.filter((f) => f.type === 'RELATION');
+        const relationFields = ct.fields.filter(
+          (f) => f.type === FIELD_TYPES.RELATION
+        );
         for (const field of relationFields) {
           const opts = parseFieldOptions(field);
           const targetIds =
-            opts.type === 'RELATION' ? opts.targetContentTypeIds : [];
+            opts.type === FIELD_TYPES.RELATION ? opts.targetContentTypeIds : [];
 
           const resolveRef = async (entry: ContentEntryShape) => {
             const data = parseEntryData(entry);
@@ -506,12 +519,14 @@ export function registerDynamicTypes(
 
         // MULTIRELATION fields (ordered list of polymorphic references)
         const multiRelationFields = ct.fields.filter(
-          (f) => f.type === 'MULTIRELATION'
+          (f) => f.type === FIELD_TYPES.MULTIRELATION
         );
         for (const field of multiRelationFields) {
           const opts = parseFieldOptions(field);
           const targetIds =
-            opts.type === 'MULTIRELATION' ? opts.targetContentTypeIds : [];
+            opts.type === FIELD_TYPES.MULTIRELATION
+              ? opts.targetContentTypeIds
+              : [];
 
           let nodeType: ReturnType<Builder['objectRef']> | undefined;
           if (targetIds.length === 1) {
@@ -623,7 +638,7 @@ export function registerDynamicTypes(
       })
     );
 
-    const hasSlug = ct.fields.some((f) => f.type === 'SLUG');
+    const hasSlug = ct.fields.some((f) => f.type === FIELD_TYPES.SLUG);
     if (hasSlug) {
       builder.queryField(`${camelName}BySlug`, (t) =>
         t.field({

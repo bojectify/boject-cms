@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { Bundle } from '../content-bundle/types';
 import type { Overlay } from './types';
 import { mergeOverlay } from './merge';
+import { FIELD_TYPES } from '../../utils/fieldTypes';
 
 const parent: Bundle = {
   version: 1,
@@ -19,7 +20,7 @@ const parent: Bundle = {
           id: null,
           identifier: 'name',
           name: 'Name',
-          type: 'ENTRY_TITLE',
+          type: FIELD_TYPES.ENTRY_TITLE,
           required: true,
           order: 0,
           options: null,
@@ -28,7 +29,7 @@ const parent: Bundle = {
           id: null,
           identifier: 'bio',
           name: 'Bio',
-          type: 'TEXTAREA',
+          type: FIELD_TYPES.TEXTAREA,
           required: false,
           order: 1,
           options: null,
@@ -56,7 +57,7 @@ describe('mergeOverlay', () => {
               id: null,
               identifier: 'name',
               name: 'Name',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
               order: 0,
               options: null,
@@ -88,7 +89,7 @@ describe('mergeOverlay', () => {
               id: null,
               identifier: 'name',
               name: 'Name',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
               order: 0,
               options: null,
@@ -116,7 +117,7 @@ describe('mergeOverlay', () => {
               id: null,
               identifier: 'position',
               name: 'Position',
-              type: 'RELATION',
+              type: FIELD_TYPES.RELATION,
               required: false,
               order: 10,
               options: {
@@ -151,7 +152,7 @@ describe('mergeOverlay', () => {
               id: null,
               identifier: 'bio',
               name: 'Biography',
-              type: 'RICHTEXT',
+              type: FIELD_TYPES.RICHTEXT,
               required: true,
               order: 1,
               options: null,
@@ -163,7 +164,7 @@ describe('mergeOverlay', () => {
     const out = mergeOverlay(parent, overlay);
     const player = out.contentTypes!.find((c) => c.identifier === 'Player')!;
     const bio = player.fields.find((f) => f.identifier === 'bio')!;
-    expect(bio.type).toBe('RICHTEXT');
+    expect(bio.type).toBe(FIELD_TYPES.RICHTEXT);
     expect(bio.required).toBe(true);
     expect(bio.name).toBe('Biography');
   });
@@ -200,7 +201,7 @@ describe('mergeOverlay', () => {
               id: null,
               identifier: 'height',
               name: 'Height',
-              type: 'NUMBER',
+              type: FIELD_TYPES.NUMBER,
               required: false,
               order: 5,
               options: null,

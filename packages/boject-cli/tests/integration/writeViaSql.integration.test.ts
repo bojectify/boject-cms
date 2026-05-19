@@ -13,6 +13,7 @@ import type {
 import type { GeneratedSeed } from '../../src/perf/generate.js';
 import { slugify } from '../../src/vendor/slugify.js';
 import { PERF_TEST_DATABASE_URL } from './globalSetup.js';
+import { FIELD_TYPES } from '../../src/vendor/fieldTypes.js';
 
 const PERF_ARTICLE_BUNDLE: Bundle = {
   version: 2,
@@ -29,7 +30,7 @@ const PERF_ARTICLE_BUNDLE: Bundle = {
           id: null,
           identifier: 'entryTitle',
           name: 'Title',
-          type: 'ENTRY_TITLE',
+          type: FIELD_TYPES.ENTRY_TITLE,
           required: true,
           unique: true,
           order: 0,
@@ -39,7 +40,7 @@ const PERF_ARTICLE_BUNDLE: Bundle = {
           id: null,
           identifier: 'slug',
           name: 'Slug',
-          type: 'SLUG',
+          type: FIELD_TYPES.SLUG,
           required: false,
           unique: true,
           order: 1,
@@ -49,7 +50,7 @@ const PERF_ARTICLE_BUNDLE: Bundle = {
           id: null,
           identifier: 'body',
           name: 'Body',
-          type: 'TEXT',
+          type: FIELD_TYPES.TEXT,
           required: false,
           unique: false,
           order: 2,
@@ -59,7 +60,7 @@ const PERF_ARTICLE_BUNDLE: Bundle = {
           id: null,
           identifier: 'publishDate',
           name: 'Publish Date',
-          type: 'DATETIME',
+          type: FIELD_TYPES.DATETIME,
           required: false,
           unique: false,
           order: 3,

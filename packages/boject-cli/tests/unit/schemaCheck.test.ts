@@ -12,6 +12,7 @@ import {
   it,
 } from 'vitest';
 import { runSchemaCheck } from '../../src/commands/schema/check.js';
+import { FIELD_TYPES } from '../../src/vendor/fieldTypes.js';
 
 let server: Server;
 let port: number;
@@ -61,7 +62,7 @@ const TYPE = (id: string) => ({
       id: null,
       identifier: 'name',
       name: 'Name',
-      type: 'ENTRY_TITLE',
+      type: FIELD_TYPES.ENTRY_TITLE,
       required: true,
       order: 0,
       options: null,

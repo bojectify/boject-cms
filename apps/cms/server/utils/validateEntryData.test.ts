@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { validateEntryData } from './validateEntryData';
+import { FIELD_TYPES } from '../../utils/fieldTypes';
 
 const imageField = {
   identifier: 'hero',
   name: 'Hero',
-  type: 'IMAGE' as const,
+  type: FIELD_TYPES.IMAGE,
   required: true,
   options: null,
 };
@@ -23,7 +24,7 @@ const fullImage = {
 const richtextFieldNoEmbeds = {
   identifier: 'body',
   name: 'Body',
-  type: 'RICHTEXT' as const,
+  type: FIELD_TYPES.RICHTEXT,
   required: false,
   options: null,
 };
@@ -35,7 +36,7 @@ const ANY_CT_UUID = '33333333-3333-4333-8333-333333333333';
 const richtextFieldWithAllowList = {
   identifier: 'body',
   name: 'Body',
-  type: 'RICHTEXT' as const,
+  type: FIELD_TYPES.RICHTEXT,
   required: false,
   options: { targetContentTypeIds: [ALLOWED_CT_UUID] },
 };
@@ -322,7 +323,7 @@ describe('validateEntryData — RICHTEXT entry links (cmsLink nodes)', () => {
     {
       identifier: 'body',
       name: 'Body',
-      type: 'RICHTEXT',
+      type: FIELD_TYPES.RICHTEXT,
       required: false,
       options: { linkTargetContentTypeIds: allowedLinks },
     },
@@ -506,7 +507,7 @@ describe('validateEntryData — RICHTEXT external links (externalLink nodes)', (
     {
       identifier: 'body',
       name: 'Body',
-      type: 'RICHTEXT',
+      type: FIELD_TYPES.RICHTEXT,
       required: false,
       options: null,
     },

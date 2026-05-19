@@ -6,6 +6,7 @@ import { createError } from 'h3';
 import { GraphQLError } from 'graphql';
 import { prisma } from '../utils/prisma';
 import { parseFieldOptions } from '../../utils/fieldOptions';
+import { FIELD_TYPES } from '../../utils/fieldTypes';
 
 export function registerDynamicFilterInputs(
   builder: Builder,
@@ -259,11 +260,11 @@ export function buildEntryConditions(
     const filter = filterValue as Record<string, unknown>;
 
     if (
-      field.type === 'ENTRY_TITLE' ||
-      field.type === 'SLUG' ||
-      field.type === 'TEXT' ||
-      field.type === 'TEXTAREA' ||
-      field.type === 'SELECT'
+      field.type === FIELD_TYPES.ENTRY_TITLE ||
+      field.type === FIELD_TYPES.SLUG ||
+      field.type === FIELD_TYPES.TEXT ||
+      field.type === FIELD_TYPES.TEXTAREA ||
+      field.type === FIELD_TYPES.SELECT
     ) {
       if (filter.equals != null) {
         conditions.push(
@@ -275,7 +276,7 @@ export function buildEntryConditions(
           Prisma.sql`${v}."data"->>${Prisma.raw(`'${field.identifier}'`)} ILIKE ${'%' + String(filter.contains) + '%'}`
         );
       }
-    } else if (field.type === 'NUMBER') {
+    } else if (field.type === FIELD_TYPES.NUMBER) {
       for (const op of COMPARISON_OPS) {
         if (filter[op] != null) {
           conditions.push(
@@ -283,13 +284,13 @@ export function buildEntryConditions(
           );
         }
       }
-    } else if (field.type === 'BOOLEAN') {
+    } else if (field.type === FIELD_TYPES.BOOLEAN) {
       if (filter.equals != null) {
         conditions.push(
           Prisma.sql`(${v}."data"->>${Prisma.raw(`'${field.identifier}'`)})::boolean = ${Boolean(filter.equals)}`
         );
       }
-    } else if (field.type === 'DATETIME') {
+    } else if (field.type === FIELD_TYPES.DATETIME) {
       const dateConditions = buildDateConditions(
         field.identifier,
         filter,
@@ -297,7 +298,7 @@ export function buildEntryConditions(
         alias.version
       );
       conditions.push(...dateConditions.map((c) => c.sql));
-    } else if (field.type === 'RELATION') {
+    } else if (field.type === FIELD_TYPES.RELATION) {
       const ident = Prisma.raw(`'${field.identifier}'`);
       if (typeof filter.equals === 'string' && filter.equals.length > 0) {
         conditions.push(
@@ -328,7 +329,7 @@ export function buildEntryConditions(
       if (filter.is && typeof filter.is === 'object') {
         const opts = parseFieldOptions(field);
         const targetIds =
-          opts.type === 'RELATION' ? opts.targetContentTypeIds : [];
+          opts.type === FIELD_TYPES.RELATION ? opts.targetContentTypeIds : [];
         if (targetIds.length === 1) {
           const targetType = contentTypes.find((c) => c.id === targetIds[0]);
           if (targetType) {
@@ -362,7 +363,7 @@ export function buildEntryConditions(
           }
         }
       }
-    } else if (field.type === 'MULTIRELATION') {
+    } else if (field.type === FIELD_TYPES.MULTIRELATION) {
       const ident = Prisma.raw(`'${field.identifier}'`);
       if (typeof filter.contains === 'string' && filter.contains.length > 0) {
         conditions.push(
@@ -398,7 +399,9 @@ export function buildEntryConditions(
       if (filter.some && typeof filter.some === 'object') {
         const opts = parseFieldOptions(field);
         const targetIds =
-          opts.type === 'MULTIRELATION' ? opts.targetContentTypeIds : [];
+          opts.type === FIELD_TYPES.MULTIRELATION
+            ? opts.targetContentTypeIds
+            : [];
         if (targetIds.length === 1) {
           const targetType = contentTypes.find((c) => c.id === targetIds[0]);
           if (targetType) {

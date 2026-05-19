@@ -5,6 +5,7 @@
 
 import type { FieldType } from '#prisma';
 import type { Bundle, BundleContentType, BundleField } from './types';
+import { FIELD_TYPES } from '../../utils/fieldTypes';
 
 /** Snapshot of current schema state, fetched once before planning. */
 export interface CurrentSchemaSnapshot {
@@ -142,7 +143,8 @@ export interface PlanOptions {
  * planner stays free of Nuxt/h3 imports.
  */
 export function effectiveBundleUnique(field: BundleField): boolean {
-  if (field.type === 'ENTRY_TITLE' || field.type === 'SLUG') return true;
+  if (field.type === FIELD_TYPES.ENTRY_TITLE || field.type === FIELD_TYPES.SLUG)
+    return true;
   return field.unique === true;
 }
 

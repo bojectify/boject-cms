@@ -9,6 +9,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../../generated/prisma/client';
 import { snapshotCurrentSchema } from './snapshotCurrentSchema';
 import { getTestDatabaseUrl } from '../../test/dbUrl';
+import { FIELD_TYPES } from '../../utils/fieldTypes';
 
 const url = getTestDatabaseUrl();
 const adapter = new PrismaPg({ connectionString: url });
@@ -43,7 +44,7 @@ describe('snapshotCurrentSchema', () => {
             {
               identifier: 'name',
               name: 'Name',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
               unique: true,
               order: 0,
@@ -82,7 +83,7 @@ describe('snapshotCurrentSchema', () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
               unique: true,
               order: 0,
@@ -90,7 +91,7 @@ describe('snapshotCurrentSchema', () => {
             {
               identifier: 'category',
               name: 'Category',
-              type: 'SELECT',
+              type: FIELD_TYPES.SELECT,
               required: false,
               unique: false,
               order: 1,
@@ -99,7 +100,7 @@ describe('snapshotCurrentSchema', () => {
             {
               identifier: 'author',
               name: 'Author',
-              type: 'RELATION',
+              type: FIELD_TYPES.RELATION,
               required: false,
               unique: false,
               order: 2,
@@ -108,7 +109,7 @@ describe('snapshotCurrentSchema', () => {
             {
               identifier: 'sku',
               name: 'SKU',
-              type: 'TEXT',
+              type: FIELD_TYPES.TEXT,
               required: false,
               unique: true,
               order: 3,
