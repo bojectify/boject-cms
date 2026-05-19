@@ -25,6 +25,7 @@ describe('validation utilities', () => {
     });
 
     it('rejects numbers', () => {
+      // eslint-disable-next-line no-restricted-syntax -- deliberately passes wrong runtime type to verify the validator rejects it
       expect(isUuid(42 as unknown as string)).toBe(false);
     });
   });
@@ -75,6 +76,7 @@ describe('validation utilities', () => {
 
     it('rejects strings', () => {
       expect(() =>
+        // eslint-disable-next-line no-restricted-syntax -- deliberately passes wrong runtime type to verify the validator rejects it
         assertNonNegativeInt('1' as unknown as number, 'order')
       ).toThrow();
     });
@@ -98,6 +100,7 @@ describe('validation utilities', () => {
 
     it('rejects non-strings', () => {
       expect(() =>
+        // eslint-disable-next-line no-restricted-syntax -- deliberately passes wrong runtime type to verify the validator rejects it
         assertStringLength(123 as unknown as string, 'name', 200)
       ).toThrow(/name must be a string/);
     });

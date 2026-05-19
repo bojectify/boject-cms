@@ -23,6 +23,7 @@ describe('seedAdminIfEmpty', () => {
     const hashPassword = vi.fn().mockResolvedValue('$scrypt$hashed');
 
     const result = await seedAdminIfEmpty(
+      // eslint-disable-next-line no-restricted-syntax -- PrismaClient surface is wide; mock only has user.count/user.create
       prisma as unknown as Parameters<typeof seedAdminIfEmpty>[0],
       {
         email: 'a@b.com',
@@ -51,6 +52,7 @@ describe('seedAdminIfEmpty', () => {
     const hashPassword = vi.fn();
 
     const result = await seedAdminIfEmpty(
+      // eslint-disable-next-line no-restricted-syntax -- PrismaClient surface is wide; mock only has user.count/user.create
       prisma as unknown as Parameters<typeof seedAdminIfEmpty>[0],
       {
         email: 'a@b.com',

@@ -10,6 +10,15 @@ export default withNuxt(
   {
     rules: {
       eqeqeq: ['error', 'always', { null: 'ignore' }],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "TSAsExpression[expression.type='TSAsExpression'][expression.typeAnnotation.type='TSUnknownKeyword']",
+          message:
+            "Avoid 'as unknown as T' double casts. Try 'as T' directly or an intersection type (e.g. 'as Window & typeof globalThis & { ... }'). If the source genuinely has insufficient overlap with the target, add an eslint-disable-next-line comment with a brief reason.",
+        },
+      ],
     },
   },
   {

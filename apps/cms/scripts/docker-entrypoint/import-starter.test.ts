@@ -28,6 +28,7 @@ describe('importStarterIfEmpty', () => {
     const readBundle = vi.fn().mockResolvedValue(SAMPLE_BUNDLE);
 
     const result = await importStarterIfEmpty(
+      // eslint-disable-next-line no-restricted-syntax -- PrismaClient surface is wide; mock only has contentType.count
       prisma as unknown as Parameters<typeof importStarterIfEmpty>[0],
       { bundlePath: '/starters/base.boject.json', importBundle, readBundle }
     );
@@ -47,6 +48,7 @@ describe('importStarterIfEmpty', () => {
     const readBundle = vi.fn();
 
     const result = await importStarterIfEmpty(
+      // eslint-disable-next-line no-restricted-syntax -- PrismaClient surface is wide; mock only has contentType.count
       prisma as unknown as Parameters<typeof importStarterIfEmpty>[0],
       { bundlePath: '/starters/base.boject.json', importBundle, readBundle }
     );

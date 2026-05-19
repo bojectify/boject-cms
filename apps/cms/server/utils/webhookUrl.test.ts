@@ -12,7 +12,7 @@ vi.mock('./resolvePublicHost', async (importOriginal) => {
 });
 
 const { resolvePublicHost } = await import('./resolvePublicHost');
-const mockResolve = resolvePublicHost as unknown as ReturnType<typeof vi.fn>;
+const mockResolve = vi.mocked(resolvePublicHost);
 
 const ORIGINAL_NODE_ENV = process.env.NODE_ENV;
 const ORIGINAL_ALLOW = process.env.WEBHOOK_ALLOW_PRIVATE_URLS;

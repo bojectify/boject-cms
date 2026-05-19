@@ -37,7 +37,7 @@ export default defineEventHandler(async (event) => {
   };
   await prisma.webhookDelivery.update({
     where: { id: placeholder.id },
-    data: { payload: payload as unknown as Prisma.InputJsonValue },
+    data: { payload: payload as Prisma.InputJsonValue },
   });
   setResponseStatus(event, 201);
   return { deliveryId: placeholder.id, isTest: true };
