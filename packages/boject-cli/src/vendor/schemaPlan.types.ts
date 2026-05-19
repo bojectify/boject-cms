@@ -9,9 +9,8 @@ import type {
   Bundle,
   BundleContentType,
   BundleField,
-  FieldType,
 } from './contentBundleTypes.js';
-import { FIELD_TYPES } from './fieldTypes.js';
+import { FIELD_TYPES, type FieldTypeName } from './fieldTypes.js';
 
 /** Snapshot of current schema state, fetched once before planning. */
 export interface CurrentSchemaSnapshot {
@@ -24,7 +23,7 @@ export interface CurrentSchemaSnapshot {
       id: string;
       identifier: string;
       name: string;
-      type: FieldType;
+      type: FieldTypeName;
       required: boolean;
       unique: boolean;
       order: number;

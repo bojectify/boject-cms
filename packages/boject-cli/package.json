@@ -9,8 +9,14 @@
   },
   "main": "./dist/index.js",
   "exports": {
-    ".": "./dist/index.js",
-    "./perf": "./dist/perf/index.js",
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./dist/index.js"
+    },
+    "./perf": {
+      "types": "./src/perf/index.ts",
+      "default": "./dist/perf/index.js"
+    },
     "./vendor/contentBundleTypes": "./dist/vendor/contentBundleTypes.ts",
     "./vendor/fieldTypes": "./dist/vendor/fieldTypes.ts",
     "./vendor/contentStatus": "./dist/vendor/contentStatus.ts"

@@ -5,10 +5,6 @@
 import type { FieldTypeName } from './fieldTypes.js';
 import type { ContentStatusName } from './contentStatus.js';
 
-export type FieldType = FieldTypeName;
-
-export type ContentStatus = ContentStatusName;
-
 export const BUNDLE_VERSION = 2;
 
 export type BundleFieldOptions = {
@@ -22,7 +18,7 @@ export interface BundleField {
   id: string | null;
   identifier: string;
   name: string;
-  type: FieldType;
+  type: FieldTypeName;
   required: boolean;
   unique?: boolean;
   order: number;
@@ -38,7 +34,7 @@ export interface BundleContentType {
 }
 
 export interface BundleEntryVersion {
-  status: ContentStatus;
+  status: ContentStatusName;
   data: Record<string, unknown>;
   publishedAt: string | null;
 }
@@ -51,7 +47,7 @@ export interface BundleEntry {
   entryKey: string;
   slug: string | null;
   // V1 flat fields (kept for backward compat on import)
-  status?: ContentStatus;
+  status?: ContentStatusName;
   publishedAt?: string | null;
   data?: Record<string, unknown>;
   // V2 versioned

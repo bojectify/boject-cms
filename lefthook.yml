@@ -26,6 +26,10 @@ pre-commit:
       glob: 'scripts/**/*.ts'
       run: pnpm typecheck:scripts
 
+    - name: typecheck-perf
+      glob: 'perf/**/*.ts'
+      run: pnpm --filter perf typecheck && pnpm --filter perf typecheck:k6
+
 pre-push:
   jobs:
     - name: test
