@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path';
 import type { Bundle } from '../vendor/contentBundleTypes.js';
 import { generatePerfData } from './generate.js';
 import { CycleRequiresNullError } from './topoSort.js';
+import { FIELD_TYPES } from '../vendor/fieldTypes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -137,7 +138,7 @@ describe('generatePerfData', () => {
               id: 'f1',
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
               unique: true,
               order: 0,
@@ -147,7 +148,7 @@ describe('generatePerfData', () => {
               id: 'f2',
               identifier: 'cover',
               name: 'Cover',
-              type: 'IMAGE',
+              type: FIELD_TYPES.IMAGE,
               required: false,
               order: 1,
               options: null,
@@ -211,7 +212,7 @@ describe('generatePerfData', () => {
               id: 'f1',
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
               unique: true,
               order: 0,
@@ -221,7 +222,7 @@ describe('generatePerfData', () => {
               id: 'f2',
               identifier: 'parent',
               name: 'Parent',
-              type: 'RELATION',
+              type: FIELD_TYPES.RELATION,
               required: true,
               order: 1,
               options: { targetContentTypeIds: ['ct-page'] },

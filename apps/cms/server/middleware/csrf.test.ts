@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { setup, fetch, url } from '@nuxt/test-utils/e2e';
 import { TEST_USERNAME, TEST_PASSWORD } from '../test/credentials';
 import { resetRateLimitStore } from '../utils/rateLimit';
+import { FIELD_TYPES } from '../../utils/fieldTypes';
 
 let _sessionCookie: string | null = null;
 
@@ -45,7 +46,7 @@ describe('CSRF Origin check', async () => {
           {
             identifier: 'title',
             name: 'Title',
-            type: 'ENTRY_TITLE',
+            type: FIELD_TYPES.ENTRY_TITLE,
             required: true,
           },
         ],

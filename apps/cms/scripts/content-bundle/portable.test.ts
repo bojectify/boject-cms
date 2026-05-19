@@ -5,6 +5,7 @@ import {
   encodeDataRefs,
   decodeDataRefs,
 } from './portable';
+import { FIELD_TYPES } from '../../utils/fieldTypes';
 
 const typeIdToIdent = new Map([['aaa-uuid-ct', 'BlogPost']]);
 const typeIdentToEntryKeys = new Map([
@@ -88,9 +89,9 @@ describe('encodeDataRefs / decodeDataRefs round-trip', () => {
       tags: [{ contentTypeId: 'aaa-uuid-ct', entryId: 'post-uuid-1' }],
     };
     const fieldTypes = {
-      title: 'ENTRY_TITLE' as const,
-      author: 'RELATION' as const,
-      tags: 'MULTIRELATION' as const,
+      title: FIELD_TYPES.ENTRY_TITLE,
+      author: FIELD_TYPES.RELATION,
+      tags: FIELD_TYPES.MULTIRELATION,
     };
 
     const encoded = encodeDataRefs(
@@ -139,7 +140,7 @@ describe('encodeDataRefs / decodeDataRefs round-trip', () => {
       ],
     };
     const data = { body };
-    const fieldTypes = { body: 'RICHTEXT' as const };
+    const fieldTypes = { body: FIELD_TYPES.RICHTEXT };
 
     const encoded = encodeDataRefs(
       data,
@@ -160,7 +161,7 @@ describe('encodeDataRefs / decodeDataRefs round-trip', () => {
 });
 
 describe('encode/decodeDataRefs — RICHTEXT embeds', () => {
-  const fieldTypes = { body: 'RICHTEXT' as const };
+  const fieldTypes = { body: FIELD_TYPES.RICHTEXT };
   const doc = {
     type: 'doc',
     content: [
@@ -267,7 +268,7 @@ describe('encode/decodeDataRefs — RICHTEXT embeds', () => {
     };
     const out = encodeDataRefs(
       { body: nested },
-      { body: 'RICHTEXT' as const },
+      { body: FIELD_TYPES.RICHTEXT },
       typeIdToIdent,
       typeIdentToEntryKeys
     );
@@ -302,7 +303,7 @@ describe('encode/decodeDataRefs — RICHTEXT embeds', () => {
     };
     const out = encodeDataRefs(
       { body: docTwo },
-      { body: 'RICHTEXT' as const },
+      { body: FIELD_TYPES.RICHTEXT },
       typeIdToIdent,
       typeIdentToEntryKeys
     );
@@ -338,7 +339,7 @@ describe('encode/decodeDataRefs — RICHTEXT embeds', () => {
     const snapshot = JSON.parse(JSON.stringify(original));
     encodeDataRefs(
       { body: original },
-      { body: 'RICHTEXT' as const },
+      { body: FIELD_TYPES.RICHTEXT },
       typeIdToIdent,
       typeIdentToEntryKeys
     );

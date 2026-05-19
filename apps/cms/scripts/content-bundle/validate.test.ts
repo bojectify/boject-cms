@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { validateBundle } from './validate';
 import type { Bundle } from './types';
+import { FIELD_TYPES } from '../../utils/fieldTypes';
 
 const baseContentType = {
   id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
@@ -12,7 +13,7 @@ const baseContentType = {
       id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
       identifier: 'title',
       name: 'Title',
-      type: 'ENTRY_TITLE' as const,
+      type: FIELD_TYPES.ENTRY_TITLE,
       required: true,
       order: 0,
       options: null,
@@ -55,7 +56,7 @@ describe('validateBundle', () => {
               id: null,
               identifier: 'body',
               name: 'Body',
-              type: 'TEXT',
+              type: FIELD_TYPES.TEXT,
               required: false,
               order: 0,
               options: null,
@@ -80,7 +81,7 @@ describe('validateBundle', () => {
               id: null,
               identifier: 'status',
               name: 'Status',
-              type: 'SELECT',
+              type: FIELD_TYPES.SELECT,
               required: false,
               order: 1,
               options: {},
@@ -105,7 +106,7 @@ describe('validateBundle', () => {
               id: null,
               identifier: 'author',
               name: 'Author',
-              type: 'RELATION',
+              type: FIELD_TYPES.RELATION,
               required: false,
               order: 1,
               options: {},

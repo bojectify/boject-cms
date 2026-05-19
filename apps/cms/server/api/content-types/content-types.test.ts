@@ -3,6 +3,7 @@ import { setup, $fetch, fetch } from '@nuxt/test-utils/e2e';
 import { TEST_USERNAME, TEST_PASSWORD } from '../../test/credentials';
 import { resetRateLimitStore } from '../../utils/rateLimit';
 import { parseFieldOptions } from '../../../utils/fieldOptions';
+import { FIELD_TYPES } from '../../../utils/fieldTypes';
 
 const TEST_API_KEY = 'boject_test_key_for_integration_tests_only';
 
@@ -76,16 +77,16 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
-            { identifier: 'body', name: 'Body', type: 'TEXTAREA' },
+            { identifier: 'body', name: 'Body', type: FIELD_TYPES.TEXTAREA },
           ],
         },
       });
       expect(created.id).toBeDefined();
       expect(created.fields).toHaveLength(2);
-      expect(created.fields[0]!.type).toBe('ENTRY_TITLE');
+      expect(created.fields[0]!.type).toBe(FIELD_TYPES.ENTRY_TITLE);
       expect(created.fields[0]!.order).toBe(0);
       expect(created.fields[1]!.order).toBe(1);
     });
@@ -97,7 +98,9 @@ describe('Content Type endpoints', async () => {
         headers: { cookie, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: `No Title ${Date.now()}`,
-          fields: [{ identifier: 'body', name: 'Body', type: 'TEXT' }],
+          fields: [
+            { identifier: 'body', name: 'Body', type: FIELD_TYPES.TEXT },
+          ],
         }),
       });
       expect(res.status).toBe(400);
@@ -115,7 +118,7 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
           ],
@@ -130,7 +133,7 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
           ],
@@ -150,10 +153,10 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
-            { identifier: 'title', name: 'Title 2', type: 'TEXT' },
+            { identifier: 'title', name: 'Title 2', type: FIELD_TYPES.TEXT },
           ],
         }),
       });
@@ -171,7 +174,7 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'Title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
           ],
@@ -191,16 +194,18 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
-            { identifier: 'slug', name: 'Slug', type: 'SLUG' },
-            { identifier: 'summary', name: 'Summary', type: 'TEXT' },
+            { identifier: 'slug', name: 'Slug', type: FIELD_TYPES.SLUG },
+            { identifier: 'summary', name: 'Summary', type: FIELD_TYPES.TEXT },
           ],
         },
       });
-      const titleField = created.fields.find((f) => f.type === 'ENTRY_TITLE');
-      const slugField = created.fields.find((f) => f.type === 'SLUG');
+      const titleField = created.fields.find(
+        (f) => f.type === FIELD_TYPES.ENTRY_TITLE
+      );
+      const slugField = created.fields.find((f) => f.type === FIELD_TYPES.SLUG);
       const textField = created.fields.find((f) => f.identifier === 'summary');
       expect(titleField!.unique).toBe(true);
       expect(slugField!.unique).toBe(true);
@@ -218,19 +223,19 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
             {
               identifier: 'sku',
               name: 'SKU',
-              type: 'TEXT',
+              type: FIELD_TYPES.TEXT,
               unique: true,
             },
             {
               identifier: 'serial',
               name: 'Serial',
-              type: 'NUMBER',
+              type: FIELD_TYPES.NUMBER,
               unique: true,
             },
           ],
@@ -253,13 +258,13 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
             {
               identifier: 'flag',
               name: 'Flag',
-              type: 'BOOLEAN',
+              type: FIELD_TYPES.BOOLEAN,
               unique: true,
             },
           ],
@@ -279,13 +284,13 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
             {
               identifier: 'link',
               name: 'Link',
-              type: 'RELATION',
+              type: FIELD_TYPES.RELATION,
               options: { targetContentTypeIds: 'not-an-array' },
             },
           ],
@@ -308,13 +313,13 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
             {
               identifier: 'body',
               name: 'Body',
-              type: 'RICHTEXT',
+              type: FIELD_TYPES.RICHTEXT,
               options: { targetContentTypeIds: 'not-an-array' },
             },
           ],
@@ -337,11 +342,11 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
-            { identifier: 'slug', name: 'Slug', type: 'SLUG' },
-            { identifier: 'slug2', name: 'Slug 2', type: 'SLUG' },
+            { identifier: 'slug', name: 'Slug', type: FIELD_TYPES.SLUG },
+            { identifier: 'slug2', name: 'Slug 2', type: FIELD_TYPES.SLUG },
           ],
         }),
       });
@@ -374,11 +379,11 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
-            { identifier: 'summary', name: 'Summary', type: 'TEXT' },
-            { identifier: 'count', name: 'Count', type: 'NUMBER' },
+            { identifier: 'summary', name: 'Summary', type: FIELD_TYPES.TEXT },
+            { identifier: 'count', name: 'Count', type: FIELD_TYPES.NUMBER },
           ],
         },
       });
@@ -417,7 +422,7 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
           ],
@@ -445,7 +450,7 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
           ],
@@ -478,7 +483,7 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
           ],
@@ -512,7 +517,7 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
           ],
@@ -538,7 +543,7 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
           ],
@@ -550,7 +555,11 @@ describe('Content Type endpoints', async () => {
         {
           method: 'POST',
           headers: { cookie },
-          body: { identifier: 'summary', name: 'Summary', type: 'TEXT' },
+          body: {
+            identifier: 'summary',
+            name: 'Summary',
+            type: FIELD_TYPES.TEXT,
+          },
         }
       );
       expect(field.id).toBeDefined();
@@ -569,7 +578,7 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
           ],
@@ -582,7 +591,7 @@ describe('Content Type endpoints', async () => {
         body: JSON.stringify({
           identifier: 'title2',
           name: 'Title 2',
-          type: 'ENTRY_TITLE',
+          type: FIELD_TYPES.ENTRY_TITLE,
         }),
       });
       expect(res.status).toBe(400);
@@ -599,10 +608,10 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
-            { identifier: 'slug', name: 'Slug', type: 'SLUG' },
+            { identifier: 'slug', name: 'Slug', type: FIELD_TYPES.SLUG },
           ],
         },
       });
@@ -613,7 +622,7 @@ describe('Content Type endpoints', async () => {
         body: JSON.stringify({
           identifier: 'slug2',
           name: 'Slug 2',
-          type: 'SLUG',
+          type: FIELD_TYPES.SLUG,
         }),
       });
       expect(res.status).toBe(400);
@@ -630,7 +639,7 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
           ],
@@ -643,7 +652,7 @@ describe('Content Type endpoints', async () => {
         body: JSON.stringify({
           identifier: 'BadName',
           name: 'Bad',
-          type: 'TEXT',
+          type: FIELD_TYPES.TEXT,
         }),
       });
       expect(res.status).toBe(400);
@@ -660,7 +669,7 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
           ],
@@ -673,7 +682,7 @@ describe('Content Type endpoints', async () => {
         body: JSON.stringify({
           identifier: 'title',
           name: 'Title Dup',
-          type: 'TEXT',
+          type: FIELD_TYPES.TEXT,
         }),
       });
       expect(res.status).toBe(409);
@@ -690,7 +699,7 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
           ],
@@ -702,11 +711,15 @@ describe('Content Type endpoints', async () => {
         {
           method: 'POST',
           headers: { cookie },
-          body: { identifier: 'body', name: 'Body', type: 'RICHTEXT' },
+          body: {
+            identifier: 'body',
+            name: 'Body',
+            type: FIELD_TYPES.RICHTEXT,
+          },
         }
       );
 
-      expect(field.type).toBe('RICHTEXT');
+      expect(field.type).toBe(FIELD_TYPES.RICHTEXT);
       expect(field.identifier).toBe('body');
     });
 
@@ -721,7 +734,7 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
           ],
@@ -737,24 +750,26 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
             {
               identifier: 'relatedItem',
               name: 'Related Item',
-              type: 'RELATION',
+              type: FIELD_TYPES.RELATION,
               options: { targetContentTypeIds: [target.id] },
             },
           ],
         },
       });
 
-      const relField = ct.fields.find((f) => f.type === 'RELATION');
+      const relField = ct.fields.find((f) => f.type === FIELD_TYPES.RELATION);
       expect(relField).toBeDefined();
       const relOpts = parseFieldOptions(relField!);
       expect(
-        relOpts.type === 'RELATION' ? relOpts.targetContentTypeIds : []
+        relOpts.type === FIELD_TYPES.RELATION
+          ? relOpts.targetContentTypeIds
+          : []
       ).toContain(target.id);
     });
 
@@ -769,7 +784,7 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
           ],
@@ -782,7 +797,7 @@ describe('Content Type endpoints', async () => {
         body: JSON.stringify({
           identifier: 'link',
           name: 'Link',
-          type: 'RELATION',
+          type: FIELD_TYPES.RELATION,
         }),
       });
       expect(res.status).toBe(400);
@@ -799,7 +814,7 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
           ],
@@ -811,7 +826,7 @@ describe('Content Type endpoints', async () => {
         {
           method: 'POST',
           headers: { cookie },
-          body: { identifier: 'slug', name: 'Slug', type: 'SLUG' },
+          body: { identifier: 'slug', name: 'Slug', type: FIELD_TYPES.SLUG },
         }
       );
       expect(field.unique).toBe(true);
@@ -828,7 +843,7 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
           ],
@@ -843,7 +858,7 @@ describe('Content Type endpoints', async () => {
           body: {
             identifier: 'sku',
             name: 'SKU',
-            type: 'TEXT',
+            type: FIELD_TYPES.TEXT,
             unique: true,
           },
         }
@@ -862,7 +877,7 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
           ],
@@ -875,7 +890,7 @@ describe('Content Type endpoints', async () => {
         body: JSON.stringify({
           identifier: 'body',
           name: 'Body',
-          type: 'RICHTEXT',
+          type: FIELD_TYPES.RICHTEXT,
           unique: true,
         }),
       });
@@ -893,7 +908,7 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
           ],
@@ -906,7 +921,7 @@ describe('Content Type endpoints', async () => {
         body: JSON.stringify({
           identifier: 'link',
           name: 'Link',
-          type: 'RELATION',
+          type: FIELD_TYPES.RELATION,
           options: {
             targetContentTypeIds: ['00000000-0000-0000-0000-000000000000'],
           },
@@ -928,10 +943,10 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
-            { identifier: 'body', name: 'Body', type: 'TEXTAREA' },
+            { identifier: 'body', name: 'Body', type: FIELD_TYPES.TEXTAREA },
           ],
         },
       });
@@ -960,10 +975,10 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
-            { identifier: 'count', name: 'Count', type: 'NUMBER' },
+            { identifier: 'count', name: 'Count', type: FIELD_TYPES.NUMBER },
           ],
         },
       });
@@ -974,10 +989,10 @@ describe('Content Type endpoints', async () => {
         {
           method: 'PUT',
           headers: { cookie },
-          body: { type: 'TEXT' },
+          body: { type: FIELD_TYPES.TEXT },
         }
       );
-      expect(updated.type).toBe('TEXT');
+      expect(updated.type).toBe(FIELD_TYPES.TEXT);
     });
 
     it('returns 404 for field not belonging to content type', async () => {
@@ -991,7 +1006,7 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
           ],
@@ -1020,10 +1035,10 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
-            { identifier: 'sku', name: 'SKU', type: 'TEXT' },
+            { identifier: 'sku', name: 'SKU', type: FIELD_TYPES.TEXT },
           ],
         },
       });
@@ -1051,13 +1066,13 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
             {
               identifier: 'sku',
               name: 'SKU',
-              type: 'TEXT',
+              type: FIELD_TYPES.TEXT,
               unique: true,
             },
           ],
@@ -1087,7 +1102,7 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
           ],
@@ -1114,14 +1129,14 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
-            { identifier: 'slug', name: 'Slug', type: 'SLUG' },
+            { identifier: 'slug', name: 'Slug', type: FIELD_TYPES.SLUG },
           ],
         },
       });
-      const slugField = ct.fields.find((f) => f.type === 'SLUG')!;
+      const slugField = ct.fields.find((f) => f.type === FIELD_TYPES.SLUG)!;
 
       const res = await fetch(
         `/api/content-types/${ct.id}/fields/${slugField.id}`,
@@ -1145,10 +1160,10 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
-            { identifier: 'active', name: 'Active', type: 'BOOLEAN' },
+            { identifier: 'active', name: 'Active', type: FIELD_TYPES.BOOLEAN },
           ],
         },
       });
@@ -1173,10 +1188,10 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
-            { identifier: 'code', name: 'Code', type: 'TEXT' },
+            { identifier: 'code', name: 'Code', type: FIELD_TYPES.TEXT },
           ],
         },
       });
@@ -1226,10 +1241,10 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
-            { identifier: 'issue', name: 'Issue', type: 'NUMBER' },
+            { identifier: 'issue', name: 'Issue', type: FIELD_TYPES.NUMBER },
           ],
         },
       });
@@ -1280,10 +1295,10 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
-            { identifier: 'code', name: 'Code', type: 'TEXT' },
+            { identifier: 'code', name: 'Code', type: FIELD_TYPES.TEXT },
           ],
         },
       });
@@ -1328,10 +1343,10 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
-            { identifier: 'code', name: 'Code', type: 'TEXT' },
+            { identifier: 'code', name: 'Code', type: FIELD_TYPES.TEXT },
           ],
         },
       });
@@ -1380,7 +1395,7 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
           ],
@@ -1395,19 +1410,21 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
             {
               identifier: 'link',
               name: 'Link',
-              type: 'RELATION',
+              type: FIELD_TYPES.RELATION,
               options: { targetContentTypeIds: [target.id] },
             },
           ],
         },
       });
-      const fieldId = ct.fields.find((f) => f.type === 'RELATION')!.id;
+      const fieldId = ct.fields.find(
+        (f) => f.type === FIELD_TYPES.RELATION
+      )!.id;
 
       const res = await fetch(`/api/content-types/${ct.id}/fields/${fieldId}`, {
         method: 'PUT',
@@ -1437,7 +1454,7 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
           ],
@@ -1452,19 +1469,21 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
             {
               identifier: 'link',
               name: 'Link',
-              type: 'RELATION',
+              type: FIELD_TYPES.RELATION,
               options: { targetContentTypeIds: [target.id] },
             },
           ],
         },
       });
-      const fieldId = ct.fields.find((f) => f.type === 'RELATION')!.id;
+      const fieldId = ct.fields.find(
+        (f) => f.type === FIELD_TYPES.RELATION
+      )!.id;
 
       const res = await fetch(`/api/content-types/${ct.id}/fields/${fieldId}`, {
         method: 'PUT',
@@ -1494,7 +1513,7 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
           ],
@@ -1509,19 +1528,21 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
             {
               identifier: 'link',
               name: 'Link',
-              type: 'RELATION',
+              type: FIELD_TYPES.RELATION,
               options: { targetContentTypeIds: [target.id] },
             },
           ],
         },
       });
-      const fieldId = ct.fields.find((f) => f.type === 'RELATION')!.id;
+      const fieldId = ct.fields.find(
+        (f) => f.type === FIELD_TYPES.RELATION
+      )!.id;
 
       const res = await fetch(`/api/content-types/${ct.id}/fields/${fieldId}`, {
         method: 'PUT',
@@ -1551,7 +1572,7 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
           ],
@@ -1566,19 +1587,21 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
             {
               identifier: 'link',
               name: 'Link',
-              type: 'RELATION',
+              type: FIELD_TYPES.RELATION,
               options: { targetContentTypeIds: [target.id] },
             },
           ],
         },
       });
-      const fieldId = ct.fields.find((f) => f.type === 'RELATION')!.id;
+      const fieldId = ct.fields.find(
+        (f) => f.type === FIELD_TYPES.RELATION
+      )!.id;
 
       const res = await fetch(`/api/content-types/${ct.id}/fields/${fieldId}`, {
         method: 'PUT',
@@ -1610,7 +1633,7 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
           ],
@@ -1625,19 +1648,21 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
             {
               identifier: 'links',
               name: 'Links',
-              type: 'MULTIRELATION',
+              type: FIELD_TYPES.MULTIRELATION,
               options: { targetContentTypeIds: [target.id] },
             },
           ],
         },
       });
-      const fieldId = ct.fields.find((f) => f.type === 'MULTIRELATION')!.id;
+      const fieldId = ct.fields.find(
+        (f) => f.type === FIELD_TYPES.MULTIRELATION
+      )!.id;
 
       const res = await fetch(`/api/content-types/${ct.id}/fields/${fieldId}`, {
         method: 'PUT',
@@ -1667,7 +1692,7 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
           ],
@@ -1682,7 +1707,7 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
           ],
@@ -1697,19 +1722,21 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
             {
               identifier: 'link',
               name: 'Link',
-              type: 'RELATION',
+              type: FIELD_TYPES.RELATION,
               options: { targetContentTypeIds: [targetA.id] },
             },
           ],
         },
       });
-      const fieldId = ct.fields.find((f) => f.type === 'RELATION')!.id;
+      const fieldId = ct.fields.find(
+        (f) => f.type === FIELD_TYPES.RELATION
+      )!.id;
 
       const updated = await $fetch<FieldResponse>(
         `/api/content-types/${ct.id}/fields/${fieldId}`,
@@ -1722,12 +1749,12 @@ describe('Content Type endpoints', async () => {
         }
       );
       const opts = parseFieldOptions({
-        type: 'RELATION',
+        type: FIELD_TYPES.RELATION,
         options: updated.options,
       });
-      expect(opts.type === 'RELATION' ? opts.targetContentTypeIds : []).toEqual(
-        [targetA.id, targetB.id]
-      );
+      expect(
+        opts.type === FIELD_TYPES.RELATION ? opts.targetContentTypeIds : []
+      ).toEqual([targetA.id, targetB.id]);
     });
   });
 
@@ -1743,10 +1770,10 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
-            { identifier: 'extra', name: 'Extra', type: 'TEXT' },
+            { identifier: 'extra', name: 'Extra', type: FIELD_TYPES.TEXT },
           ],
         },
       });
@@ -1772,7 +1799,7 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
           ],
@@ -1798,7 +1825,7 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
           ],
@@ -1842,11 +1869,11 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
-            { identifier: 'summary', name: 'Summary', type: 'TEXT' },
-            { identifier: 'count', name: 'Count', type: 'NUMBER' },
+            { identifier: 'summary', name: 'Summary', type: FIELD_TYPES.TEXT },
+            { identifier: 'count', name: 'Count', type: FIELD_TYPES.NUMBER },
           ],
         },
       });
@@ -1890,7 +1917,7 @@ describe('Content Type endpoints', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
             },
           ],

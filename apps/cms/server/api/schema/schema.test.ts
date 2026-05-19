@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { TEST_USERNAME, TEST_PASSWORD } from '../../test/credentials';
 import { prisma } from '../../utils/prisma';
 import { generateApiKey } from '../../utils/apiKey';
+import { FIELD_TYPES } from '../../../utils/fieldTypes';
 
 await setup({
   rootDir: fileURLToPath(new URL('../../..', import.meta.url)),
@@ -62,7 +63,7 @@ describe('GET /api/schema/export', () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
               order: 0,
             },
@@ -136,7 +137,7 @@ describe('POST /api/schema/apply', () => {
               id: null,
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
               order: 0,
               options: null,
@@ -231,7 +232,7 @@ describe('POST /api/schema/apply', () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
               order: 0,
             },

@@ -1,4 +1,5 @@
 import type { FieldConfig } from '~/types/contentEditor';
+import { FIELD_TYPES } from './fieldTypes';
 
 export function mapFieldToConfig(field: {
   identifier: string;
@@ -8,45 +9,45 @@ export function mapFieldToConfig(field: {
   options: unknown;
 }): FieldConfig {
   switch (field.type) {
-    case 'ENTRY_TITLE':
-    case 'SLUG':
-    case 'TEXT':
+    case FIELD_TYPES.ENTRY_TITLE:
+    case FIELD_TYPES.SLUG:
+    case FIELD_TYPES.TEXT:
       return {
         type: 'text',
         key: field.identifier,
         label: field.name,
         required: field.required,
       };
-    case 'TEXTAREA':
+    case FIELD_TYPES.TEXTAREA:
       return {
         type: 'textarea',
         key: field.identifier,
         label: field.name,
         required: field.required,
       };
-    case 'NUMBER':
+    case FIELD_TYPES.NUMBER:
       return {
         type: 'number',
         key: field.identifier,
         label: field.name,
         required: field.required,
       };
-    case 'BOOLEAN':
+    case FIELD_TYPES.BOOLEAN:
       return {
         type: 'boolean',
         key: field.identifier,
         label: field.name,
       };
-    case 'DATETIME':
+    case FIELD_TYPES.DATETIME:
       return {
         type: 'datetime',
         key: field.identifier,
         label: field.name,
         required: field.required,
       };
-    case 'SELECT': {
+    case FIELD_TYPES.SELECT: {
       const opts = parseFieldOptions(field);
-      const choices = opts.type === 'SELECT' ? opts.choices : [];
+      const choices = opts.type === FIELD_TYPES.SELECT ? opts.choices : [];
       return {
         type: 'select',
         key: field.identifier,
@@ -55,12 +56,12 @@ export function mapFieldToConfig(field: {
         options: choices.map((c) => ({ label: c, value: c })),
       };
     }
-    case 'RICHTEXT': {
+    case FIELD_TYPES.RICHTEXT: {
       const opts = parseFieldOptions(field);
       const targetIds =
-        opts.type === 'RICHTEXT' ? opts.targetContentTypeIds : [];
+        opts.type === FIELD_TYPES.RICHTEXT ? opts.targetContentTypeIds : [];
       const linkTargetIds =
-        opts.type === 'RICHTEXT' ? opts.linkTargetContentTypeIds : [];
+        opts.type === FIELD_TYPES.RICHTEXT ? opts.linkTargetContentTypeIds : [];
       return {
         type: 'richtext',
         key: field.identifier,
@@ -69,10 +70,10 @@ export function mapFieldToConfig(field: {
         linkTargetContentTypeIds: linkTargetIds,
       };
     }
-    case 'RELATION': {
+    case FIELD_TYPES.RELATION: {
       const opts = parseFieldOptions(field);
       const targetContentTypeIds =
-        opts.type === 'RELATION' ? opts.targetContentTypeIds : [];
+        opts.type === FIELD_TYPES.RELATION ? opts.targetContentTypeIds : [];
       return {
         type: 'dynamic-relation' as const,
         key: field.identifier,
@@ -81,10 +82,12 @@ export function mapFieldToConfig(field: {
         targetContentTypeIds,
       };
     }
-    case 'MULTIRELATION': {
+    case FIELD_TYPES.MULTIRELATION: {
       const opts = parseFieldOptions(field);
       const targetContentTypeIds =
-        opts.type === 'MULTIRELATION' ? opts.targetContentTypeIds : [];
+        opts.type === FIELD_TYPES.MULTIRELATION
+          ? opts.targetContentTypeIds
+          : [];
       return {
         type: 'dynamic-multirelation' as const,
         key: field.identifier,
@@ -92,7 +95,7 @@ export function mapFieldToConfig(field: {
         targetContentTypeIds,
       };
     }
-    case 'IMAGE':
+    case FIELD_TYPES.IMAGE:
       return {
         type: 'image' as const,
         key: field.identifier,

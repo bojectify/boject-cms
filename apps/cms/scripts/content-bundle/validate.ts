@@ -1,3 +1,8 @@
+import {
+  FIELD_TYPES,
+  FIELD_TYPE_NAMES,
+  isFieldTypeName,
+} from '../../utils/fieldTypes';
 import { isObject } from '../../utils/isObject';
 import type {
   Bundle,
@@ -8,21 +13,6 @@ import type {
   ValidationError,
   ValidationResult,
 } from './types';
-
-const FIELD_TYPES = new Set([
-  'ENTRY_TITLE',
-  'SLUG',
-  'TEXT',
-  'TEXTAREA',
-  'NUMBER',
-  'BOOLEAN',
-  'DATETIME',
-  'SELECT',
-  'RICHTEXT',
-  'RELATION',
-  'MULTIRELATION',
-  'IMAGE',
-]);
 
 const STATUSES = new Set(['DRAFT', 'PUBLISHED', 'CHANGED', 'ARCHIVED']);
 
@@ -123,7 +113,7 @@ function validateContentType(
   }
 
   const titleCount = c.fields.filter(
-    (f) => isObject(f) && (f as BundleField).type === 'ENTRY_TITLE'
+    (f) => isObject(f) && (f as BundleField).type === FIELD_TYPES.ENTRY_TITLE
   ).length;
   if (titleCount !== 1) {
     errors.push({
@@ -133,7 +123,7 @@ function validateContentType(
   }
 
   const slugCount = c.fields.filter(
-    (f) => isObject(f) && (f as BundleField).type === 'SLUG'
+    (f) => isObject(f) && (f as BundleField).type === FIELD_TYPES.SLUG
   ).length;
   if (slugCount > 1) {
     errors.push({
@@ -162,10 +152,10 @@ function validateField(
       message: 'must be a non-empty string',
     });
   }
-  if (typeof f.type !== 'string' || !FIELD_TYPES.has(f.type)) {
+  if (!isFieldTypeName(f.type)) {
     errors.push({
       path: `${path}.type`,
-      message: `must be one of ${Array.from(FIELD_TYPES).join(', ')}`,
+      message: `must be one of ${FIELD_TYPE_NAMES.join(', ')}`,
     });
     return;
   }
@@ -181,7 +171,7 @@ function validateField(
     });
   }
 
-  if (f.type === 'SELECT') {
+  if (f.type === FIELD_TYPES.SELECT) {
     const choices = (f.options as { choices?: string[] } | null)?.choices;
     if (!Array.isArray(choices) || choices.length === 0) {
       errors.push({
@@ -191,7 +181,7 @@ function validateField(
     }
   }
 
-  if (f.type === 'RELATION' || f.type === 'MULTIRELATION') {
+  if (f.type === FIELD_TYPES.RELATION || f.type === FIELD_TYPES.MULTIRELATION) {
     const opts = f.options ?? {};
     const ids = (opts as { targetContentTypeIds?: unknown })
       .targetContentTypeIds;

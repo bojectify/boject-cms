@@ -30,20 +30,7 @@ interface FieldDraft {
   options: unknown;
 }
 
-const fieldTypeOptions = [
-  { label: 'Entry Title', value: 'ENTRY_TITLE' },
-  { label: 'Slug', value: 'SLUG' },
-  { label: 'Text', value: 'TEXT' },
-  { label: 'Textarea', value: 'TEXTAREA' },
-  { label: 'Number', value: 'NUMBER' },
-  { label: 'Boolean', value: 'BOOLEAN' },
-  { label: 'Date/Time', value: 'DATETIME' },
-  { label: 'Select', value: 'SELECT' },
-  { label: 'Rich Text', value: 'RICHTEXT' },
-  { label: 'Relation', value: 'RELATION' },
-  { label: 'Multi Relation', value: 'MULTIRELATION' },
-  { label: 'Image', value: 'IMAGE' },
-];
+const fieldTypeOptions = FIELD_TYPE_OPTIONS;
 
 // Content type options for relation field target picker
 const { data: contentTypeOptions } = useAuthedFetch<
@@ -54,7 +41,7 @@ const fields = ref<FieldDraft[]>([
   {
     identifier: 'title',
     name: 'Title',
-    type: 'ENTRY_TITLE',
+    type: FIELD_TYPES.ENTRY_TITLE,
     required: true,
     unique: true,
     options: null,
@@ -163,7 +150,7 @@ function fieldMenuItems(index: number) {
 }
 
 const hasEntryTitle = computed(() =>
-  fields.value.some((f) => f.type === 'ENTRY_TITLE')
+  fields.value.some((f) => f.type === FIELD_TYPES.ENTRY_TITLE)
 );
 
 async function handleSave() {

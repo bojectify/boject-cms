@@ -8,6 +8,7 @@ import type {
 } from './types';
 import { validateBundle } from './validate';
 import { decodeDataRefs } from './portable';
+import { FIELD_TYPES } from '../../utils/fieldTypes';
 
 export interface ImportOptions {
   mode: BundleMode;
@@ -19,7 +20,8 @@ export interface ImportOptions {
 // ENTRY_TITLE and SLUG are always unique; everything else honours the
 // bundle's flag (defaulting to false for legacy bundles that don't carry it).
 function resolveBundleFieldUnique(f: BundleField): boolean {
-  if (f.type === 'ENTRY_TITLE' || f.type === 'SLUG') return true;
+  if (f.type === FIELD_TYPES.ENTRY_TITLE || f.type === FIELD_TYPES.SLUG)
+    return true;
   return f.unique === true;
 }
 
@@ -315,7 +317,7 @@ function stripRelationFields(
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(data)) {
     const type = fieldTypes[key];
-    if (type === 'RELATION' || type === 'MULTIRELATION') {
+    if (type === FIELD_TYPES.RELATION || type === FIELD_TYPES.MULTIRELATION) {
       out[key] = null;
     } else {
       out[key] = value;

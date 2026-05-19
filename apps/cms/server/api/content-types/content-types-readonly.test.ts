@@ -17,6 +17,7 @@ import { PrismaClient } from '../../../generated/prisma/client';
 import { TEST_USERNAME, TEST_PASSWORD } from '../../test/credentials';
 import { resetRateLimitStore } from '../../utils/rateLimit';
 import { getTestDatabaseUrl } from '../../../test/dbUrl';
+import { FIELD_TYPES } from '../../../utils/fieldTypes';
 /* eslint-enable import/first */
 
 const prismaUrl = getTestDatabaseUrl();
@@ -66,7 +67,7 @@ describe('Schema read-only flag (BOJECT_SCHEMA_READONLY=true)', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
               unique: true,
               order: 0,
@@ -97,7 +98,7 @@ describe('Schema read-only flag (BOJECT_SCHEMA_READONLY=true)', async () => {
           {
             identifier: 'title',
             name: 'Title',
-            type: 'ENTRY_TITLE',
+            type: FIELD_TYPES.ENTRY_TITLE,
             required: true,
           },
         ],
@@ -133,7 +134,7 @@ describe('Schema read-only flag (BOJECT_SCHEMA_READONLY=true)', async () => {
             {
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
               unique: true,
               order: 0,
@@ -159,7 +160,7 @@ describe('Schema read-only flag (BOJECT_SCHEMA_READONLY=true)', async () => {
       body: JSON.stringify({
         identifier: 'shouldNotCreate',
         name: 'Should Not Create',
-        type: 'TEXT',
+        type: FIELD_TYPES.TEXT,
       }),
     });
     expect(res.status).toBe(403);
@@ -192,7 +193,7 @@ describe('Schema read-only flag (BOJECT_SCHEMA_READONLY=true)', async () => {
         contentTypeId: seeded.id,
         identifier: `disposable${Date.now()}`,
         name: 'Disposable',
-        type: 'TEXT',
+        type: FIELD_TYPES.TEXT,
         required: false,
         unique: false,
         order: 99,

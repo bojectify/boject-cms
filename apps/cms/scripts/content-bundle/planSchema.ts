@@ -17,6 +17,7 @@ import type {
   TypeUpdate,
 } from './schemaPlan.types';
 import { effectiveBundleUnique } from './schemaPlan.types';
+import { FIELD_TYPES } from '../../utils/fieldTypes';
 
 export function planSchema(
   bundle: Bundle,
@@ -111,7 +112,11 @@ export function planSchema(
   ]);
   for (const bt of bundleTypes) {
     for (const bf of bt.fields) {
-      if (bf.type !== 'RELATION' && bf.type !== 'MULTIRELATION') continue;
+      if (
+        bf.type !== FIELD_TYPES.RELATION &&
+        bf.type !== FIELD_TYPES.MULTIRELATION
+      )
+        continue;
       const targets =
         (bf.options?.targetContentTypeIdentifiers as string[] | undefined) ??
         [];
@@ -193,7 +198,7 @@ function diffFieldUpdate(
   }
 
   // SELECT choice changes (rows 17, 18, 19)
-  if (bf.type === 'SELECT') {
+  if (bf.type === FIELD_TYPES.SELECT) {
     const bundleChoices = (bf.options?.choices as string[] | undefined) ?? [];
     const dbChoices = (dbField.options?.choices as string[] | undefined) ?? [];
     const removed = dbChoices.filter((c) => !bundleChoices.includes(c));
@@ -222,7 +227,10 @@ function diffFieldUpdate(
   }
 
   // RELATION/MULTIRELATION target changes (rows 20, 21, 22)
-  if (bf.type === 'RELATION' || bf.type === 'MULTIRELATION') {
+  if (
+    bf.type === FIELD_TYPES.RELATION ||
+    bf.type === FIELD_TYPES.MULTIRELATION
+  ) {
     const bundleTargets =
       (bf.options?.targetContentTypeIdentifiers as string[] | undefined) ?? [];
     const dbTargets =
@@ -258,14 +266,18 @@ function diffFieldUpdate(
 
   // Generic options-diff fall-through (rows 23, 24)
   // SELECT, RELATION, MULTIRELATION are handled by their dedicated blocks above.
-  const knownHandledTypes = new Set(['SELECT', 'RELATION', 'MULTIRELATION']);
+  const knownHandledTypes: Set<string> = new Set([
+    FIELD_TYPES.SELECT,
+    FIELD_TYPES.RELATION,
+    FIELD_TYPES.MULTIRELATION,
+  ]);
   if (
     !knownHandledTypes.has(bf.type) &&
     !shallowOptionsEqual(bf.options, dbField.options)
   ) {
     changes.options = bf.options ?? {};
     // RICHTEXT is documented-safe in the spec (row 23) — no warning.
-    if (bf.type !== 'RICHTEXT') {
+    if (bf.type !== FIELD_TYPES.RICHTEXT) {
       const unknownKeys = Object.keys(bf.options ?? {}).filter(
         (k) =>
           !(k in (dbField.options ?? {})) ||

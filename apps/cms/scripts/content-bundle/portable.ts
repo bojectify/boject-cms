@@ -1,4 +1,5 @@
 import type { FieldType } from '#prisma';
+import { FIELD_TYPES } from '../../utils/fieldTypes';
 
 export interface UuidRelationRef {
   contentTypeId: string;
@@ -145,17 +146,17 @@ export function encodeDataRefs(
       out[key] = value;
       continue;
     }
-    if (type === 'RELATION') {
+    if (type === FIELD_TYPES.RELATION) {
       out[key] = encodeRelationRef(
         value as UuidRelationRef,
         typeIdToIdentifier,
         typeIdentifierToEntryKeys
       );
-    } else if (type === 'MULTIRELATION') {
+    } else if (type === FIELD_TYPES.MULTIRELATION) {
       out[key] = (value as UuidRelationRef[]).map((ref) =>
         encodeRelationRef(ref, typeIdToIdentifier, typeIdentifierToEntryKeys)
       );
-    } else if (type === 'RICHTEXT') {
+    } else if (type === FIELD_TYPES.RICHTEXT) {
       out[key] = encodeRichtextRefs(
         value,
         typeIdToIdentifier,
@@ -181,17 +182,17 @@ export function decodeDataRefs(
       out[key] = value;
       continue;
     }
-    if (type === 'RELATION') {
+    if (type === FIELD_TYPES.RELATION) {
       out[key] = decodeRelationRef(
         value as PortableRelationRef,
         identifierToTypeId,
         typeIdentifierToKeyToEntry
       );
-    } else if (type === 'MULTIRELATION') {
+    } else if (type === FIELD_TYPES.MULTIRELATION) {
       out[key] = (value as PortableRelationRef[]).map((ref) =>
         decodeRelationRef(ref, identifierToTypeId, typeIdentifierToKeyToEntry)
       );
-    } else if (type === 'RICHTEXT') {
+    } else if (type === FIELD_TYPES.RICHTEXT) {
       out[key] = decodeRichtextRefs(
         value,
         identifierToTypeId,

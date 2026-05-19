@@ -14,6 +14,7 @@ import { setup, fetch } from '@nuxt/test-utils/e2e';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { prisma } from '../../utils/prisma';
 import { generateApiKey } from '../../utils/apiKey';
+import { FIELD_TYPES } from '../../../utils/fieldTypes';
 /* eslint-enable import/first */
 
 await setup({
@@ -50,7 +51,7 @@ const SAMPLE: { bundle: unknown } = {
             id: null,
             identifier: 'title',
             name: 'Title',
-            type: 'ENTRY_TITLE',
+            type: FIELD_TYPES.ENTRY_TITLE,
             required: true,
             order: 0,
             options: null,

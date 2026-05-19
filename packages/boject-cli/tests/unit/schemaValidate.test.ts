@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { runSchemaValidate } from '../../src/commands/schema/validate.js';
+import { FIELD_TYPES } from '../../src/vendor/fieldTypes.js';
 
 let workDir: string;
 beforeEach(async () => {
@@ -34,7 +35,7 @@ const VALID_BUNDLE = {
           id: null,
           identifier: 'title',
           name: 'Title',
-          type: 'ENTRY_TITLE',
+          type: FIELD_TYPES.ENTRY_TITLE,
           required: true,
           order: 0,
           options: null,
@@ -88,7 +89,7 @@ describe('runSchemaValidate', () => {
                 id: null,
                 identifier: 'title',
                 name: 'Title',
-                type: 'ENTRY_TITLE',
+                type: FIELD_TYPES.ENTRY_TITLE,
                 required: true,
                 order: 0,
                 options: null,
@@ -97,7 +98,7 @@ describe('runSchemaValidate', () => {
                 id: null,
                 identifier: 'author',
                 name: 'Author',
-                type: 'RELATION',
+                type: FIELD_TYPES.RELATION,
                 required: false,
                 order: 1,
                 options: {

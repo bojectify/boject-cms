@@ -8,6 +8,7 @@ import { applySchema } from '../content-bundle/applySchema';
 import { SchemaApplyBlockedError } from '../content-bundle/applySchemaErrors';
 import { applySchemaIfConfigured } from './apply-schema';
 import { getTestDatabaseUrl } from '../../test/dbUrl';
+import { FIELD_TYPES } from '../../utils/fieldTypes';
 
 const url = getTestDatabaseUrl();
 const adapter = new PrismaPg({ connectionString: url });
@@ -30,7 +31,7 @@ const ARTICLE_BUNDLE = {
           id: null,
           identifier: 'title',
           name: 'Title',
-          type: 'ENTRY_TITLE' as const,
+          type: FIELD_TYPES.ENTRY_TITLE,
           required: true,
           order: 0,
           options: null,
@@ -51,7 +52,7 @@ const ARTICLE_BUNDLE_WITH_TAGLINE = {
           id: null,
           identifier: 'tagline',
           name: 'Tagline',
-          type: 'TEXT' as const,
+          type: FIELD_TYPES.TEXT,
           required: false,
           order: 1,
           options: null,

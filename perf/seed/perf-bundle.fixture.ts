@@ -1,4 +1,5 @@
 import type { Bundle } from '@boject/cli/vendor/contentBundleTypes';
+import { FIELD_TYPES } from '@boject/cli/vendor/fieldTypes';
 
 /**
  * Hardcoded PerfArticle + PerfAuthor as a Bundle. The workspace's
@@ -26,7 +27,7 @@ export const PERF_BUNDLE: Bundle = {
           id: '01900000-0000-4000-8000-00000000a101',
           identifier: 'name',
           name: 'Name',
-          type: 'ENTRY_TITLE',
+          type: FIELD_TYPES.ENTRY_TITLE,
           required: true,
           unique: true,
           order: 0,
@@ -36,7 +37,7 @@ export const PERF_BUNDLE: Bundle = {
           id: '01900000-0000-4000-8000-00000000a102',
           identifier: 'bio',
           name: 'Bio',
-          type: 'TEXTAREA',
+          type: FIELD_TYPES.TEXTAREA,
           required: false,
           order: 1,
           options: null,
@@ -54,7 +55,7 @@ export const PERF_BUNDLE: Bundle = {
           id: '01900000-0000-4000-8000-00000000a201',
           identifier: 'title',
           name: 'Title',
-          type: 'ENTRY_TITLE',
+          type: FIELD_TYPES.ENTRY_TITLE,
           required: true,
           unique: true,
           order: 0,
@@ -64,7 +65,7 @@ export const PERF_BUNDLE: Bundle = {
           id: '01900000-0000-4000-8000-00000000a202',
           identifier: 'slug',
           name: 'Slug',
-          type: 'SLUG',
+          type: FIELD_TYPES.SLUG,
           required: false,
           unique: true,
           order: 1,
@@ -74,7 +75,7 @@ export const PERF_BUNDLE: Bundle = {
           id: '01900000-0000-4000-8000-00000000a203',
           identifier: 'excerpt',
           name: 'Excerpt',
-          type: 'TEXT',
+          type: FIELD_TYPES.TEXT,
           required: false,
           order: 2,
           options: null,
@@ -83,7 +84,7 @@ export const PERF_BUNDLE: Bundle = {
           id: '01900000-0000-4000-8000-00000000a204',
           identifier: 'body',
           name: 'Body',
-          type: 'RICHTEXT',
+          type: FIELD_TYPES.RICHTEXT,
           required: false,
           order: 3,
           options: null,
@@ -92,7 +93,7 @@ export const PERF_BUNDLE: Bundle = {
           id: '01900000-0000-4000-8000-00000000a205',
           identifier: 'publishDate',
           name: 'Publish Date',
-          type: 'DATETIME',
+          type: FIELD_TYPES.DATETIME,
           required: false,
           order: 4,
           options: null,
@@ -101,7 +102,7 @@ export const PERF_BUNDLE: Bundle = {
           id: '01900000-0000-4000-8000-00000000a206',
           identifier: 'author',
           name: 'Author',
-          type: 'RELATION',
+          type: FIELD_TYPES.RELATION,
           required: false,
           order: 5,
           options: {

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { setup, fetch, $fetch } from '@nuxt/test-utils/e2e';
 import { TEST_USERNAME, TEST_PASSWORD } from '../../test/credentials';
 import { toCamelCase } from '../../../utils/casing';
+import { FIELD_TYPES } from '../../../utils/fieldTypes';
 
 // Separate file because @nuxt/test-utils v4 stores its test context in a
 // module-level singleton — multiple setup() calls in one file have their
@@ -36,10 +37,10 @@ async function createComplexityTestCt(cookie: string): Promise<string> {
         {
           identifier: 'title',
           name: 'Title',
-          type: 'ENTRY_TITLE',
+          type: FIELD_TYPES.ENTRY_TITLE,
           required: true,
         },
-        { identifier: 'body', name: 'Body', type: 'RICHTEXT' },
+        { identifier: 'body', name: 'Body', type: FIELD_TYPES.RICHTEXT },
       ],
     },
   });

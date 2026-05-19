@@ -28,6 +28,7 @@ import {
 } from './valueGen/relations.js';
 import { generateImage } from './valueGen/image.js';
 import { slugify } from '../vendor/slugify.js';
+import { FIELD_TYPES } from '../vendor/fieldTypes.js';
 
 export interface GenerateOptions {
   contentTypeIdentifier: string;
@@ -147,7 +148,7 @@ export function generatePerfData(
     const entries: BundleEntry[] = [];
     const patches: GeneratedSeedGroup['patches'] = [];
     const uniqueTrackers = new Map<string, Set<string>>();
-    const slugField = ct.fields.find((f) => f.type === 'SLUG');
+    const slugField = ct.fields.find((f) => f.type === FIELD_TYPES.SLUG);
 
     // First pass: build entries with deferred fields omitted; SLUG handled inline
     for (let i = 0; i < count; i++) {
@@ -157,7 +158,7 @@ export function generatePerfData(
 
       for (const field of ct.fields) {
         if (deferredFieldIds.has(field.identifier)) continue;
-        if (field.type === 'SLUG') continue; // handled after the loop so entryTitle is captured
+        if (field.type === FIELD_TYPES.SLUG) continue; // handled after the loop so entryTitle is captured
 
         const value = generateFieldValue({
           field,
@@ -173,7 +174,8 @@ export function generatePerfData(
         });
         if (value === undefined) continue;
         data[field.identifier] = value;
-        if (field.type === 'ENTRY_TITLE') entryTitle = value as string;
+        if (field.type === FIELD_TYPES.ENTRY_TITLE)
+          entryTitle = value as string;
       }
 
       // SLUG is synthesised after ENTRY_TITLE so it can derive from the actual title
@@ -313,7 +315,11 @@ function collectReachable(
     seen.add(t.identifier);
     out.push(t);
     for (const f of t.fields) {
-      if (f.type !== 'RELATION' && f.type !== 'MULTIRELATION') continue;
+      if (
+        f.type !== FIELD_TYPES.RELATION &&
+        f.type !== FIELD_TYPES.MULTIRELATION
+      )
+        continue;
       const targets = resolveFieldTargetIdentifiers(
         f.options?.targetContentTypeIds as Array<string | null> | undefined,
         f.options?.targetContentTypeIdentifiers,
@@ -336,7 +342,11 @@ function buildEdges(
   const edges: Edge[] = [];
   for (const t of types) {
     for (const f of t.fields) {
-      if (f.type !== 'RELATION' && f.type !== 'MULTIRELATION') continue;
+      if (
+        f.type !== FIELD_TYPES.RELATION &&
+        f.type !== FIELD_TYPES.MULTIRELATION
+      )
+        continue;
       const targets = resolveFieldTargetIdentifiers(
         f.options?.targetContentTypeIds as Array<string | null> | undefined,
         f.options?.targetContentTypeIdentifiers,
@@ -347,7 +357,7 @@ function buildEdges(
         if (!target) continue;
         // For MULTIRELATION the empty array satisfies any cardinality, so
         // treat as optional even when field.required is true.
-        const required = f.type === 'RELATION' && f.required;
+        const required = f.type === FIELD_TYPES.RELATION && f.required;
         edges.push({
           from: t.identifier,
           to: target.identifier,
@@ -376,14 +386,14 @@ interface FieldGenContext {
 function generateFieldValue(ctx: FieldGenContext): unknown {
   const { field } = ctx;
   switch (field.type) {
-    case 'ENTRY_TITLE':
+    case FIELD_TYPES.ENTRY_TITLE:
       return generateEntryTitle({ rand: ctx.rand, index: ctx.index });
-    case 'SLUG':
+    case FIELD_TYPES.SLUG:
       // SLUG is handled inline by the orchestrator (after ENTRY_TITLE),
       // so this branch shouldn't be reached during normal walk. Return
       // undefined defensively in case someone calls this directly.
       return undefined;
-    case 'TEXT': {
+    case FIELD_TYPES.TEXT: {
       const key = `${ctx.contentTypeIdentifier}.${field.identifier}`;
       let tracker = ctx.uniqueTrackers.get(key);
       if (!tracker) {
@@ -397,24 +407,24 @@ function generateFieldValue(ctx: FieldGenContext): unknown {
         seenValues: tracker,
       });
     }
-    case 'TEXTAREA':
+    case FIELD_TYPES.TEXTAREA:
       return generateTextarea({ rand: ctx.rand });
-    case 'NUMBER':
+    case FIELD_TYPES.NUMBER:
       return generateNumber({
         rand: ctx.rand,
         unique: field.unique === true,
         index: ctx.index,
       });
-    case 'BOOLEAN':
+    case FIELD_TYPES.BOOLEAN:
       return generateBoolean({ rand: ctx.rand });
-    case 'DATETIME':
+    case FIELD_TYPES.DATETIME:
       return generateDatetime({ rand: ctx.rand, window: ctx.window });
-    case 'SELECT':
+    case FIELD_TYPES.SELECT:
       return generateSelect({
         rand: ctx.rand,
         choices: (field.options?.choices ?? []) as string[],
       });
-    case 'RICHTEXT': {
+    case FIELD_TYPES.RICHTEXT: {
       const refPool = buildRichtextRefPool(
         field,
         ctx.idPools,
@@ -422,11 +432,11 @@ function generateFieldValue(ctx: FieldGenContext): unknown {
       );
       return generateRichtext({ rand: ctx.rand, refPool });
     }
-    case 'RELATION': {
+    case FIELD_TYPES.RELATION: {
       const pool = buildRelationPool(field, ctx.idPools, ctx.idToIdentifier);
       return generateRelation({ rand: ctx.rand, pool });
     }
-    case 'MULTIRELATION': {
+    case FIELD_TYPES.MULTIRELATION: {
       const pool = buildRelationPool(field, ctx.idPools, ctx.idToIdentifier);
       return generateMultirelation({
         rand: ctx.rand,
@@ -434,7 +444,7 @@ function generateFieldValue(ctx: FieldGenContext): unknown {
         fanout: ctx.fanout,
       });
     }
-    case 'IMAGE':
+    case FIELD_TYPES.IMAGE:
       return generateImage({ rand: ctx.rand, index: ctx.index });
     default:
       ctx.warnings.push(

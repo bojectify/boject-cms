@@ -2,6 +2,7 @@ import { Prisma } from '#prisma';
 import type { FieldType } from '#prisma';
 import { createError } from 'h3';
 import { prisma } from './prisma';
+import { FIELD_TYPES } from '../../utils/fieldTypes';
 
 interface FieldDef {
   identifier: string;
@@ -27,7 +28,8 @@ export async function assertUniqueFieldValues(
 ): Promise<void> {
   for (const field of fields) {
     if (!field.unique) continue;
-    if (field.type !== 'TEXT' && field.type !== 'NUMBER') continue;
+    if (field.type !== FIELD_TYPES.TEXT && field.type !== FIELD_TYPES.NUMBER)
+      continue;
 
     const value = data[field.identifier];
     if (value === null || value === undefined || value === '') continue;
@@ -58,7 +60,7 @@ export async function assertUniqueFieldValues(
 async function queryConflicts(
   contentTypeId: string,
   identifier: string,
-  type: 'TEXT' | 'NUMBER',
+  type: typeof FIELD_TYPES.TEXT | typeof FIELD_TYPES.NUMBER,
   value: unknown,
   excludeEntryId: string | undefined
 ): Promise<Array<{ entryId: string }>> {
@@ -69,7 +71,7 @@ async function queryConflicts(
     ? Prisma.sql`AND ce."id" <> ${excludeEntryId}`
     : Prisma.empty;
 
-  if (type === 'NUMBER') {
+  if (type === FIELD_TYPES.NUMBER) {
     return prisma.$queryRaw<Array<{ entryId: string }>>`
       SELECT ce."id" AS "entryId"
       FROM "ContentEntry" ce

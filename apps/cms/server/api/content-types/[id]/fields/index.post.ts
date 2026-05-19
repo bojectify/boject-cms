@@ -13,21 +13,7 @@ import {
   parseFieldOptions,
   getFieldOptionsErrorShape,
 } from '../../../../../utils/fieldOptions';
-
-const VALID_FIELD_TYPES = new Set<string>([
-  'ENTRY_TITLE',
-  'SLUG',
-  'TEXT',
-  'TEXTAREA',
-  'NUMBER',
-  'BOOLEAN',
-  'DATETIME',
-  'SELECT',
-  'RICHTEXT',
-  'RELATION',
-  'MULTIRELATION',
-  'IMAGE',
-]);
+import { FIELD_TYPES, isFieldTypeName } from '../../../../../utils/fieldTypes';
 
 export default defineEventHandler(async (event) => {
   assertSchemaEditable(event);
@@ -39,7 +25,7 @@ export default defineEventHandler(async (event) => {
   const fieldIdentifier = assertFieldIdentifier(body.identifier, 'identifier');
   const name = assertStringLength(body.name, 'name', 200);
 
-  if (typeof body.type !== 'string' || !VALID_FIELD_TYPES.has(body.type)) {
+  if (!isFieldTypeName(body.type)) {
     throw createError({
       statusCode: 400,
       statusMessage: 'type must be a valid FieldType',
@@ -48,7 +34,7 @@ export default defineEventHandler(async (event) => {
   const type = body.type as FieldType;
 
   // Validate targetContentTypeIds for relation fields
-  if (type === 'RELATION' || type === 'MULTIRELATION') {
+  if (type === FIELD_TYPES.RELATION || type === FIELD_TYPES.MULTIRELATION) {
     let opts;
     try {
       opts = parseFieldOptions({ type, options: body.options });
@@ -63,7 +49,8 @@ export default defineEventHandler(async (event) => {
       });
     }
     const ids =
-      opts.type === 'RELATION' || opts.type === 'MULTIRELATION'
+      opts.type === FIELD_TYPES.RELATION ||
+      opts.type === FIELD_TYPES.MULTIRELATION
         ? opts.targetContentTypeIds
         : [];
     if (ids.length === 0) {
@@ -85,7 +72,11 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  if (type === 'RICHTEXT' && body.options && typeof body.options === 'object') {
+  if (
+    type === FIELD_TYPES.RICHTEXT &&
+    body.options &&
+    typeof body.options === 'object'
+  ) {
     let opts;
     try {
       opts = parseFieldOptions({ type, options: body.options });
@@ -100,7 +91,10 @@ export default defineEventHandler(async (event) => {
             : `Invalid UUID in ${key}`,
       });
     }
-    if (opts.type === 'RICHTEXT' && opts.targetContentTypeIds.length > 0) {
+    if (
+      opts.type === FIELD_TYPES.RICHTEXT &&
+      opts.targetContentTypeIds.length > 0
+    ) {
       const existingCount = await prisma.contentType.count({
         where: { id: { in: opts.targetContentTypeIds } },
       });
@@ -128,15 +122,18 @@ export default defineEventHandler(async (event) => {
 
   // Check uniqueness of ENTRY_TITLE and SLUG
   if (
-    type === 'ENTRY_TITLE' &&
-    contentType.fields.some((f) => f.type === 'ENTRY_TITLE')
+    type === FIELD_TYPES.ENTRY_TITLE &&
+    contentType.fields.some((f) => f.type === FIELD_TYPES.ENTRY_TITLE)
   ) {
     throw createError({
       statusCode: 400,
       statusMessage: 'Content type already has an ENTRY_TITLE field',
     });
   }
-  if (type === 'SLUG' && contentType.fields.some((f) => f.type === 'SLUG')) {
+  if (
+    type === FIELD_TYPES.SLUG &&
+    contentType.fields.some((f) => f.type === FIELD_TYPES.SLUG)
+  ) {
     throw createError({
       statusCode: 400,
       statusMessage: 'Content type already has a SLUG field',

@@ -2,6 +2,7 @@ import { afterAll, afterEach, describe, expect, it } from 'vitest';
 import { setupServer, type SetupServer } from 'msw/node';
 import { http, HttpResponse } from 'msw';
 import { runPerfSeed } from './seed.js';
+import { FIELD_TYPES } from '../../vendor/fieldTypes.js';
 
 const baseUrl = 'http://cms.test';
 const apiKey = 'boject_test';
@@ -21,7 +22,7 @@ const minimalBundleResponse = {
           id: 'f1',
           identifier: 'title',
           name: 'Title',
-          type: 'ENTRY_TITLE',
+          type: FIELD_TYPES.ENTRY_TITLE,
           required: true,
           unique: true,
           order: 0,

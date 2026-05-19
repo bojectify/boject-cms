@@ -1,4 +1,5 @@
 import type { ContentTypeField } from '#prisma';
+import { FIELD_TYPES } from '../../utils/fieldTypes';
 
 export interface EnrichDeps {
   loadIdentifiers: (contentTypeIds: string[]) => Promise<Map<string, string>>;
@@ -130,7 +131,7 @@ export async function enrichEntryDataWithEmbedIdentifiers(
   fields: Pick<ContentTypeField, 'identifier' | 'type'>[],
   deps: EnrichDeps
 ): Promise<Record<string, unknown>> {
-  const richtextFields = fields.filter((f) => f.type === 'RICHTEXT');
+  const richtextFields = fields.filter((f) => f.type === FIELD_TYPES.RICHTEXT);
   if (richtextFields.length === 0) return data;
 
   // Collect all unique contentTypeIds across all RICHTEXT fields

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { setup, $fetch, fetch } from '@nuxt/test-utils/e2e';
 import { TEST_USERNAME, TEST_PASSWORD } from '../../test/credentials';
+import { FIELD_TYPES } from '../../../utils/fieldTypes';
 
 const TEST_API_KEY = 'boject_test_key_for_integration_tests_only';
 
@@ -96,10 +97,10 @@ describe('Content API filters', async () => {
           {
             identifier: 'title',
             name: 'Title',
-            type: 'ENTRY_TITLE',
+            type: FIELD_TYPES.ENTRY_TITLE,
             required: true,
           },
-          { identifier: 'slug', name: 'Slug', type: 'SLUG' },
+          { identifier: 'slug', name: 'Slug', type: FIELD_TYPES.SLUG },
         ],
       },
     });
@@ -114,7 +115,7 @@ describe('Content API filters', async () => {
           {
             identifier: 'title',
             name: 'Title',
-            type: 'ENTRY_TITLE',
+            type: FIELD_TYPES.ENTRY_TITLE,
             required: true,
           },
         ],

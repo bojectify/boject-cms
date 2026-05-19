@@ -14,21 +14,7 @@ import {
   parseFieldOptions,
   getFieldOptionsErrorShape,
 } from '../../../utils/fieldOptions';
-
-const VALID_FIELD_TYPES = new Set<string>([
-  'ENTRY_TITLE',
-  'SLUG',
-  'TEXT',
-  'TEXTAREA',
-  'NUMBER',
-  'BOOLEAN',
-  'DATETIME',
-  'SELECT',
-  'RICHTEXT',
-  'RELATION',
-  'MULTIRELATION',
-  'IMAGE',
-]);
+import { FIELD_TYPES, isFieldTypeName } from '../../../utils/fieldTypes';
 
 const NAME_MAX = 200;
 
@@ -79,7 +65,7 @@ export default defineEventHandler(async (event) => {
 
     const fieldName = assertStringLength(f.name, `fields[${idx}].name`, 200);
 
-    if (typeof f.type !== 'string' || !VALID_FIELD_TYPES.has(f.type)) {
+    if (!isFieldTypeName(f.type)) {
       throw createError({
         statusCode: 400,
         statusMessage: `fields[${idx}].type must be a valid FieldType`,
@@ -87,7 +73,7 @@ export default defineEventHandler(async (event) => {
     }
     const type = f.type as FieldType;
 
-    if (type === 'RELATION' || type === 'MULTIRELATION') {
+    if (type === FIELD_TYPES.RELATION || type === FIELD_TYPES.MULTIRELATION) {
       let opts;
       try {
         opts = parseFieldOptions({ type, options: f.options });
@@ -102,7 +88,8 @@ export default defineEventHandler(async (event) => {
         });
       }
       const ids =
-        opts.type === 'RELATION' || opts.type === 'MULTIRELATION'
+        opts.type === FIELD_TYPES.RELATION ||
+        opts.type === FIELD_TYPES.MULTIRELATION
           ? opts.targetContentTypeIds
           : [];
       if (ids.length === 0) {
@@ -113,7 +100,11 @@ export default defineEventHandler(async (event) => {
       }
     }
 
-    if (type === 'RICHTEXT' && f.options && typeof f.options === 'object') {
+    if (
+      type === FIELD_TYPES.RICHTEXT &&
+      f.options &&
+      typeof f.options === 'object'
+    ) {
       try {
         parseFieldOptions({ type, options: f.options });
       } catch (e) {
@@ -129,8 +120,8 @@ export default defineEventHandler(async (event) => {
       }
     }
 
-    if (type === 'ENTRY_TITLE') entryTitleCount++;
-    if (type === 'SLUG') slugCount++;
+    if (type === FIELD_TYPES.ENTRY_TITLE) entryTitleCount++;
+    if (type === FIELD_TYPES.SLUG) slugCount++;
 
     const uniqueFlag = resolveUniqueFlag(
       type,

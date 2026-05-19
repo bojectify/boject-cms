@@ -135,11 +135,14 @@ const contentType = computed<ContentTypeShape | null>(() => {
 
 const slugFieldIdentifier = computed(
   () =>
-    contentType.value?.fields.find((f) => f.type === 'SLUG')?.identifier ?? null
+    contentType.value?.fields.find((f) => f.type === FIELD_TYPES.SLUG)
+      ?.identifier ?? null
 );
 
 const entryTitleFieldIdentifier = computed(() => {
-  const field = contentType.value?.fields.find((f) => f.type === 'ENTRY_TITLE');
+  const field = contentType.value?.fields.find(
+    (f) => f.type === FIELD_TYPES.ENTRY_TITLE
+  );
   return field?.identifier ?? 'title';
 });
 

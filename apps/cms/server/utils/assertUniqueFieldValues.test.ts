@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { FieldType } from '#prisma';
 import { assertUniqueFieldValues } from './assertUniqueFieldValues';
+import { FIELD_TYPES } from '../../utils/fieldTypes';
 
 type FakeRow = { entryId: string; value: unknown };
 
@@ -39,7 +40,7 @@ describe('assertUniqueFieldValues', () => {
   it('skips fields with unique=false', async () => {
     await assertUniqueFieldValues(
       { sku: 'ABC' },
-      [{ ...fieldBase, unique: false, type: 'TEXT' as FieldType }],
+      [{ ...fieldBase, unique: false, type: FIELD_TYPES.TEXT as FieldType }],
       'ct1'
     );
     expect(fakePrisma.$queryRaw).not.toHaveBeenCalled();
@@ -48,7 +49,13 @@ describe('assertUniqueFieldValues', () => {
   it('skips fields of unsupported types even when unique=true', async () => {
     await assertUniqueFieldValues(
       { sku: 'ABC' },
-      [{ ...fieldBase, unique: true, type: 'ENTRY_TITLE' as FieldType }],
+      [
+        {
+          ...fieldBase,
+          unique: true,
+          type: FIELD_TYPES.ENTRY_TITLE as FieldType,
+        },
+      ],
       'ct1'
     );
     expect(fakePrisma.$queryRaw).not.toHaveBeenCalled();
@@ -58,9 +65,21 @@ describe('assertUniqueFieldValues', () => {
     await assertUniqueFieldValues(
       { sku: null, issue: undefined, code: '' },
       [
-        { ...fieldBase, identifier: 'sku', type: 'TEXT' as FieldType },
-        { ...fieldBase, identifier: 'issue', type: 'NUMBER' as FieldType },
-        { ...fieldBase, identifier: 'code', type: 'TEXT' as FieldType },
+        {
+          ...fieldBase,
+          identifier: 'sku',
+          type: FIELD_TYPES.TEXT as FieldType,
+        },
+        {
+          ...fieldBase,
+          identifier: 'issue',
+          type: FIELD_TYPES.NUMBER as FieldType,
+        },
+        {
+          ...fieldBase,
+          identifier: 'code',
+          type: FIELD_TYPES.TEXT as FieldType,
+        },
       ],
       'ct1'
     );
@@ -72,7 +91,13 @@ describe('assertUniqueFieldValues', () => {
     await expect(
       assertUniqueFieldValues(
         { sku: 'ABC' },
-        [{ ...fieldBase, identifier: 'sku', type: 'TEXT' as FieldType }],
+        [
+          {
+            ...fieldBase,
+            identifier: 'sku',
+            type: FIELD_TYPES.TEXT as FieldType,
+          },
+        ],
         'ct1'
       )
     ).rejects.toMatchObject({
@@ -86,7 +111,13 @@ describe('assertUniqueFieldValues', () => {
     await expect(
       assertUniqueFieldValues(
         { issue: 42 },
-        [{ ...fieldBase, identifier: 'issue', type: 'NUMBER' as FieldType }],
+        [
+          {
+            ...fieldBase,
+            identifier: 'issue',
+            type: FIELD_TYPES.NUMBER as FieldType,
+          },
+        ],
         'ct1'
       )
     ).rejects.toMatchObject({
@@ -101,7 +132,13 @@ describe('assertUniqueFieldValues', () => {
     await expect(
       assertUniqueFieldValues(
         { sku: 'ABC' },
-        [{ ...fieldBase, identifier: 'sku', type: 'TEXT' as FieldType }],
+        [
+          {
+            ...fieldBase,
+            identifier: 'sku',
+            type: FIELD_TYPES.TEXT as FieldType,
+          },
+        ],
         'ct1',
         'e1'
       )
@@ -114,7 +151,13 @@ describe('assertUniqueFieldValues', () => {
     await expect(
       assertUniqueFieldValues(
         { sku: 'abc' },
-        [{ ...fieldBase, identifier: 'sku', type: 'TEXT' as FieldType }],
+        [
+          {
+            ...fieldBase,
+            identifier: 'sku',
+            type: FIELD_TYPES.TEXT as FieldType,
+          },
+        ],
         'ct1'
       )
     ).resolves.toBeUndefined();

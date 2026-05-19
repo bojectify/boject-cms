@@ -6,6 +6,7 @@
 
 import type { PrismaClient } from '#prisma';
 import type { CurrentSchemaSnapshot, FieldUsage } from './schemaPlan.types';
+import { FIELD_TYPES } from '../../utils/fieldTypes';
 
 export async function snapshotCurrentSchema(
   prisma: PrismaClient
@@ -59,10 +60,12 @@ export async function snapshotCurrentSchema(
       const key = `${ct.identifier}:${field.identifier}`;
       const usage: FieldUsage = { entriesWithValue: 0 };
       const fieldType = field.type;
-      const trackChoices = fieldType === 'SELECT';
+      const trackChoices = fieldType === FIELD_TYPES.SELECT;
       const trackRelationTargets =
-        fieldType === 'RELATION' || fieldType === 'MULTIRELATION';
-      const trackDuplicates = fieldType === 'TEXT' || fieldType === 'NUMBER';
+        fieldType === FIELD_TYPES.RELATION ||
+        fieldType === FIELD_TYPES.MULTIRELATION;
+      const trackDuplicates =
+        fieldType === FIELD_TYPES.TEXT || fieldType === FIELD_TYPES.NUMBER;
 
       if (trackChoices) usage.selectChoiceCounts = new Map();
       if (trackRelationTargets) usage.relationTargetCounts = new Map();
@@ -166,7 +169,8 @@ function snapshotOptionsForPlanner(
   typeIdToIdentifier: Map<string, string>
 ): Record<string, unknown> | null {
   if (!options) return null;
-  if (type !== 'RELATION' && type !== 'MULTIRELATION') return options;
+  if (type !== FIELD_TYPES.RELATION && type !== FIELD_TYPES.MULTIRELATION)
+    return options;
   const ids = options.targetContentTypeIds;
   if (!Array.isArray(ids)) return options;
   const identifiers: string[] = [];

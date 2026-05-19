@@ -12,6 +12,7 @@ import {
   it,
 } from 'vitest';
 import { runSchemaPull } from '../../src/commands/schema/pull.js';
+import { FIELD_TYPES } from '../../src/vendor/fieldTypes.js';
 
 let server: Server;
 let port: number;
@@ -82,7 +83,7 @@ describe('runSchemaPull', () => {
               id: null,
               identifier: 'name',
               name: 'Name',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
               order: 0,
               options: null,

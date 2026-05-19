@@ -1,4 +1,5 @@
 import { http, HttpResponse } from 'msw';
+import { FIELD_TYPES } from '~/utils/fieldTypes';
 
 const contentTypeNames: Record<string, string> = {
   'ct-author': 'Author',
@@ -33,7 +34,7 @@ export const defaultHandlers = [
     return HttpResponse.json({
       id,
       name: contentTypeNames[id] ?? 'Unknown',
-      fields: [{ identifier: 'title', type: 'ENTRY_TITLE' }],
+      fields: [{ identifier: 'title', type: FIELD_TYPES.ENTRY_TITLE }],
     });
   }),
   http.get('/api/content-entries', ({ request }) => {
@@ -58,7 +59,7 @@ export const defaultHandlers = [
       contentType: {
         id: entry.contentTypeId,
         name: contentTypeNames[entry.contentTypeId] ?? 'Unknown',
-        fields: [{ identifier: 'title', type: 'ENTRY_TITLE' }],
+        fields: [{ identifier: 'title', type: FIELD_TYPES.ENTRY_TITLE }],
       },
     });
   }),

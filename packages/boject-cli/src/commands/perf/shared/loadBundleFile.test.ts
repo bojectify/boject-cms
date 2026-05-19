@@ -3,6 +3,7 @@ import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadBundleFile } from './loadBundleFile.js';
+import { FIELD_TYPES } from '../../../vendor/fieldTypes.js';
 
 async function withTempBundle(content: object | string): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), 'boject-bundle-'));
@@ -31,7 +32,7 @@ describe('loadBundleFile', () => {
               id: 'f1',
               identifier: 'title',
               name: 'Title',
-              type: 'ENTRY_TITLE',
+              type: FIELD_TYPES.ENTRY_TITLE,
               required: true,
               unique: true,
               order: 0,
