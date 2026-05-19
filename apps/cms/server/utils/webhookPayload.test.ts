@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildWebhookPayload } from './webhookPayload';
+import { CONTENT_STATUSES } from '../../utils/contentStatus';
 
 describe('buildWebhookPayload', () => {
   const timestamp = new Date('2026-04-22T12:00:00Z');
@@ -8,7 +9,7 @@ describe('buildWebhookPayload', () => {
     id: 'e-1',
     entryTitle: 'Hello',
     slug: 'hello',
-    status: 'PUBLISHED' as const,
+    status: CONTENT_STATUSES.PUBLISHED,
     publishedAt: new Date('2026-04-22T11:00:00Z'),
     createdAt: new Date('2026-04-22T10:00:00Z'),
     updatedAt: new Date('2026-04-22T11:00:00Z'),
@@ -32,7 +33,7 @@ describe('buildWebhookPayload', () => {
         id: 'e-1',
         entryTitle: 'Hello',
         slug: 'hello',
-        status: 'PUBLISHED',
+        status: CONTENT_STATUSES.PUBLISHED,
         publishedAt: '2026-04-22T11:00:00.000Z',
         createdAt: '2026-04-22T10:00:00.000Z',
         updatedAt: '2026-04-22T11:00:00.000Z',

@@ -7,6 +7,10 @@
 import type { PrismaClient } from '#prisma';
 import type { CurrentSchemaSnapshot, FieldUsage } from './schemaPlan.types';
 import { FIELD_TYPES } from '../../utils/fieldTypes';
+import {
+  CONTENT_STATUSES,
+  type ContentStatusName,
+} from '../../utils/contentStatus';
 
 export async function snapshotCurrentSchema(
   prisma: PrismaClient
@@ -187,15 +191,15 @@ function snapshotOptionsForPlanner(
 }
 
 type Version = {
-  status: 'DRAFT' | 'PUBLISHED' | 'CHANGED' | 'ARCHIVED';
+  status: ContentStatusName;
   data: unknown;
 };
 
 function pickLiveVersion(versions: Version[]): Version | null {
   return (
-    versions.find((v) => v.status === 'CHANGED') ??
-    versions.find((v) => v.status === 'DRAFT') ??
-    versions.find((v) => v.status === 'PUBLISHED') ??
+    versions.find((v) => v.status === CONTENT_STATUSES.CHANGED) ??
+    versions.find((v) => v.status === CONTENT_STATUSES.DRAFT) ??
+    versions.find((v) => v.status === CONTENT_STATUSES.PUBLISHED) ??
     null
   );
 }

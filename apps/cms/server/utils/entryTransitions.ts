@@ -6,6 +6,7 @@ import type {
 } from '#prisma';
 import type { WebhookEntrySnapshot } from './webhookPayload';
 import { getPublishedVersion, getDraftVersion } from './resolveVersion';
+import { CONTENT_STATUSES } from '../../utils/contentStatus';
 
 export type TransitionAction =
   | 'unpublish'
@@ -57,7 +58,7 @@ function snapshotFromPublished(
     id: entry.id,
     entryTitle: published.entryTitle,
     slug: entry.slug,
-    status: 'PUBLISHED',
+    status: CONTENT_STATUSES.PUBLISHED,
     publishedAt: published.publishedAt,
     createdAt: entry.createdAt,
     updatedAt: entry.updatedAt,
@@ -85,7 +86,7 @@ export function planTransition(
           message: 'Entry is not published',
         };
       }
-      if (draft && draft.status === 'CHANGED') {
+      if (draft && draft.status === CONTENT_STATUSES.CHANGED) {
         return {
           kind: 'ok',
           mutations: [
@@ -93,7 +94,7 @@ export function planTransition(
             {
               kind: 'update-status',
               versionId: draft.id,
-              status: 'DRAFT',
+              status: CONTENT_STATUSES.DRAFT,
               publishedAt: null,
             },
           ],
@@ -107,7 +108,7 @@ export function planTransition(
           {
             kind: 'update-status',
             versionId: published.id,
-            status: 'DRAFT',
+            status: CONTENT_STATUSES.DRAFT,
             publishedAt: null,
           },
         ],
@@ -123,7 +124,7 @@ export function planTransition(
           message: 'Only published entries can be archived',
         };
       }
-      if (draft && draft.status === 'CHANGED') {
+      if (draft && draft.status === CONTENT_STATUSES.CHANGED) {
         return {
           kind: 'error',
           error: 'DRAFT_PRESENT',
@@ -136,7 +137,7 @@ export function planTransition(
           {
             kind: 'update-status',
             versionId: published.id,
-            status: 'ARCHIVED',
+            status: CONTENT_STATUSES.ARCHIVED,
           },
         ],
         webhookEvent: 'ENTRY_UNPUBLISHED',
@@ -144,7 +145,9 @@ export function planTransition(
       };
     }
     case 'unarchive': {
-      const archived = entry.versions.find((v) => v.status === 'ARCHIVED');
+      const archived = entry.versions.find(
+        (v) => v.status === CONTENT_STATUSES.ARCHIVED
+      );
       if (!archived) {
         return {
           kind: 'error',
@@ -158,7 +161,7 @@ export function planTransition(
           {
             kind: 'update-status',
             versionId: archived.id,
-            status: 'DRAFT',
+            status: CONTENT_STATUSES.DRAFT,
             publishedAt: null,
           },
         ],

@@ -2,21 +2,12 @@
 // The CLI is published standalone and cannot import from apps/cms/.
 // Keep this file in sync when the canonical version changes.
 
-export type FieldType =
-  | 'ENTRY_TITLE'
-  | 'SLUG'
-  | 'TEXT'
-  | 'TEXTAREA'
-  | 'NUMBER'
-  | 'BOOLEAN'
-  | 'DATETIME'
-  | 'SELECT'
-  | 'RICHTEXT'
-  | 'RELATION'
-  | 'MULTIRELATION'
-  | 'IMAGE';
+import type { FieldTypeName } from './fieldTypes.js';
+import type { ContentStatusName } from './contentStatus.js';
 
-export type ContentStatus = 'DRAFT' | 'PUBLISHED' | 'CHANGED' | 'ARCHIVED';
+export type FieldType = FieldTypeName;
+
+export type ContentStatus = ContentStatusName;
 
 export const BUNDLE_VERSION = 2;
 

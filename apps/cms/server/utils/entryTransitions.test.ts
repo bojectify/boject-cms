@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { ContentEntryVersion } from '#prisma';
 import { planTransition } from './entryTransitions';
+import { CONTENT_STATUSES } from '../../utils/contentStatus';
 
 type VersionFixture = Pick<
   ContentEntryVersion,
@@ -18,7 +19,9 @@ function v(
     data: { title: id },
     entryTitle: id,
     publishedAt:
-      status === 'PUBLISHED' ? new Date('2026-04-22T10:00:00Z') : null,
+      status === CONTENT_STATUSES.PUBLISHED
+        ? new Date('2026-04-22T10:00:00Z')
+        : null,
     ...extras,
   };
 }
@@ -47,7 +50,7 @@ describe('planTransition', () => {
   describe('unpublish', () => {
     it('demotes PUBLISHED to DRAFT when no CHANGED exists', () => {
       const plan = planTransition(
-        makeEntry('e1', [v('pub', 'PUBLISHED')]),
+        makeEntry('e1', [v('pub', CONTENT_STATUSES.PUBLISHED)]),
         'unpublish'
       );
       expect(plan.kind).toBe('ok');
@@ -56,12 +59,12 @@ describe('planTransition', () => {
         {
           kind: 'update-status',
           versionId: 'pub',
-          status: 'DRAFT',
+          status: CONTENT_STATUSES.DRAFT,
           publishedAt: null,
         },
       ]);
       expect(plan.webhookEvent).toBe('ENTRY_UNPUBLISHED');
-      expect(plan.snapshot?.status).toBe('PUBLISHED');
+      expect(plan.snapshot?.status).toBe(CONTENT_STATUSES.PUBLISHED);
       expect(plan.snapshot?.data).toEqual({ title: 'pub' });
       expect(plan.snapshot?.slug).toBe('e1-slug');
       expect(plan.snapshot?.createdAt).toEqual(
@@ -74,7 +77,10 @@ describe('planTransition', () => {
 
     it('drops PUBLISHED and flips CHANGED → DRAFT when CHANGED exists', () => {
       const plan = planTransition(
-        makeEntry('e1', [v('pub', 'PUBLISHED'), v('ch', 'CHANGED')]),
+        makeEntry('e1', [
+          v('pub', CONTENT_STATUSES.PUBLISHED),
+          v('ch', CONTENT_STATUSES.CHANGED),
+        ]),
         'unpublish'
       );
       expect(plan.kind).toBe('ok');
@@ -84,7 +90,7 @@ describe('planTransition', () => {
         {
           kind: 'update-status',
           versionId: 'ch',
-          status: 'DRAFT',
+          status: CONTENT_STATUSES.DRAFT,
           publishedAt: null,
         },
       ]);
@@ -94,7 +100,7 @@ describe('planTransition', () => {
 
     it('rejects when entry has no PUBLISHED version', () => {
       const plan = planTransition(
-        makeEntry('e1', [v('dr', 'DRAFT')]),
+        makeEntry('e1', [v('dr', CONTENT_STATUSES.DRAFT)]),
         'unpublish'
       );
       expect(plan).toEqual({
@@ -108,20 +114,27 @@ describe('planTransition', () => {
   describe('archive', () => {
     it('flips PUBLISHED → ARCHIVED', () => {
       const plan = planTransition(
-        makeEntry('e1', [v('pub', 'PUBLISHED')]),
+        makeEntry('e1', [v('pub', CONTENT_STATUSES.PUBLISHED)]),
         'archive'
       );
       expect(plan.kind).toBe('ok');
       if (plan.kind !== 'ok') return;
       expect(plan.mutations).toEqual([
-        { kind: 'update-status', versionId: 'pub', status: 'ARCHIVED' },
+        {
+          kind: 'update-status',
+          versionId: 'pub',
+          status: CONTENT_STATUSES.ARCHIVED,
+        },
       ]);
       expect(plan.webhookEvent).toBe('ENTRY_UNPUBLISHED');
     });
 
     it('blocks when CHANGED draft exists', () => {
       const plan = planTransition(
-        makeEntry('e1', [v('pub', 'PUBLISHED'), v('ch', 'CHANGED')]),
+        makeEntry('e1', [
+          v('pub', CONTENT_STATUSES.PUBLISHED),
+          v('ch', CONTENT_STATUSES.CHANGED),
+        ]),
         'archive'
       );
       expect(plan).toEqual({
@@ -133,7 +146,7 @@ describe('planTransition', () => {
 
     it('rejects when no PUBLISHED version exists', () => {
       const plan = planTransition(
-        makeEntry('e1', [v('dr', 'DRAFT')]),
+        makeEntry('e1', [v('dr', CONTENT_STATUSES.DRAFT)]),
         'archive'
       );
       expect(plan).toEqual({
@@ -145,7 +158,7 @@ describe('planTransition', () => {
 
     it('archive preserves publishedAt by omitting it from the mutation', () => {
       const plan = planTransition(
-        makeEntry('e1', [v('pub', 'PUBLISHED')]),
+        makeEntry('e1', [v('pub', CONTENT_STATUSES.PUBLISHED)]),
         'archive'
       );
       expect(plan.kind).toBe('ok');
@@ -160,7 +173,7 @@ describe('planTransition', () => {
   describe('unarchive', () => {
     it('flips ARCHIVED → DRAFT with no webhook', () => {
       const plan = planTransition(
-        makeEntry('e1', [v('arc', 'ARCHIVED')]),
+        makeEntry('e1', [v('arc', CONTENT_STATUSES.ARCHIVED)]),
         'unarchive'
       );
       expect(plan.kind).toBe('ok');
@@ -169,7 +182,7 @@ describe('planTransition', () => {
         {
           kind: 'update-status',
           versionId: 'arc',
-          status: 'DRAFT',
+          status: CONTENT_STATUSES.DRAFT,
           publishedAt: null,
         },
       ]);
@@ -179,7 +192,7 @@ describe('planTransition', () => {
 
     it('rejects when no ARCHIVED version exists', () => {
       const plan = planTransition(
-        makeEntry('e1', [v('dr', 'DRAFT')]),
+        makeEntry('e1', [v('dr', CONTENT_STATUSES.DRAFT)]),
         'unarchive'
       );
       expect(plan.kind).toBe('error');
@@ -189,7 +202,7 @@ describe('planTransition', () => {
   describe('republish', () => {
     it('no mutations, refires ENTRY_PUBLISHED with current PUBLISHED snapshot', () => {
       const plan = planTransition(
-        makeEntry('e1', [v('pub', 'PUBLISHED')]),
+        makeEntry('e1', [v('pub', CONTENT_STATUSES.PUBLISHED)]),
         'republish'
       );
       expect(plan.kind).toBe('ok');
@@ -208,7 +221,10 @@ describe('planTransition', () => {
 
     it('is unaffected by a CHANGED draft (always targets PUBLISHED)', () => {
       const plan = planTransition(
-        makeEntry('e1', [v('pub', 'PUBLISHED'), v('ch', 'CHANGED')]),
+        makeEntry('e1', [
+          v('pub', CONTENT_STATUSES.PUBLISHED),
+          v('ch', CONTENT_STATUSES.CHANGED),
+        ]),
         'republish'
       );
       expect(plan.kind).toBe('ok');
@@ -218,7 +234,7 @@ describe('planTransition', () => {
 
     it('rejects when no PUBLISHED version exists', () => {
       const plan = planTransition(
-        makeEntry('e1', [v('dr', 'DRAFT')]),
+        makeEntry('e1', [v('dr', CONTENT_STATUSES.DRAFT)]),
         'republish'
       );
       expect(plan).toEqual({
@@ -230,7 +246,7 @@ describe('planTransition', () => {
 
     it('preserves a null slug in the snapshot', () => {
       const plan = planTransition(
-        makeEntry('e1', [v('pub', 'PUBLISHED')], { slug: null }),
+        makeEntry('e1', [v('pub', CONTENT_STATUSES.PUBLISHED)], { slug: null }),
         'republish'
       );
       expect(plan.kind).toBe('ok');

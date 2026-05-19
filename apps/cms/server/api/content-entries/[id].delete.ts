@@ -5,6 +5,7 @@ import { enforceMutationRateLimit } from '../../utils/rateLimitEndpoint';
 import { enqueueWebhookDeliveries } from '../../utils/webhooks';
 import { getPublishedVersion } from '../../utils/resolveVersion';
 import { assertApiKeyScope } from '../../utils/assertApiKeyScope';
+import { CONTENT_STATUSES } from '../../../utils/contentStatus';
 
 export default defineEventHandler(async (event) => {
   assertApiKeyScope(event, 'content:write');
@@ -40,7 +41,7 @@ export default defineEventHandler(async (event) => {
               id: existing.id,
               entryTitle: existing.entryTitle,
               slug: existing.slug,
-              status: 'PUBLISHED',
+              status: CONTENT_STATUSES.PUBLISHED,
               publishedAt: publishedVersion.publishedAt,
               createdAt: existing.createdAt,
               updatedAt: existing.updatedAt,

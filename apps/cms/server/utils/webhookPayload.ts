@@ -1,10 +1,11 @@
 import type { WebhookEvent } from '#prisma';
+import type { CONTENT_STATUSES } from '../../utils/contentStatus';
 
 export interface WebhookEntrySnapshot {
   id: string;
   entryTitle: string;
   slug: string | null;
-  status: 'PUBLISHED';
+  status: typeof CONTENT_STATUSES.PUBLISHED;
   publishedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -28,7 +29,7 @@ export interface WebhookPayload {
     id: string;
     entryTitle: string;
     slug: string | null;
-    status: 'PUBLISHED';
+    status: typeof CONTENT_STATUSES.PUBLISHED;
     publishedAt: string | null;
     createdAt: string;
     updatedAt: string;

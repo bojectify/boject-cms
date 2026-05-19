@@ -1,5 +1,6 @@
 import type { H3Event } from 'h3';
 import type { ContentEntryVersion, ContentEntry } from '#prisma';
+import { CONTENT_STATUSES } from '../../utils/contentStatus';
 
 export function isCmsRequest(event: H3Event): boolean {
   return event.context.authMethod === 'session';
@@ -9,8 +10,8 @@ export function getDraftVersion(
   versions: ContentEntryVersion[]
 ): ContentEntryVersion | null {
   return (
-    versions.find((v) => v.status === 'CHANGED') ??
-    versions.find((v) => v.status === 'DRAFT') ??
+    versions.find((v) => v.status === CONTENT_STATUSES.CHANGED) ??
+    versions.find((v) => v.status === CONTENT_STATUSES.DRAFT) ??
     null
   );
 }
@@ -18,7 +19,7 @@ export function getDraftVersion(
 export function getPublishedVersion(
   versions: ContentEntryVersion[]
 ): ContentEntryVersion | null {
-  return versions.find((v) => v.status === 'PUBLISHED') ?? null;
+  return versions.find((v) => v.status === CONTENT_STATUSES.PUBLISHED) ?? null;
 }
 
 export function getVersionForContext(

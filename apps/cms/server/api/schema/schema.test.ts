@@ -5,6 +5,7 @@ import { TEST_USERNAME, TEST_PASSWORD } from '../../test/credentials';
 import { prisma } from '../../utils/prisma';
 import { generateApiKey } from '../../utils/apiKey';
 import { FIELD_TYPES } from '../../../utils/fieldTypes';
+import { CONTENT_STATUSES } from '../../../utils/contentStatus';
 
 await setup({
   rootDir: fileURLToPath(new URL('../../..', import.meta.url)),
@@ -253,7 +254,7 @@ describe('POST /api/schema/apply', () => {
           create: {
             data: { title: 'X' },
             entryTitle: 'X',
-            status: 'PUBLISHED',
+            status: CONTENT_STATUSES.PUBLISHED,
           },
         },
       },

@@ -10,6 +10,7 @@ import { PrismaClient } from '../../generated/prisma/client';
 import { snapshotCurrentSchema } from './snapshotCurrentSchema';
 import { getTestDatabaseUrl } from '../../test/dbUrl';
 import { FIELD_TYPES } from '../../utils/fieldTypes';
+import { CONTENT_STATUSES } from '../../utils/contentStatus';
 
 const url = getTestDatabaseUrl();
 const adapter = new PrismaPg({ connectionString: url });
@@ -64,7 +65,7 @@ describe('snapshotCurrentSchema', () => {
         versions: {
           create: [
             {
-              status: 'PUBLISHED',
+              status: CONTENT_STATUSES.PUBLISHED,
               entryTitle: 'Dave',
               data: { name: 'Dave' },
               publishedAt: new Date(),
@@ -128,7 +129,7 @@ describe('snapshotCurrentSchema', () => {
         versions: {
           create: [
             {
-              status: 'PUBLISHED',
+              status: CONTENT_STATUSES.PUBLISHED,
               entryTitle: 'First',
               data: {
                 title: 'First',
@@ -152,7 +153,7 @@ describe('snapshotCurrentSchema', () => {
         versions: {
           create: [
             {
-              status: 'PUBLISHED',
+              status: CONTENT_STATUSES.PUBLISHED,
               entryTitle: 'Second',
               data: {
                 title: 'Second',

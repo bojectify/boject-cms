@@ -5,6 +5,7 @@ import { importBundle } from './import';
 import type { Bundle } from './types';
 import { getTestDatabaseUrl } from '../../test/dbUrl';
 import { FIELD_TYPES } from '../../utils/fieldTypes';
+import { CONTENT_STATUSES } from '../../utils/contentStatus';
 
 const url = getTestDatabaseUrl();
 const adapter = new PrismaPg({ connectionString: url });
@@ -135,7 +136,7 @@ describe('importBundle', () => {
           entryTitle: 'News',
           entryKey: 'news',
           slug: 'news',
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
           publishedAt: null,
           data: { name: 'News' },
         },
@@ -146,7 +147,7 @@ describe('importBundle', () => {
           entryTitle: 'Hello',
           entryKey: 'hello',
           slug: 'hello',
-          status: 'DRAFT',
+          status: CONTENT_STATUSES.DRAFT,
           publishedAt: null,
           data: {
             title: 'Hello',
@@ -337,7 +338,7 @@ describe('importBundle', () => {
             entryTitle: 'Imported',
             // entryKey intentionally missing
             slug: 'imported',
-            status: 'DRAFT',
+            status: CONTENT_STATUSES.DRAFT,
             publishedAt: null,
             data: { title: 'Imported' },
           },
@@ -359,7 +360,7 @@ describe('importBundle', () => {
             entryTitle: 'Imported',
             entryKey: 'imported-key',
             slug: 'imported',
-            status: 'DRAFT',
+            status: CONTENT_STATUSES.DRAFT,
             publishedAt: null,
             data: { title: 'Imported' },
           },
@@ -433,7 +434,7 @@ describe('importBundle', () => {
             entryTitle: 'News',
             entryKey: 'news',
             slug: 'news-cat',
-            status: 'PUBLISHED',
+            status: CONTENT_STATUSES.PUBLISHED,
             publishedAt: null,
             data: { name: 'News' },
           },
@@ -444,7 +445,7 @@ describe('importBundle', () => {
             entryTitle: 'Hello',
             entryKey: 'hello',
             slug: 'hello-post',
-            status: 'DRAFT',
+            status: CONTENT_STATUSES.DRAFT,
             publishedAt: null,
             data: {
               title: 'Hello',
@@ -488,7 +489,7 @@ describe('importBundle', () => {
             entryTitle: 'Foo',
             entryKey: 'foo',
             slug: 'foo',
-            status: 'DRAFT',
+            status: CONTENT_STATUSES.DRAFT,
             publishedAt: null,
             data: { title: 'Foo' },
           },
@@ -509,7 +510,7 @@ describe('importBundle', () => {
             entryTitle: 'Foo II',
             entryKey: 'foo',
             slug: 'foo-2',
-            status: 'DRAFT',
+            status: CONTENT_STATUSES.DRAFT,
             publishedAt: null,
             data: { title: 'Foo II' },
           },

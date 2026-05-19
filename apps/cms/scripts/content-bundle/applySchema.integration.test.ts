@@ -15,6 +15,7 @@ import * as schemaModule from '../../server/graphql/schema';
 import type { Bundle } from './types';
 import { getTestDatabaseUrl } from '../../test/dbUrl';
 import { FIELD_TYPES } from '../../utils/fieldTypes';
+import { CONTENT_STATUSES } from '../../utils/contentStatus';
 
 const url = getTestDatabaseUrl();
 const adapter = new PrismaPg({ connectionString: url });
@@ -122,7 +123,7 @@ describe('applySchema', () => {
             create: {
               data: { title: 'X' },
               entryTitle: 'X',
-              status: 'PUBLISHED',
+              status: CONTENT_STATUSES.PUBLISHED,
             },
           },
         },
@@ -181,7 +182,7 @@ describe('applySchema', () => {
             create: {
               data: { title: 'X' },
               entryTitle: 'X',
-              status: 'PUBLISHED',
+              status: CONTENT_STATUSES.PUBLISHED,
             },
           },
         },
@@ -593,7 +594,7 @@ describe('applySchema', () => {
             create: {
               data: { title: 'A', tagline: 'Hello' },
               entryTitle: 'A',
-              status: 'PUBLISHED',
+              status: CONTENT_STATUSES.PUBLISHED,
             },
           },
         },
@@ -1211,7 +1212,7 @@ describe('applySchema', () => {
             create: {
               data: { title: 'X' },
               entryTitle: 'X',
-              status: 'PUBLISHED',
+              status: CONTENT_STATUSES.PUBLISHED,
             },
           },
         },

@@ -1,7 +1,8 @@
 import type { BasicComponentProps } from '~/types/basicComponentProps';
 import type { EntryAction } from '~/components/entry-action-menu/entryActionMenu.types';
+import type { ContentStatusName } from '~/utils/contentStatus';
 
-export type EntryStatus = 'DRAFT' | 'PUBLISHED' | 'CHANGED' | 'ARCHIVED';
+export type EntryStatus = ContentStatusName;
 
 export type EntrySidebarProps = BasicComponentProps & {
   status: EntryStatus;

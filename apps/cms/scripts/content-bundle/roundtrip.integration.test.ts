@@ -5,6 +5,7 @@ import { exportBundle } from './export';
 import { importBundle } from './import';
 import { getTestDatabaseUrl } from '../../test/dbUrl';
 import { FIELD_TYPES } from '../../utils/fieldTypes';
+import { CONTENT_STATUSES } from '../../utils/contentStatus';
 
 const url = getTestDatabaseUrl();
 const adapter = new PrismaPg({ connectionString: url });
@@ -42,7 +43,7 @@ async function seed() {
         create: {
           data: { name: 'News' },
           entryTitle: 'News',
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
         },
       },
     },
@@ -88,7 +89,7 @@ async function seed() {
             },
           },
           entryTitle: 'Welcome',
-          status: 'DRAFT',
+          status: CONTENT_STATUSES.DRAFT,
         },
       },
     },

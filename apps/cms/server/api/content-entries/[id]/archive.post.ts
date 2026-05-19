@@ -7,6 +7,7 @@ import {
   planTransition,
 } from '../../../utils/entryTransitions';
 import { enqueueWebhookDeliveries } from '../../../utils/webhooks';
+import { CONTENT_STATUSES } from '../../../../utils/contentStatus';
 
 export default defineEventHandler(async (event) => {
   assertApiKeyScope(event, 'content:write');
@@ -51,7 +52,9 @@ export default defineEventHandler(async (event) => {
     where: { id },
     include: { versions: true, contentType: true },
   });
-  const archived = refreshed.versions.find((v) => v.status === 'ARCHIVED');
+  const archived = refreshed.versions.find(
+    (v) => v.status === CONTENT_STATUSES.ARCHIVED
+  );
   if (!archived) {
     throw createError({
       statusCode: 500,

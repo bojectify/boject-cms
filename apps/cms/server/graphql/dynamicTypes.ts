@@ -13,6 +13,10 @@ import {
 } from './jsonbFilters';
 import { Prisma } from '#prisma';
 import { FIELD_TYPES } from '../../utils/fieldTypes';
+import {
+  CONTENT_STATUSES,
+  type ContentStatusName,
+} from '../../utils/contentStatus';
 
 interface ContentTypeWithFields {
   id: string;
@@ -37,7 +41,7 @@ export interface ContentEntryShape {
   data: unknown;
   slug: string | null;
   entryKey: string;
-  status: 'DRAFT' | 'PUBLISHED' | 'CHANGED' | 'ARCHIVED';
+  status: ContentStatusName;
   publishedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -252,7 +256,9 @@ export function registerDynamicTypes(
           const entryIds = refs.map((r) => r.entryId);
           const entries = await prisma.contentEntry.findMany({
             where: { id: { in: entryIds } },
-            include: { versions: { where: { status: 'PUBLISHED' } } },
+            include: {
+              versions: { where: { status: CONTENT_STATUSES.PUBLISHED } },
+            },
           });
           const byId = new Map<string, ContentEntryShape>();
           for (const e of entries) {
@@ -469,7 +475,9 @@ export function registerDynamicTypes(
             if (!ref?.entryId) return null;
             const related = await prisma.contentEntry.findUnique({
               where: { id: ref.entryId },
-              include: { versions: { where: { status: 'PUBLISHED' } } },
+              include: {
+                versions: { where: { status: CONTENT_STATUSES.PUBLISHED } },
+              },
             });
             if (!related || related.versions.length === 0) return null;
             return flattenToShape(related, related.versions[0]!);
@@ -582,7 +590,9 @@ export function registerDynamicTypes(
                   const entries = await prisma.contentEntry.findMany({
                     where: { id: { in: entryIds } },
                     include: {
-                      versions: { where: { status: 'PUBLISHED' } },
+                      versions: {
+                        where: { status: CONTENT_STATUSES.PUBLISHED },
+                      },
                     },
                   });
                   const byId = new Map(
@@ -630,7 +640,9 @@ export function registerDynamicTypes(
         resolve: async (_root, args) => {
           const entry = await prisma.contentEntry.findFirst({
             where: { id: String(args.id), contentTypeId: ct.id },
-            include: { versions: { where: { status: 'PUBLISHED' } } },
+            include: {
+              versions: { where: { status: CONTENT_STATUSES.PUBLISHED } },
+            },
           });
           if (!entry || entry.versions.length === 0) return null;
           return flattenToShape(entry, entry.versions[0]!);
@@ -648,7 +660,9 @@ export function registerDynamicTypes(
           resolve: async (_root, args) => {
             const entry = await prisma.contentEntry.findFirst({
               where: { contentTypeId: ct.id, slug: args.slug },
-              include: { versions: { where: { status: 'PUBLISHED' } } },
+              include: {
+                versions: { where: { status: CONTENT_STATUSES.PUBLISHED } },
+              },
             });
             if (!entry || entry.versions.length === 0) return null;
             return flattenToShape(entry, entry.versions[0]!);
@@ -666,7 +680,9 @@ export function registerDynamicTypes(
         resolve: async (_root, args) => {
           const entry = await prisma.contentEntry.findFirst({
             where: { contentTypeId: ct.id, entryKey: args.entryKey },
-            include: { versions: { where: { status: 'PUBLISHED' } } },
+            include: {
+              versions: { where: { status: CONTENT_STATUSES.PUBLISHED } },
+            },
           });
           if (!entry || entry.versions.length === 0) return null;
           return flattenToShape(entry, entry.versions[0]!);

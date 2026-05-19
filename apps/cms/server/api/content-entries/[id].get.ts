@@ -4,6 +4,7 @@ import {
   getPublishedVersion,
   flattenEntryWithVersion,
 } from '../../utils/resolveVersion';
+import { CONTENT_STATUSES } from '../../../utils/contentStatus';
 
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id');
@@ -34,7 +35,7 @@ export default defineEventHandler(async (event) => {
 
   const publishedVersion = getPublishedVersion(entry.versions);
   const hasArchivedVersion = entry.versions.some(
-    (v) => v.status === 'ARCHIVED'
+    (v) => v.status === CONTENT_STATUSES.ARCHIVED
   );
 
   return flattenEntryWithVersion(entry, version, {

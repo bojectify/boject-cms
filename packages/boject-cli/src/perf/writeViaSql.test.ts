@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { GeneratedSeed } from './generate.js';
 import { writeViaSql, MissingContentTypeError } from './writeViaSql.js';
 import { SeedMostlyDuplicateError } from './seedErrors.js';
+import { CONTENT_STATUSES } from '../vendor/contentStatus.js';
 
 interface QueryCall {
   sql: string;
@@ -87,7 +88,7 @@ describe('writeViaSql', () => {
               slug: null,
               versions: [
                 {
-                  status: 'PUBLISHED',
+                  status: CONTENT_STATUSES.PUBLISHED,
                   data: { name: 'A' },
                   publishedAt: '2026-01-01T00:00:00.000Z',
                 },
@@ -107,7 +108,7 @@ describe('writeViaSql', () => {
               slug: 'art-0',
               versions: [
                 {
-                  status: 'PUBLISHED',
+                  status: CONTENT_STATUSES.PUBLISHED,
                   data: {
                     author: {
                       entryId: 'syn-a',
@@ -155,7 +156,7 @@ describe('writeViaSql', () => {
               slug: 'a',
               versions: [
                 {
-                  status: 'PUBLISHED',
+                  status: CONTENT_STATUSES.PUBLISHED,
                   data: { title: 'A' },
                   publishedAt: '2026-05-13T00:00:00.000Z',
                 },
@@ -196,7 +197,7 @@ describe('writeViaSql', () => {
               slug: null,
               versions: [
                 {
-                  status: 'PUBLISHED',
+                  status: CONTENT_STATUSES.PUBLISHED,
                   data: { name: 'A' },
                   publishedAt: '2026-01-01T00:00:00.000Z',
                 },
@@ -216,7 +217,7 @@ describe('writeViaSql', () => {
               slug: null,
               versions: [
                 {
-                  status: 'PUBLISHED',
+                  status: CONTENT_STATUSES.PUBLISHED,
                   data: {
                     author: {
                       entryId: 'syn-a',
@@ -265,7 +266,7 @@ describe('writeViaSql', () => {
               slug: null,
               versions: [
                 {
-                  status: 'PUBLISHED',
+                  status: CONTENT_STATUSES.PUBLISHED,
                   data: {},
                   publishedAt: '2026-01-01T00:00:00.000Z',
                 },
@@ -297,7 +298,7 @@ describe('writeViaSql', () => {
               slug: null,
               versions: [
                 {
-                  status: 'PUBLISHED',
+                  status: CONTENT_STATUSES.PUBLISHED,
                   data: {},
                   publishedAt: '2026-01-01T00:00:00.000Z',
                 },
@@ -312,7 +313,7 @@ describe('writeViaSql', () => {
               slug: null,
               versions: [
                 {
-                  status: 'PUBLISHED',
+                  status: CONTENT_STATUSES.PUBLISHED,
                   data: {},
                   publishedAt: '2026-01-01T00:00:00.000Z',
                 },
@@ -354,7 +355,7 @@ describe('writeViaSql', () => {
       slug: null,
       versions: [
         {
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
           data: {},
           publishedAt: '2026-01-01T00:00:00.000Z',
         },
@@ -388,7 +389,7 @@ describe('writeViaSql', () => {
       slug: `p-${i}`,
       versions: [
         {
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
           data: {},
           publishedAt: '2026-01-01T00:00:00.000Z',
         },
@@ -498,7 +499,7 @@ describe('writeViaSql', () => {
               slug: null,
               versions: [
                 {
-                  status: 'PUBLISHED',
+                  status: CONTENT_STATUSES.PUBLISHED,
                   data: {},
                   publishedAt: '2026-01-01T00:00:00.000Z',
                 },
@@ -513,7 +514,7 @@ describe('writeViaSql', () => {
               slug: null,
               versions: [
                 {
-                  status: 'PUBLISHED',
+                  status: CONTENT_STATUSES.PUBLISHED,
                   data: {},
                   publishedAt: '2026-01-01T00:00:00.000Z',
                 },
@@ -577,7 +578,7 @@ describe('writeViaSql', () => {
               slug: null,
               versions: [
                 {
-                  status: 'PUBLISHED',
+                  status: CONTENT_STATUSES.PUBLISHED,
                   data: { name: 'A0' },
                   publishedAt: '2026-01-01T00:00:00.000Z',
                 },
@@ -592,7 +593,7 @@ describe('writeViaSql', () => {
               slug: null,
               versions: [
                 {
-                  status: 'PUBLISHED',
+                  status: CONTENT_STATUSES.PUBLISHED,
                   data: { name: 'A1' },
                   publishedAt: '2026-01-01T00:00:00.000Z',
                 },
@@ -612,7 +613,7 @@ describe('writeViaSql', () => {
               slug: 'art-0',
               versions: [
                 {
-                  status: 'PUBLISHED',
+                  status: CONTENT_STATUSES.PUBLISHED,
                   data: {
                     author: {
                       entryId: 'syn-a1',
@@ -633,7 +634,7 @@ describe('writeViaSql', () => {
               slug: 'art-1',
               versions: [
                 {
-                  status: 'PUBLISHED',
+                  status: CONTENT_STATUSES.PUBLISHED,
                   data: {
                     author: {
                       entryId: 'syn-a0',
@@ -654,7 +655,7 @@ describe('writeViaSql', () => {
               slug: 'art-2',
               versions: [
                 {
-                  status: 'PUBLISHED',
+                  status: CONTENT_STATUSES.PUBLISHED,
                   data: {
                     author: {
                       entryId: 'syn-a0',
@@ -720,7 +721,7 @@ describe('writeViaSql', () => {
       slug: `author-${i}`,
       versions: [
         {
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
           data: { name: `Author ${i}` },
           publishedAt: '2026-01-01T00:00:00.000Z',
         },
@@ -738,7 +739,7 @@ describe('writeViaSql', () => {
       slug: `article-${i}`,
       versions: [
         {
-          status: 'PUBLISHED',
+          status: CONTENT_STATUSES.PUBLISHED,
           data: {
             author: {
               entryId: authorRefId,
@@ -814,7 +815,7 @@ describe('writeViaSql', () => {
               slug: 'cat-0',
               versions: [
                 {
-                  status: 'PUBLISHED',
+                  status: CONTENT_STATUSES.PUBLISHED,
                   data: {},
                   publishedAt: '2026-01-01T00:00:00.000Z',
                 },
@@ -834,7 +835,7 @@ describe('writeViaSql', () => {
               slug: 'article-0',
               versions: [
                 {
-                  status: 'PUBLISHED',
+                  status: CONTENT_STATUSES.PUBLISHED,
                   data: {
                     category: {
                       entryId: 'syn-cat-0',
@@ -860,7 +861,7 @@ describe('writeViaSql', () => {
               slug: 'comment-0',
               versions: [
                 {
-                  status: 'PUBLISHED',
+                  status: CONTENT_STATUSES.PUBLISHED,
                   data: {
                     article: {
                       entryId: 'syn-article-0',
@@ -919,7 +920,7 @@ describe('writeViaSql', () => {
               slug: 'article-0',
               versions: [
                 {
-                  status: 'PUBLISHED',
+                  status: CONTENT_STATUSES.PUBLISHED,
                   data: {
                     coAuthors: [
                       {
@@ -985,7 +986,7 @@ describe('writeViaSql', () => {
               slug: 'article-0',
               versions: [
                 {
-                  status: 'PUBLISHED',
+                  status: CONTENT_STATUSES.PUBLISHED,
                   data: {
                     body: {
                       type: 'doc',
@@ -1131,7 +1132,7 @@ describe('writeViaSql', () => {
               slug: 'p1',
               versions: [
                 {
-                  status: 'PUBLISHED',
+                  status: CONTENT_STATUSES.PUBLISHED,
                   data: {},
                   publishedAt: '2026-01-01T00:00:00.000Z',
                 },
@@ -1146,7 +1147,7 @@ describe('writeViaSql', () => {
               slug: 'p2',
               versions: [
                 {
-                  status: 'PUBLISHED',
+                  status: CONTENT_STATUSES.PUBLISHED,
                   data: {},
                   publishedAt: '2026-01-01T00:00:00.000Z',
                 },
@@ -1161,7 +1162,7 @@ describe('writeViaSql', () => {
               slug: 'p3',
               versions: [
                 {
-                  status: 'PUBLISHED',
+                  status: CONTENT_STATUSES.PUBLISHED,
                   data: {},
                   publishedAt: '2026-01-01T00:00:00.000Z',
                 },
@@ -1224,7 +1225,7 @@ describe('writeViaSql', () => {
               slug: 'p1',
               versions: [
                 {
-                  status: 'PUBLISHED',
+                  status: CONTENT_STATUSES.PUBLISHED,
                   data: {},
                   publishedAt: '2026-01-01T00:00:00.000Z',
                 },
@@ -1239,7 +1240,7 @@ describe('writeViaSql', () => {
               slug: 'p2',
               versions: [
                 {
-                  status: 'PUBLISHED',
+                  status: CONTENT_STATUSES.PUBLISHED,
                   data: {},
                   publishedAt: '2026-01-01T00:00:00.000Z',
                 },
@@ -1303,7 +1304,7 @@ describe('writeViaSql', () => {
               slug: 'a',
               versions: [
                 {
-                  status: 'PUBLISHED',
+                  status: CONTENT_STATUSES.PUBLISHED,
                   data: { name: 'A' },
                   publishedAt: '2026-05-12T00:00:00.000Z',
                 },
@@ -1323,7 +1324,7 @@ describe('writeViaSql', () => {
               slug: 'ar',
               versions: [
                 {
-                  status: 'PUBLISHED',
+                  status: CONTENT_STATUSES.PUBLISHED,
                   data: {
                     title: 'AR',
                     author: {

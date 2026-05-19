@@ -13,6 +13,7 @@ import {
   getVersionForContext,
   flattenEntryWithVersion,
 } from '../../utils/resolveVersion';
+import { CONTENT_STATUSES } from '../../../utils/contentStatus';
 
 export default defineEventHandler(async (event) => {
   assertApiKeyScope(event, 'content:write');
@@ -62,7 +63,7 @@ export default defineEventHandler(async (event) => {
     );
   }
 
-  const isPublish = body.status === 'PUBLISHED';
+  const isPublish = body.status === CONTENT_STATUSES.PUBLISHED;
 
   if (isPublish) {
     await publishFlow(entry, validatedData);
@@ -133,7 +134,9 @@ async function saveDraftFlow(
 ): Promise<void> {
   const publishedVersion = getPublishedVersion(entry.versions);
   const draftVersion = getDraftVersion(entry.versions);
-  const targetStatus = publishedVersion ? 'CHANGED' : 'DRAFT';
+  const targetStatus = publishedVersion
+    ? CONTENT_STATUSES.CHANGED
+    : CONTENT_STATUSES.DRAFT;
 
   // Determine the data to save — use provided data or fall back to existing draft data
   const dataToSave =
@@ -236,7 +239,7 @@ async function publishFlow(
               data: (validatedData ??
                 draftVersion.data) as Prisma.InputJsonValue,
               entryTitle,
-              status: 'PUBLISHED',
+              status: CONTENT_STATUSES.PUBLISHED,
               publishedAt,
             },
           });
@@ -246,7 +249,7 @@ async function publishFlow(
               entryId: entry.id,
               data: dataToPublish as Prisma.InputJsonValue,
               entryTitle,
-              status: 'PUBLISHED',
+              status: CONTENT_STATUSES.PUBLISHED,
               publishedAt,
             },
           });
@@ -261,7 +264,7 @@ async function publishFlow(
         // Re-read the canonical published version inside this transaction so
         // the snapshot matches what consumers would see via GraphQL/REST.
         const published = await tx.contentEntryVersion.findFirstOrThrow({
-          where: { entryId: entry.id, status: 'PUBLISHED' },
+          where: { entryId: entry.id, status: CONTENT_STATUSES.PUBLISHED },
         });
         await enqueueWebhookDeliveries(tx, {
           event: 'ENTRY_PUBLISHED',
@@ -273,7 +276,7 @@ async function publishFlow(
             id: entry.id,
             entryTitle,
             slug,
-            status: 'PUBLISHED',
+            status: CONTENT_STATUSES.PUBLISHED,
             publishedAt: published.publishedAt,
             createdAt: entry.createdAt,
             updatedAt: new Date(),

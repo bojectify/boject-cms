@@ -12,7 +12,8 @@
     ".": "./dist/index.js",
     "./perf": "./dist/perf/index.js",
     "./vendor/contentBundleTypes": "./dist/vendor/contentBundleTypes.ts",
-    "./vendor/fieldTypes": "./dist/vendor/fieldTypes.ts"
+    "./vendor/fieldTypes": "./dist/vendor/fieldTypes.ts",
+    "./vendor/contentStatus": "./dist/vendor/contentStatus.ts"
   },
   "files": [
     "dist"
