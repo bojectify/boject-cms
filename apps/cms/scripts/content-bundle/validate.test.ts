@@ -35,17 +35,6 @@ describe('validateBundle', () => {
     expect(validateBundle(validBundle)).toEqual({ ok: true, errors: [] });
   });
 
-  it('accepts version 1', () => {
-    const result = validateBundle({ ...validBundle, version: 1 });
-    expect(result.ok).toBe(true);
-  });
-
-  it('rejects wrong version', () => {
-    const result = validateBundle({ ...validBundle, version: 99 });
-    expect(result.ok).toBe(false);
-    expect(result.errors[0]?.path).toBe('version');
-  });
-
   it('rejects missing ENTRY_TITLE field', () => {
     const result = validateBundle({
       ...validBundle,
@@ -268,5 +257,74 @@ describe('entryKey validation (#205)', () => {
     expect(
       result.errors.find((e) => e.message.includes('duplicate entryKey'))
     ).toBeUndefined();
+  });
+});
+
+describe('validateBundle — version tightening', () => {
+  it('rejects bundles claiming version 1', () => {
+    const bundle = { ...validBundle, version: 1 };
+    const result = validateBundle(bundle);
+    expect(result.ok).toBe(false);
+    expect(result.errors[0]).toMatchObject({ path: 'version' });
+    expect(result.errors[0]?.message).toMatch(/expected version 2, got 1/);
+    expect(result.errors[0]?.message).toMatch(/boject bundle migrate/);
+  });
+
+  it('rejects bundles claiming a future version', () => {
+    const bundle = { ...validBundle, version: 99 };
+    const result = validateBundle(bundle);
+    expect(result.ok).toBe(false);
+    expect(result.errors[0]?.message).toMatch(/expected version 2, got 99/);
+  });
+
+  it('rejects v1-style entries with flat data and no versions array', () => {
+    const bundle = {
+      ...validBundle,
+      entries: [
+        {
+          id: null,
+          contentTypeId: null,
+          contentTypeIdentifier: 'BlogPost',
+          entryTitle: 'Hello',
+          entryKey: 'hello',
+          slug: null,
+          status: 'PUBLISHED',
+          publishedAt: null,
+          data: { title: 'Hello' },
+        },
+      ],
+    };
+    const result = validateBundle(bundle);
+    expect(result.ok).toBe(false);
+    expect(
+      result.errors.some(
+        (e) => e.path === 'entries[0]' && /versions/.test(e.message)
+      )
+    ).toBe(true);
+  });
+
+  it('accepts v2-style entries with a non-empty versions array', () => {
+    const bundle = {
+      ...validBundle,
+      entries: [
+        {
+          id: null,
+          contentTypeId: null,
+          contentTypeIdentifier: 'BlogPost',
+          entryTitle: 'Hello',
+          entryKey: 'hello',
+          slug: null,
+          versions: [
+            {
+              status: 'PUBLISHED',
+              data: { title: 'Hello' },
+              publishedAt: null,
+            },
+          ],
+        },
+      ],
+    };
+    const result = validateBundle(bundle);
+    expect(result).toEqual({ ok: true, errors: [] });
   });
 });

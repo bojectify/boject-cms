@@ -18,7 +18,7 @@ async function reset() {
 }
 
 const schemaOnly: Bundle = {
-  version: 1,
+  version: 2,
   exportedAt: '2026-04-14T10:00:00.000Z',
   portable: true,
   contentTypes: [
@@ -77,7 +77,7 @@ describe('importBundle', () => {
 
   it('imports entries with portable refs via two-pass resolution', async () => {
     const withRelations: Bundle = {
-      version: 1,
+      version: 2,
       exportedAt: '2026-04-14T10:00:00.000Z',
       portable: true,
       contentTypes: [
@@ -136,9 +136,13 @@ describe('importBundle', () => {
           entryTitle: 'News',
           entryKey: 'news',
           slug: 'news',
-          status: CONTENT_STATUSES.PUBLISHED,
-          publishedAt: null,
-          data: { name: 'News' },
+          versions: [
+            {
+              status: CONTENT_STATUSES.PUBLISHED,
+              publishedAt: null,
+              data: { name: 'News' },
+            },
+          ],
         },
         {
           id: null,
@@ -147,12 +151,19 @@ describe('importBundle', () => {
           entryTitle: 'Hello',
           entryKey: 'hello',
           slug: 'hello',
-          status: CONTENT_STATUSES.DRAFT,
-          publishedAt: null,
-          data: {
-            title: 'Hello',
-            category: { contentTypeIdentifier: 'Category', entryKey: 'news' },
-          },
+          versions: [
+            {
+              status: CONTENT_STATUSES.DRAFT,
+              publishedAt: null,
+              data: {
+                title: 'Hello',
+                category: {
+                  contentTypeIdentifier: 'Category',
+                  entryKey: 'news',
+                },
+              },
+            },
+          ],
         },
       ],
     };
@@ -182,7 +193,7 @@ describe('importBundle', () => {
 
   it('resolves RELATION field targets that forward-reference later content types', async () => {
     const forwardRef: Bundle = {
-      version: 1,
+      version: 2,
       exportedAt: '2026-04-14T10:00:00.000Z',
       portable: true,
       contentTypes: [
@@ -258,7 +269,7 @@ describe('importBundle', () => {
 
   it('throws a clear error when a RELATION field targets an undeclared content type', async () => {
     const danglingRef: Bundle = {
-      version: 1,
+      version: 2,
       exportedAt: '2026-04-14T10:00:00.000Z',
       portable: true,
       contentTypes: [
@@ -360,9 +371,13 @@ describe('importBundle', () => {
             entryTitle: 'Imported',
             entryKey: 'imported-key',
             slug: 'imported',
-            status: CONTENT_STATUSES.DRAFT,
-            publishedAt: null,
-            data: { title: 'Imported' },
+            versions: [
+              {
+                status: CONTENT_STATUSES.DRAFT,
+                publishedAt: null,
+                data: { title: 'Imported' },
+              },
+            ],
           },
         ],
       };
@@ -434,9 +449,13 @@ describe('importBundle', () => {
             entryTitle: 'News',
             entryKey: 'news',
             slug: 'news-cat',
-            status: CONTENT_STATUSES.PUBLISHED,
-            publishedAt: null,
-            data: { name: 'News' },
+            versions: [
+              {
+                status: CONTENT_STATUSES.PUBLISHED,
+                publishedAt: null,
+                data: { name: 'News' },
+              },
+            ],
           },
           {
             id: null,
@@ -445,12 +464,19 @@ describe('importBundle', () => {
             entryTitle: 'Hello',
             entryKey: 'hello',
             slug: 'hello-post',
-            status: CONTENT_STATUSES.DRAFT,
-            publishedAt: null,
-            data: {
-              title: 'Hello',
-              category: { contentTypeIdentifier: 'Category', entryKey: 'news' },
-            },
+            versions: [
+              {
+                status: CONTENT_STATUSES.DRAFT,
+                publishedAt: null,
+                data: {
+                  title: 'Hello',
+                  category: {
+                    contentTypeIdentifier: 'Category',
+                    entryKey: 'news',
+                  },
+                },
+              },
+            ],
           },
         ],
       };
@@ -489,9 +515,13 @@ describe('importBundle', () => {
             entryTitle: 'Foo',
             entryKey: 'foo',
             slug: 'foo',
-            status: CONTENT_STATUSES.DRAFT,
-            publishedAt: null,
-            data: { title: 'Foo' },
+            versions: [
+              {
+                status: CONTENT_STATUSES.DRAFT,
+                publishedAt: null,
+                data: { title: 'Foo' },
+              },
+            ],
           },
         ],
       };
@@ -510,9 +540,13 @@ describe('importBundle', () => {
             entryTitle: 'Foo II',
             entryKey: 'foo',
             slug: 'foo-2',
-            status: CONTENT_STATUSES.DRAFT,
-            publishedAt: null,
-            data: { title: 'Foo II' },
+            versions: [
+              {
+                status: CONTENT_STATUSES.DRAFT,
+                publishedAt: null,
+                data: { title: 'Foo II' },
+              },
+            ],
           },
         ],
       };
