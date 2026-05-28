@@ -1,9 +1,15 @@
 import type { ContentStatus, FieldType } from '#prisma';
 
-// V2 was redefined in #205: entries are now REQUIRED to carry an `entryKey`
-// string. The version number was deliberately not bumped (clean cutover —
-// no real-world v1/v2 entry-bearing bundles exist outside this repo).
-// Validation enforces the new requirement at validate.ts.
+// Coupling rule: bumping BUNDLE_VERSION is a breaking change to the bundle
+// format and MUST coincide with a CLI semver-major release. The reverse
+// does not hold — a CLI major may ship without a bundle version bump.
+// See docs/superpowers/specs/2026-05-28-bundle-format-versioning-and-migrations-design.md
+// (internal repo) for the full versioning policy.
+//
+// History: V2 was redefined in #205 to require `entryKey` on every entry.
+// The version number was not bumped at that time (clean cutover — no real
+// v1/v2 entry-bearing bundles existed outside this repo). The defensive
+// v1 entry-shape fallback was removed in #32.
 export const BUNDLE_VERSION = 2;
 
 export type BundleFieldOptions = {
