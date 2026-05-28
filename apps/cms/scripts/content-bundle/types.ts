@@ -51,12 +51,7 @@ export interface BundleEntry {
   entryTitle: string;
   entryKey: string;
   slug: string | null;
-  // V1 flat fields (kept for backward compat on import)
-  status?: ContentStatus;
-  publishedAt?: string | null;
-  data?: Record<string, unknown>;
-  // V2 versioned
-  versions?: BundleEntryVersion[];
+  versions: BundleEntryVersion[];
 }
 
 export interface Bundle {
