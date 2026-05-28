@@ -13,7 +13,7 @@ function makeWorkspace(): string {
 }
 
 const baseBundle = {
-  version: 1,
+  version: 2,
   exportedAt: '2026-04-15T00:00:00.000Z',
   portable: true,
   contentTypes: [
@@ -222,7 +222,7 @@ describe('buildAll', () => {
     await buildAll(root, { now: '2026-04-15T12:00:00.000Z' });
     const content = readFileSync(join(root, 'sport.boject.json'), 'utf8');
     expect(content.endsWith('\n')).toBe(true);
-    expect(content).toContain('  "version": 1');
+    expect(content).toContain('  "version": 2');
   });
 
   it('successive rebuilds differ only by exportedAt', async () => {
