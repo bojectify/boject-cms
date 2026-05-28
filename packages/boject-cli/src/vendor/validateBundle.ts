@@ -8,6 +8,7 @@ import {
   isFieldTypeName,
 } from './fieldTypes.js';
 import { CONTENT_STATUS_NAMES, isContentStatusName } from './contentStatus.js';
+import { BUNDLE_VERSION } from './contentBundleTypes.js';
 import type {
   Bundle,
   BundleContentType,
@@ -34,10 +35,10 @@ export function validateBundle(bundle: unknown): ValidationResult {
 
   const b = bundle as Partial<Bundle>;
 
-  if (b.version !== 1 && b.version !== 2) {
+  if (b.version !== BUNDLE_VERSION) {
     errors.push({
       path: 'version',
-      message: `expected version 1 or 2, got ${b.version}`,
+      message: `expected version ${BUNDLE_VERSION}, got ${b.version}; run \`boject bundle migrate <path>\` to upgrade`,
     });
   }
 
@@ -235,34 +236,20 @@ function validateEntry(
     });
   }
 
-  const hasVersions = Array.isArray(e.versions);
-  const hasData = isObject(e.data);
-
-  if (hasVersions) {
-    // V2 format
-    if (e.versions!.length === 0) {
-      errors.push({
-        path: `${path}.versions`,
-        message: 'must contain at least one version',
-      });
-    }
-    e.versions!.forEach((v, i) =>
+  if (!Array.isArray(e.versions)) {
+    errors.push({
+      path,
+      message: 'entry must have a non-empty versions array',
+    });
+  } else if (e.versions.length === 0) {
+    errors.push({
+      path: `${path}.versions`,
+      message: 'must contain at least one version',
+    });
+  } else {
+    e.versions.forEach((v, i) =>
       validateEntryVersion(v, `${path}.versions[${i}]`, errors)
     );
-  } else if (hasData) {
-    // V1 format
-    if (!isContentStatusName(e.status)) {
-      errors.push({
-        path: `${path}.status`,
-        message: `must be one of ${CONTENT_STATUS_NAMES.join(', ')}`,
-      });
-    }
-  } else {
-    errors.push({
-      path: `${path}`,
-      message:
-        'entry must have either a versions array (V2) or a data object (V1)',
-    });
   }
 
   if (portable && e.id !== null) {
