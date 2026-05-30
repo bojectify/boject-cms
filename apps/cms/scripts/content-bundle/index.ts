@@ -15,7 +15,9 @@ const HELP = `content-bundle — dynamic content types & entries as JSON bundles
 
 Usage:
   pnpm content:export   [--schema|--entries|--all] [--portable] [--out <path>]
-  pnpm content:import   <path> [--schema|--entries|--all] [--author <string>] [--apply [--allow-destructive]]
+  pnpm content:import   <path> [--schema|--entries|--all] [--author <s>]
+                              [--on-conflict <fail|skip|replace>] [--dry-run]
+                              [--apply [--allow-destructive]]
   pnpm content:validate <path>
 
 Commands:
@@ -34,6 +36,12 @@ Flags:
   --apply        Apply schema diff idempotently via applySchema (import --schema only)
   --allow-destructive
                  With --apply, allow content-type and field removals
+  --on-conflict <m>
+                 Entry-collision behaviour (default: fail). skip leaves the
+                 existing entry alone; replace wholesale-overwrites it
+                 (preserves id + entryKey + createdAt).
+  --dry-run      Run the import planner, print the would-do counts, do not
+                 write. Conflicts with --apply.
   --help, -h     Show this help message
 
 Examples:
@@ -122,6 +130,28 @@ export async function runCli(argv: string[]): Promise<void> {
             : 'schema';
       const mode = parseMode(args.slice(1), defaultMode);
       const apply = args.includes('--apply');
+      const dryRun = args.includes('--dry-run');
+      const onConflictRaw = flagValue(args, '--on-conflict');
+      if (
+        onConflictRaw !== undefined &&
+        !['fail', 'skip', 'replace'].includes(onConflictRaw)
+      ) {
+        console.error(
+          `Invalid --on-conflict value "${onConflictRaw}". Expected one of: fail, skip, replace.`
+        );
+        process.exit(2);
+        return;
+      }
+      const onConflict: 'fail' | 'skip' | 'replace' =
+        (onConflictRaw as 'fail' | 'skip' | 'replace' | undefined) ?? 'fail';
+
+      if (apply && (onConflictRaw !== undefined || dryRun)) {
+        console.error(
+          `--on-conflict and --dry-run are not valid with --apply. --apply uses applySchema's own idempotent diff.`
+        );
+        process.exit(2);
+        return;
+      }
 
       if (apply && mode !== 'schema') {
         console.error(`--apply is only valid with --schema. Got mode=${mode}.`);
@@ -149,9 +179,18 @@ export async function runCli(argv: string[]): Promise<void> {
       }
 
       const author = flagValue(args, '--author');
-      const result = await importBundle(prisma, bundle, { mode, author });
+      const result = await importBundle(prisma, bundle, {
+        mode,
+        author,
+        onConflict,
+        dryRun,
+      });
+      const verb = dryRun ? 'Would import' : 'Imported';
       console.log(
-        `Imported ${result.contentTypesCreated} content type(s) and ${result.entriesCreated} entry/entries`
+        `${verb} ${result.contentTypesCreated} content type(s); ` +
+          `${result.entriesCreated} entries created, ` +
+          `${result.entriesUpdated} updated, ` +
+          `${result.entriesSkipped} skipped.`
       );
       process.exit(0);
       return;
