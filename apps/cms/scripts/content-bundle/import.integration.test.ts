@@ -997,6 +997,13 @@ describe('importBundle', () => {
       });
       expect(afterCount).toBe(beforeCount);
 
+      const afterVersionCount = await prisma.contentEntryVersion.count({
+        where: { entry: { contentTypeId: contentType.id } },
+      });
+      // The seeded entry has exactly one PUBLISHED version; the new entry
+      // in the bundle never got persisted (dry-run rollback).
+      expect(afterVersionCount).toBe(1);
+
       const after = await prisma.contentEntry.findUniqueOrThrow({
         where: { id: seeded.id },
       });

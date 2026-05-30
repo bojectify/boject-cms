@@ -52,7 +52,12 @@ export async function importBundle(
   // sentinel exception so Prisma rolls back. The summary was captured
   // into `captured` before the throw.
   class DryRunRollback extends Error {}
-  let captured: ImportResult | undefined;
+  let captured: ImportResult = {
+    contentTypesCreated: 0,
+    entriesCreated: 0,
+    entriesUpdated: 0,
+    entriesSkipped: 0,
+  };
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -356,11 +361,14 @@ export async function importBundle(
       };
       if (dryRun) throw new DryRunRollback();
     });
+    // Prisma $transaction rethrows the user-callback error verbatim after
+    // issuing ROLLBACK, so the sentinel arrives at this catch with its
+    // identity intact and instanceof matches.
   } catch (err) {
     if (!(err instanceof DryRunRollback)) throw err;
   }
 
-  return captured!;
+  return captured;
 }
 
 function stripRelationFields(
