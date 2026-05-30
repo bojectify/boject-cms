@@ -68,7 +68,6 @@ describe('writeProject', () => {
   });
 
   it('throws when the target directory is non-empty and force is false', async () => {
-    const target = join(workDir, 'site');
     await writeFile(join(workDir, 'existing.txt'), 'hi');
 
     await expect(

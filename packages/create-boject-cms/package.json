@@ -19,6 +19,8 @@
   },
   "scripts": {
     "build": "tsup && tsx scripts/copyStarters.ts",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run tests/unit",

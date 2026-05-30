@@ -43,7 +43,8 @@ export async function startPgSampler(
 
   const client: PgSamplerClient = opts.clientFactory
     ? opts.clientFactory(opts.databaseUrl)
-    : (new Client({
+    : // eslint-disable-next-line no-restricted-syntax -- pg.Client's overloaded signatures don't structurally satisfy the narrower PgSamplerClient
+      (new Client({
         connectionString: opts.databaseUrl,
       }) as unknown as PgSamplerClient);
 

@@ -37,6 +37,7 @@ describe('resolveStarter', () => {
   it('throws if the user cancels the prompt', async () => {
     const cancelSymbol = Symbol('cancel');
     vi.mocked(clack.select).mockResolvedValueOnce(
+      // eslint-disable-next-line no-restricted-syntax -- Symbol has no overlap with string; mocking clack's cancel sentinel
       cancelSymbol as unknown as string
     );
     vi.mocked(clack.isCancel).mockReturnValueOnce(true);
