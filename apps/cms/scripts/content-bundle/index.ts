@@ -7,7 +7,8 @@ import { applySchema } from './applySchema';
 import { exportBundle } from './export';
 import { importBundle } from './import';
 import { validateBundle } from './validate';
-import type { BundleMode } from './types';
+import type { BundleMode, OnConflict } from './types';
+import { ON_CONFLICT_VALUES } from './types';
 
 const DEFAULT_OUT_DIR = './generated';
 
@@ -134,16 +135,16 @@ export async function runCli(argv: string[]): Promise<void> {
       const onConflictRaw = flagValue(args, '--on-conflict');
       if (
         onConflictRaw !== undefined &&
-        !['fail', 'skip', 'replace'].includes(onConflictRaw)
+        !(ON_CONFLICT_VALUES as readonly string[]).includes(onConflictRaw)
       ) {
         console.error(
-          `Invalid --on-conflict value "${onConflictRaw}". Expected one of: fail, skip, replace.`
+          `Invalid --on-conflict value "${onConflictRaw}". Expected one of: ${ON_CONFLICT_VALUES.join(', ')}.`
         );
         process.exit(2);
         return;
       }
-      const onConflict: 'fail' | 'skip' | 'replace' =
-        (onConflictRaw as 'fail' | 'skip' | 'replace' | undefined) ?? 'fail';
+      const onConflict: OnConflict =
+        (onConflictRaw as OnConflict | undefined) ?? 'fail';
 
       if (apply && (onConflictRaw !== undefined || dryRun)) {
         console.error(

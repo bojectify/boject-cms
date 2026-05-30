@@ -95,7 +95,8 @@ export interface ImportResult {
   entriesSkipped: number;
 }
 
-export type OnConflict = 'fail' | 'skip' | 'replace';
+export const ON_CONFLICT_VALUES = ['fail', 'skip', 'replace'] as const;
+export type OnConflict = (typeof ON_CONFLICT_VALUES)[number];
 
 export type EntryImportPlan =
   | { action: 'create'; bundleEntry: BundleEntry }
