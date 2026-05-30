@@ -3,6 +3,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../../generated/prisma/client';
 import { importBundle } from './import';
 import type { Bundle } from './types';
+import { BUNDLE_VERSION } from './types';
 import { getTestDatabaseUrl } from '../../test/dbUrl';
 import { FIELD_TYPES } from '../../utils/fieldTypes';
 import { CONTENT_STATUSES } from '../../utils/contentStatus';
@@ -572,5 +573,319 @@ describe('importBundle', () => {
     ).rejects.toThrow();
     const count = await prisma.contentType.count();
     expect(count).toBe(0);
+  });
+
+  describe('importBundle on-conflict skip', () => {
+    it('leaves the existing entry untouched and reports skipped', async () => {
+      const contentType = await prisma.contentType.create({
+        data: {
+          identifier: 'PageSkipTest',
+          name: 'Page Skip Test',
+          description: null,
+          fields: {
+            create: [
+              {
+                identifier: 'title',
+                name: 'Title',
+                type: FIELD_TYPES.ENTRY_TITLE,
+                required: true,
+                unique: true,
+                order: 0,
+              },
+            ],
+          },
+        },
+      });
+      const seeded = await prisma.contentEntry.create({
+        data: {
+          contentTypeId: contentType.id,
+          entryTitle: 'Original Title',
+          entryKey: 'original-title',
+          slug: null,
+          versions: {
+            create: {
+              data: { title: 'Original Title' },
+              entryTitle: 'Original Title',
+              status: CONTENT_STATUSES.PUBLISHED,
+              publishedAt: new Date(),
+            },
+          },
+        },
+      });
+      const seededUpdatedAt = seeded.updatedAt;
+
+      const bundle: Bundle = {
+        version: BUNDLE_VERSION,
+        exportedAt: '2026-05-30T00:00:00.000Z',
+        portable: false,
+        entries: [
+          {
+            id: null,
+            contentTypeId: null,
+            contentTypeIdentifier: 'PageSkipTest',
+            entryTitle: 'Conflicting Title',
+            entryKey: 'original-title',
+            slug: null,
+            versions: [
+              {
+                status: CONTENT_STATUSES.PUBLISHED,
+                data: { title: 'Conflicting Title' },
+                publishedAt: '2026-05-30T00:00:00.000Z',
+              },
+            ],
+          },
+        ],
+      };
+
+      const result = await importBundle(prisma, bundle, {
+        mode: 'entries',
+        onConflict: 'skip',
+      });
+
+      expect(result).toMatchObject({
+        entriesCreated: 0,
+        entriesUpdated: 0,
+        entriesSkipped: 1,
+      });
+
+      const after = await prisma.contentEntry.findUniqueOrThrow({
+        where: { id: seeded.id },
+      });
+      expect(after.entryTitle).toBe('Original Title');
+      expect(after.updatedAt.getTime()).toBe(seededUpdatedAt.getTime());
+    });
+  });
+
+  describe('importBundle on-conflict replace', () => {
+    it('wholesale-replaces versions, preserves id+entryKey+createdAt, updates envelope', async () => {
+      const contentType = await prisma.contentType.create({
+        data: {
+          identifier: 'PageReplaceTest',
+          name: 'Page Replace Test',
+          description: null,
+          fields: {
+            create: [
+              {
+                identifier: 'title',
+                name: 'Title',
+                type: FIELD_TYPES.ENTRY_TITLE,
+                required: true,
+                unique: true,
+                order: 0,
+              },
+            ],
+          },
+        },
+      });
+      const seeded = await prisma.contentEntry.create({
+        data: {
+          contentTypeId: contentType.id,
+          entryTitle: 'Original',
+          entryKey: 'replace-target',
+          slug: 'original-slug',
+          versions: {
+            create: [
+              {
+                data: { title: 'Original' },
+                entryTitle: 'Original',
+                status: CONTENT_STATUSES.PUBLISHED,
+                publishedAt: new Date(),
+              },
+              {
+                data: { title: 'Original Draft' },
+                entryTitle: 'Original Draft',
+                status: CONTENT_STATUSES.CHANGED,
+                publishedAt: null,
+              },
+            ],
+          },
+        },
+        include: { versions: true },
+      });
+      const seededCreatedAt = seeded.createdAt;
+      const oldVersionIds = seeded.versions.map((v) => v.id);
+
+      const bundle: Bundle = {
+        version: BUNDLE_VERSION,
+        exportedAt: '2026-05-30T00:00:00.000Z',
+        portable: false,
+        entries: [
+          {
+            id: null,
+            contentTypeId: null,
+            contentTypeIdentifier: 'PageReplaceTest',
+            entryTitle: 'Replaced',
+            entryKey: 'replace-target',
+            slug: 'replaced-slug',
+            versions: [
+              {
+                status: CONTENT_STATUSES.PUBLISHED,
+                data: { title: 'Replaced' },
+                publishedAt: '2026-05-30T00:00:00.000Z',
+              },
+            ],
+          },
+        ],
+      };
+
+      const result = await importBundle(prisma, bundle, {
+        mode: 'entries',
+        onConflict: 'replace',
+        author: 'olly@example.com',
+      });
+
+      expect(result).toMatchObject({
+        entriesCreated: 0,
+        entriesUpdated: 1,
+        entriesSkipped: 0,
+      });
+
+      const after = await prisma.contentEntry.findUniqueOrThrow({
+        where: { id: seeded.id },
+        include: { versions: true },
+      });
+      expect(after.id).toBe(seeded.id);
+      expect(after.entryKey).toBe('replace-target');
+      expect(after.createdAt.getTime()).toBe(seededCreatedAt.getTime());
+      expect(after.entryTitle).toBe('Replaced');
+      expect(after.slug).toBe('replaced-slug');
+
+      expect(after.versions).toHaveLength(1);
+      expect(after.versions[0]!.status).toBe(CONTENT_STATUSES.PUBLISHED);
+      expect(after.versions[0]!.data).toEqual({ title: 'Replaced' });
+      expect(after.versions[0]!.createdBy).toBe('olly@example.com');
+      expect(after.versions[0]!.updatedBy).toBe('olly@example.com');
+      expect(oldVersionIds).not.toContain(after.versions[0]!.id);
+    });
+  });
+
+  describe('importBundle on-conflict=replace with portable RELATION', () => {
+    it('resolves relations to the updated entry id, not a new one', async () => {
+      const author = await prisma.contentType.create({
+        data: {
+          identifier: 'AuthorReplaceTest',
+          name: 'Author Replace Test',
+          fields: {
+            create: [
+              {
+                identifier: 'name',
+                name: 'Name',
+                type: FIELD_TYPES.ENTRY_TITLE,
+                required: true,
+                unique: true,
+                order: 0,
+              },
+            ],
+          },
+        },
+      });
+      const article = await prisma.contentType.create({
+        data: {
+          identifier: 'ArticleReplaceTest',
+          name: 'Article Replace Test',
+          fields: {
+            create: [
+              {
+                identifier: 'title',
+                name: 'Title',
+                type: FIELD_TYPES.ENTRY_TITLE,
+                required: true,
+                unique: true,
+                order: 0,
+              },
+              {
+                identifier: 'author',
+                name: 'Author',
+                type: FIELD_TYPES.RELATION,
+                required: false,
+                order: 1,
+                options: { targetContentTypeIds: [author.id] },
+              },
+            ],
+          },
+        },
+      });
+      const seededAuthor = await prisma.contentEntry.create({
+        data: {
+          contentTypeId: author.id,
+          entryTitle: 'Olly',
+          entryKey: 'olly',
+          slug: 'olly',
+          versions: {
+            create: {
+              data: { name: 'Olly' },
+              entryTitle: 'Olly',
+              status: CONTENT_STATUSES.PUBLISHED,
+              publishedAt: new Date(),
+            },
+          },
+        },
+      });
+
+      const bundle: Bundle = {
+        version: BUNDLE_VERSION,
+        exportedAt: '2026-05-30T00:00:00.000Z',
+        portable: true,
+        entries: [
+          {
+            id: null,
+            contentTypeId: null,
+            contentTypeIdentifier: 'AuthorReplaceTest',
+            entryTitle: 'Olly (replaced)',
+            entryKey: 'olly',
+            slug: 'olly',
+            versions: [
+              {
+                status: CONTENT_STATUSES.PUBLISHED,
+                data: { name: 'Olly (replaced)' },
+                publishedAt: '2026-05-30T00:00:00.000Z',
+              },
+            ],
+          },
+          {
+            id: null,
+            contentTypeId: null,
+            contentTypeIdentifier: 'ArticleReplaceTest',
+            entryTitle: 'My Article',
+            entryKey: 'my-article',
+            slug: 'my-article',
+            versions: [
+              {
+                status: CONTENT_STATUSES.PUBLISHED,
+                data: {
+                  title: 'My Article',
+                  author: {
+                    contentTypeIdentifier: 'AuthorReplaceTest',
+                    entryKey: 'olly',
+                  },
+                },
+                publishedAt: '2026-05-30T00:00:00.000Z',
+              },
+            ],
+          },
+        ],
+      };
+
+      await importBundle(prisma, bundle, {
+        mode: 'entries',
+        onConflict: 'replace',
+      });
+
+      const articleEntry = await prisma.contentEntry.findFirstOrThrow({
+        where: { contentTypeId: article.id, entryKey: 'my-article' },
+        include: {
+          versions: { where: { status: CONTENT_STATUSES.PUBLISHED } },
+        },
+      });
+      const articleData = articleEntry.versions[0]!.data as Record<
+        string,
+        unknown
+      >;
+      const authorRef = articleData.author as {
+        contentTypeId: string;
+        entryId: string;
+      };
+      expect(authorRef.entryId).toBe(seededAuthor.id);
+    });
   });
 });
