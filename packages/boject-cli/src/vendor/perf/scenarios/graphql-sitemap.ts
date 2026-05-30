@@ -2,8 +2,7 @@
 // Each VU drains every entry of the chosen content type via {camelName}List.
 // PERF_VUS scales concurrent read load, NOT parallel partitioning.
 // Requires the perf DB pre-seeded (`pnpm perf:seed --size=N`) and the
-// perf API key present (`SEED_PERF_KEY=1 pnpm prisma:seed` once per
-// fresh DB).
+// perf API key present (`pnpm prisma:seed:perf` once per fresh DB).
 //
 // PERF_LIST_FIELD overrides the list field name (default
 // `perfArticleList` keeps the internal harness unchanged). The CLI

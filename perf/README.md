@@ -19,8 +19,8 @@ docker compose exec db psql -U boject -c "CREATE DATABASE boject_perf;" 2>/dev/n
 # Apply the CMS schema to the perf database
 DATABASE_URL=postgresql://boject:boject@localhost:5432/boject_perf pnpm --filter cms prisma:migrate
 
-# Seed the perf API key (flag-gated; does not touch dev)
-SEED_PERF_KEY=1 DATABASE_URL=postgresql://boject:boject@localhost:5432/boject_perf pnpm prisma:seed
+# Seed the perf admin + load-test API key into the boject_perf DB
+pnpm prisma:seed:perf
 
 # Export the key for k6 to read (add to your .envrc or export each session)
 export PERF_API_KEY=boject_perf_key_for_load_tests_only

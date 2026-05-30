@@ -17,6 +17,6 @@ describe('ensurePerfApiKey', () => {
       ensurePerfApiKey({
         prisma: { apiKey: { findUnique } } as never,
       })
-    ).rejects.toThrow(/SEED_PERF_KEY=1/);
+    ).rejects.toThrow(/pnpm prisma:seed:perf/);
   });
 });

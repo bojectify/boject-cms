@@ -322,25 +322,27 @@ apps/cms/docker/smoke-test.sh
 
 These scripts are forwarded from the workspace root to `apps/cms/` via `pnpm --filter cms`.
 
-| Script                  | Description                                   |
-| ----------------------- | --------------------------------------------- |
-| `pnpm dev`              | Start Nuxt development server                 |
-| `pnpm build`            | Build for production (outputs to `.output/`)  |
-| `pnpm preview`          | Preview production build locally              |
-| `pnpm prisma:generate`  | Regenerate Prisma client + Pothos types       |
-| `pnpm prisma:migrate`   | Run database migrations                       |
-| `pnpm prisma:seed`      | Seed admin user + test API key                |
-| `pnpm test:integration` | Run CMS integration tests only                |
-| `pnpm test:storybook`   | Run Storybook interaction tests (browser)     |
-| `pnpm typecheck`        | Run TypeScript type checker                   |
-| `pnpm apikey:create`    | Create a new API key                          |
-| `pnpm apikey:list`      | List all API keys                             |
-| `pnpm apikey:revoke`    | Revoke an API key by prefix                   |
-| `pnpm content:export`   | Export dynamic content types/entries as JSON  |
-| `pnpm content:import`   | Import a content bundle                       |
-| `pnpm content:validate` | Validate a bundle's shape without touching DB |
-| `pnpm starters:build`   | Build overlay-based starter bundles           |
-| `pnpm starters:check`   | Verify committed starter outputs are current  |
+| Script                     | Description                                                                                                        |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `pnpm dev`                 | Start Nuxt development server                                                                                      |
+| `pnpm build`               | Build for production (outputs to `.output/`)                                                                       |
+| `pnpm preview`             | Preview production build locally                                                                                   |
+| `pnpm prisma:generate`     | Regenerate Prisma client + Pothos types                                                                            |
+| `pnpm prisma:migrate`      | Run database migrations                                                                                            |
+| `pnpm dev:bootstrap-admin` | Bootstrap a single admin user in the dev DB (no API keys; requires `BOJECT_ADMIN_EMAIL` + `BOJECT_ADMIN_PASSWORD`) |
+| `pnpm prisma:seed:test`    | Seed the `boject_test` DB (admin + integration test API key)                                                       |
+| `pnpm prisma:seed:perf`    | Seed the `boject_perf` DB (admin + perf load-test API key)                                                         |
+| `pnpm test:integration`    | Run CMS integration tests only                                                                                     |
+| `pnpm test:storybook`      | Run Storybook interaction tests (browser)                                                                          |
+| `pnpm typecheck`           | Run TypeScript type checker                                                                                        |
+| `pnpm apikey:create`       | Create a new API key                                                                                               |
+| `pnpm apikey:list`         | List all API keys                                                                                                  |
+| `pnpm apikey:revoke`       | Revoke an API key by prefix                                                                                        |
+| `pnpm content:export`      | Export dynamic content types/entries as JSON                                                                       |
+| `pnpm content:import`      | Import a content bundle                                                                                            |
+| `pnpm content:validate`    | Validate a bundle's shape without touching DB                                                                      |
+| `pnpm starters:build`      | Build overlay-based starter bundles                                                                                |
+| `pnpm starters:check`      | Verify committed starter outputs are current                                                                       |
 
 For workspace-wide scripts (`db:up`, `lint`, `format`, `test`), see the [repo root README](../../README.md#workspace-scripts).
 
