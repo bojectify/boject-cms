@@ -898,4 +898,110 @@ describe('importBundle', () => {
       expect(authorRef.entryId).toBe(seededAuthor.id);
     });
   });
+
+  describe('importBundle dry-run', () => {
+    it('reports planned counts without writing to the DB', async () => {
+      const contentType = await prisma.contentType.create({
+        data: {
+          identifier: 'PageDryRunTest',
+          name: 'Page Dry Run Test',
+          description: null,
+          fields: {
+            create: [
+              {
+                identifier: 'title',
+                name: 'Title',
+                type: FIELD_TYPES.ENTRY_TITLE,
+                required: true,
+                unique: true,
+                order: 0,
+              },
+            ],
+          },
+        },
+      });
+      const seeded = await prisma.contentEntry.create({
+        data: {
+          contentTypeId: contentType.id,
+          entryTitle: 'Original',
+          entryKey: 'dry-run-target',
+          slug: null,
+          versions: {
+            create: {
+              data: { title: 'Original' },
+              entryTitle: 'Original',
+              status: CONTENT_STATUSES.PUBLISHED,
+              publishedAt: new Date(),
+            },
+          },
+        },
+      });
+      const seededUpdatedAt = seeded.updatedAt;
+      const beforeCount = await prisma.contentEntry.count({
+        where: { contentTypeId: contentType.id },
+      });
+
+      const bundle: Bundle = {
+        version: BUNDLE_VERSION,
+        exportedAt: '2026-05-30T00:00:00.000Z',
+        portable: false,
+        entries: [
+          {
+            id: null,
+            contentTypeId: null,
+            contentTypeIdentifier: 'PageDryRunTest',
+            entryTitle: 'Conflicting',
+            entryKey: 'dry-run-target',
+            slug: null,
+            versions: [
+              {
+                status: CONTENT_STATUSES.PUBLISHED,
+                data: { title: 'Conflicting' },
+                publishedAt: '2026-05-30T00:00:00.000Z',
+              },
+            ],
+          },
+          {
+            id: null,
+            contentTypeId: null,
+            contentTypeIdentifier: 'PageDryRunTest',
+            entryTitle: 'Brand New',
+            entryKey: 'dry-run-new',
+            slug: null,
+            versions: [
+              {
+                status: CONTENT_STATUSES.PUBLISHED,
+                data: { title: 'Brand New' },
+                publishedAt: '2026-05-30T00:00:00.000Z',
+              },
+            ],
+          },
+        ],
+      };
+
+      const result = await importBundle(prisma, bundle, {
+        mode: 'entries',
+        onConflict: 'replace',
+        dryRun: true,
+      });
+
+      expect(result).toEqual({
+        contentTypesCreated: 0,
+        entriesCreated: 1,
+        entriesUpdated: 1,
+        entriesSkipped: 0,
+      });
+
+      const afterCount = await prisma.contentEntry.count({
+        where: { contentTypeId: contentType.id },
+      });
+      expect(afterCount).toBe(beforeCount);
+
+      const after = await prisma.contentEntry.findUniqueOrThrow({
+        where: { id: seeded.id },
+      });
+      expect(after.entryTitle).toBe('Original');
+      expect(after.updatedAt.getTime()).toBe(seededUpdatedAt.getTime());
+    });
+  });
 });

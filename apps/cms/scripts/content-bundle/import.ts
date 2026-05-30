@@ -44,312 +44,323 @@ export async function importBundle(
   }
 
   const { mode, author, onConflict = 'fail', dryRun = false } = options;
-  // dryRun is wired through ImportOptions ahead of its executor (planner-only
-  // rollback to follow in a subsequent change). void keeps lint quiet until then.
-  void dryRun;
   const wantsSchema = mode === 'schema' || mode === 'all';
   const wantsEntries = mode === 'entries' || mode === 'all';
 
-  return prisma.$transaction(async (tx) => {
-    let contentTypesCreated = 0;
-    let entriesCreated = 0;
-    let entriesUpdated = 0;
-    let entriesSkipped = 0;
+  // Dry-run mechanism: the transaction still opens and the planner +
+  // executor populate counters as normal, but at the end we throw a
+  // sentinel exception so Prisma rolls back. The summary was captured
+  // into `captured` before the throw.
+  class DryRunRollback extends Error {}
+  let captured: ImportResult | undefined;
 
-    const identifierToTypeId = new Map<string, string>();
-    const typeIdentifierToKeyToEntry = new Map<string, Map<string, string>>();
-    const fieldTypesByTypeId = new Map<string, Record<string, FieldType>>();
+  try {
+    await prisma.$transaction(async (tx) => {
+      let contentTypesCreated = 0;
+      let entriesCreated = 0;
+      let entriesUpdated = 0;
+      let entriesSkipped = 0;
 
-    const existingTypes = await tx.contentType.findMany({
-      include: { fields: true },
-    });
-    for (const ct of existingTypes) {
-      identifierToTypeId.set(ct.identifier, ct.id);
-      const fieldTypes: Record<string, FieldType> = {};
-      for (const f of ct.fields) fieldTypes[f.identifier] = f.type;
-      fieldTypesByTypeId.set(ct.id, fieldTypes);
-    }
-    const existingEntries = await tx.contentEntry.findMany();
-    for (const entry of existingEntries) {
-      const ident = existingTypes.find(
-        (t) => t.id === entry.contentTypeId
-      )?.identifier;
-      if (!ident) continue;
-      let map = typeIdentifierToKeyToEntry.get(ident);
-      if (!map) {
-        map = new Map();
-        typeIdentifierToKeyToEntry.set(ident, map);
-      }
-      map.set(entry.entryKey, entry.id);
-    }
+      const identifierToTypeId = new Map<string, string>();
+      const typeIdentifierToKeyToEntry = new Map<string, Map<string, string>>();
+      const fieldTypesByTypeId = new Map<string, Record<string, FieldType>>();
 
-    // Pending field-target resolutions — in portable mode, RELATION/
-    // MULTIRELATION targetContentTypeIdentifiers may point to content types
-    // declared later in the bundle. Pass 1 creates fields with an empty
-    // targetContentTypeIds array; pass 2 resolves and updates them below.
-    const pendingFieldTargets: Array<{
-      fieldId: string;
-      fieldIdentifier: string;
-      identifiers: string[];
-      otherOptions: Record<string, unknown>;
-    }> = [];
-
-    if (wantsSchema && bundle.contentTypes) {
-      for (const ct of bundle.contentTypes) {
-        if (identifierToTypeId.has(ct.identifier)) {
-          throw new Error(
-            `ContentType identifier "${ct.identifier}" already exists on target`
-          );
-        }
-      }
-
-      for (const ct of bundle.contentTypes) {
-        const created = await tx.contentType.create({
-          data: {
-            id: bundle.portable ? undefined : (ct.id ?? undefined),
-            identifier: ct.identifier,
-            name: ct.name,
-            description: ct.description ?? undefined,
-            fields: {
-              create: ct.fields.map((f) => {
-                let opts = f.options ?? null;
-                if (
-                  bundle.portable &&
-                  opts &&
-                  Array.isArray(opts.targetContentTypeIdentifiers)
-                ) {
-                  // Defer target resolution to pass 2 — other content types
-                  // in this bundle may not yet be created.
-                  const {
-                    targetContentTypeIdentifiers: _omitIdents,
-                    targetContentTypeIds: _omitIds,
-                    ...rest
-                  } = opts;
-                  opts = { ...rest, targetContentTypeIds: [] };
-                }
-                return {
-                  id: bundle.portable ? undefined : (f.id ?? undefined),
-                  identifier: f.identifier,
-                  name: f.name,
-                  type: f.type,
-                  required: f.required,
-                  unique: resolveBundleFieldUnique(f),
-                  order: f.order,
-                  options: (opts ?? undefined) as Prisma.InputJsonValue,
-                };
-              }),
-            },
-          },
-          include: { fields: true },
-        });
-        contentTypesCreated++;
-        identifierToTypeId.set(created.identifier, created.id);
+      const existingTypes = await tx.contentType.findMany({
+        include: { fields: true },
+      });
+      for (const ct of existingTypes) {
+        identifierToTypeId.set(ct.identifier, ct.id);
         const fieldTypes: Record<string, FieldType> = {};
-        for (const f of created.fields) fieldTypes[f.identifier] = f.type;
-        fieldTypesByTypeId.set(created.id, fieldTypes);
-
-        if (bundle.portable) {
-          for (const bundleField of ct.fields) {
-            const opts = bundleField.options;
-            if (!opts || !Array.isArray(opts.targetContentTypeIdentifiers)) {
-              continue;
-            }
-            const createdField = created.fields.find(
-              (cf) => cf.identifier === bundleField.identifier
-            );
-            if (!createdField) continue;
-            const {
-              targetContentTypeIdentifiers: _omitIdents,
-              targetContentTypeIds: _omitIds,
-              ...otherOptions
-            } = opts;
-            pendingFieldTargets.push({
-              fieldId: createdField.id,
-              fieldIdentifier: bundleField.identifier,
-              identifiers: opts.targetContentTypeIdentifiers,
-              otherOptions,
-            });
-          }
+        for (const f of ct.fields) fieldTypes[f.identifier] = f.type;
+        fieldTypesByTypeId.set(ct.id, fieldTypes);
+      }
+      const existingEntries = await tx.contentEntry.findMany();
+      for (const entry of existingEntries) {
+        const ident = existingTypes.find(
+          (t) => t.id === entry.contentTypeId
+        )?.identifier;
+        if (!ident) continue;
+        let map = typeIdentifierToKeyToEntry.get(ident);
+        if (!map) {
+          map = new Map();
+          typeIdentifierToKeyToEntry.set(ident, map);
         }
+        map.set(entry.entryKey, entry.id);
       }
 
-      // Pass 2: resolve deferred RELATION/MULTIRELATION field targets now
-      // that every content type declared in this bundle exists.
-      for (const pending of pendingFieldTargets) {
-        const resolved = pending.identifiers.map((ident) => {
-          const id = identifierToTypeId.get(ident);
-          if (!id) {
-            throw new Error(
-              `RELATION field "${pending.fieldIdentifier}" targets unknown content type "${ident}"`
-            );
-          }
-          return id;
-        });
-        await tx.contentTypeField.update({
-          where: { id: pending.fieldId },
-          data: {
-            options: {
-              ...pending.otherOptions,
-              targetContentTypeIds: resolved,
-            } as Prisma.InputJsonValue,
-          },
-        });
-      }
-    }
-
-    if (wantsEntries && bundle.entries) {
-      const { plans } = planEntryImport(
-        typeIdentifierToKeyToEntry,
-        bundle,
-        identifierToTypeId,
-        onConflict
-      );
-
-      const pendingEntries: Array<{
-        entryId: string;
-        versionIds: string[];
-        bundleEntry: BundleEntry;
-        rawDataArrays: Record<string, unknown>[];
+      // Pending field-target resolutions — in portable mode, RELATION/
+      // MULTIRELATION targetContentTypeIdentifiers may point to content types
+      // declared later in the bundle. Pass 1 creates fields with an empty
+      // targetContentTypeIds array; pass 2 resolves and updates them below.
+      const pendingFieldTargets: Array<{
+        fieldId: string;
+        fieldIdentifier: string;
+        identifiers: string[];
+        otherOptions: Record<string, unknown>;
       }> = [];
 
-      const buildVersionCreates = (
-        bundleEntry: BundleEntry,
-        versionSpecs: Array<{
-          data: Record<string, unknown>;
-          status: ContentStatus;
-          publishedAt: string | null;
-        }>,
-        pass1Datas: Record<string, unknown>[]
-      ) =>
-        versionSpecs.map((v, i) => ({
-          data: pass1Datas[i] as Prisma.InputJsonValue,
-          entryTitle: bundleEntry.entryTitle,
-          status: v.status,
-          publishedAt: v.publishedAt ? new Date(v.publishedAt) : null,
-          createdBy: author ?? null,
-          updatedBy: author ?? null,
-        }));
+      if (wantsSchema && bundle.contentTypes) {
+        for (const ct of bundle.contentTypes) {
+          if (identifierToTypeId.has(ct.identifier)) {
+            throw new Error(
+              `ContentType identifier "${ct.identifier}" already exists on target`
+            );
+          }
+        }
 
-      for (const plan of plans) {
-        const e = plan.bundleEntry;
-        const typeId = identifierToTypeId.get(e.contentTypeIdentifier)!;
-        const fieldTypes = fieldTypesByTypeId.get(typeId) ?? {};
+        for (const ct of bundle.contentTypes) {
+          const created = await tx.contentType.create({
+            data: {
+              id: bundle.portable ? undefined : (ct.id ?? undefined),
+              identifier: ct.identifier,
+              name: ct.name,
+              description: ct.description ?? undefined,
+              fields: {
+                create: ct.fields.map((f) => {
+                  let opts = f.options ?? null;
+                  if (
+                    bundle.portable &&
+                    opts &&
+                    Array.isArray(opts.targetContentTypeIdentifiers)
+                  ) {
+                    // Defer target resolution to pass 2 — other content types
+                    // in this bundle may not yet be created.
+                    const {
+                      targetContentTypeIdentifiers: _omitIdents,
+                      targetContentTypeIds: _omitIds,
+                      ...rest
+                    } = opts;
+                    opts = { ...rest, targetContentTypeIds: [] };
+                  }
+                  return {
+                    id: bundle.portable ? undefined : (f.id ?? undefined),
+                    identifier: f.identifier,
+                    name: f.name,
+                    type: f.type,
+                    required: f.required,
+                    unique: resolveBundleFieldUnique(f),
+                    order: f.order,
+                    options: (opts ?? undefined) as Prisma.InputJsonValue,
+                  };
+                }),
+              },
+            },
+            include: { fields: true },
+          });
+          contentTypesCreated++;
+          identifierToTypeId.set(created.identifier, created.id);
+          const fieldTypes: Record<string, FieldType> = {};
+          for (const f of created.fields) fieldTypes[f.identifier] = f.type;
+          fieldTypesByTypeId.set(created.id, fieldTypes);
 
-        if (plan.action === 'skip') {
-          // Seed the relation-resolution map with the existing id so
-          // portable bundles can still resolve references to skipped entries.
+          if (bundle.portable) {
+            for (const bundleField of ct.fields) {
+              const opts = bundleField.options;
+              if (!opts || !Array.isArray(opts.targetContentTypeIdentifiers)) {
+                continue;
+              }
+              const createdField = created.fields.find(
+                (cf) => cf.identifier === bundleField.identifier
+              );
+              if (!createdField) continue;
+              const {
+                targetContentTypeIdentifiers: _omitIdents,
+                targetContentTypeIds: _omitIds,
+                ...otherOptions
+              } = opts;
+              pendingFieldTargets.push({
+                fieldId: createdField.id,
+                fieldIdentifier: bundleField.identifier,
+                identifiers: opts.targetContentTypeIdentifiers,
+                otherOptions,
+              });
+            }
+          }
+        }
+
+        // Pass 2: resolve deferred RELATION/MULTIRELATION field targets now
+        // that every content type declared in this bundle exists.
+        for (const pending of pendingFieldTargets) {
+          const resolved = pending.identifiers.map((ident) => {
+            const id = identifierToTypeId.get(ident);
+            if (!id) {
+              throw new Error(
+                `RELATION field "${pending.fieldIdentifier}" targets unknown content type "${ident}"`
+              );
+            }
+            return id;
+          });
+          await tx.contentTypeField.update({
+            where: { id: pending.fieldId },
+            data: {
+              options: {
+                ...pending.otherOptions,
+                targetContentTypeIds: resolved,
+              } as Prisma.InputJsonValue,
+            },
+          });
+        }
+      }
+
+      if (wantsEntries && bundle.entries) {
+        const { plans } = planEntryImport(
+          typeIdentifierToKeyToEntry,
+          bundle,
+          identifierToTypeId,
+          onConflict
+        );
+
+        const pendingEntries: Array<{
+          entryId: string;
+          versionIds: string[];
+          bundleEntry: BundleEntry;
+          rawDataArrays: Record<string, unknown>[];
+        }> = [];
+
+        const buildVersionCreates = (
+          bundleEntry: BundleEntry,
+          versionSpecs: Array<{
+            data: Record<string, unknown>;
+            status: ContentStatus;
+            publishedAt: string | null;
+          }>,
+          pass1Datas: Record<string, unknown>[]
+        ) =>
+          versionSpecs.map((v, i) => ({
+            data: pass1Datas[i] as Prisma.InputJsonValue,
+            entryTitle: bundleEntry.entryTitle,
+            status: v.status,
+            publishedAt: v.publishedAt ? new Date(v.publishedAt) : null,
+            createdBy: author ?? null,
+            updatedBy: author ?? null,
+          }));
+
+        for (const plan of plans) {
+          const e = plan.bundleEntry;
+          const typeId = identifierToTypeId.get(e.contentTypeIdentifier)!;
+          const fieldTypes = fieldTypesByTypeId.get(typeId) ?? {};
+
+          if (plan.action === 'skip') {
+            // Seed the relation-resolution map with the existing id so
+            // portable bundles can still resolve references to skipped entries.
+            let map = typeIdentifierToKeyToEntry.get(e.contentTypeIdentifier);
+            if (!map) {
+              map = new Map();
+              typeIdentifierToKeyToEntry.set(e.contentTypeIdentifier, map);
+            }
+            map.set(e.entryKey, plan.existingId);
+            entriesSkipped++;
+            continue;
+          }
+
+          const versionSpecs = e.versions.map((v) => ({
+            data: v.data,
+            status: v.status,
+            publishedAt: v.publishedAt,
+          }));
+          const pass1Datas = versionSpecs.map((v) =>
+            bundle.portable
+              ? stripRelationFields(v.data, fieldTypes)
+              : (v.data as Record<string, unknown>)
+          );
+
+          let entryId: string;
+          let versionIds: string[];
+
+          if (plan.action === 'create') {
+            const created = await tx.contentEntry.create({
+              data: {
+                id: bundle.portable ? undefined : (e.id ?? undefined),
+                contentTypeId: typeId,
+                entryTitle: e.entryTitle,
+                entryKey: e.entryKey,
+                slug: e.slug,
+                versions: {
+                  create: buildVersionCreates(e, versionSpecs, pass1Datas),
+                },
+              },
+              include: { versions: true },
+            });
+            entryId = created.id;
+            versionIds = created.versions.map((v) => v.id);
+            entriesCreated++;
+          } else {
+            // update
+            await tx.contentEntryVersion.deleteMany({
+              where: { entryId: plan.existingId },
+            });
+            const updated = await tx.contentEntry.update({
+              where: { id: plan.existingId },
+              data: {
+                entryTitle: e.entryTitle,
+                slug: e.slug,
+                versions: {
+                  create: buildVersionCreates(e, versionSpecs, pass1Datas),
+                },
+              },
+              include: { versions: true },
+            });
+            entryId = updated.id;
+            versionIds = updated.versions.map((v) => v.id);
+            entriesUpdated++;
+          }
+
           let map = typeIdentifierToKeyToEntry.get(e.contentTypeIdentifier);
           if (!map) {
             map = new Map();
             typeIdentifierToKeyToEntry.set(e.contentTypeIdentifier, map);
           }
-          map.set(e.entryKey, plan.existingId);
-          entriesSkipped++;
-          continue;
+          map.set(e.entryKey, entryId);
+
+          pendingEntries.push({
+            entryId,
+            versionIds,
+            bundleEntry: e,
+            rawDataArrays: versionSpecs.map((v) => v.data),
+          });
         }
 
-        const versionSpecs = e.versions.map((v) => ({
-          data: v.data,
-          status: v.status,
-          publishedAt: v.publishedAt,
-        }));
-        const pass1Datas = versionSpecs.map((v) =>
-          bundle.portable
-            ? stripRelationFields(v.data, fieldTypes)
-            : (v.data as Record<string, unknown>)
-        );
-
-        let entryId: string;
-        let versionIds: string[];
-
-        if (plan.action === 'create') {
-          const created = await tx.contentEntry.create({
-            data: {
-              id: bundle.portable ? undefined : (e.id ?? undefined),
-              contentTypeId: typeId,
-              entryTitle: e.entryTitle,
-              entryKey: e.entryKey,
-              slug: e.slug,
-              versions: {
-                create: buildVersionCreates(e, versionSpecs, pass1Datas),
-              },
-            },
-            include: { versions: true },
-          });
-          entryId = created.id;
-          versionIds = created.versions.map((v) => v.id);
-          entriesCreated++;
-        } else {
-          // update
-          await tx.contentEntryVersion.deleteMany({
-            where: { entryId: plan.existingId },
-          });
-          const updated = await tx.contentEntry.update({
-            where: { id: plan.existingId },
-            data: {
-              entryTitle: e.entryTitle,
-              slug: e.slug,
-              versions: {
-                create: buildVersionCreates(e, versionSpecs, pass1Datas),
-              },
-            },
-            include: { versions: true },
-          });
-          entryId = updated.id;
-          versionIds = updated.versions.map((v) => v.id);
-          entriesUpdated++;
-        }
-
-        let map = typeIdentifierToKeyToEntry.get(e.contentTypeIdentifier);
-        if (!map) {
-          map = new Map();
-          typeIdentifierToKeyToEntry.set(e.contentTypeIdentifier, map);
-        }
-        map.set(e.entryKey, entryId);
-
-        pendingEntries.push({
-          entryId,
-          versionIds,
-          bundleEntry: e,
-          rawDataArrays: versionSpecs.map((v) => v.data),
-        });
-      }
-
-      if (bundle.portable) {
-        for (const {
-          versionIds,
-          bundleEntry,
-          rawDataArrays,
-        } of pendingEntries) {
-          const typeId = identifierToTypeId.get(
-            bundleEntry.contentTypeIdentifier
-          )!;
-          const fieldTypes = fieldTypesByTypeId.get(typeId) ?? {};
-          for (let i = 0; i < versionIds.length; i++) {
-            const resolvedData = decodeDataRefs(
-              rawDataArrays[i]!,
-              fieldTypes,
-              identifierToTypeId,
-              typeIdentifierToKeyToEntry
-            );
-            await tx.contentEntryVersion.update({
-              where: { id: versionIds[i] },
-              data: {
-                data: resolvedData as Prisma.InputJsonValue,
-              },
-            });
+        if (bundle.portable) {
+          for (const {
+            versionIds,
+            bundleEntry,
+            rawDataArrays,
+          } of pendingEntries) {
+            const typeId = identifierToTypeId.get(
+              bundleEntry.contentTypeIdentifier
+            )!;
+            const fieldTypes = fieldTypesByTypeId.get(typeId) ?? {};
+            for (let i = 0; i < versionIds.length; i++) {
+              const resolvedData = decodeDataRefs(
+                rawDataArrays[i]!,
+                fieldTypes,
+                identifierToTypeId,
+                typeIdentifierToKeyToEntry
+              );
+              await tx.contentEntryVersion.update({
+                where: { id: versionIds[i] },
+                data: {
+                  data: resolvedData as Prisma.InputJsonValue,
+                },
+              });
+            }
           }
         }
       }
-    }
 
-    return {
-      contentTypesCreated,
-      entriesCreated,
-      entriesUpdated,
-      entriesSkipped,
-    };
-  });
+      captured = {
+        contentTypesCreated,
+        entriesCreated,
+        entriesUpdated,
+        entriesSkipped,
+      };
+      if (dryRun) throw new DryRunRollback();
+    });
+  } catch (err) {
+    if (!(err instanceof DryRunRollback)) throw err;
+  }
+
+  return captured!;
 }
 
 function stripRelationFields(
