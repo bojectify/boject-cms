@@ -91,4 +91,24 @@ export interface ValidationResult {
 export interface ImportResult {
   contentTypesCreated: number;
   entriesCreated: number;
+  entriesUpdated: number;
+  entriesSkipped: number;
+}
+
+export type OnConflict = 'fail' | 'skip' | 'replace';
+
+export type EntryImportPlan =
+  | { action: 'create'; bundleEntry: BundleEntry }
+  | { action: 'update'; bundleEntry: BundleEntry; existingId: string }
+  | { action: 'skip'; bundleEntry: BundleEntry; existingId: string };
+
+export interface EntryImportSummary {
+  created: number;
+  updated: number;
+  skipped: number;
+}
+
+export interface EntryImportPlanResult {
+  plans: EntryImportPlan[];
+  summary: EntryImportSummary;
 }

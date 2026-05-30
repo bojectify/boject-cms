@@ -5,14 +5,18 @@ import type {
   BundleField,
   BundleMode,
   ImportResult,
+  OnConflict,
 } from './types';
 import { validateBundle } from './validate';
 import { decodeDataRefs } from './portable';
 import { FIELD_TYPES } from '../../utils/fieldTypes';
+import { planEntryImport } from './planEntryImport';
 
 export interface ImportOptions {
   mode: BundleMode;
   author?: string;
+  onConflict?: OnConflict;
+  dryRun?: boolean;
 }
 
 // Mirrors apps/cms/server/utils/validateFieldUnique.ts::resolveUniqueFlag
@@ -39,13 +43,17 @@ export async function importBundle(
     );
   }
 
-  const { mode, author } = options;
+  const { mode, author, onConflict = 'fail', dryRun = false } = options;
+  // dryRun is read here for the type-check side-effect; it's consumed in Task 8.
+  void dryRun;
   const wantsSchema = mode === 'schema' || mode === 'all';
   const wantsEntries = mode === 'entries' || mode === 'all';
 
   return prisma.$transaction(async (tx) => {
     let contentTypesCreated = 0;
     let entriesCreated = 0;
+    let entriesUpdated = 0;
+    let entriesSkipped = 0;
 
     const identifierToTypeId = new Map<string, string>();
     const typeIdentifierToKeyToEntry = new Map<string, Map<string, string>>();
@@ -189,79 +197,114 @@ export async function importBundle(
     }
 
     if (wantsEntries && bundle.entries) {
-      for (const e of bundle.entries) {
-        const typeId = identifierToTypeId.get(e.contentTypeIdentifier);
-        if (!typeId) {
-          throw new Error(
-            `Entry "${e.entryTitle}" references unknown content type "${e.contentTypeIdentifier}"`
-          );
-        }
-        const existing = await tx.contentEntry.findFirst({
-          where: { contentTypeId: typeId, entryKey: e.entryKey },
-        });
-        if (existing) {
-          throw new Error(
-            `Entry "${e.contentTypeIdentifier}:${e.entryKey}" already exists on target`
-          );
-        }
-      }
+      const { plans } = planEntryImport(
+        typeIdentifierToKeyToEntry,
+        bundle,
+        identifierToTypeId,
+        onConflict
+      );
 
       const pendingEntries: Array<{
         entryId: string;
         versionIds: string[];
         bundleEntry: BundleEntry;
-        /** The raw data arrays (one per version) before portable resolution */
         rawDataArrays: Record<string, unknown>[];
       }> = [];
 
-      for (const e of bundle.entries) {
+      for (const plan of plans) {
+        const e = plan.bundleEntry;
         const typeId = identifierToTypeId.get(e.contentTypeIdentifier)!;
         const fieldTypes = fieldTypesByTypeId.get(typeId) ?? {};
+
+        if (plan.action === 'skip') {
+          // Seed the relation-resolution map with the existing id so
+          // portable bundles can still resolve references to skipped entries.
+          let map = typeIdentifierToKeyToEntry.get(e.contentTypeIdentifier);
+          if (!map) {
+            map = new Map();
+            typeIdentifierToKeyToEntry.set(e.contentTypeIdentifier, map);
+          }
+          map.set(e.entryKey, plan.existingId);
+          entriesSkipped++;
+          continue;
+        }
 
         const versionSpecs = e.versions.map((v) => ({
           data: v.data,
           status: v.status,
           publishedAt: v.publishedAt,
         }));
-
         const pass1Datas = versionSpecs.map((v) =>
           bundle.portable
             ? stripRelationFields(v.data, fieldTypes)
             : (v.data as Record<string, unknown>)
         );
 
-        const created = await tx.contentEntry.create({
-          data: {
-            id: bundle.portable ? undefined : (e.id ?? undefined),
-            contentTypeId: typeId,
-            entryTitle: e.entryTitle,
-            entryKey: e.entryKey,
-            slug: e.slug,
-            versions: {
-              create: versionSpecs.map((v, i) => ({
-                data: pass1Datas[i] as Prisma.InputJsonValue,
-                entryTitle: e.entryTitle,
-                status: v.status,
-                publishedAt: v.publishedAt ? new Date(v.publishedAt) : null,
-                createdBy: author ?? null,
-                updatedBy: author ?? null,
-              })),
-            },
-          },
-          include: { versions: true },
-        });
+        let entryId: string;
+        let versionIds: string[];
 
-        entriesCreated++;
+        if (plan.action === 'create') {
+          const created = await tx.contentEntry.create({
+            data: {
+              id: bundle.portable ? undefined : (e.id ?? undefined),
+              contentTypeId: typeId,
+              entryTitle: e.entryTitle,
+              entryKey: e.entryKey,
+              slug: e.slug,
+              versions: {
+                create: versionSpecs.map((v, i) => ({
+                  data: pass1Datas[i] as Prisma.InputJsonValue,
+                  entryTitle: e.entryTitle,
+                  status: v.status,
+                  publishedAt: v.publishedAt ? new Date(v.publishedAt) : null,
+                  createdBy: author ?? null,
+                  updatedBy: author ?? null,
+                })),
+              },
+            },
+            include: { versions: true },
+          });
+          entryId = created.id;
+          versionIds = created.versions.map((v) => v.id);
+          entriesCreated++;
+        } else {
+          // update
+          await tx.contentEntryVersion.deleteMany({
+            where: { entryId: plan.existingId },
+          });
+          const updated = await tx.contentEntry.update({
+            where: { id: plan.existingId },
+            data: {
+              entryTitle: e.entryTitle,
+              slug: e.slug,
+              versions: {
+                create: versionSpecs.map((v, i) => ({
+                  data: pass1Datas[i] as Prisma.InputJsonValue,
+                  entryTitle: e.entryTitle,
+                  status: v.status,
+                  publishedAt: v.publishedAt ? new Date(v.publishedAt) : null,
+                  createdBy: author ?? null,
+                  updatedBy: author ?? null,
+                })),
+              },
+            },
+            include: { versions: true },
+          });
+          entryId = updated.id;
+          versionIds = updated.versions.map((v) => v.id);
+          entriesUpdated++;
+        }
+
         let map = typeIdentifierToKeyToEntry.get(e.contentTypeIdentifier);
         if (!map) {
           map = new Map();
           typeIdentifierToKeyToEntry.set(e.contentTypeIdentifier, map);
         }
-        map.set(e.entryKey, created.id);
+        map.set(e.entryKey, entryId);
 
         pendingEntries.push({
-          entryId: created.id,
-          versionIds: created.versions.map((v) => v.id),
+          entryId,
+          versionIds,
           bundleEntry: e,
           rawDataArrays: versionSpecs.map((v) => v.data),
         });
@@ -295,7 +338,12 @@ export async function importBundle(
       }
     }
 
-    return { contentTypesCreated, entriesCreated };
+    return {
+      contentTypesCreated,
+      entriesCreated,
+      entriesUpdated,
+      entriesSkipped,
+    };
   });
 }
 
