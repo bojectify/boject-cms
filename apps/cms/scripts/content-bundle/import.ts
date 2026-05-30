@@ -1,4 +1,4 @@
-import type { PrismaClient, FieldType, Prisma } from '#prisma';
+import type { PrismaClient, FieldType, Prisma, ContentStatus } from '#prisma';
 import type {
   Bundle,
   BundleEntry,
@@ -44,7 +44,8 @@ export async function importBundle(
   }
 
   const { mode, author, onConflict = 'fail', dryRun = false } = options;
-  // dryRun is read here for the type-check side-effect; it's consumed in Task 8.
+  // dryRun is wired through ImportOptions ahead of its executor (planner-only
+  // rollback to follow in a subsequent change). void keeps lint quiet until then.
   void dryRun;
   const wantsSchema = mode === 'schema' || mode === 'all';
   const wantsEntries = mode === 'entries' || mode === 'all';
@@ -211,6 +212,24 @@ export async function importBundle(
         rawDataArrays: Record<string, unknown>[];
       }> = [];
 
+      const buildVersionCreates = (
+        bundleEntry: BundleEntry,
+        versionSpecs: Array<{
+          data: Record<string, unknown>;
+          status: ContentStatus;
+          publishedAt: string | null;
+        }>,
+        pass1Datas: Record<string, unknown>[]
+      ) =>
+        versionSpecs.map((v, i) => ({
+          data: pass1Datas[i] as Prisma.InputJsonValue,
+          entryTitle: bundleEntry.entryTitle,
+          status: v.status,
+          publishedAt: v.publishedAt ? new Date(v.publishedAt) : null,
+          createdBy: author ?? null,
+          updatedBy: author ?? null,
+        }));
+
       for (const plan of plans) {
         const e = plan.bundleEntry;
         const typeId = identifierToTypeId.get(e.contentTypeIdentifier)!;
@@ -252,14 +271,7 @@ export async function importBundle(
               entryKey: e.entryKey,
               slug: e.slug,
               versions: {
-                create: versionSpecs.map((v, i) => ({
-                  data: pass1Datas[i] as Prisma.InputJsonValue,
-                  entryTitle: e.entryTitle,
-                  status: v.status,
-                  publishedAt: v.publishedAt ? new Date(v.publishedAt) : null,
-                  createdBy: author ?? null,
-                  updatedBy: author ?? null,
-                })),
+                create: buildVersionCreates(e, versionSpecs, pass1Datas),
               },
             },
             include: { versions: true },
@@ -278,14 +290,7 @@ export async function importBundle(
               entryTitle: e.entryTitle,
               slug: e.slug,
               versions: {
-                create: versionSpecs.map((v, i) => ({
-                  data: pass1Datas[i] as Prisma.InputJsonValue,
-                  entryTitle: e.entryTitle,
-                  status: v.status,
-                  publishedAt: v.publishedAt ? new Date(v.publishedAt) : null,
-                  createdBy: author ?? null,
-                  updatedBy: author ?? null,
-                })),
+                create: buildVersionCreates(e, versionSpecs, pass1Datas),
               },
             },
             include: { versions: true },
