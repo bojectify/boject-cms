@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "exportedAt": "2026-04-14T10:00:00.000Z",
   "portable": true,
   "contentTypes": [
@@ -58,9 +58,13 @@
       "entryTitle": "News",
       "entryKey": "news",
       "slug": "news",
-      "status": "PUBLISHED",
-      "publishedAt": null,
-      "data": { "name": "News" }
+      "versions": [
+        {
+          "status": "PUBLISHED",
+          "publishedAt": null,
+          "data": { "name": "News" }
+        }
+      ]
     },
     {
       "id": null,
@@ -69,12 +73,19 @@
       "entryTitle": "Welcome",
       "entryKey": "welcome",
       "slug": "welcome",
-      "status": "DRAFT",
-      "publishedAt": null,
-      "data": {
-        "title": "Welcome",
-        "category": { "contentTypeIdentifier": "Category", "entryKey": "news" }
-      }
+      "versions": [
+        {
+          "status": "DRAFT",
+          "publishedAt": null,
+          "data": {
+            "title": "Welcome",
+            "category": {
+              "contentTypeIdentifier": "Category",
+              "entryKey": "news"
+            }
+          }
+        }
+      ]
     }
   ]
 }

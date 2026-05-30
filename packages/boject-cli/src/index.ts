@@ -13,6 +13,7 @@ import { runPerfSweep } from './commands/perf/sweep.js';
 import { runPerfReport } from './commands/perf/report.js';
 import { runPerfReset } from './commands/perf/reset.js';
 import { runPerfSeed } from './commands/perf/seed.js';
+import { runBundleMigrate } from './commands/bundle/migrate.js';
 import { spawn } from 'node:child_process';
 import { CLI_VERSION } from './version.js';
 
@@ -29,6 +30,7 @@ Commands:
   apikey list        List API keys.
   apikey revoke      Revoke an API key by prefix.
   perf <command>     Run perf scenarios / sweep / report / check / seed / reset.
+  bundle migrate     Migrate a bundle file in place to the current format version.
 
 Run \`boject <command> --help\` for command-specific flags.
 `;
@@ -233,6 +235,23 @@ With --json, emits the raw response for piping to jq.
 const APIKEY_REVOKE_USAGE = `Usage: boject apikey revoke <prefix> [--url <url>]
 
 Soft-revokes an API key by its prefix. Requires BOJECT_API_KEY (apikey:write scope).
+`;
+
+const BUNDLE_USAGE = `Usage: boject bundle <command> [flags]
+
+Commands:
+  migrate <path>    Migrate a bundle file on disk to the current bundle format version.
+
+Run \`boject bundle <command> --help\` for command-specific flags.
+`;
+
+const BUNDLE_MIGRATE_USAGE = `Usage: boject bundle migrate <path> [--dry-run]
+
+Reads the bundle at <path>, runs format-version migrations up to the current
+CLI's supported version, and writes the result back.
+
+Flags:
+  --dry-run    Print the planned transition without writing the file.
 `;
 
 const nodeRunner: CommandRunner = {
@@ -751,6 +770,47 @@ async function dispatchPerf(args: string[]): Promise<number> {
   }
 }
 
+async function dispatchBundle(args: string[]): Promise<number> {
+  const subcommand = args[0];
+  const rest = args.slice(1);
+  if (!subcommand || subcommand === '--help' || subcommand === '-h') {
+    process.stdout.write(BUNDLE_USAGE);
+    return subcommand ? 0 : 1;
+  }
+
+  switch (subcommand) {
+    case 'migrate': {
+      if (rest.includes('--help') || rest.includes('-h')) {
+        process.stdout.write(BUNDLE_MIGRATE_USAGE);
+        return 0;
+      }
+      const { values, positionals } = parseArgs({
+        args: rest,
+        allowPositionals: true,
+        options: {
+          'dry-run': { type: 'boolean', default: false },
+        },
+      });
+      const path = positionals[0];
+      if (!path) {
+        process.stdout.write(BUNDLE_MIGRATE_USAGE);
+        return 1;
+      }
+      const r = await runBundleMigrate({
+        path,
+        flags: { dryRun: values['dry-run'] === true },
+        stdout,
+        stderr,
+      });
+      return r.exitCode;
+    }
+    default:
+      process.stderr.write(`Unknown bundle subcommand: ${subcommand}\n`);
+      process.stdout.write(BUNDLE_USAGE);
+      return 1;
+  }
+}
+
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
 
@@ -777,6 +837,11 @@ async function main(): Promise<void> {
 
   if (command === 'perf') {
     const code = await dispatchPerf(rest);
+    process.exit(code);
+  }
+
+  if (command === 'bundle') {
+    const code = await dispatchBundle(rest);
     process.exit(code);
   }
 

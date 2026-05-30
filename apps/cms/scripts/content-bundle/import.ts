@@ -217,23 +217,12 @@ export async function importBundle(
       for (const e of bundle.entries) {
         const typeId = identifierToTypeId.get(e.contentTypeIdentifier)!;
         const fieldTypes = fieldTypesByTypeId.get(typeId) ?? {};
-        const isV2 = Array.isArray(e.versions);
 
-        // Normalise versions: V1 entries have flat status/data, V2 entries
-        // have a versions array.
-        const versionSpecs = isV2
-          ? e.versions!.map((v) => ({
-              data: v.data,
-              status: v.status,
-              publishedAt: v.publishedAt,
-            }))
-          : [
-              {
-                data: e.data!,
-                status: e.status!,
-                publishedAt: e.publishedAt ?? null,
-              },
-            ];
+        const versionSpecs = e.versions.map((v) => ({
+          data: v.data,
+          status: v.status,
+          publishedAt: v.publishedAt,
+        }));
 
         const pass1Datas = versionSpecs.map((v) =>
           bundle.portable
