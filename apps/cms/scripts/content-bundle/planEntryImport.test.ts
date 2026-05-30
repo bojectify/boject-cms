@@ -114,7 +114,7 @@ describe('planEntryImport', () => {
     ).toThrow(/unknown content type "UnknownType"/);
   });
 
-  it('mixes create + update + skip in one plan run', () => {
+  it('mixes create + update in one plan run (replace mode)', () => {
     const existing = new Map([
       [
         'Page',

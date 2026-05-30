@@ -1,6 +1,20 @@
 // VENDORED from apps/cms/scripts/content-bundle/types.ts.
 // The CLI is published standalone and cannot import from apps/cms/.
 // Keep this file in sync when the canonical version changes.
+//
+// This is a PARTIAL vendor by design — the canonical defines additional
+// types (`OnConflict`, `EntryImportPlan`, `EntryImportSummary`,
+// `EntryImportPlanResult`) used by the importer's planner that the CLI
+// does not consume. Do not add them here unless the CLI starts needing
+// them. The drift test (`tests/unit/vendorDrift.test.ts`) intentionally
+// omits this pair because a byte-identical check would fail on the
+// import-source rewrites and the missing types.
+//
+// Types that MUST stay structurally in sync with the canonical:
+//   BundleFieldOptions, BundleField, BundleContentType,
+//   BundleEntryVersion, BundleEntry, Bundle, BundleMode,
+//   ValidationError, ConflictErrorKind, ConflictError,
+//   ValidationResult, ImportResult, and the BUNDLE_VERSION constant.
 
 import type { FieldTypeName } from './fieldTypes.js';
 import type { ContentStatusName } from './contentStatus.js';
@@ -96,4 +110,6 @@ export interface ValidationResult {
 export interface ImportResult {
   contentTypesCreated: number;
   entriesCreated: number;
+  entriesUpdated: number;
+  entriesSkipped: number;
 }

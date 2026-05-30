@@ -747,6 +747,7 @@ describe('importBundle', () => {
         include: { versions: true },
       });
       expect(after.id).toBe(seeded.id);
+      expect(after.contentTypeId).toBe(seeded.contentTypeId);
       expect(after.entryKey).toBe('replace-target');
       expect(after.createdAt.getTime()).toBe(seededCreatedAt.getTime());
       expect(after.updatedAt.getTime()).toBeGreaterThan(
