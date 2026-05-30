@@ -289,7 +289,7 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder. The schema is
 - `apps/cms/generated/pothos-types.ts` — Pothos-Prisma type bridge (gitignored, regenerated)
 - `docker-compose.yml` — Local PostgreSQL 17 container
 - `apps/cms/eslint.config.mjs` — ESLint flat config (extends Nuxt-generated config, loads `@typescript-eslint` plugin)
-- `lefthook.yml` — Pre-commit (lint, format, typecheck per package) and pre-push (`pnpm test` + storybook tests) hook configuration
+- `lefthook.yml` — Pre-commit (lint, format, single workspace-wide typecheck) and pre-push (`pnpm test` + storybook tests) hook configuration
 - `apps/cms/vitest.config.ts` — Vitest configuration (three projects: integration + unit + storybook; fileParallelism disabled)
 - `apps/cms/vitest.globalSetup.ts` — Resets and seeds the `boject_test` database before integration tests run
 - `apps/cms/vitest.workerSetup.ts` — Per-worker setup applied to every Vitest project
@@ -377,7 +377,7 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder. The schema is
 - **ESLint** — Via `@nuxt/eslint` module (registered in `apps/cms/nuxt.config.ts`). Includes Vue, TypeScript, and Nuxt-specific rules. Config in `apps/cms/eslint.config.mjs`. Custom config covers `**/*.ts` files with `@typescript-eslint/parser` and `@typescript-eslint/eslint-plugin`. A separate block sets `parserOptions.parser` to `@typescript-eslint/parser` for `**/*.vue` files (the Nuxt-generated config uses `vue-eslint-parser` but doesn't configure a TypeScript sub-parser). Underscore-prefixed variables are allowed as unused (`varsIgnorePattern: '^_'`). Destructured rest siblings are also ignored (`ignoreRestSiblings: true`).
 - **Prettier** — Single quotes, trailing commas (es5), semicolons, 2-space indent, 80 char width. Config in `.prettierrc.yml`.
 - **eslint-config-prettier** — Disables ESLint rules that conflict with Prettier.
-- **Lefthook** — Pre-commit hooks run ESLint, Prettier, and per-package `typecheck` jobs (cms, create-boject-cms, boject-cli, root scripts) in parallel on staged files. Pre-push runs the full `pnpm test` suite plus `pnpm --filter cms test:storybook`; the storybook-test job can be skipped via `SKIP_STORYBOOK_TEST=1`. Config in `lefthook.yml`.
+- **Lefthook** — Pre-commit hooks run ESLint, Prettier, and a single workspace-wide `pnpm typecheck` job (which fans out via `pnpm -r typecheck` plus the root `scripts/` tsconfig) in parallel on staged files. Pre-push runs the full `pnpm test` suite plus `pnpm --filter cms test:storybook`; the storybook-test job can be skipped via `SKIP_STORYBOOK_TEST=1`. Config in `lefthook.yml`.
 
 ## Testing
 
