@@ -1,4 +1,5 @@
-import type { PrismaClient, FieldType, Prisma, ContentStatus } from '#prisma';
+import type { PrismaClient, FieldType, ContentStatus } from '#prisma';
+import { Prisma } from '#prisma';
 import type {
   Bundle,
   BundleEntry,
@@ -145,7 +146,14 @@ export async function importBundle(
                     required: f.required,
                     unique: resolveBundleFieldUnique(f),
                     order: f.order,
-                    options: (opts ?? undefined) as Prisma.InputJsonValue,
+                    // Prisma.DbNull writes SQL NULL into the nullable Json column.
+                    // Matches the prior behaviour (undefined → field omitted → DB
+                    // default NULL). The narrowing cast is honest about both
+                    // runtime branches (object or DbNull sentinel) rather than
+                    // lying that undefined is an InputJsonValue.
+                    options: (opts ?? Prisma.DbNull) as
+                      | Prisma.InputJsonValue
+                      | typeof Prisma.DbNull,
                   };
                 }),
               },
