@@ -26,6 +26,10 @@ export function setup() {
     env,
   });
   console.log('[globalSetup] Running seed...');
-  execSync('pnpm prisma:seed', { stdio: 'inherit', env });
+  // Invoke the test seed script directly rather than via a pnpm alias —
+  // there is no top-level `prisma:seed` anymore (the dev-facing alias was
+  // dropped to prevent test fixtures landing in the dev DB). DATABASE_URL
+  // is already overridden in `env` by the caller.
+  execSync('pnpm exec tsx prisma/seed.ts', { stdio: 'inherit', env });
   console.log('[globalSetup] Test database ready.');
 }

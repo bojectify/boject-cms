@@ -16,9 +16,7 @@ export async function ensurePerfApiKey(opts: EnsureOpts): Promise<string> {
   const keyHash = createHash('sha256').update(PERF_KEY_RAW).digest('hex');
   const row = await opts.prisma.apiKey.findUnique({ where: { keyHash } });
   if (!row) {
-    throw new Error(
-      'Perf API key not found. Run: SEED_PERF_KEY=1 DATABASE_URL=postgresql://boject:boject@localhost:5432/boject_perf pnpm prisma:seed'
-    );
+    throw new Error('Perf API key not found. Run: pnpm prisma:seed:perf');
   }
   return PERF_KEY_RAW;
 }

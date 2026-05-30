@@ -82,7 +82,9 @@ Every `pnpm` and `pnpx` invocation runs inside a Docker container that has no ac
    pnpm --filter cms exec msw init public --no-save
    pnpm --filter cms exec playwright install chromium chromium-headless-shell
    pnpm prisma:migrate
-   pnpm prisma:seed
+   BOJECT_ADMIN_EMAIL=admin@example.com \
+     BOJECT_ADMIN_PASSWORD='choose-a-strong-dev-password' \
+     pnpm dev:bootstrap-admin
    ```
 
    The Playwright browsers are cached in a docker named volume
@@ -134,8 +136,10 @@ cp apps/cms/.env.example apps/cms/.env
 # Run database migrations
 pnpm prisma:migrate
 
-# Seed the database with admin user + test API key
-pnpm prisma:seed
+# Bootstrap a dev admin user (no API keys — those belong in test/perf DBs)
+BOJECT_ADMIN_EMAIL=admin@example.com \
+  BOJECT_ADMIN_PASSWORD='choose-a-strong-dev-password' \
+  pnpm dev:bootstrap-admin
 
 # Optionally apply the base starter bundle (8 content types + a SiteSettings entry)
 pnpm content:import ./starters/base.boject.json
