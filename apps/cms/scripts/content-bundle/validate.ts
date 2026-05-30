@@ -246,6 +246,31 @@ function validateEntry(
     e.versions.forEach((v, i) =>
       validateEntryVersion(v, `${path}.versions[${i}]`, errors)
     );
+
+    // Two-slot invariant: at most one PUBLISHED version and at most one
+    // draft-slot version (DRAFT or CHANGED) per entry. ARCHIVED is
+    // unbounded. Mirrors the partial unique index on ContentEntryVersion.
+    const publishedCount = e.versions.filter(
+      (v) => isObject(v) && (v as { status?: unknown }).status === 'PUBLISHED'
+    ).length;
+    if (publishedCount > 1) {
+      errors.push({
+        path: `${path}.versions`,
+        message: 'at most one PUBLISHED version per entry',
+      });
+    }
+    const draftCount = e.versions.filter(
+      (v) =>
+        isObject(v) &&
+        ((v as { status?: unknown }).status === 'DRAFT' ||
+          (v as { status?: unknown }).status === 'CHANGED')
+    ).length;
+    if (draftCount > 1) {
+      errors.push({
+        path: `${path}.versions`,
+        message: 'at most one draft version (DRAFT or CHANGED) per entry',
+      });
+    }
   }
 
   if (portable && e.id !== null) {

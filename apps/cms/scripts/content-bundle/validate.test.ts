@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { validateBundle } from './validate';
-import type { Bundle } from './types';
+import { BUNDLE_VERSION, type Bundle } from './types';
 import { FIELD_TYPES } from '../../utils/fieldTypes';
 import { CONTENT_STATUSES } from '../../utils/contentStatus';
 
@@ -326,5 +326,69 @@ describe('validateBundle — version tightening', () => {
     };
     const result = validateBundle(bundle);
     expect(result).toEqual({ ok: true, errors: [] });
+  });
+});
+
+describe('validateBundle two-slot invariant', () => {
+  function bundleWithVersions(versions: Array<{ status: string }>) {
+    return {
+      version: BUNDLE_VERSION,
+      exportedAt: '2026-05-30T00:00:00.000Z',
+      portable: false,
+      entries: [
+        {
+          id: null,
+          contentTypeId: null,
+          contentTypeIdentifier: 'Page',
+          entryTitle: 'Hello',
+          entryKey: 'hello',
+          slug: null,
+          versions: versions.map((v) => ({
+            status: v.status,
+            data: {},
+            publishedAt: null,
+          })),
+        },
+      ],
+    };
+  }
+
+  it('rejects two PUBLISHED versions on one entry', () => {
+    const result = validateBundle(
+      bundleWithVersions([{ status: 'PUBLISHED' }, { status: 'PUBLISHED' }])
+    );
+    expect(result.ok).toBe(false);
+    expect(
+      result.errors.some((e) => /at most one PUBLISHED/i.test(e.message))
+    ).toBe(true);
+  });
+
+  it('rejects two draft-slot versions on one entry', () => {
+    const result = validateBundle(
+      bundleWithVersions([{ status: 'DRAFT' }, { status: 'CHANGED' }])
+    );
+    expect(result.ok).toBe(false);
+    expect(
+      result.errors.some((e) => /at most one draft/i.test(e.message))
+    ).toBe(true);
+  });
+
+  it('accepts one PUBLISHED + one DRAFT', () => {
+    const result = validateBundle(
+      bundleWithVersions([{ status: 'PUBLISHED' }, { status: 'DRAFT' }])
+    );
+    expect(result.ok).toBe(true);
+  });
+
+  it('accepts unlimited ARCHIVED versions', () => {
+    const result = validateBundle(
+      bundleWithVersions([
+        { status: 'PUBLISHED' },
+        { status: 'ARCHIVED' },
+        { status: 'ARCHIVED' },
+        { status: 'ARCHIVED' },
+      ])
+    );
+    expect(result.ok).toBe(true);
   });
 });
