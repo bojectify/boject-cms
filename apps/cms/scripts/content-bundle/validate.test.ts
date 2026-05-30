@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { validateBundle } from './validate';
 import { BUNDLE_VERSION, type Bundle } from './types';
 import { FIELD_TYPES } from '../../utils/fieldTypes';
-import { CONTENT_STATUSES } from '../../utils/contentStatus';
+import {
+  CONTENT_STATUSES,
+  type ContentStatusName,
+} from '../../utils/contentStatus';
 
 const baseContentType = {
   id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
@@ -330,7 +333,7 @@ describe('validateBundle — version tightening', () => {
 });
 
 describe('validateBundle two-slot invariant', () => {
-  function bundleWithVersions(versions: Array<{ status: string }>) {
+  function bundleWithVersions(versions: Array<{ status: ContentStatusName }>) {
     return {
       version: BUNDLE_VERSION,
       exportedAt: '2026-05-30T00:00:00.000Z',
@@ -355,7 +358,10 @@ describe('validateBundle two-slot invariant', () => {
 
   it('rejects two PUBLISHED versions on one entry', () => {
     const result = validateBundle(
-      bundleWithVersions([{ status: 'PUBLISHED' }, { status: 'PUBLISHED' }])
+      bundleWithVersions([
+        { status: CONTENT_STATUSES.PUBLISHED },
+        { status: CONTENT_STATUSES.PUBLISHED },
+      ])
     );
     expect(result.ok).toBe(false);
     expect(
@@ -365,7 +371,10 @@ describe('validateBundle two-slot invariant', () => {
 
   it('rejects two draft-slot versions on one entry', () => {
     const result = validateBundle(
-      bundleWithVersions([{ status: 'DRAFT' }, { status: 'CHANGED' }])
+      bundleWithVersions([
+        { status: CONTENT_STATUSES.DRAFT },
+        { status: CONTENT_STATUSES.CHANGED },
+      ])
     );
     expect(result.ok).toBe(false);
     expect(
@@ -375,7 +384,10 @@ describe('validateBundle two-slot invariant', () => {
 
   it('accepts one PUBLISHED + one DRAFT', () => {
     const result = validateBundle(
-      bundleWithVersions([{ status: 'PUBLISHED' }, { status: 'DRAFT' }])
+      bundleWithVersions([
+        { status: CONTENT_STATUSES.PUBLISHED },
+        { status: CONTENT_STATUSES.DRAFT },
+      ])
     );
     expect(result.ok).toBe(true);
   });
@@ -383,10 +395,10 @@ describe('validateBundle two-slot invariant', () => {
   it('accepts unlimited ARCHIVED versions', () => {
     const result = validateBundle(
       bundleWithVersions([
-        { status: 'PUBLISHED' },
-        { status: 'ARCHIVED' },
-        { status: 'ARCHIVED' },
-        { status: 'ARCHIVED' },
+        { status: CONTENT_STATUSES.PUBLISHED },
+        { status: CONTENT_STATUSES.ARCHIVED },
+        { status: CONTENT_STATUSES.ARCHIVED },
+        { status: CONTENT_STATUSES.ARCHIVED },
       ])
     );
     expect(result.ok).toBe(true);

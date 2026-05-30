@@ -4,6 +4,7 @@ import {
   isFieldTypeName,
 } from '../../utils/fieldTypes';
 import {
+  CONTENT_STATUSES,
   CONTENT_STATUS_NAMES,
   isContentStatusName,
 } from '../../utils/contentStatus';
@@ -251,7 +252,9 @@ function validateEntry(
     // draft-slot version (DRAFT or CHANGED) per entry. ARCHIVED is
     // unbounded. Mirrors the partial unique index on ContentEntryVersion.
     const publishedCount = e.versions.filter(
-      (v) => isObject(v) && (v as { status?: unknown }).status === 'PUBLISHED'
+      (v) =>
+        isObject(v) &&
+        (v as { status?: unknown }).status === CONTENT_STATUSES.PUBLISHED
     ).length;
     if (publishedCount > 1) {
       errors.push({
@@ -262,8 +265,8 @@ function validateEntry(
     const draftCount = e.versions.filter(
       (v) =>
         isObject(v) &&
-        ((v as { status?: unknown }).status === 'DRAFT' ||
-          (v as { status?: unknown }).status === 'CHANGED')
+        ((v as { status?: unknown }).status === CONTENT_STATUSES.DRAFT ||
+          (v as { status?: unknown }).status === CONTENT_STATUSES.CHANGED)
     ).length;
     if (draftCount > 1) {
       errors.push({
