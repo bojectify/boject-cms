@@ -642,7 +642,8 @@ describe('importBundle', () => {
         onConflict: 'skip',
       });
 
-      expect(result).toMatchObject({
+      expect(result).toEqual({
+        contentTypesCreated: 0,
         entriesCreated: 0,
         entriesUpdated: 0,
         entriesSkipped: 1,
@@ -734,7 +735,8 @@ describe('importBundle', () => {
         author: 'olly@example.com',
       });
 
-      expect(result).toMatchObject({
+      expect(result).toEqual({
+        contentTypesCreated: 0,
         entriesCreated: 0,
         entriesUpdated: 1,
         entriesSkipped: 0,
@@ -747,6 +749,9 @@ describe('importBundle', () => {
       expect(after.id).toBe(seeded.id);
       expect(after.entryKey).toBe('replace-target');
       expect(after.createdAt.getTime()).toBe(seededCreatedAt.getTime());
+      expect(after.updatedAt.getTime()).toBeGreaterThan(
+        seeded.updatedAt.getTime()
+      );
       expect(after.entryTitle).toBe('Replaced');
       expect(after.slug).toBe('replaced-slug');
 
@@ -756,6 +761,11 @@ describe('importBundle', () => {
       expect(after.versions[0]!.createdBy).toBe('olly@example.com');
       expect(after.versions[0]!.updatedBy).toBe('olly@example.com');
       expect(oldVersionIds).not.toContain(after.versions[0]!.id);
+
+      const orphanCount = await prisma.contentEntryVersion.count({
+        where: { id: { in: oldVersionIds } },
+      });
+      expect(orphanCount).toBe(0);
     });
   });
 
