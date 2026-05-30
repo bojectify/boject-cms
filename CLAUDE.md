@@ -45,7 +45,7 @@ pnpm apikey:create <name>     # Create a new API key (prints raw key once)
 pnpm apikey:list              # List all API keys (prefix, name, status, last used)
 pnpm apikey:revoke <prefix>   # Revoke an API key by its prefix
 pnpm content:export [--schema|--entries|--all] [--portable] [--out <path>]   # Export dynamic content types and/or entries as a JSON bundle
-pnpm content:import <path> [--schema|--entries|--all] [--apply] [--allow-destructive] [--author <string>]   # Import a JSON bundle into the CMS. With --schema --apply, runs idempotent schema apply via applySchema (Spec 3). --allow-destructive unlocks safe removals.
+pnpm content:import <path> [--schema|--entries|--all] [--apply] [--allow-destructive] [--author <string>] [--on-conflict <fail|skip|replace>] [--dry-run]   # Import a JSON bundle into the CMS. With --schema --apply, runs idempotent schema apply via applySchema (Spec 3). --allow-destructive unlocks safe removals. --on-conflict controls entry-collision behaviour (default fail; skip leaves existing entries alone; replace wholesale-overwrites preserving id+entryKey+createdAt). --dry-run reports planned counts without writing.
 pnpm content:validate <path>                                                  # Validate a JSON bundle's shape without touching the DB
 pnpm starters:build           # Build sport.boject.json / rugby.boject.json from overlays in starters/src/
 pnpm starters:check           # Verify committed starter outputs are up to date (CI)
@@ -328,7 +328,8 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder. The schema is
 - `apps/cms/scripts/content-bundle/validate.ts` — Bundle shape validation (no DB access)
 - `apps/cms/scripts/content-bundle/portable.ts` — Portable reference rewriting helpers
 - `apps/cms/scripts/content-bundle/export.ts` — `exportBundle(prisma, { mode, portable })` queries the DB and returns a `Bundle`
-- `apps/cms/scripts/content-bundle/import.ts` — `importBundle(prisma, bundle, { mode, author })` runs a transactional two-pass import
+- `apps/cms/scripts/content-bundle/import.ts` — `importBundle(prisma, bundle, { mode, author, onConflict?, dryRun? })` runs a transactional two-pass import. Entry collisions are matched by `(contentTypeId, entryKey)`; `onConflict` defaults to `'fail'` (throw, current behaviour), with `'skip'` (leave existing untouched) and `'replace'` (wholesale-replace versions, preserve `id` + `entryKey` + `createdAt`). `dryRun: true` runs the planner inside a transaction that's rolled back via a sentinel throw, so the returned summary `{ contentTypesCreated, entriesCreated, entriesUpdated, entriesSkipped }` reflects what apply-mode would do without persisting. The pure classifier `apps/cms/scripts/content-bundle/planEntryImport.ts` is exported separately so the future entries-UI (#27) can preview a bundle without touching the executor.
+- `apps/cms/scripts/content-bundle/planEntryImport.ts` — pure `planEntryImport(existingByTypeAndKey, bundle, identifierToTypeId, onConflict)` classifier returning `{ plans, summary }`; consumed by `importBundle` and (later) the entries import UI for dry-run previews
 - `apps/cms/scripts/content-bundle/index.ts` — CLI wrapper dispatching `export`/`import`/`validate` subcommands
 - `apps/cms/scripts/content-bundle/applySchema.ts` — Idempotent transactional schema applier
 - `apps/cms/scripts/content-bundle/migrate.ts` — Pure `migrate(bundle, target?, migrations?)` runner + `MIGRATIONS` registry + `BundleMigrationError`
