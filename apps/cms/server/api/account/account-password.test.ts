@@ -4,6 +4,7 @@ import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { prisma } from '../../utils/prisma';
 import { TEST_USER_EMAIL, TEST_USER_PASSWORD } from '../../test/credentials';
 import type { RateLimitedBody } from '../../utils/rateLimitEndpoint';
+import { resetRateLimitStore } from '../../utils/rateLimit';
 
 await setup({
   rootDir: fileURLToPath(new URL('../../..', import.meta.url)),
@@ -55,6 +56,11 @@ describe('POST /api/account/password', () => {
 
   afterEach(async () => {
     await resetTestUser();
+    // Clear the in-process rate limiter between tests so the two cases
+    // that pick random IPs from 192.0.2.0/24 can't collide (~0.4% per
+    // run otherwise). Matches the convention in csrf / content-entries /
+    // content-types / webhooks / rate-limit unit tests.
+    resetRateLimitStore();
   });
 
   it('changes the password (204), bumps passwordVersion, current cookie still works', async () => {
