@@ -43,6 +43,7 @@ export async function runPerfReset(flags: PerfResetFlags): Promise<void> {
   }
   const client: PerfResetClient =
     flags._testClient ??
+    // eslint-disable-next-line no-restricted-syntax -- pg.Client's overloaded signatures don't structurally satisfy the narrower PerfResetClient
     (new Client({
       connectionString: flags.databaseUrl,
     }) as unknown as PerfResetClient);

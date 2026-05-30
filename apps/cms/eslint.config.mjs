@@ -2,24 +2,14 @@ import withNuxt from './.nuxt/eslint.config.mjs';
 import eslintConfigPrettier from 'eslint-config-prettier';
 import tseslint from '@typescript-eslint/eslint-plugin';
 import tsParser from '@typescript-eslint/parser';
+import { sharedCoreRules, sharedTsRules } from '../../eslint.rules.shared.mjs';
 
 export default withNuxt(
   {
     ignores: ['generated/**'],
   },
   {
-    rules: {
-      eqeqeq: ['error', 'always', { null: 'ignore' }],
-      'no-restricted-syntax': [
-        'error',
-        {
-          selector:
-            "TSAsExpression[expression.type='TSAsExpression'][expression.typeAnnotation.type='TSUnknownKeyword']",
-          message:
-            "Avoid 'as unknown as T' double casts. Try 'as T' directly or an intersection type (e.g. 'as Window & typeof globalThis & { ... }'). If the source genuinely has insufficient overlap with the target, add an eslint-disable-next-line comment with a brief reason.",
-        },
-      ],
-    },
+    rules: sharedCoreRules,
   },
   {
     files: ['**/*.ts'],
@@ -29,17 +19,7 @@ export default withNuxt(
     plugins: {
       '@typescript-eslint': tseslint,
     },
-    rules: {
-      'no-unused-vars': 'off',
-      '@typescript-eslint/no-unused-vars': [
-        'error',
-        {
-          varsIgnorePattern: '^_',
-          argsIgnorePattern: '^_',
-          ignoreRestSiblings: true,
-        },
-      ],
-    },
+    rules: sharedTsRules,
   },
   {
     files: ['**/*.vue'],
@@ -51,17 +31,7 @@ export default withNuxt(
     plugins: {
       '@typescript-eslint': tseslint,
     },
-    rules: {
-      'no-unused-vars': 'off',
-      '@typescript-eslint/no-unused-vars': [
-        'error',
-        {
-          varsIgnorePattern: '^_',
-          argsIgnorePattern: '^_',
-          ignoreRestSiblings: true,
-        },
-      ],
-    },
+    rules: sharedTsRules,
   },
   eslintConfigPrettier
 );
