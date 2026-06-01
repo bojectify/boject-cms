@@ -29,7 +29,7 @@ export const API_KEY_SCOPE_DESCRIPTIONS: Record<ApiKeyScope, string> = {
   'content:write':
     'Create, update, delete, and transition content entries via /api/content-entries.',
   'content:export':
-    'Export content entries as a portable bundle (/api/content-bundle/export); includes drafts when --include-drafts is passed.',
+    'Export content entries as a portable bundle (/api/content-bundle/export), including draft versions.',
   'content:import':
     'Import content entry bundles (/api/content-bundle/import).',
   'schema:read': 'Export the schema bundle.',
