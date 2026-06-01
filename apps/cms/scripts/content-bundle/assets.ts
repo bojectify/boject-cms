@@ -1,4 +1,10 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { createStorage, type Storage } from 'unstorage';
 import fsDriver from 'unstorage/drivers/fs';
@@ -195,4 +201,47 @@ export async function exportAssets(
   }
 
   return { count, totalBytes };
+}
+
+/** List asset filenames in `assetsDir`, or [] if the dir is absent. */
+export function listAssetKeys(assetsDir: string): string[] {
+  if (!existsSync(assetsDir)) return [];
+  return readdirSync(assetsDir, { withFileTypes: true })
+    .filter((e) => e.isFile())
+    .map((e) => e.name);
+}
+
+export interface ImportAssetsArgs {
+  storage: Storage;
+  assetsDir: string;
+}
+
+export interface ImportAssetsResult {
+  written: number;
+  skipped: number;
+}
+
+/**
+ * Write every file in `assetsDir` into `storage` under its filename
+ * (the storage key). Skip keys already present — storage keys are random
+ * UUIDs, so a collision means the same bytes are already there. Idempotent.
+ */
+export async function importAssets(
+  args: ImportAssetsArgs
+): Promise<ImportAssetsResult> {
+  const { storage, assetsDir } = args;
+  let written = 0;
+  let skipped = 0;
+
+  for (const key of listAssetKeys(assetsDir)) {
+    if (await storage.hasItem(key)) {
+      skipped++;
+      continue;
+    }
+    const buffer = readFileSync(join(assetsDir, key));
+    await storage.setItemRaw(key, buffer);
+    written++;
+  }
+
+  return { written, skipped };
 }

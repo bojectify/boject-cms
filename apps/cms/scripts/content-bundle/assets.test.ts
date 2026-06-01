@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { mkdtempSync, readFileSync, existsSync, rmSync } from 'node:fs';
+import {
+  mkdtempSync,
+  readFileSync,
+  existsSync,
+  rmSync,
+  mkdirSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createStorage } from 'unstorage';
@@ -11,6 +18,8 @@ import {
   assertAssetsComplete,
   assertWithinCaps,
   exportAssets,
+  importAssets,
+  listAssetKeys,
 } from './assets';
 import { BUNDLE_VERSION } from './types';
 import type { Bundle } from './types';
@@ -264,5 +273,40 @@ describe('exportAssets', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('importAssets', () => {
+  it('writes every asset file into storage, skipping ones already present', async () => {
+    const storage = createStorage({ driver: memoryDriver() });
+    await storage.setItemRaw('existing.png', Buffer.from('OLD'));
+
+    const dir = mkdtempSync(join(tmpdir(), 'assets-import-'));
+    const assetsDir = join(dir, 'assets');
+    mkdirSync(assetsDir, { recursive: true });
+    writeFileSync(join(assetsDir, 'new.png'), Buffer.from('NEW'));
+    writeFileSync(
+      join(assetsDir, 'existing.png'),
+      Buffer.from('SHOULD-NOT-OVERWRITE')
+    );
+
+    try {
+      const result = await importAssets({ storage, assetsDir });
+      expect(result.written).toBe(1);
+      expect(result.skipped).toBe(1);
+      expect((await storage.getItemRaw<Buffer>('new.png'))!.toString()).toBe(
+        'NEW'
+      );
+      // existing key untouched
+      expect(
+        (await storage.getItemRaw<Buffer>('existing.png'))!.toString()
+      ).toBe('OLD');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('listAssetKeys returns [] when the dir does not exist', () => {
+    expect(listAssetKeys(join(tmpdir(), 'definitely-not-here-31'))).toEqual([]);
   });
 });
