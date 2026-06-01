@@ -391,7 +391,7 @@ export async function runCli(argv: string[]): Promise<void> {
           );
         }
       } else {
-        console.log('Bundle is valid');
+        console.log('Bundle is valid.');
       }
       process.exit(0);
       return;
