@@ -225,3 +225,184 @@ describe('exportBundle', () => {
     ]);
   });
 });
+
+describe('exportBundle filter options', () => {
+  beforeEach(async () => await reset());
+  afterEach(async () => await reset());
+
+  it('publishedOnly drops draft versions and entries with no published version', async () => {
+    const ct = await prisma.contentType.create({
+      data: {
+        identifier: 'BlogPost',
+        name: 'Blog Post',
+        fields: {
+          create: {
+            identifier: 'title',
+            name: 'Title',
+            type: FIELD_TYPES.ENTRY_TITLE,
+            required: true,
+            order: 0,
+          },
+        },
+      },
+    });
+
+    // Entry with both a PUBLISHED and a DRAFT (CHANGED) version.
+    await prisma.contentEntry.create({
+      data: {
+        contentTypeId: ct.id,
+        entryTitle: 'Published',
+        entryKey: 'published',
+        slug: 'published',
+        versions: {
+          create: [
+            {
+              data: { title: 'Published' },
+              entryTitle: 'Published',
+              status: CONTENT_STATUSES.PUBLISHED,
+              publishedAt: new Date('2026-04-01T00:00:00.000Z'),
+            },
+            {
+              data: { title: 'Published (edited)' },
+              entryTitle: 'Published (edited)',
+              status: CONTENT_STATUSES.CHANGED,
+            },
+          ],
+        },
+      },
+    });
+
+    // Draft-only entry.
+    await prisma.contentEntry.create({
+      data: {
+        contentTypeId: ct.id,
+        entryTitle: 'DraftOnly',
+        entryKey: 'draft-only',
+        slug: 'draft-only',
+        versions: {
+          create: {
+            data: { title: 'DraftOnly' },
+            entryTitle: 'DraftOnly',
+            status: CONTENT_STATUSES.DRAFT,
+          },
+        },
+      },
+    });
+
+    const bundle = await exportBundle(prisma, {
+      mode: 'entries',
+      portable: false,
+      publishedOnly: true,
+    });
+
+    const entries = bundle.entries ?? [];
+    // DRAFT-only entry is excluded entirely.
+    expect(entries.every((e) => e.versions.length > 0)).toBe(true);
+    // Every surviving version is PUBLISHED.
+    expect(
+      entries.flatMap((e) => e.versions).every((v) => v.status === 'PUBLISHED')
+    ).toBe(true);
+    // Sanity: the published entry survived; the draft-only one did not.
+    expect(entries.map((e) => e.entryKey)).toEqual(['published']);
+  });
+
+  it('contentType filter restricts entries to the named identifier', async () => {
+    const alpha = await prisma.contentType.create({
+      data: {
+        identifier: 'Alpha',
+        name: 'Alpha',
+        fields: {
+          create: {
+            identifier: 'title',
+            name: 'Title',
+            type: FIELD_TYPES.ENTRY_TITLE,
+            required: true,
+            order: 0,
+          },
+        },
+      },
+    });
+    const beta = await prisma.contentType.create({
+      data: {
+        identifier: 'Beta',
+        name: 'Beta',
+        fields: {
+          create: {
+            identifier: 'title',
+            name: 'Title',
+            type: FIELD_TYPES.ENTRY_TITLE,
+            required: true,
+            order: 0,
+          },
+        },
+      },
+    });
+    await prisma.contentEntry.create({
+      data: {
+        contentTypeId: alpha.id,
+        entryTitle: 'A1',
+        entryKey: 'a1',
+        slug: 'a1',
+        versions: {
+          create: {
+            data: { title: 'A1' },
+            entryTitle: 'A1',
+            status: CONTENT_STATUSES.PUBLISHED,
+          },
+        },
+      },
+    });
+    await prisma.contentEntry.create({
+      data: {
+        contentTypeId: beta.id,
+        entryTitle: 'B1',
+        entryKey: 'b1',
+        slug: 'b1',
+        versions: {
+          create: {
+            data: { title: 'B1' },
+            entryTitle: 'B1',
+            status: CONTENT_STATUSES.PUBLISHED,
+          },
+        },
+      },
+    });
+
+    const bundle = await exportBundle(prisma, {
+      mode: 'entries',
+      portable: false,
+      contentType: 'Alpha',
+    });
+
+    expect(bundle.entries ?? []).toHaveLength(1);
+    expect(
+      (bundle.entries ?? []).every((e) => e.contentTypeIdentifier === 'Alpha')
+    ).toBe(true);
+  });
+
+  it('unknown contentType identifier yields zero entries (no throw)', async () => {
+    await prisma.contentType.create({
+      data: {
+        identifier: 'Alpha',
+        name: 'Alpha',
+        fields: {
+          create: {
+            identifier: 'title',
+            name: 'Title',
+            type: FIELD_TYPES.ENTRY_TITLE,
+            required: true,
+            order: 0,
+          },
+        },
+      },
+    });
+
+    const bundle = await exportBundle(prisma, {
+      mode: 'entries',
+      portable: false,
+      contentType: 'DoesNotExist',
+    });
+
+    expect(bundle.entries ?? []).toHaveLength(0);
+  });
+});
