@@ -339,3 +339,124 @@ describe('GET /api/content-bundle/export', () => {
     expect(allVersions.some((v) => v.status !== 'PUBLISHED')).toBe(true);
   });
 });
+
+function entriesBundle(title: string) {
+  return {
+    version: 2,
+    exportedAt: '2026-06-01T00:00:00.000Z',
+    portable: true,
+    entries: [
+      {
+        id: null,
+        contentTypeId: null,
+        contentTypeIdentifier: 'Note',
+        entryTitle: title,
+        entryKey: title.toLowerCase(),
+        slug: null,
+        versions: [{ status: 'PUBLISHED', data: { title }, publishedAt: null }],
+      },
+    ],
+  };
+}
+
+describe('POST /api/content-bundle/import', () => {
+  beforeEach(async () => {
+    await prisma.contentEntry.deleteMany();
+    await prisma.contentTypeField.deleteMany();
+    await prisma.contentType.deleteMany();
+    await seedType('Note');
+  });
+
+  afterEach(async () => {
+    await prisma.apiKey.deleteMany({
+      where: { name: { startsWith: 'test-' } },
+    });
+  });
+
+  it('returns 403 INSUFFICIENT_SCOPE without content:import', async () => {
+    const key = await makeKey(['content:write']); // content:write is NOT enough
+    const res = await fetch('/api/content-bundle/import', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ bundle: entriesBundle('Alpha') }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('imports entries and returns a summary with content:import', async () => {
+    const key = await makeKey(['content:import']);
+    const res = await fetch('/api/content-bundle/import', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ bundle: entriesBundle('Alpha') }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { entriesCreated: number };
+    expect(body.entriesCreated).toBe(1);
+  });
+
+  it('400 BAD_REQUEST when body has no bundle', async () => {
+    const key = await makeKey(['content:import']);
+    const res = await fetch('/api/content-bundle/import', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({}),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('409 ENTRY_IMPORT_CONFLICT on a fail-mode collision', async () => {
+    const key = await makeKey(['content:import']);
+    const headers = {
+      Authorization: `Bearer ${key}`,
+      'Content-Type': 'application/json',
+    };
+    const body = JSON.stringify({ bundle: entriesBundle('Dup') });
+    await fetch('/api/content-bundle/import', {
+      method: 'POST',
+      headers,
+      body,
+    });
+    const res = await fetch('/api/content-bundle/import', {
+      method: 'POST',
+      headers,
+      body,
+    });
+    expect(res.status).toBe(409);
+    const j = (await res.json()) as { data?: { error?: string } };
+    expect(j.data?.error).toBe('ENTRY_IMPORT_CONFLICT');
+  });
+
+  it('replace onConflict overwrites instead of 409', async () => {
+    const key = await makeKey(['content:import']);
+    const headers = {
+      Authorization: `Bearer ${key}`,
+      'Content-Type': 'application/json',
+    };
+    await fetch('/api/content-bundle/import', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ bundle: entriesBundle('Rep') }),
+    });
+    const res = await fetch('/api/content-bundle/import', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        bundle: entriesBundle('Rep'),
+        onConflict: 'replace',
+      }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { entriesUpdated: number };
+    expect(body.entriesUpdated).toBe(1);
+  });
+});
