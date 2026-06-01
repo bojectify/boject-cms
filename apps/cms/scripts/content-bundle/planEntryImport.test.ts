@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { planEntryImport } from './planEntryImport';
+import {
+  EntryImportConflictError,
+  EntryImportReferenceError,
+} from './importErrors';
 import { BUNDLE_VERSION } from './types';
 import type { Bundle, BundleEntry } from './types';
 import { CONTENT_STATUSES } from '../../utils/contentStatus';
@@ -151,5 +155,40 @@ describe('planEntryImport', () => {
     );
     expect(result.plans).toEqual([]);
     expect(result.summary).toEqual({ created: 0, updated: 0, skipped: 0 });
+  });
+});
+
+describe('planEntryImport typed errors', () => {
+  const existingWithHome = new Map([
+    ['Page', new Map([['home', 'existing-home-id']])],
+  ]);
+  const identToId = new Map([['Page', 'type-page-id']]);
+  const bundleWithHome = bundleWith([
+    entry({ entryKey: 'home', entryTitle: 'Home' }),
+  ]);
+  const bundleUnknownType = bundleWith([
+    entry({ contentTypeIdentifier: 'UnknownType', entryTitle: 'Mystery' }),
+  ]);
+
+  it('throws EntryImportConflictError on fail-mode collision', () => {
+    expect(() =>
+      planEntryImport(existingWithHome, bundleWithHome, identToId, 'fail')
+    ).toThrow(EntryImportConflictError);
+  });
+
+  it('throws EntryImportReferenceError for an unknown content type', () => {
+    expect(() =>
+      planEntryImport(new Map(), bundleUnknownType, new Map(), 'fail')
+    ).toThrow(EntryImportReferenceError);
+  });
+
+  it('keeps the conflict message byte-identical to the legacy string', () => {
+    try {
+      planEntryImport(existingWithHome, bundleWithHome, identToId, 'fail');
+    } catch (e) {
+      expect((e as Error).message).toBe(
+        'Entry "Page:home" already exists on target'
+      );
+    }
   });
 });

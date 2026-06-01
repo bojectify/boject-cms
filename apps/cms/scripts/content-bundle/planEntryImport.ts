@@ -4,6 +4,10 @@ import type {
   EntryImportPlanResult,
   OnConflict,
 } from './types';
+import {
+  EntryImportConflictError,
+  EntryImportReferenceError,
+} from './importErrors';
 
 /**
  * Pure planner: classifies each bundle entry as create / update / skip
@@ -27,7 +31,7 @@ export function planEntryImport(
 
   for (const bundleEntry of bundle.entries ?? []) {
     if (!identifierToTypeId.has(bundleEntry.contentTypeIdentifier)) {
-      throw new Error(
+      throw new EntryImportReferenceError(
         `Entry "${bundleEntry.entryTitle}" references unknown content type "${bundleEntry.contentTypeIdentifier}"`
       );
     }
@@ -43,8 +47,10 @@ export function planEntryImport(
     }
 
     if (onConflict === 'fail') {
-      throw new Error(
-        `Entry "${bundleEntry.contentTypeIdentifier}:${bundleEntry.entryKey}" already exists on target`
+      throw new EntryImportConflictError(
+        `Entry "${bundleEntry.contentTypeIdentifier}:${bundleEntry.entryKey}" already exists on target`,
+        bundleEntry.contentTypeIdentifier,
+        bundleEntry.entryKey
       );
     }
     if (onConflict === 'skip') {

@@ -12,6 +12,10 @@ import { validateBundle } from './validate';
 import { decodeDataRefs } from './portable';
 import { FIELD_TYPES } from '../../utils/fieldTypes';
 import { planEntryImport } from './planEntryImport';
+import {
+  BundleImportValidationError,
+  EntryImportReferenceError,
+} from './importErrors';
 
 export interface ImportOptions {
   mode: BundleMode;
@@ -37,11 +41,7 @@ export async function importBundle(
 ): Promise<ImportResult> {
   const validation = validateBundle(bundle);
   if (!validation.ok) {
-    throw new Error(
-      `Bundle failed validation:\n${validation.errors
-        .map((e) => `  ${e.path}: ${e.message}`)
-        .join('\n')}`
-    );
+    throw new BundleImportValidationError(validation.errors);
   }
 
   const { mode, author, onConflict = 'fail', dryRun = false } = options;
@@ -108,7 +108,7 @@ export async function importBundle(
       if (wantsSchema && bundle.contentTypes) {
         for (const ct of bundle.contentTypes) {
           if (identifierToTypeId.has(ct.identifier)) {
-            throw new Error(
+            throw new EntryImportReferenceError(
               `ContentType identifier "${ct.identifier}" already exists on target`
             );
           }
@@ -197,7 +197,7 @@ export async function importBundle(
           const resolved = pending.identifiers.map((ident) => {
             const id = identifierToTypeId.get(ident);
             if (!id) {
-              throw new Error(
+              throw new EntryImportReferenceError(
                 `RELATION field "${pending.fieldIdentifier}" targets unknown content type "${ident}"`
               );
             }
