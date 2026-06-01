@@ -1,9 +1,18 @@
 import 'dotenv/config';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../../generated/prisma/client';
 import { applySchema } from './applySchema';
+import {
+  DEFAULT_ASSET_CAPS,
+  buildImageFieldsFromContentTypes,
+  collectImageStorageKeys,
+  createBundleStorage,
+  exportAssets,
+  type AssetCaps,
+  type ImageFieldsByType,
+} from './assets';
 import { exportBundle } from './export';
 import { importBundle } from './import';
 import { validateBundle } from './validate';
@@ -79,6 +88,52 @@ function writeBundle(out: string, bundle: unknown) {
   writeFileSync(abs, JSON.stringify(bundle, null, 2));
 }
 
+const MB = 1024 * 1024;
+
+/** A directory target = trailing slash, or an existing directory. */
+function isDirectoryTarget(out: string): boolean {
+  if (out.endsWith('/')) return true;
+  try {
+    return statSync(out).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+function parseCaps(args: string[]): AssetCaps {
+  const asset = flagValue(args, '--max-asset-size');
+  const bundle = flagValue(args, '--max-bundle-size');
+  return {
+    perAsset: asset ? Number(asset) * MB : DEFAULT_ASSET_CAPS.perAsset,
+    perBundle: bundle ? Number(bundle) * MB : DEFAULT_ASSET_CAPS.perBundle,
+  };
+}
+
+/** Build the IMAGE-field map straight from the DB (mode-independent). */
+async function imageFieldsFromDb(
+  prisma: import('#prisma').PrismaClient
+): Promise<ImageFieldsByType> {
+  const cts = await prisma.contentType.findMany({ include: { fields: true } });
+  return buildImageFieldsFromContentTypes(
+    cts.map((ct) => ({
+      id: ct.id,
+      identifier: ct.identifier,
+      name: ct.name,
+      description: ct.description ?? null,
+      fields: ct.fields.map((f) => ({
+        id: f.id,
+        identifier: f.identifier,
+        name: f.name,
+        type: f.type,
+        required: f.required,
+        unique: f.unique,
+        order: f.order,
+        options: (f.options ?? null) as never,
+      })),
+    }))
+  );
+}
+
 // Each branch follows process.exit() with `return` so tests that mock
 // process.exit don't fall through to the next branch.
 export async function runCli(argv: string[]): Promise<void> {
@@ -102,13 +157,35 @@ export async function runCli(argv: string[]): Promise<void> {
       }
       const mode = parseMode(args, 'schema');
       const portable = args.includes('--portable');
+      const noAssets = args.includes('--no-assets');
       const out =
         flagValue(args, '--out') ??
         `${DEFAULT_OUT_DIR}/content-bundle${mode === 'all' ? '' : `-${mode}`}.json`;
 
       const bundle = await exportBundle(prisma, { mode, portable });
-      writeBundle(out, bundle);
-      console.log(`Wrote bundle to ${out}`);
+
+      const dirTarget = isDirectoryTarget(out);
+      if (dirTarget && !noAssets) {
+        const dir = resolve(out);
+        const imageFields = await imageFieldsFromDb(prisma);
+        const storageKeys = collectImageStorageKeys(bundle, imageFields);
+        const storage = createBundleStorage();
+        const { count, totalBytes } = await exportAssets({
+          storage,
+          storageKeys,
+          assetsDir: resolve(dir, 'assets'),
+          caps: parseCaps(args),
+        });
+        writeBundle(resolve(dir, 'bundle.json'), bundle);
+        console.log(
+          `Wrote bundle to ${dir}/bundle.json with ${count} asset(s) ` +
+            `(${totalBytes} bytes) in ${dir}/assets/`
+        );
+      } else {
+        const target = dirTarget ? resolve(out, 'bundle.json') : out;
+        writeBundle(target, bundle);
+        console.log(`Wrote bundle to ${target}`);
+      }
       process.exit(0);
       return;
     }
