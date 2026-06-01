@@ -193,4 +193,149 @@ describe('GET /api/content-bundle/export', () => {
         .some((v) => v.status !== 'PUBLISHED')
     ).toBe(true);
   });
+
+  it('?contentType= filters by content type identifier', async () => {
+    const exportThingId = await seedType('ExportThing');
+    const otherThingId = await seedType('OtherThing');
+    await prisma.contentEntry.create({
+      data: {
+        contentTypeId: exportThingId,
+        entryTitle: 'Export Entry',
+        entryKey: 'export-entry',
+        slug: 'export-entry',
+        versions: {
+          create: [
+            {
+              data: { title: 'Export Entry' },
+              entryTitle: 'Export Entry',
+              status: CONTENT_STATUSES.PUBLISHED,
+              publishedAt: new Date(),
+            },
+          ],
+        },
+      },
+    });
+    await prisma.contentEntry.create({
+      data: {
+        contentTypeId: otherThingId,
+        entryTitle: 'Other Entry',
+        entryKey: 'other-entry',
+        slug: 'other-entry',
+        versions: {
+          create: [
+            {
+              data: { title: 'Other Entry' },
+              entryTitle: 'Other Entry',
+              status: CONTENT_STATUSES.PUBLISHED,
+              publishedAt: new Date(),
+            },
+          ],
+        },
+      },
+    });
+    const key = await makeKey(['content:export']);
+    const res = await fetch(
+      '/api/content-bundle/export?contentType=ExportThing',
+      {
+        headers: { Authorization: `Bearer ${key}` },
+      }
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      entries: Array<{ contentTypeIdentifier: string }>;
+    };
+    expect(body.entries).toHaveLength(1);
+    const entry = body.entries[0];
+    expect(entry).toBeDefined();
+    expect(entry?.contentTypeIdentifier).toBe('ExportThing');
+  });
+
+  it('?portable=false preserves real UUID references', async () => {
+    const ctId = await seedType('ExportThing');
+    await prisma.contentEntry.create({
+      data: {
+        contentTypeId: ctId,
+        entryTitle: 'Published One',
+        entryKey: 'published-one',
+        slug: 'published-one',
+        versions: {
+          create: [
+            {
+              data: { title: 'Published One' },
+              entryTitle: 'Published One',
+              status: CONTENT_STATUSES.PUBLISHED,
+              publishedAt: new Date(),
+            },
+          ],
+        },
+      },
+    });
+    const key = await makeKey(['content:export']);
+    const res = await fetch('/api/content-bundle/export?portable=false', {
+      headers: { Authorization: `Bearer ${key}` },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      portable: boolean;
+      entries: Array<{ id: string | null; contentTypeId: string | null }>;
+    };
+    expect(body.portable).toBe(false);
+    const entry = body.entries[0];
+    expect(entry).toBeDefined();
+    expect(typeof entry?.id).toBe('string');
+    expect(entry?.id).not.toBeNull();
+    expect(typeof entry?.contentTypeId).toBe('string');
+    expect(entry?.contentTypeId).not.toBeNull();
+  });
+
+  it('includeDrafts=true returns published AND draft versions, not only drafts', async () => {
+    const ctId = await seedType('ExportThing');
+    await prisma.contentEntry.create({
+      data: {
+        contentTypeId: ctId,
+        entryTitle: 'Published One',
+        entryKey: 'published-one',
+        slug: 'published-one',
+        versions: {
+          create: [
+            {
+              data: { title: 'Published One' },
+              entryTitle: 'Published One',
+              status: CONTENT_STATUSES.PUBLISHED,
+              publishedAt: new Date(),
+            },
+          ],
+        },
+      },
+    });
+    await prisma.contentEntry.create({
+      data: {
+        contentTypeId: ctId,
+        entryTitle: 'Draft Only',
+        entryKey: 'draft-only',
+        slug: null,
+        versions: {
+          create: [
+            {
+              data: { title: 'Draft Only' },
+              entryTitle: 'Draft Only',
+              status: CONTENT_STATUSES.DRAFT,
+              publishedAt: null,
+            },
+          ],
+        },
+      },
+    });
+    const key = await makeKey(['content:export']);
+    const res = await fetch('/api/content-bundle/export?includeDrafts=true', {
+      headers: { Authorization: `Bearer ${key}` },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      entries: Array<{ versions: Array<{ status: string }> }>;
+    };
+    const allVersions = body.entries.flatMap((e) => e.versions);
+    expect(allVersions.some((v) => v.status === 'PUBLISHED')).toBe(true);
+    expect(allVersions.some((v) => v.status !== 'PUBLISHED')).toBe(true);
+  });
 });
