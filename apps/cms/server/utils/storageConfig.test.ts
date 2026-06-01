@@ -47,6 +47,22 @@ describe('buildStorageConfig', () => {
     });
   });
 
+  it('builds an r2 spec with auto region and account endpoint', () => {
+    process.env.STORAGE_DRIVER = 'r2';
+    process.env.R2_BUCKET = 'b';
+    process.env.R2_ACCESS_KEY_ID = 'k';
+    process.env.R2_SECRET_ACCESS_KEY = 's';
+    process.env.R2_ACCOUNT_ID = 'acct123';
+    const spec = buildStorageConfig();
+    expect(spec['images:originals']).toMatchObject({
+      driver: 's3',
+      bucket: 'b',
+      region: 'auto',
+      endpoint: 'https://acct123.r2.cloudflarestorage.com',
+      pathPrefix: 'images/originals/',
+    });
+  });
+
   it('throws on an unsupported driver', () => {
     process.env.STORAGE_DRIVER = 'floppy';
     expect(() => buildStorageConfig()).toThrow(/Unsupported STORAGE_DRIVER/);
