@@ -43,6 +43,13 @@ export interface ApplySchemaResultLike {
   plan?: unknown;
 }
 
+export interface EntriesImportResultLike {
+  contentTypesCreated: number;
+  entriesCreated: number;
+  entriesUpdated: number;
+  entriesSkipped: number;
+}
+
 export interface BlockerLike {
   code: string;
   message: string;
