@@ -114,24 +114,7 @@ async function imageFieldsFromDb(
   prisma: import('#prisma').PrismaClient
 ): Promise<ImageFieldsByType> {
   const cts = await prisma.contentType.findMany({ include: { fields: true } });
-  return buildImageFieldsFromContentTypes(
-    cts.map((ct) => ({
-      id: ct.id,
-      identifier: ct.identifier,
-      name: ct.name,
-      description: ct.description ?? null,
-      fields: ct.fields.map((f) => ({
-        id: f.id,
-        identifier: f.identifier,
-        name: f.name,
-        type: f.type,
-        required: f.required,
-        unique: f.unique,
-        order: f.order,
-        options: (f.options ?? null) as never,
-      })),
-    }))
-  );
+  return buildImageFieldsFromContentTypes(cts);
 }
 
 // Each branch follows process.exit() with `return` so tests that mock

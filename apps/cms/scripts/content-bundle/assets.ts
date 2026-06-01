@@ -11,7 +11,7 @@ import fsDriver from 'unstorage/drivers/fs';
 import s3Driver from 'unstorage/drivers/s3';
 import { FIELD_TYPES } from '../../utils/fieldTypes';
 import { buildStorageConfig } from '../../server/utils/storageConfig';
-import type { Bundle, BundleContentType } from './types';
+import type { Bundle } from './types';
 
 /**
  * Map of content-type identifier -> set of IMAGE field identifiers.
@@ -20,7 +20,10 @@ import type { Bundle, BundleContentType } from './types';
 export type ImageFieldsByType = Map<string, Set<string>>;
 
 export function buildImageFieldsFromContentTypes(
-  contentTypes: BundleContentType[]
+  contentTypes: {
+    identifier: string;
+    fields: { identifier: string; type: string }[];
+  }[]
 ): ImageFieldsByType {
   const map: ImageFieldsByType = new Map();
   for (const ct of contentTypes) {
