@@ -240,4 +240,29 @@ describe('exportAssets', () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it('normalizes non-Buffer getItemRaw results (e.g. s3 ArrayBuffer)', async () => {
+    const bytes = new Uint8Array([1, 2, 3, 4]);
+    // Stub storage whose getItemRaw returns an ArrayBuffer, like the s3 driver.
+    // eslint-disable-next-line no-restricted-syntax -- minimal stub; no structural overlap with the full Storage surface
+    const storage = {
+      getItemRaw: async () => bytes.buffer,
+    } as unknown as import('unstorage').Storage;
+
+    const dir = mkdtempSync(join(tmpdir(), 'assets-export-'));
+    try {
+      const result = await exportAssets({
+        storage,
+        storageKeys: ['ab.bin'],
+        assetsDir: join(dir, 'assets'),
+        caps: DEFAULT_ASSET_CAPS,
+      });
+      expect(result.count).toBe(1);
+      expect(result.totalBytes).toBe(4);
+      const written = readFileSync(join(dir, 'assets', 'ab.bin'));
+      expect([...written]).toEqual([1, 2, 3, 4]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });

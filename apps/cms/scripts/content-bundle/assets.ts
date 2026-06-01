@@ -153,6 +153,10 @@ export interface ExportAssetsResult {
  * disk. Fail-fast on a missing byte or a cap breach. The assets dir is only
  * created once the first byte is about to be written, so a fail-fast on the
  * very first key leaves no empty dir behind.
+ *
+ * On a mid-stream failure (missing byte or cap breach), assets already written
+ * for earlier keys are left on disk — the caller owns cleanup of the output
+ * directory.
  */
 export async function exportAssets(
   args: ExportAssetsArgs
@@ -163,14 +167,20 @@ export async function exportAssets(
   let dirReady = false;
 
   for (const key of storageKeys) {
-    const raw = await storage.getItemRaw<Buffer | Uint8Array>(key);
+    const raw = await storage.getItemRaw<Buffer | Uint8Array | ArrayBuffer>(
+      key
+    );
     if (raw == null) {
       throw new Error(
         `Cannot export bundle: storage has no bytes for image storage key ` +
           `"${key}". Repair the drift or remove the reference, then retry.`
       );
     }
-    const buffer = Buffer.isBuffer(raw) ? raw : Buffer.from(raw);
+    // s3 returns ArrayBuffer; fs/memory return Buffer. Wrap ArrayBuffer in a
+    // typed-array view so Buffer.from picks the ArrayLike<number> overload.
+    const buffer = Buffer.isBuffer(raw)
+      ? raw
+      : Buffer.from(raw instanceof ArrayBuffer ? new Uint8Array(raw) : raw);
     // assertWithinCaps takes the PRE-asset running total and checks
     // priorTotal + size internally, so assert BEFORE incrementing.
     assertWithinCaps(key, buffer.length, totalBytes, caps);
