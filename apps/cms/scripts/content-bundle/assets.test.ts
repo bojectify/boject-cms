@@ -2,6 +2,9 @@ import { describe, it, expect } from 'vitest';
 import {
   buildImageFieldsFromContentTypes,
   collectImageStorageKeys,
+  DEFAULT_ASSET_CAPS,
+  assertAssetsComplete,
+  assertWithinCaps,
 } from './assets';
 import { BUNDLE_VERSION } from './types';
 import type { Bundle } from './types';
@@ -119,5 +122,48 @@ describe('collectImageStorageKeys', () => {
     const keys = collectImageStorageKeys(b, map);
     expect(keys).not.toContain(undefined);
     expect(keys).toContain('k2.png'); // draft version still has k2
+  });
+});
+
+describe('assertAssetsComplete', () => {
+  it('passes when every referenced key is present', () => {
+    expect(() =>
+      assertAssetsComplete(
+        ['k1.png', 'k2.png'],
+        new Set(['k1.png', 'k2.png', 'extra.png'])
+      )
+    ).not.toThrow();
+  });
+
+  it('throws naming the first missing key', () => {
+    expect(() =>
+      assertAssetsComplete(['k1.png', 'k2.png'], new Set(['k1.png']))
+    ).toThrow(/k2\.png/);
+  });
+});
+
+describe('assertWithinCaps', () => {
+  it('uses sensible defaults', () => {
+    expect(DEFAULT_ASSET_CAPS.perAsset).toBe(25 * 1024 * 1024);
+    expect(DEFAULT_ASSET_CAPS.perBundle).toBe(1024 * 1024 * 1024);
+  });
+
+  it('throws when a single asset exceeds the per-asset cap', () => {
+    expect(() =>
+      assertWithinCaps('big.png', 30 * 1024 * 1024, 0, DEFAULT_ASSET_CAPS)
+    ).toThrow(/big\.png/);
+  });
+
+  it('throws when the running total exceeds the per-bundle cap', () => {
+    const caps = { perAsset: 1024, perBundle: 1500 };
+    expect(() => assertWithinCaps('a.png', 800, 800, caps)).toThrow(
+      /bundle size cap/i
+    );
+  });
+
+  it('passes within caps', () => {
+    expect(() =>
+      assertWithinCaps('ok.png', 100, 100, DEFAULT_ASSET_CAPS)
+    ).not.toThrow();
   });
 });

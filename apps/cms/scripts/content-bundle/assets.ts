@@ -47,3 +47,61 @@ export function collectImageStorageKeys(
   }
   return [...keys];
 }
+
+export interface AssetCaps {
+  /** Max bytes for a single asset. */
+  perAsset: number;
+  /** Max cumulative bytes across all assets in one bundle. */
+  perBundle: number;
+}
+
+export const DEFAULT_ASSET_CAPS: AssetCaps = {
+  perAsset: 25 * 1024 * 1024, // 25 MB
+  perBundle: 1024 * 1024 * 1024, // 1 GB
+};
+
+/**
+ * Throw if any referenced storage key is missing from the present set.
+ * Used at import time when an `assets/` directory exists (corrupt/partial
+ * bundle detection).
+ */
+export function assertAssetsComplete(
+  referencedKeys: string[],
+  presentKeys: Set<string>
+): void {
+  for (const key of referencedKeys) {
+    if (!presentKeys.has(key)) {
+      throw new Error(
+        `Bundle is missing asset bytes for storage key "${key}". ` +
+          `The assets/ directory is present but incomplete.`
+      );
+    }
+  }
+}
+
+/**
+ * Throw if adding `size` bytes for `storageKey` would breach either cap.
+ * `runningTotal` is the cumulative size of assets accumulated BEFORE this one;
+ * the per-bundle check is evaluated against `runningTotal + size`.
+ */
+export function assertWithinCaps(
+  storageKey: string,
+  size: number,
+  runningTotal: number,
+  caps: AssetCaps
+): void {
+  if (size > caps.perAsset) {
+    throw new Error(
+      `Asset "${storageKey}" is ${size} bytes, over the per-asset cap of ` +
+        `${caps.perAsset} bytes. Raise it with --max-asset-size <MB>.`
+    );
+  }
+  const cumulative = runningTotal + size;
+  if (cumulative > caps.perBundle) {
+    throw new Error(
+      `Cumulative asset size ${cumulative} bytes exceeds the per-bundle ` +
+        `size cap of ${caps.perBundle} bytes. Raise it with ` +
+        `--max-bundle-size <MB>.`
+    );
+  }
+}
