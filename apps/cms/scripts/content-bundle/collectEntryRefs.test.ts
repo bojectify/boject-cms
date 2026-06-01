@@ -69,4 +69,19 @@ describe('collectEntryRefs', () => {
       )
     ).toEqual([]);
   });
+
+  it('skips a MULTIRELATION value that is not an array', () => {
+    expect(
+      collectEntryRefs(
+        { tags: { contentTypeId: 'ct', entryId: 'e' } }, // object, not array
+        fieldTypes
+      )
+    ).toEqual([]);
+  });
+
+  it('returns no refs for a non-object RICHTEXT value', () => {
+    expect(
+      collectEntryRefs({ body: 'just a plain string' }, fieldTypes)
+    ).toEqual([]);
+  });
 });
