@@ -1,4 +1,10 @@
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { createStorage, type Storage } from 'unstorage';
+import fsDriver from 'unstorage/drivers/fs';
+import s3Driver from 'unstorage/drivers/s3';
 import { FIELD_TYPES } from '../../utils/fieldTypes';
+import { buildStorageConfig } from '../../server/utils/storageConfig';
 import type { Bundle, BundleContentType } from './types';
 
 /**
@@ -104,4 +110,79 @@ export function assertWithinCaps(
         `--max-bundle-size <MB>.`
     );
   }
+}
+
+/**
+ * Re-hydrate the Nuxt `images:originals` storage spec into a standalone
+ * unstorage instance. The spec object IS the unstorage driver options plus a
+ * `driver` discriminator, so building a live handle is a direct mapping.
+ * Runs outside Nitro (the bundle CLI is a tsx script).
+ */
+export function createBundleStorage(): Storage {
+  const { driver, ...opts } = buildStorageConfig()['images:originals']!;
+  if (driver === 'fs') {
+    return createStorage({ driver: fsDriver({ base: opts.base as string }) });
+  }
+  if (driver === 's3') {
+    return createStorage({
+      // s3Driver option keys match the spec exactly (bucket/region/
+      // accessKeyId/secretAccessKey/endpoint/pathPrefix), but the spec is
+      // typed as a loose `Record<string, unknown>` so it has no structural
+      // overlap with S3DriverOptions — the double cast is the honest bridge.
+      // eslint-disable-next-line no-restricted-syntax -- spec is Record<string, unknown>; no structural overlap with S3DriverOptions
+      driver: s3Driver(opts as unknown as Parameters<typeof s3Driver>[0]),
+    });
+  }
+  throw new Error(`Unsupported storage driver for bundle assets: "${driver}".`);
+}
+
+export interface ExportAssetsArgs {
+  storage: Storage;
+  storageKeys: string[];
+  assetsDir: string;
+  caps: AssetCaps;
+}
+
+export interface ExportAssetsResult {
+  count: number;
+  totalBytes: number;
+}
+
+/**
+ * Read each referenced byte from `storage` and write it to `assetsDir` on
+ * disk. Fail-fast on a missing byte or a cap breach. The assets dir is only
+ * created once the first byte is about to be written, so a fail-fast on the
+ * very first key leaves no empty dir behind.
+ */
+export async function exportAssets(
+  args: ExportAssetsArgs
+): Promise<ExportAssetsResult> {
+  const { storage, storageKeys, assetsDir, caps } = args;
+  let totalBytes = 0;
+  let count = 0;
+  let dirReady = false;
+
+  for (const key of storageKeys) {
+    const raw = await storage.getItemRaw<Buffer | Uint8Array>(key);
+    if (raw == null) {
+      throw new Error(
+        `Cannot export bundle: storage has no bytes for image storage key ` +
+          `"${key}". Repair the drift or remove the reference, then retry.`
+      );
+    }
+    const buffer = Buffer.isBuffer(raw) ? raw : Buffer.from(raw);
+    // assertWithinCaps takes the PRE-asset running total and checks
+    // priorTotal + size internally, so assert BEFORE incrementing.
+    assertWithinCaps(key, buffer.length, totalBytes, caps);
+    totalBytes += buffer.length;
+
+    if (!dirReady) {
+      mkdirSync(assetsDir, { recursive: true });
+      dirReady = true;
+    }
+    writeFileSync(join(assetsDir, key), buffer);
+    count++;
+  }
+
+  return { count, totalBytes };
 }

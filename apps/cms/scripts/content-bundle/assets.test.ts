@@ -1,10 +1,16 @@
 import { describe, it, expect } from 'vitest';
+import { mkdtempSync, readFileSync, existsSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { createStorage } from 'unstorage';
+import memoryDriver from 'unstorage/drivers/memory';
 import {
   buildImageFieldsFromContentTypes,
   collectImageStorageKeys,
   DEFAULT_ASSET_CAPS,
   assertAssetsComplete,
   assertWithinCaps,
+  exportAssets,
 } from './assets';
 import { BUNDLE_VERSION } from './types';
 import type { Bundle } from './types';
@@ -171,5 +177,67 @@ describe('assertWithinCaps', () => {
     const caps = { perAsset: 1000, perBundle: 1000 };
     expect(() => assertWithinCaps('edge.png', 1000, 0, caps)).not.toThrow();
     expect(() => assertWithinCaps('edge.png', 400, 600, caps)).not.toThrow();
+  });
+});
+
+describe('exportAssets', () => {
+  it('writes referenced bytes into the assets dir and reports total size', async () => {
+    const storage = createStorage({ driver: memoryDriver() });
+    await storage.setItemRaw('k1.png', Buffer.from('hello'));
+    await storage.setItemRaw('k2.png', Buffer.from('world!!'));
+
+    const dir = mkdtempSync(join(tmpdir(), 'assets-export-'));
+    try {
+      const result = await exportAssets({
+        storage,
+        storageKeys: ['k1.png', 'k2.png'],
+        assetsDir: join(dir, 'assets'),
+        caps: DEFAULT_ASSET_CAPS,
+      });
+      expect(result.count).toBe(2);
+      expect(result.totalBytes).toBe(12); // 5 + 7
+      expect(readFileSync(join(dir, 'assets', 'k1.png'), 'utf8')).toBe('hello');
+      expect(readFileSync(join(dir, 'assets', 'k2.png'), 'utf8')).toBe(
+        'world!!'
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('fails fast when a referenced byte is missing from storage', async () => {
+    const storage = createStorage({ driver: memoryDriver() });
+    const dir = mkdtempSync(join(tmpdir(), 'assets-export-'));
+    try {
+      await expect(
+        exportAssets({
+          storage,
+          storageKeys: ['gone.png'],
+          assetsDir: join(dir, 'assets'),
+          caps: DEFAULT_ASSET_CAPS,
+        })
+      ).rejects.toThrow(/gone\.png/);
+      expect(existsSync(join(dir, 'assets'))).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('fails fast when an asset exceeds the per-asset cap', async () => {
+    const storage = createStorage({ driver: memoryDriver() });
+    await storage.setItemRaw('big.png', Buffer.alloc(2048));
+    const dir = mkdtempSync(join(tmpdir(), 'assets-export-'));
+    try {
+      await expect(
+        exportAssets({
+          storage,
+          storageKeys: ['big.png'],
+          assetsDir: join(dir, 'assets'),
+          caps: { perAsset: 1024, perBundle: 1024 * 1024 },
+        })
+      ).rejects.toThrow(/big\.png/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
