@@ -432,8 +432,75 @@ describe('POST /api/content-bundle/import', () => {
       body,
     });
     expect(res.status).toBe(409);
-    const j = (await res.json()) as { data?: { error?: string } };
+    const j = (await res.json()) as {
+      data?: {
+        error?: string;
+        contentTypeIdentifier?: string;
+        entryKey?: string;
+      };
+    };
     expect(j.data?.error).toBe('ENTRY_IMPORT_CONFLICT');
+    expect(j.data?.contentTypeIdentifier).toBe('Note');
+    expect(j.data?.entryKey).toBe('dup');
+  });
+
+  it('dryRun: true reports planned counts but persists nothing', async () => {
+    const key = await makeKey(['content:import']);
+    const res = await fetch('/api/content-bundle/import', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ bundle: entriesBundle('Dry'), dryRun: true }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { entriesCreated: number };
+    expect(body.entriesCreated).toBe(1);
+    expect(await prisma.contentEntry.count()).toBe(0);
+  });
+
+  it('skip onConflict leaves the existing entry and reports entriesSkipped', async () => {
+    const key = await makeKey(['content:import']);
+    const headers = {
+      Authorization: `Bearer ${key}`,
+      'Content-Type': 'application/json',
+    };
+    await fetch('/api/content-bundle/import', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ bundle: entriesBundle('Skp') }),
+    });
+    const res = await fetch('/api/content-bundle/import', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        bundle: entriesBundle('Skp'),
+        onConflict: 'skip',
+      }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      entriesCreated: number;
+      entriesSkipped: number;
+    };
+    expect(body.entriesSkipped).toBe(1);
+    expect(body.entriesCreated).toBe(0);
+  });
+
+  it('400 BUNDLE_INVALID when the bundle fails validateBundle', async () => {
+    const key = await makeKey(['content:import']);
+    const res = await fetch('/api/content-bundle/import', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ bundle: { version: 99 } }),
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { data?: { error?: string } };
+    expect(body.data?.error).toBe('BUNDLE_INVALID');
   });
 
   it('replace onConflict overwrites instead of 409', async () => {

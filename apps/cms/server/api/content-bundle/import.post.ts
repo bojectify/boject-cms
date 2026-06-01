@@ -29,6 +29,9 @@ export default defineEventHandler(async (event) => {
     });
   }
 
+  // Unknown/invalid onConflict silently falls back to 'fail' — the safe,
+  // non-destructive default. Mirrors the codebase's "ignore invalid filter
+  // value" convention rather than 400-ing on a malformed flag.
   const onConflict: OnConflict = (
     ON_CONFLICT_VALUES as readonly string[]
   ).includes(body.onConflict ?? 'fail')
