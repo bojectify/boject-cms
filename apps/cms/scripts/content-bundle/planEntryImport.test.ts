@@ -183,12 +183,23 @@ describe('planEntryImport typed errors', () => {
   });
 
   it('keeps the conflict message byte-identical to the legacy string', () => {
+    // Guard against the vacuous-pass trap: if the throw ever stopped happening,
+    // the catch block would never run and the test would pass with zero
+    // assertions. expect.assertions() enforces that all three run.
+    expect.assertions(3);
     try {
       planEntryImport(existingWithHome, bundleWithHome, identToId, 'fail');
     } catch (e) {
+      expect(e).toBeInstanceOf(EntryImportConflictError);
       expect((e as Error).message).toBe(
         'Entry "Page:home" already exists on target'
       );
+      // Structured fields the 409 endpoint will read off the caught error.
+      expect(e).toMatchObject({
+        code: 'ENTRY_IMPORT_CONFLICT',
+        contentTypeIdentifier: 'Page',
+        entryKey: 'home',
+      });
     }
   });
 });

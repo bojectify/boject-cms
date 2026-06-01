@@ -2,6 +2,9 @@ import type { ValidationError } from './types';
 
 /** Bundle failed shape validation before any DB work. Maps to HTTP 400. */
 export class BundleImportValidationError extends Error {
+  // Intentionally shares the 'BUNDLE_INVALID' code with SchemaApplyValidationError
+  // (applySchemaErrors.ts): both map to HTTP 400 but live in separate flows
+  // (entry-import vs schema-apply), so no single endpoint switch ever sees both.
   readonly code = 'BUNDLE_INVALID' as const;
   constructor(readonly errors: ValidationError[]) {
     super(
