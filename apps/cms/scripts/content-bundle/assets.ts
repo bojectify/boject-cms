@@ -81,13 +81,13 @@ export function assertAssetsComplete(
 
 /**
  * Throw if adding `size` bytes for `storageKey` would breach either cap.
- * `runningTotal` is the cumulative size of assets accumulated BEFORE this one;
- * the per-bundle check is evaluated against `runningTotal + size`.
+ * `priorTotal` is the cumulative size of assets accumulated BEFORE this one
+ * (the check is priorTotal + size > perBundle).
  */
 export function assertWithinCaps(
   storageKey: string,
   size: number,
-  runningTotal: number,
+  priorTotal: number,
   caps: AssetCaps
 ): void {
   if (size > caps.perAsset) {
@@ -96,7 +96,7 @@ export function assertWithinCaps(
         `${caps.perAsset} bytes. Raise it with --max-asset-size <MB>.`
     );
   }
-  const cumulative = runningTotal + size;
+  const cumulative = priorTotal + size;
   if (cumulative > caps.perBundle) {
     throw new Error(
       `Cumulative asset size ${cumulative} bytes exceeds the per-bundle ` +

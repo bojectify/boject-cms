@@ -166,4 +166,10 @@ describe('assertWithinCaps', () => {
       assertWithinCaps('ok.png', 100, 100, DEFAULT_ASSET_CAPS)
     ).not.toThrow();
   });
+
+  it('passes when sizes land exactly on the caps', () => {
+    const caps = { perAsset: 1000, perBundle: 1000 };
+    expect(() => assertWithinCaps('edge.png', 1000, 0, caps)).not.toThrow();
+    expect(() => assertWithinCaps('edge.png', 400, 600, caps)).not.toThrow();
+  });
 });
