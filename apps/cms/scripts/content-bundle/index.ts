@@ -9,7 +9,6 @@ import {
 import { dirname, join, resolve } from 'node:path';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../../generated/prisma/client';
-import { FIELD_TYPES } from '../../utils/fieldTypes';
 import { applySchema } from './applySchema';
 import {
   DEFAULT_ASSET_CAPS,
@@ -26,7 +25,7 @@ import {
 import { exportBundle } from './export';
 import { importBundle } from './import';
 import { validateBundle } from './validate';
-import type { BundleMode, OnConflict } from './types';
+import type { Bundle, BundleMode, OnConflict } from './types';
 import { ON_CONFLICT_VALUES } from './types';
 
 const DEFAULT_OUT_DIR = './generated';
@@ -149,6 +148,43 @@ function resolveImportSource(path: string): {
     bundlePath: join(abs, 'bundle.json'),
     assetsDir: existsSync(assetsDir) ? assetsDir : null,
   };
+}
+
+/**
+ * Restore sidecar asset bytes into storage before the DB import. Builds the
+ * IMAGE-field map from the bundle's own contentTypes unioned with the target
+ * DB's (so entries-only bundles are covered), verifies completeness, then
+ * writes bytes (skip-if-exists). Dry-run logs the present count without
+ * writing.
+ */
+async function restoreAssets(
+  prisma: import('#prisma').PrismaClient,
+  bundle: Bundle,
+  assetsDir: string,
+  opts: { dryRun: boolean }
+): Promise<void> {
+  if (opts.dryRun) {
+    console.log(
+      `Assets: ${listAssetKeys(assetsDir).length} present (not written — dry run).`
+    );
+    return;
+  }
+  const presentKeys = new Set(listAssetKeys(assetsDir));
+  const imageFields = buildImageFieldsFromContentTypes(
+    bundle.contentTypes ?? []
+  );
+  // Union the target DB's IMAGE fields so entries-only bundles (no
+  // contentTypes) are still covered.
+  for (const [identifier, fields] of await imageFieldsFromDb(prisma)) {
+    const existing = imageFields.get(identifier);
+    if (existing) for (const f of fields) existing.add(f);
+    else imageFields.set(identifier, new Set(fields));
+  }
+  const referenced = collectImageStorageKeys(bundle, imageFields);
+  assertAssetsComplete(referenced, presentKeys);
+  const storage = createBundleStorage();
+  const { written, skipped } = await importAssets({ storage, assetsDir });
+  console.log(`Assets: ${written} written, ${skipped} skipped.`);
 }
 
 // Each branch follows process.exit() with `return` so tests that mock
@@ -278,33 +314,8 @@ export async function runCli(argv: string[]): Promise<void> {
       // transactional with Prisma, so writing first means a DB rollback
       // leaves only unreferenced blobs (harmless, idempotent) rather than
       // entries pointing at missing bytes.
-      if (assetsDir && !dryRun) {
-        const presentKeys = new Set(listAssetKeys(assetsDir));
-        // Completeness check: every referenced IMAGE key must be present.
-        // Start from the bundle's own contentTypes...
-        const imageFields = buildImageFieldsFromContentTypes(
-          bundle.contentTypes ?? []
-        );
-        // ...then merge target DB image fields so entries-only bundles
-        // (no contentTypes in the bundle) are still covered.
-        for (const ct of await prisma.contentType.findMany({
-          include: { fields: true },
-        })) {
-          const set = imageFields.get(ct.identifier) ?? new Set<string>();
-          for (const f of ct.fields)
-            if (f.type === FIELD_TYPES.IMAGE) set.add(f.identifier);
-          imageFields.set(ct.identifier, set);
-        }
-        const referenced = collectImageStorageKeys(bundle, imageFields);
-        assertAssetsComplete(referenced, presentKeys);
-
-        const storage = createBundleStorage();
-        const { written, skipped } = await importAssets({ storage, assetsDir });
-        console.log(`Assets: ${written} written, ${skipped} skipped.`);
-      } else if (assetsDir && dryRun) {
-        console.log(
-          `Assets: ${listAssetKeys(assetsDir).length} present (not written — dry run).`
-        );
+      if (assetsDir) {
+        await restoreAssets(prisma, bundle, assetsDir, { dryRun });
       }
 
       const author = flagValue(args, '--author');
