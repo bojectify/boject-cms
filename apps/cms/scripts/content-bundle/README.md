@@ -48,6 +48,29 @@ pnpm content:import ./generated/content-bundle-entries.json --entries --author a
 pnpm content:validate ./starters/sport.boject.json
 ```
 
+## Image bytes (sidecar layout)
+
+`content:export --out ./my-bundle/` (a **directory** target) writes:
+
+    my-bundle/
+    ├── bundle.json
+    └── assets/
+        └── <storageKey>      # original image bytes
+
+Import the directory with `content:import ./my-bundle/` to restore entries
+**and** image bytes. A single-file `.json` target (or no `--out`) writes
+references only — image bytes are not bundled (status quo).
+
+- `--no-assets` — references-only even with a directory target (use when source
+  and target share one storage bucket, so the storageKey already resolves).
+- `--max-asset-size <MB>` / `--max-bundle-size <MB>` — size caps (default
+  25 MB / 1 GB). Export fails fast if either is exceeded, or if a referenced
+  storageKey has no bytes in storage.
+- Import is idempotent: bytes already present in the target are skipped.
+- `content:validate <dir>` also checks every referenced image storageKey has a
+  file in `assets/` (offline; only for bundles that carry contentTypes).
+- Originals only — transforms regenerate on demand.
+
 ## Related
 
 - `scripts/content-bundle/fixtures/` — test-only bundles used by unit tests in this module.
