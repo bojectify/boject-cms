@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../../generated/prisma/client';
@@ -1010,6 +1011,260 @@ describe('importBundle', () => {
       });
       expect(after.entryTitle).toBe('Original');
       expect(after.updatedAt.getTime()).toBe(seededUpdatedAt.getTime());
+    });
+  });
+
+  describe('non-portable dangling reference guard', () => {
+    // Build NON-PORTABLE bundles (portable: false) with a content type that has
+    // an ENTRY_TITLE field and a self-targeting RELATION field "rel". Entries
+    // carry real `id` UUIDs; `data.rel` is { contentTypeId: <typeId>, entryId }.
+
+    function selfRelBundle(
+      typeId: string,
+      typeIdentifier: string,
+      entries: Bundle['entries']
+    ): Bundle {
+      return {
+        version: BUNDLE_VERSION,
+        exportedAt: '2026-05-30T00:00:00.000Z',
+        portable: false,
+        contentTypes: [
+          {
+            id: typeId,
+            identifier: typeIdentifier,
+            name: typeIdentifier,
+            description: null,
+            fields: [
+              {
+                id: randomUUID(),
+                identifier: 'title',
+                name: 'Title',
+                type: FIELD_TYPES.ENTRY_TITLE,
+                required: true,
+                order: 0,
+                options: null,
+              },
+              {
+                id: randomUUID(),
+                identifier: 'rel',
+                name: 'Rel',
+                type: FIELD_TYPES.RELATION,
+                required: false,
+                order: 1,
+                options: { targetContentTypeIds: [typeId] },
+              },
+            ],
+          },
+        ],
+        entries,
+      };
+    }
+
+    it('throws and persists nothing when a RELATION points at a missing entry', async () => {
+      const typeId = randomUUID();
+      const entryId = randomUUID();
+      const missingId = randomUUID();
+      const danglingBundle = selfRelBundle(typeId, 'DanglingRelType', [
+        {
+          id: entryId,
+          contentTypeId: typeId,
+          contentTypeIdentifier: 'DanglingRelType',
+          entryTitle: 'Source',
+          entryKey: 'source',
+          slug: 'source',
+          versions: [
+            {
+              status: CONTENT_STATUSES.PUBLISHED,
+              publishedAt: '2026-05-30T00:00:00.000Z',
+              data: {
+                title: 'Source',
+                rel: { contentTypeId: typeId, entryId: missingId },
+              },
+            },
+          ],
+        },
+      ]);
+
+      const before = await prisma.contentEntry.count();
+      await expect(
+        importBundle(prisma, danglingBundle, { mode: 'all' })
+      ).rejects.toThrow(/references missing entry/);
+      expect(await prisma.contentEntry.count()).toBe(before); // rolled back
+    });
+
+    it('resolves a forward reference to another entry in the same bundle', async () => {
+      const typeId = randomUUID();
+      const idA = randomUUID();
+      const idB = randomUUID();
+      const forwardRefBundle = selfRelBundle(typeId, 'ForwardRefType', [
+        {
+          id: idA,
+          contentTypeId: typeId,
+          contentTypeIdentifier: 'ForwardRefType',
+          entryTitle: 'A',
+          entryKey: 'a',
+          slug: 'a',
+          versions: [
+            {
+              status: CONTENT_STATUSES.PUBLISHED,
+              publishedAt: '2026-05-30T00:00:00.000Z',
+              data: {
+                title: 'A',
+                rel: { contentTypeId: typeId, entryId: idB },
+              },
+            },
+          ],
+        },
+        {
+          id: idB,
+          contentTypeId: typeId,
+          contentTypeIdentifier: 'ForwardRefType',
+          entryTitle: 'B',
+          entryKey: 'b',
+          slug: 'b',
+          versions: [
+            {
+              status: CONTENT_STATUSES.PUBLISHED,
+              publishedAt: '2026-05-30T00:00:00.000Z',
+              data: { title: 'B' },
+            },
+          ],
+        },
+      ]);
+
+      await expect(
+        importBundle(prisma, forwardRefBundle, { mode: 'all' })
+      ).resolves.toBeDefined();
+    });
+
+    it('resolves a reference to a pre-existing target entry', async () => {
+      const typeId = randomUUID();
+      const existingId = randomUUID();
+
+      // Seed the content type + target entry B first via a schema+entries import.
+      await importBundle(
+        prisma,
+        selfRelBundle(typeId, 'PreExistingType', [
+          {
+            id: existingId,
+            contentTypeId: typeId,
+            contentTypeIdentifier: 'PreExistingType',
+            entryTitle: 'Existing',
+            entryKey: 'existing',
+            slug: 'existing',
+            versions: [
+              {
+                status: CONTENT_STATUSES.PUBLISHED,
+                publishedAt: '2026-05-30T00:00:00.000Z',
+                data: { title: 'Existing' },
+              },
+            ],
+          },
+        ]),
+        { mode: 'all' }
+      );
+
+      // Now import a new entry whose rel points at the pre-existing entry.
+      const refToExistingBundle: Bundle = {
+        version: BUNDLE_VERSION,
+        exportedAt: '2026-05-30T00:00:00.000Z',
+        portable: false,
+        entries: [
+          {
+            id: randomUUID(),
+            contentTypeId: typeId,
+            contentTypeIdentifier: 'PreExistingType',
+            entryTitle: 'Referrer',
+            entryKey: 'referrer',
+            slug: 'referrer',
+            versions: [
+              {
+                status: CONTENT_STATUSES.PUBLISHED,
+                publishedAt: '2026-05-30T00:00:00.000Z',
+                data: {
+                  title: 'Referrer',
+                  rel: { contentTypeId: typeId, entryId: existingId },
+                },
+              },
+            ],
+          },
+        ],
+      };
+
+      await expect(
+        importBundle(prisma, refToExistingBundle, { mode: 'entries' })
+      ).resolves.toBeDefined();
+    });
+
+    it('throws on a dangling RICHTEXT cmsEmbed reference', async () => {
+      const typeId = randomUUID();
+      const entryId = randomUUID();
+      const missingId = randomUUID();
+      const danglingRichtextBundle: Bundle = {
+        version: BUNDLE_VERSION,
+        exportedAt: '2026-05-30T00:00:00.000Z',
+        portable: false,
+        contentTypes: [
+          {
+            id: typeId,
+            identifier: 'RichtextDangleType',
+            name: 'RichtextDangleType',
+            description: null,
+            fields: [
+              {
+                id: randomUUID(),
+                identifier: 'title',
+                name: 'Title',
+                type: FIELD_TYPES.ENTRY_TITLE,
+                required: true,
+                order: 0,
+                options: null,
+              },
+              {
+                id: randomUUID(),
+                identifier: 'body',
+                name: 'Body',
+                type: FIELD_TYPES.RICHTEXT,
+                required: false,
+                order: 1,
+                options: { targetContentTypeIds: [typeId] },
+              },
+            ],
+          },
+        ],
+        entries: [
+          {
+            id: entryId,
+            contentTypeId: typeId,
+            contentTypeIdentifier: 'RichtextDangleType',
+            entryTitle: 'Source',
+            entryKey: 'source',
+            slug: 'source',
+            versions: [
+              {
+                status: CONTENT_STATUSES.PUBLISHED,
+                publishedAt: '2026-05-30T00:00:00.000Z',
+                data: {
+                  title: 'Source',
+                  body: {
+                    type: 'doc',
+                    content: [
+                      {
+                        type: 'cmsEmbed',
+                        attrs: { contentTypeId: typeId, entryId: missingId },
+                      },
+                    ],
+                  },
+                },
+              },
+            ],
+          },
+        ],
+      };
+
+      await expect(
+        importBundle(prisma, danglingRichtextBundle, { mode: 'all' })
+      ).rejects.toThrow(/references missing entry/);
     });
   });
 });
