@@ -1,4 +1,3 @@
-import type { FieldType } from '#prisma';
 import { FIELD_TYPES } from '../../utils/fieldTypes';
 import type { Bundle, BundleContentType } from './types';
 
@@ -15,7 +14,7 @@ export function buildImageFieldsFromContentTypes(
   for (const ct of contentTypes) {
     const set = new Set<string>();
     for (const f of ct.fields) {
-      if ((f.type as FieldType) === FIELD_TYPES.IMAGE) set.add(f.identifier);
+      if (f.type === FIELD_TYPES.IMAGE) set.add(f.identifier);
     }
     map.set(ct.identifier, set);
   }
@@ -38,14 +37,10 @@ export function collectImageStorageKeys(
     for (const version of entry.versions) {
       for (const fieldId of imageFields) {
         const value = version.data[fieldId];
-        if (
-          value &&
-          typeof value === 'object' &&
-          !Array.isArray(value) &&
-          typeof (value as { storageKey?: unknown }).storageKey === 'string' &&
-          (value as { storageKey: string }).storageKey.length > 0
-        ) {
-          keys.add((value as { storageKey: string }).storageKey);
+        const storageKey = (value as { storageKey?: unknown } | null)
+          ?.storageKey;
+        if (typeof storageKey === 'string' && storageKey.length > 0) {
+          keys.add(storageKey);
         }
       }
     }
