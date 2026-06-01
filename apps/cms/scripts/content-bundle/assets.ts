@@ -176,6 +176,12 @@ export async function exportAssets(
   let dirReady = false;
 
   for (const key of storageKeys) {
+    if (key.includes('/') || key.includes('\\') || key.includes('..')) {
+      throw new Error(
+        `Refusing to export asset with an unsafe storage key "${key}" ` +
+          `(contains a path separator or "..").`
+      );
+    }
     const raw = await storage.getItemRaw<Buffer | Uint8Array | ArrayBuffer>(
       key
     );

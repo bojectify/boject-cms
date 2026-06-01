@@ -250,6 +250,24 @@ describe('exportAssets', () => {
     }
   });
 
+  it('rejects an unsafe storage key with a path separator', async () => {
+    const storage = createStorage({ driver: memoryDriver() });
+    await storage.setItemRaw('ok.png', Buffer.from('x'));
+    const dir = mkdtempSync(join(tmpdir(), 'assets-export-'));
+    try {
+      await expect(
+        exportAssets({
+          storage,
+          storageKeys: ['../escape.png'],
+          assetsDir: join(dir, 'assets'),
+          caps: DEFAULT_ASSET_CAPS,
+        })
+      ).rejects.toThrow(/unsafe storage key/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('normalizes non-Buffer getItemRaw results (e.g. s3 ArrayBuffer)', async () => {
     const bytes = new Uint8Array([1, 2, 3, 4]);
     // Stub storage whose getItemRaw returns an ArrayBuffer, like the s3 driver.
