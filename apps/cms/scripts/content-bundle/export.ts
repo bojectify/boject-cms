@@ -12,13 +12,17 @@ import { encodeDataRefs, type EntryKeyMap } from './portable';
 export interface ExportOptions {
   mode: BundleMode;
   portable: boolean;
+  /** When true, keep only PUBLISHED versions and drop entries left with none. */
+  publishedOnly?: boolean;
+  /** Restrict exported entries to this ContentType identifier. */
+  contentType?: string;
 }
 
 export async function exportBundle(
   prisma: PrismaClient,
   options: ExportOptions
 ): Promise<Bundle> {
-  const { mode, portable } = options;
+  const { mode, portable, publishedOnly = false, contentType } = options;
 
   const wantsSchema = mode === 'schema' || mode === 'all';
   const wantsEntries = mode === 'entries' || mode === 'all';
@@ -111,33 +115,47 @@ export async function exportBundle(
       fieldTypesByContentTypeId.set(ct.id, map);
     }
 
-    bundle.entries = allEntries.map((entry) => {
-      const identifier =
-        typeIdToIdentifier.get(entry.contentTypeId) ?? entry.contentTypeId;
-      const fieldTypes =
-        fieldTypesByContentTypeId.get(entry.contentTypeId) ?? {};
+    const selectedEntries = contentType
+      ? allEntries.filter(
+          (entry) => typeIdToIdentifier.get(entry.contentTypeId) === contentType
+        )
+      : allEntries;
 
-      return {
-        id: portable ? null : entry.id,
-        contentTypeId: portable ? null : entry.contentTypeId,
-        contentTypeIdentifier: identifier,
-        entryTitle: entry.entryTitle,
-        entryKey: entry.entryKey,
-        slug: entry.slug,
-        versions: entry.versions.map((v) => ({
-          status: v.status,
-          data: portable
-            ? encodeDataRefs(
-                v.data as Record<string, unknown>,
-                fieldTypes as Record<string, import('#prisma').FieldType>,
-                typeIdToIdentifier,
-                entryKeysByType
-              )
-            : (v.data as Record<string, unknown>),
-          publishedAt: v.publishedAt ? v.publishedAt.toISOString() : null,
-        })),
-      } satisfies BundleEntry;
-    });
+    bundle.entries = selectedEntries
+      .map((entry) => {
+        const identifier =
+          typeIdToIdentifier.get(entry.contentTypeId) ?? entry.contentTypeId;
+        const fieldTypes =
+          fieldTypesByContentTypeId.get(entry.contentTypeId) ?? {};
+
+        const versionsSource = publishedOnly
+          ? entry.versions.filter((v) => v.status === 'PUBLISHED')
+          : entry.versions;
+
+        return {
+          id: portable ? null : entry.id,
+          contentTypeId: portable ? null : entry.contentTypeId,
+          contentTypeIdentifier: identifier,
+          entryTitle: entry.entryTitle,
+          entryKey: entry.entryKey,
+          slug: entry.slug,
+          versions: versionsSource.map((v) => ({
+            status: v.status,
+            data: portable
+              ? encodeDataRefs(
+                  v.data as Record<string, unknown>,
+                  fieldTypes as Record<string, import('#prisma').FieldType>,
+                  typeIdToIdentifier,
+                  entryKeysByType
+                )
+              : (v.data as Record<string, unknown>),
+            publishedAt: v.publishedAt ? v.publishedAt.toISOString() : null,
+          })),
+        } satisfies BundleEntry;
+      })
+      // In publishedOnly mode an entry with only a draft has zero versions —
+      // drop it so the bundle never carries an entry with an empty history.
+      .filter((e) => e.versions.length > 0);
   }
 
   return bundle;

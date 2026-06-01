@@ -14,6 +14,9 @@ import { runPerfReport } from './commands/perf/report.js';
 import { runPerfReset } from './commands/perf/reset.js';
 import { runPerfSeed } from './commands/perf/seed.js';
 import { runBundleMigrate } from './commands/bundle/migrate.js';
+import { runEntriesExport } from './commands/entries/export.js';
+import { runEntriesImport } from './commands/entries/import.js';
+import { runEntriesValidate } from './commands/entries/validate.js';
 import { spawn } from 'node:child_process';
 import { CLI_VERSION } from './version.js';
 
@@ -31,6 +34,9 @@ Commands:
   apikey revoke      Revoke an API key by prefix.
   perf <command>     Run perf scenarios / sweep / report / check / seed / reset.
   bundle migrate     Migrate a bundle file in place to the current format version.
+  entries export     Export entries from a CMS to a bundle file.
+  entries import     Push a local entries bundle to a CMS.
+  entries validate   Validate an entries bundle (no network).
 
 Run \`boject <command> --help\` for command-specific flags.
 `;
@@ -220,7 +226,7 @@ const APIKEY_CREATE_USAGE = `Usage: boject apikey create --name <n> --scopes <cs
 Mints a new API key. Requires BOJECT_API_KEY in env (must have apikey:write scope).
 The raw key is printed once; it cannot be retrieved later.
 
-Recognised scopes: content:read, content:write, schema:read, schema:write, apikey:read, apikey:write.
+Recognised scopes: content:read, content:write, content:export, content:import, schema:read, schema:write, apikey:read, apikey:write.
 
 Note: minting a key with apikey:write requires session auth (CMS UI). API-key callers
 cannot self-replicate.
@@ -252,6 +258,52 @@ CLI's supported version, and writes the result back.
 
 Flags:
   --dry-run    Print the planned transition without writing the file.
+`;
+
+const ENTRIES_USAGE = `Usage: boject entries <command> [flags]
+
+Commands:
+  export             Fetch entries from a CMS and write a bundle to disk.
+  import <path>      Push a local entries bundle to a CMS.
+  validate <path>    Validate an entries bundle's shape (no network).
+
+Run \`boject entries <command> --help\` for command-specific flags.
+`;
+
+const ENTRIES_EXPORT_USAGE = `Usage: boject entries export [--out <path>] [--url <url>]
+                            [--include-drafts] [--content-type <identifier>]
+                            [--non-portable]
+
+GETs <cms.url>/api/content-bundle/export and writes the bundle to --out
+(default ./content-entries.boject.json). Requires BOJECT_API_KEY (content:export).
+
+Defaults to PUBLISHED-only. Image bytes are NOT included — clone your storage
+bucket out-of-band (e.g. aws s3 sync) so storageKey references resolve on the
+target.
+
+Flags:
+  --include-drafts          Also export DRAFT/CHANGED versions
+                            (default: published-only).
+  --content-type <id>       Restrict to one content type identifier.
+  --non-portable            Keep real UUIDs (default is portable).
+`;
+
+const ENTRIES_IMPORT_USAGE = `Usage: boject entries import <path> [--url <url>] [--author <s>]
+                            [--on-conflict <fail|skip|replace>] [--dry-run]
+
+POSTs the bundle at <path> to <cms.url>/api/content-bundle/import.
+Requires BOJECT_API_KEY (content:import). Imports ENTRIES only — apply schema
+first with \`boject schema apply\`.
+
+Flags:
+  --author <s>                     createdBy/updatedBy stamp on imported entries.
+  --on-conflict <fail|skip|replace>  Entry-collision behaviour (default fail).
+  --dry-run                        Report planned counts without writing.
+`;
+
+const ENTRIES_VALIDATE_USAGE = `Usage: boject entries validate <path>
+
+Validates an entries bundle's shape. No network.
 `;
 
 const nodeRunner: CommandRunner = {
@@ -811,6 +863,114 @@ async function dispatchBundle(args: string[]): Promise<number> {
   }
 }
 
+async function dispatchEntries(args: string[]): Promise<number> {
+  const subcommand = args[0];
+  const rest = args.slice(1);
+  if (!subcommand || subcommand === '--help' || subcommand === '-h') {
+    process.stdout.write(ENTRIES_USAGE);
+    return subcommand ? 0 : 1;
+  }
+
+  const apiKey = process.env.BOJECT_API_KEY;
+
+  switch (subcommand) {
+    case 'export': {
+      if (rest.includes('--help') || rest.includes('-h')) {
+        process.stdout.write(ENTRIES_EXPORT_USAGE);
+        return 0;
+      }
+      const { values } = parseArgs({
+        args: rest,
+        allowPositionals: false,
+        options: {
+          out: { type: 'string' },
+          url: { type: 'string' },
+          'include-drafts': { type: 'boolean', default: false },
+          'content-type': { type: 'string' },
+          'non-portable': { type: 'boolean', default: false },
+        },
+      });
+      const r = await runEntriesExport({
+        cwd: process.cwd(),
+        apiKey,
+        flags: {
+          out: values.out,
+          url: values.url,
+          includeDrafts: values['include-drafts'] === true,
+          contentType: values['content-type'],
+          portable: values['non-portable'] !== true,
+        },
+        stdout,
+        stderr,
+      });
+      return r.exitCode;
+    }
+    case 'import': {
+      if (rest.includes('--help') || rest.includes('-h')) {
+        process.stdout.write(ENTRIES_IMPORT_USAGE);
+        return 0;
+      }
+      const { values, positionals } = parseArgs({
+        args: rest,
+        allowPositionals: true,
+        options: {
+          url: { type: 'string' },
+          author: { type: 'string' },
+          'on-conflict': { type: 'string' },
+          'dry-run': { type: 'boolean', default: false },
+        },
+      });
+      const onConflict = values['on-conflict'];
+      if (
+        onConflict !== undefined &&
+        onConflict !== 'fail' &&
+        onConflict !== 'skip' &&
+        onConflict !== 'replace'
+      ) {
+        process.stderr.write(
+          `Error: --on-conflict must be fail|skip|replace, got "${onConflict}".\n`
+        );
+        return 1;
+      }
+      const r = await runEntriesImport({
+        cwd: process.cwd(),
+        apiKey,
+        flags: {
+          path: positionals[0],
+          url: values.url,
+          author: values.author,
+          onConflict: onConflict as 'fail' | 'skip' | 'replace' | undefined,
+          dryRun: values['dry-run'] === true,
+        },
+        stdout,
+        stderr,
+      });
+      return r.exitCode;
+    }
+    case 'validate': {
+      if (rest.includes('--help') || rest.includes('-h')) {
+        process.stdout.write(ENTRIES_VALIDATE_USAGE);
+        return 0;
+      }
+      const { positionals } = parseArgs({
+        args: rest,
+        allowPositionals: true,
+        options: {},
+      });
+      const r = await runEntriesValidate({
+        path: positionals[0],
+        stdout,
+        stderr,
+      });
+      return r.exitCode;
+    }
+    default:
+      process.stderr.write(`Unknown entries subcommand: ${subcommand}\n`);
+      process.stdout.write(ENTRIES_USAGE);
+      return 1;
+  }
+}
+
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
 
@@ -842,6 +1002,11 @@ async function main(): Promise<void> {
 
   if (command === 'bundle') {
     const code = await dispatchBundle(rest);
+    process.exit(code);
+  }
+
+  if (command === 'entries') {
+    const code = await dispatchEntries(rest);
     process.exit(code);
   }
 

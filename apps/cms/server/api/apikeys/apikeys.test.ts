@@ -151,6 +151,8 @@ describe('POST /api/apikeys', () => {
       expect(body.data?.recognised).toEqual([
         'content:read',
         'content:write',
+        'content:export',
+        'content:import',
         'schema:read',
         'schema:write',
         'apikey:read',

@@ -4,6 +4,7 @@ import type {
   ApplySchemaResultLike,
   BlockerLike,
   Bundle,
+  EntriesImportResultLike,
 } from './types.js';
 
 export class HttpError extends Error {
@@ -99,7 +100,53 @@ export function applySchemaRemote(
   );
 }
 
-export type { Bundle, ApplySchemaResultLike, BlockerLike };
+export interface EntriesExportQuery {
+  portable?: boolean;
+  includeDrafts?: boolean;
+  contentType?: string;
+}
+
+export function getEntriesBundle(
+  ctx: ApiContext,
+  query: EntriesExportQuery = {}
+): Promise<Bundle> {
+  const params = new URLSearchParams();
+  if (query.portable === false) params.set('portable', 'false');
+  if (query.includeDrafts) params.set('includeDrafts', 'true');
+  if (query.contentType) params.set('contentType', query.contentType);
+  const qs = params.toString();
+  return callJson<Bundle>(
+    ctx,
+    'GET',
+    `/api/content-bundle/export${qs ? `?${qs}` : ''}`
+  );
+}
+
+export interface EntriesImportArgs {
+  bundle: Bundle;
+  author?: string;
+  onConflict?: 'fail' | 'skip' | 'replace';
+  dryRun?: boolean;
+}
+
+export function importEntriesRemote(
+  ctx: ApiContext,
+  args: EntriesImportArgs
+): Promise<EntriesImportResultLike> {
+  return callJson<EntriesImportResultLike>(
+    ctx,
+    'POST',
+    '/api/content-bundle/import',
+    args
+  );
+}
+
+export type {
+  Bundle,
+  ApplySchemaResultLike,
+  BlockerLike,
+  EntriesImportResultLike,
+};
 
 export function createApiKey(
   ctx: ApiContext,

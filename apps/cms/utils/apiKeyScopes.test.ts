@@ -11,6 +11,8 @@ describe('apiKeyScopes', () => {
     expect(API_KEY_SCOPES).toEqual([
       'content:read',
       'content:write',
+      'content:export',
+      'content:import',
       'schema:read',
       'schema:write',
       'apikey:read',
