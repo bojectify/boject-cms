@@ -33,7 +33,9 @@ const DEFAULT_OUT_DIR = './generated';
 const HELP = `content-bundle — dynamic content types & entries as JSON bundles
 
 Usage:
-  pnpm content:export   [--schema|--entries|--all] [--portable] [--out <path>]
+  pnpm content:export   [--schema|--entries|--all] [--portable]
+                        [--out <path>] [--no-assets]
+                        [--max-asset-size <MB>] [--max-bundle-size <MB>]
   pnpm content:import   <path> [--schema|--entries|--all] [--author <s>]
                               [--on-conflict <fail|skip|replace>] [--dry-run]
                               [--apply [--allow-destructive]]
@@ -51,6 +53,10 @@ Flags:
   --all          Both content types and entries
   --portable     Rewrite UUID references to identifier/slug keys (export only)
   --out <path>   Write export to a custom path
+  --no-assets    With a directory --out, write bundle.json only (no asset
+                 bytes). Use when source and target share one storage bucket.
+  --max-asset-size <MB>   Per-asset size cap (default 25).
+  --max-bundle-size <MB>  Per-bundle total asset cap (default 1024).
   --author <s>   Attribute imported entries to this user (import only)
   --apply        Apply schema diff idempotently via applySchema (import --schema only)
   --allow-destructive
@@ -66,7 +72,9 @@ Flags:
 Examples:
   pnpm content:export --all --portable
   pnpm content:export --entries --out ./generated/entries.json
+  pnpm content:export --all --out ./my-bundle/        # bundle.json + assets/
   pnpm content:import ./generated/content-bundle-all.json --all
+  pnpm content:import ./my-bundle/                    # restores entries + bytes
   pnpm content:validate ./starters/base.boject.json
 `;
 
@@ -344,19 +352,48 @@ export async function runCli(argv: string[]): Promise<void> {
       }
       const path = args[0];
       if (!path) throw new Error('Usage: content-bundle validate <path>');
-      const raw = readFileSync(resolve(path), 'utf8');
+      const { bundlePath, assetsDir } = resolveImportSource(path);
+      const raw = readFileSync(bundlePath, 'utf8');
       const bundle = JSON.parse(raw);
       const result = validateBundle(bundle);
-      if (result.ok) {
-        console.log('Bundle is valid');
-        process.exit(0);
+      if (!result.ok) {
+        console.error('Bundle failed validation:');
+        for (const err of result.errors) {
+          console.error(`  ${err.path}: ${err.message}`);
+        }
+        process.exit(1);
         return;
       }
-      console.error('Bundle failed validation:');
-      for (const err of result.errors) {
-        console.error(`  ${err.path}: ${err.message}`);
+
+      // Offline asset completeness — only possible when the bundle carries
+      // contentTypes (so we know which fields are IMAGE). Entries-only bundles
+      // can't be checked without a DB; report and skip.
+      if (assetsDir) {
+        if (bundle.contentTypes) {
+          const imageFields = buildImageFieldsFromContentTypes(
+            bundle.contentTypes
+          );
+          const referenced = collectImageStorageKeys(bundle, imageFields);
+          const present = new Set(listAssetKeys(assetsDir));
+          try {
+            assertAssetsComplete(referenced, present);
+            console.log(
+              `Bundle is valid (${referenced.length} asset(s) present).`
+            );
+          } catch (e) {
+            console.error(e instanceof Error ? e.message : String(e));
+            process.exit(1);
+            return;
+          }
+        } else {
+          console.log(
+            'Bundle is valid (entries-only: asset completeness not checked offline).'
+          );
+        }
+      } else {
+        console.log('Bundle is valid');
       }
-      process.exit(1);
+      process.exit(0);
       return;
     }
 
