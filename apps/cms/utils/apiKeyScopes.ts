@@ -8,6 +8,8 @@
 export const API_KEY_SCOPES = [
   'content:read',
   'content:write',
+  'content:export',
+  'content:import',
   'schema:read',
   'schema:write',
   'apikey:read',
@@ -26,6 +28,10 @@ export const API_KEY_SCOPE_DESCRIPTIONS: Record<ApiKeyScope, string> = {
   'content:read': 'Read content via GraphQL.',
   'content:write':
     'Create, update, delete, and transition content entries via /api/content-entries.',
+  'content:export':
+    'Export content entries as a portable bundle (/api/content-bundle/export); includes drafts when --include-drafts is passed.',
+  'content:import':
+    'Import content entry bundles (/api/content-bundle/import).',
   'schema:read': 'Export the schema bundle.',
   'schema:write': 'Apply schema changes.',
   'apikey:read': 'List API keys.',

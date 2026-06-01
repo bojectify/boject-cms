@@ -220,7 +220,7 @@ const APIKEY_CREATE_USAGE = `Usage: boject apikey create --name <n> --scopes <cs
 Mints a new API key. Requires BOJECT_API_KEY in env (must have apikey:write scope).
 The raw key is printed once; it cannot be retrieved later.
 
-Recognised scopes: content:read, content:write, schema:read, schema:write, apikey:read, apikey:write.
+Recognised scopes: content:read, content:write, content:export, content:import, schema:read, schema:write, apikey:read, apikey:write.
 
 Note: minting a key with apikey:write requires session auth (CMS UI). API-key callers
 cannot self-replicate.
