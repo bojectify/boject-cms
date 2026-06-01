@@ -1,4 +1,5 @@
 import { fileURLToPath } from 'node:url';
+import { randomUUID } from 'node:crypto';
 import { setup, fetch } from '@nuxt/test-utils/e2e';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { prisma } from '../../utils/prisma';
@@ -43,6 +44,39 @@ async function seedType(identifier: string): Promise<string> {
     },
   });
   return ct.id;
+}
+
+async function seedLinkerType(): Promise<{ typeId: string }> {
+  const ct = await prisma.contentType.create({
+    data: {
+      identifier: 'Linker',
+      name: 'Linker',
+      fields: {
+        create: [
+          {
+            identifier: 'title',
+            name: 'Title',
+            type: FIELD_TYPES.ENTRY_TITLE,
+            required: true,
+            order: 0,
+          },
+          {
+            identifier: 'rel',
+            name: 'Rel',
+            type: FIELD_TYPES.RELATION,
+            required: false,
+            order: 1,
+            options: { targetContentTypeIds: [] },
+          },
+        ],
+      },
+    },
+  });
+  await prisma.contentTypeField.updateMany({
+    where: { contentTypeId: ct.id, identifier: 'rel' },
+    data: { options: { targetContentTypeIds: [ct.id] } },
+  });
+  return { typeId: ct.id };
 }
 
 describe('GET /api/content-bundle/export', () => {
@@ -525,5 +559,47 @@ describe('POST /api/content-bundle/import', () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { entriesUpdated: number };
     expect(body.entriesUpdated).toBe(1);
+  });
+
+  it('400 ENTRY_IMPORT_REFERENCE_INVALID on a dangling non-portable RELATION', async () => {
+    const { typeId } = await seedLinkerType();
+    const key = await makeKey(['content:import']);
+    const missing = randomUUID();
+    const bundle = {
+      version: 2,
+      exportedAt: '2026-06-01T00:00:00.000Z',
+      portable: false,
+      entries: [
+        {
+          id: randomUUID(),
+          contentTypeId: typeId,
+          contentTypeIdentifier: 'Linker',
+          entryTitle: 'A',
+          entryKey: 'a',
+          slug: null,
+          versions: [
+            {
+              status: 'PUBLISHED',
+              data: {
+                title: 'A',
+                rel: { contentTypeId: typeId, entryId: missing },
+              },
+              publishedAt: null,
+            },
+          ],
+        },
+      ],
+    };
+    const res = await fetch('/api/content-bundle/import', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ bundle }),
+    });
+    expect(res.status).toBe(400);
+    const j = (await res.json()) as { data?: { error?: string } };
+    expect(j.data?.error).toBe('ENTRY_IMPORT_REFERENCE_INVALID');
   });
 });
