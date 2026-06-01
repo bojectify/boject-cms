@@ -380,6 +380,128 @@ describe('exportBundle filter options', () => {
     ).toBe(true);
   });
 
+  it('publishedOnly + portable strips UUIDs, keeps PUBLISHED, and encodes relation refs', async () => {
+    const category = await prisma.contentType.create({
+      data: {
+        identifier: 'Category',
+        name: 'Category',
+        fields: {
+          create: {
+            identifier: 'name',
+            name: 'Name',
+            type: FIELD_TYPES.ENTRY_TITLE,
+            required: true,
+            order: 0,
+          },
+        },
+      },
+    });
+    const categoryEntry = await prisma.contentEntry.create({
+      data: {
+        contentTypeId: category.id,
+        entryTitle: 'News',
+        entryKey: 'news',
+        slug: 'news',
+        versions: {
+          create: {
+            data: { name: 'News' },
+            entryTitle: 'News',
+            status: CONTENT_STATUSES.PUBLISHED,
+            publishedAt: new Date('2026-04-01T00:00:00.000Z'),
+          },
+        },
+      },
+    });
+    const blog = await prisma.contentType.create({
+      data: {
+        identifier: 'BlogPost',
+        name: 'Blog Post',
+        fields: {
+          create: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: FIELD_TYPES.ENTRY_TITLE,
+              required: true,
+              order: 0,
+            },
+            {
+              identifier: 'category',
+              name: 'Category',
+              type: FIELD_TYPES.RELATION,
+              required: false,
+              order: 1,
+              options: { targetContentTypeIds: [category.id] },
+            },
+          ],
+        },
+      },
+    });
+    // Entry with a PUBLISHED version (carrying the relation) plus a CHANGED draft.
+    await prisma.contentEntry.create({
+      data: {
+        contentTypeId: blog.id,
+        entryTitle: 'Hello',
+        entryKey: 'hello',
+        slug: 'hello',
+        versions: {
+          create: [
+            {
+              data: {
+                title: 'Hello',
+                category: {
+                  contentTypeId: category.id,
+                  entryId: categoryEntry.id,
+                },
+              },
+              entryTitle: 'Hello',
+              status: CONTENT_STATUSES.PUBLISHED,
+              publishedAt: new Date('2026-04-02T00:00:00.000Z'),
+            },
+            {
+              data: {
+                title: 'Hello (edited)',
+                category: {
+                  contentTypeId: category.id,
+                  entryId: categoryEntry.id,
+                },
+              },
+              entryTitle: 'Hello (edited)',
+              status: CONTENT_STATUSES.CHANGED,
+            },
+          ],
+        },
+      },
+    });
+
+    const bundle = await exportBundle(prisma, {
+      mode: 'entries',
+      portable: true,
+      publishedOnly: true,
+    });
+
+    const entries = bundle.entries ?? [];
+    // Portable mode strips UUIDs off every surviving entry.
+    expect(entries.every((e) => e.id === null)).toBe(true);
+    expect(entries.every((e) => e.contentTypeId === null)).toBe(true);
+    // Only PUBLISHED versions survive.
+    expect(
+      entries.flatMap((e) => e.versions).every((v) => v.status === 'PUBLISHED')
+    ).toBe(true);
+
+    // The relation ref on the surviving PUBLISHED version was encoded to the
+    // portable identifier+entryKey shape rather than raw UUIDs — and resolved
+    // correctly even though the unrelated draft version was filtered out.
+    const blogEntry = entries.find(
+      (e) => e.contentTypeIdentifier === 'BlogPost'
+    )!;
+    expect(blogEntry.versions).toHaveLength(1);
+    expect(blogEntry.versions[0]!.data.category).toEqual({
+      contentTypeIdentifier: 'Category',
+      entryKey: 'news',
+    });
+  });
+
   it('unknown contentType identifier yields zero entries (no throw)', async () => {
     await prisma.contentType.create({
       data: {
