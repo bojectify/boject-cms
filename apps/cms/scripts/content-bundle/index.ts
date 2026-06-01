@@ -1,15 +1,25 @@
 import 'dotenv/config';
-import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../../generated/prisma/client';
+import { FIELD_TYPES } from '../../utils/fieldTypes';
 import { applySchema } from './applySchema';
 import {
   DEFAULT_ASSET_CAPS,
+  assertAssetsComplete,
   buildImageFieldsFromContentTypes,
   collectImageStorageKeys,
   createBundleStorage,
   exportAssets,
+  importAssets,
+  listAssetKeys,
   type AssetCaps,
   type ImageFieldsByType,
 } from './assets';
@@ -117,6 +127,30 @@ async function imageFieldsFromDb(
   return buildImageFieldsFromContentTypes(cts);
 }
 
+/**
+ * Resolve an import source into the bundle JSON path + optional assets dir.
+ * A directory source reads `<dir>/bundle.json`; a `.json` file reads directly
+ * (references-only, status quo).
+ */
+function resolveImportSource(path: string): {
+  bundlePath: string;
+  assetsDir: string | null;
+} {
+  const abs = resolve(path);
+  let isDir = false;
+  try {
+    isDir = statSync(abs).isDirectory();
+  } catch {
+    isDir = false;
+  }
+  if (!isDir) return { bundlePath: abs, assetsDir: null };
+  const assetsDir = join(abs, 'assets');
+  return {
+    bundlePath: join(abs, 'bundle.json'),
+    assetsDir: existsSync(assetsDir) ? assetsDir : null,
+  };
+}
+
 // Each branch follows process.exit() with `return` so tests that mock
 // process.exit don't fall through to the next branch.
 export async function runCli(argv: string[]): Promise<void> {
@@ -181,7 +215,8 @@ export async function runCli(argv: string[]): Promise<void> {
       }
       const path = args[0];
       if (!path) throw new Error('Usage: content-bundle import <path>');
-      const raw = readFileSync(resolve(path), 'utf8');
+      const { bundlePath, assetsDir } = resolveImportSource(path);
+      const raw = readFileSync(bundlePath, 'utf8');
       const bundle = JSON.parse(raw);
       const defaultMode: BundleMode =
         bundle.contentTypes && bundle.entries
@@ -237,6 +272,39 @@ export async function runCli(argv: string[]): Promise<void> {
         }
         process.exit(0);
         return;
+      }
+
+      // Restore asset bytes before the DB import. Storage writes are not
+      // transactional with Prisma, so writing first means a DB rollback
+      // leaves only unreferenced blobs (harmless, idempotent) rather than
+      // entries pointing at missing bytes.
+      if (assetsDir && !dryRun) {
+        const presentKeys = new Set(listAssetKeys(assetsDir));
+        // Completeness check: every referenced IMAGE key must be present.
+        // Start from the bundle's own contentTypes...
+        const imageFields = buildImageFieldsFromContentTypes(
+          bundle.contentTypes ?? []
+        );
+        // ...then merge target DB image fields so entries-only bundles
+        // (no contentTypes in the bundle) are still covered.
+        for (const ct of await prisma.contentType.findMany({
+          include: { fields: true },
+        })) {
+          const set = imageFields.get(ct.identifier) ?? new Set<string>();
+          for (const f of ct.fields)
+            if (f.type === FIELD_TYPES.IMAGE) set.add(f.identifier);
+          imageFields.set(ct.identifier, set);
+        }
+        const referenced = collectImageStorageKeys(bundle, imageFields);
+        assertAssetsComplete(referenced, presentKeys);
+
+        const storage = createBundleStorage();
+        const { written, skipped } = await importAssets({ storage, assetsDir });
+        console.log(`Assets: ${written} written, ${skipped} skipped.`);
+      } else if (assetsDir && dryRun) {
+        console.log(
+          `Assets: ${listAssetKeys(assetsDir).length} present (not written — dry run).`
+        );
       }
 
       const author = flagValue(args, '--author');
