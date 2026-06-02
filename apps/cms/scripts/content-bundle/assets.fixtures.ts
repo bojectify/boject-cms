@@ -3,7 +3,7 @@
 // shared builders in ./bundleFactories; the storage stubs (in-memory unstorage
 // driver, the s3 ArrayBuffer getItemRaw fake) stay inline in the test — they
 // are collaborators, not data.
-import { ct, field, makeBundle } from './bundleFactories';
+import { ct, entry, field, makeBundle, version } from './bundleFactories';
 import type { Bundle } from './types';
 import { FIELD_TYPES } from '../../utils/fieldTypes';
 import { CONTENT_STATUSES } from '../../utils/contentStatus';
@@ -28,50 +28,34 @@ export function makeAssetsBundle(): Bundle {
       ]),
     ],
     entries: [
-      {
-        id: null,
-        contentTypeId: null,
-        contentTypeIdentifier: 'Article',
+      entry('Article', 'a', {
         entryTitle: 'A',
-        entryKey: 'a',
-        slug: null,
         versions: [
-          {
-            status: CONTENT_STATUSES.PUBLISHED,
+          version(CONTENT_STATUSES.PUBLISHED, {
             data: {
               title: 'A',
               hero: { storageKey: 'k1.png', width: 1, height: 1 },
             },
-            publishedAt: null,
-          },
-          {
-            status: CONTENT_STATUSES.DRAFT,
+          }),
+          version(CONTENT_STATUSES.DRAFT, {
             data: {
               title: 'A',
               hero: { storageKey: 'k2.png', width: 1, height: 1 },
             },
-            publishedAt: null,
-          },
+          }),
         ],
-      },
-      {
-        id: null,
-        contentTypeId: null,
-        contentTypeIdentifier: 'Article',
+      }),
+      entry('Article', 'b', {
         entryTitle: 'B',
-        entryKey: 'b',
-        slug: null,
         versions: [
-          {
-            status: CONTENT_STATUSES.PUBLISHED,
+          version(CONTENT_STATUSES.PUBLISHED, {
             data: {
               title: 'B',
               hero: { storageKey: 'k1.png', width: 1, height: 1 },
             },
-            publishedAt: null,
-          },
+          }),
         ],
-      },
+      }),
     ],
   });
 }
