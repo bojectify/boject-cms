@@ -3,9 +3,7 @@
 // canonical ./types so a single Bundle-typed builder serves every consumer.
 //
 // Defaults reproduce the most common inline literal exactly; deviations are
-// expressed via overrides or build-then-mutate at the call site. Parity with
-// the original literals is proven per-fixture with a temporary toStrictEqual
-// assertion during extraction.
+// expressed via overrides or build-then-mutate at the call site.
 import type { ContentStatus, FieldType } from '#prisma';
 import type {
   Bundle,

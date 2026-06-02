@@ -2,8 +2,7 @@
 // match) and NOT vendored. The bundle/content-type DATA flows through the
 // shared builders in ./bundleFactories; the storage stubs (in-memory unstorage
 // driver, the s3 ArrayBuffer getItemRaw fake) stay inline in the test — they
-// are collaborators, not data. Parity with the original inline literal was
-// proven with a temporary toStrictEqual assertion during extraction.
+// are collaborators, not data.
 import { ct, field, makeBundle } from './bundleFactories';
 import type { Bundle } from './types';
 import { FIELD_TYPES } from '../../utils/fieldTypes';

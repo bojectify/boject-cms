@@ -9,9 +9,7 @@
 // shape; do NOT reach for the bundle ct()/field() builders for snapshots.
 //
 // `fieldUsage` is a Map (with optionally-nested Maps for selectChoiceCounts /
-// relationTargetCounts) — fixtures construct it directly. Parity with the
-// original literals is proven per-fixture with a temporary toStrictEqual
-// during extraction.
+// relationTargetCounts) — fixtures construct it directly.
 import type { FieldType } from '#prisma';
 import type { Bundle, CurrentSchemaSnapshot } from './schemaPlan.types';
 import { FIELD_TYPES } from '../../utils/fieldTypes';

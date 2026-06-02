@@ -1,9 +1,7 @@
 // Test-support fixtures for validate.test.ts. NOT a test file (no *.test.ts
 // glob match) and NOT vendored. Valid baselines flow through the shared
 // builders in ./bundleFactories; deliberately-malformed variants are
-// built-then-mutated or kept as bespoke literals. Parity with the original
-// inline literals was proven per-fixture with a temporary toStrictEqual
-// assertion during extraction.
+// built-then-mutated or kept as bespoke literals.
 //
 // validateBundle accepts `unknown`, so the deliberately-malformed fixtures are
 // left with their inferred object-literal types (no `as Bundle` cast) — the
