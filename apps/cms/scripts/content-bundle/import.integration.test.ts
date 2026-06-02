@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../../generated/prisma/client';
@@ -1010,6 +1011,433 @@ describe('importBundle', () => {
       });
       expect(after.entryTitle).toBe('Original');
       expect(after.updatedAt.getTime()).toBe(seededUpdatedAt.getTime());
+    });
+  });
+
+  describe('non-portable dangling reference guard', () => {
+    // Build NON-PORTABLE bundles (portable: false) with a content type that has
+    // an ENTRY_TITLE field and a self-targeting RELATION field "rel". Entries
+    // carry real `id` UUIDs; `data.rel` is { contentTypeId: <typeId>, entryId }.
+
+    function selfRelBundle(
+      typeId: string,
+      typeIdentifier: string,
+      entries: Bundle['entries']
+    ): Bundle {
+      return {
+        version: BUNDLE_VERSION,
+        exportedAt: '2026-05-30T00:00:00.000Z',
+        portable: false,
+        contentTypes: [
+          {
+            id: typeId,
+            identifier: typeIdentifier,
+            name: typeIdentifier,
+            description: null,
+            fields: [
+              {
+                id: randomUUID(),
+                identifier: 'title',
+                name: 'Title',
+                type: FIELD_TYPES.ENTRY_TITLE,
+                required: true,
+                order: 0,
+                options: null,
+              },
+              {
+                id: randomUUID(),
+                identifier: 'rel',
+                name: 'Rel',
+                type: FIELD_TYPES.RELATION,
+                required: false,
+                order: 1,
+                options: { targetContentTypeIds: [typeId] },
+              },
+            ],
+          },
+        ],
+        entries,
+      };
+    }
+
+    it('throws and persists nothing when a RELATION points at a missing entry', async () => {
+      const typeId = randomUUID();
+      const entryId = randomUUID();
+      const missingId = randomUUID();
+      const danglingBundle = selfRelBundle(typeId, 'DanglingRelType', [
+        {
+          id: entryId,
+          contentTypeId: typeId,
+          contentTypeIdentifier: 'DanglingRelType',
+          entryTitle: 'Source',
+          entryKey: 'source',
+          slug: 'source',
+          versions: [
+            {
+              status: CONTENT_STATUSES.PUBLISHED,
+              publishedAt: '2026-05-30T00:00:00.000Z',
+              data: {
+                title: 'Source',
+                rel: { contentTypeId: typeId, entryId: missingId },
+              },
+            },
+          ],
+        },
+      ]);
+
+      const before = await prisma.contentEntry.count();
+      await expect(
+        importBundle(prisma, danglingBundle, { mode: 'all' })
+      ).rejects.toThrow(/references missing entry/);
+      expect(await prisma.contentEntry.count()).toBe(before); // rolled back
+    });
+
+    it('resolves a forward reference to another entry in the same bundle', async () => {
+      const typeId = randomUUID();
+      const idA = randomUUID();
+      const idB = randomUUID();
+      const forwardRefBundle = selfRelBundle(typeId, 'ForwardRefType', [
+        {
+          id: idA,
+          contentTypeId: typeId,
+          contentTypeIdentifier: 'ForwardRefType',
+          entryTitle: 'A',
+          entryKey: 'a',
+          slug: 'a',
+          versions: [
+            {
+              status: CONTENT_STATUSES.PUBLISHED,
+              publishedAt: '2026-05-30T00:00:00.000Z',
+              data: {
+                title: 'A',
+                rel: { contentTypeId: typeId, entryId: idB },
+              },
+            },
+          ],
+        },
+        {
+          id: idB,
+          contentTypeId: typeId,
+          contentTypeIdentifier: 'ForwardRefType',
+          entryTitle: 'B',
+          entryKey: 'b',
+          slug: 'b',
+          versions: [
+            {
+              status: CONTENT_STATUSES.PUBLISHED,
+              publishedAt: '2026-05-30T00:00:00.000Z',
+              data: { title: 'B' },
+            },
+          ],
+        },
+      ]);
+
+      await expect(
+        importBundle(prisma, forwardRefBundle, { mode: 'all' })
+      ).resolves.toBeDefined();
+    });
+
+    it('resolves a reference to a pre-existing target entry', async () => {
+      const typeId = randomUUID();
+      const existingId = randomUUID();
+
+      // Seed the content type + target entry B first via a schema+entries import.
+      await importBundle(
+        prisma,
+        selfRelBundle(typeId, 'PreExistingType', [
+          {
+            id: existingId,
+            contentTypeId: typeId,
+            contentTypeIdentifier: 'PreExistingType',
+            entryTitle: 'Existing',
+            entryKey: 'existing',
+            slug: 'existing',
+            versions: [
+              {
+                status: CONTENT_STATUSES.PUBLISHED,
+                publishedAt: '2026-05-30T00:00:00.000Z',
+                data: { title: 'Existing' },
+              },
+            ],
+          },
+        ]),
+        { mode: 'all' }
+      );
+
+      // Now import a new entry whose rel points at the pre-existing entry.
+      const refToExistingBundle: Bundle = {
+        version: BUNDLE_VERSION,
+        exportedAt: '2026-05-30T00:00:00.000Z',
+        portable: false,
+        entries: [
+          {
+            id: randomUUID(),
+            contentTypeId: typeId,
+            contentTypeIdentifier: 'PreExistingType',
+            entryTitle: 'Referrer',
+            entryKey: 'referrer',
+            slug: 'referrer',
+            versions: [
+              {
+                status: CONTENT_STATUSES.PUBLISHED,
+                publishedAt: '2026-05-30T00:00:00.000Z',
+                data: {
+                  title: 'Referrer',
+                  rel: { contentTypeId: typeId, entryId: existingId },
+                },
+              },
+            ],
+          },
+        ],
+      };
+
+      await expect(
+        importBundle(prisma, refToExistingBundle, { mode: 'entries' })
+      ).resolves.toBeDefined();
+    });
+
+    it('throws on a dangling RICHTEXT cmsEmbed reference', async () => {
+      const typeId = randomUUID();
+      const entryId = randomUUID();
+      const missingId = randomUUID();
+      const danglingRichtextBundle: Bundle = {
+        version: BUNDLE_VERSION,
+        exportedAt: '2026-05-30T00:00:00.000Z',
+        portable: false,
+        contentTypes: [
+          {
+            id: typeId,
+            identifier: 'RichtextDangleType',
+            name: 'RichtextDangleType',
+            description: null,
+            fields: [
+              {
+                id: randomUUID(),
+                identifier: 'title',
+                name: 'Title',
+                type: FIELD_TYPES.ENTRY_TITLE,
+                required: true,
+                order: 0,
+                options: null,
+              },
+              {
+                id: randomUUID(),
+                identifier: 'body',
+                name: 'Body',
+                type: FIELD_TYPES.RICHTEXT,
+                required: false,
+                order: 1,
+                options: { targetContentTypeIds: [typeId] },
+              },
+            ],
+          },
+        ],
+        entries: [
+          {
+            id: entryId,
+            contentTypeId: typeId,
+            contentTypeIdentifier: 'RichtextDangleType',
+            entryTitle: 'Source',
+            entryKey: 'source',
+            slug: 'source',
+            versions: [
+              {
+                status: CONTENT_STATUSES.PUBLISHED,
+                publishedAt: '2026-05-30T00:00:00.000Z',
+                data: {
+                  title: 'Source',
+                  body: {
+                    type: 'doc',
+                    content: [
+                      {
+                        type: 'cmsEmbed',
+                        attrs: { contentTypeId: typeId, entryId: missingId },
+                      },
+                    ],
+                  },
+                },
+              },
+            ],
+          },
+        ],
+      };
+
+      await expect(
+        importBundle(prisma, danglingRichtextBundle, { mode: 'all' })
+      ).rejects.toThrow(/references missing entry/);
+    });
+
+    it('throws and persists nothing when a MULTIRELATION array contains a missing entry', async () => {
+      // Build a NON-PORTABLE bundle whose content type has an ENTRY_TITLE plus a
+      // self-targeting MULTIRELATION field "mrel". One entry's data.mrel is an
+      // array mixing a VALID self-ref (its own id) with a ref to a missing id —
+      // proving the guard walks MULTIRELATION arrays and that one-resolves /
+      // one-dangles still throws.
+      const typeId = randomUUID();
+      const entryId = randomUUID();
+      const missingId = randomUUID();
+      const danglingMrelBundle: Bundle = {
+        version: BUNDLE_VERSION,
+        exportedAt: '2026-05-30T00:00:00.000Z',
+        portable: false,
+        contentTypes: [
+          {
+            id: typeId,
+            identifier: 'DanglingMrelType',
+            name: 'DanglingMrelType',
+            description: null,
+            fields: [
+              {
+                id: randomUUID(),
+                identifier: 'title',
+                name: 'Title',
+                type: FIELD_TYPES.ENTRY_TITLE,
+                required: true,
+                order: 0,
+                options: null,
+              },
+              {
+                id: randomUUID(),
+                identifier: 'mrel',
+                name: 'Mrel',
+                type: FIELD_TYPES.MULTIRELATION,
+                required: false,
+                order: 1,
+                options: { targetContentTypeIds: [typeId] },
+              },
+            ],
+          },
+        ],
+        entries: [
+          {
+            id: entryId,
+            contentTypeId: typeId,
+            contentTypeIdentifier: 'DanglingMrelType',
+            entryTitle: 'Source',
+            entryKey: 'source',
+            slug: 'source',
+            versions: [
+              {
+                status: CONTENT_STATUSES.PUBLISHED,
+                publishedAt: '2026-05-30T00:00:00.000Z',
+                data: {
+                  title: 'Source',
+                  mrel: [
+                    // valid self-ref (resolves) + a dangling ref (missing)
+                    { contentTypeId: typeId, entryId: entryId },
+                    { contentTypeId: typeId, entryId: missingId },
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+      };
+
+      const before = await prisma.contentEntry.count();
+      await expect(
+        importBundle(prisma, danglingMrelBundle, { mode: 'all' })
+      ).rejects.toThrow(/references missing entry/);
+      expect(await prisma.contentEntry.count()).toBe(before); // rolled back
+    });
+
+    it('does NOT re-validate a pre-existing dangling entry that on-conflict=skip leaves untouched', async () => {
+      // Intent pin: skipped entries bypass the guard. The guard only validates
+      // entries THIS import creates/updates (i.e. entries that enter
+      // pendingEntries). An on-conflict=skip collision leaves the existing row
+      // alone, so we never re-write it and never re-check its references —
+      // re-validating pre-existing rows is deliberately out of scope. We seed a
+      // row whose data.rel already dangles (bypassing importBundle's guard via
+      // raw Prisma), then import a colliding entry with onConflict: 'skip' and
+      // assert the import resolves rather than throwing on the stale dangle.
+      const missingId = randomUUID();
+
+      const ct = await prisma.contentType.create({
+        data: {
+          identifier: 'SkipDangleType',
+          name: 'SkipDangleType',
+          fields: {
+            create: [
+              {
+                identifier: 'title',
+                name: 'Title',
+                type: FIELD_TYPES.ENTRY_TITLE,
+                required: true,
+                order: 0,
+              },
+              {
+                identifier: 'rel',
+                name: 'Rel',
+                type: FIELD_TYPES.RELATION,
+                required: false,
+                order: 1,
+                options: { targetContentTypeIds: [] }, // patched below to self
+              },
+            ],
+          },
+        },
+      });
+
+      // Point the RELATION field at its own content type (self-targeting).
+      await prisma.contentTypeField.updateMany({
+        where: { contentTypeId: ct.id, identifier: 'rel' },
+        data: { options: { targetContentTypeIds: [ct.id] } },
+      });
+
+      // Seed an entry whose data.rel points at a NON-EXISTENT entry — this is an
+      // already-dangling row, written raw so importBundle's guard never sees it.
+      await prisma.contentEntry.create({
+        data: {
+          contentTypeId: ct.id,
+          entryTitle: 'Dup',
+          entryKey: 'dup',
+          slug: 'dup',
+          versions: {
+            create: {
+              data: {
+                title: 'Dup',
+                rel: { contentTypeId: ct.id, entryId: missingId },
+              },
+              entryTitle: 'Dup',
+              status: CONTENT_STATUSES.PUBLISHED,
+            },
+          },
+        },
+      });
+
+      // Import a non-portable bundle (schema already present) carrying an entry
+      // with the SAME identifier + entryKey 'dup' so it collides, using skip.
+      const collidingBundle: Bundle = {
+        version: BUNDLE_VERSION,
+        exportedAt: '2026-05-30T00:00:00.000Z',
+        portable: false,
+        entries: [
+          {
+            id: randomUUID(),
+            contentTypeId: ct.id,
+            contentTypeIdentifier: 'SkipDangleType',
+            entryTitle: 'Dup',
+            entryKey: 'dup',
+            slug: 'dup',
+            versions: [
+              {
+                status: CONTENT_STATUSES.PUBLISHED,
+                publishedAt: '2026-05-30T00:00:00.000Z',
+                data: { title: 'Dup' },
+              },
+            ],
+          },
+        ],
+      };
+
+      const result = await importBundle(prisma, collidingBundle, {
+        mode: 'entries',
+        onConflict: 'skip',
+      });
+
+      // The colliding entry is skipped, so its (and the pre-existing row's)
+      // dangling ref is never re-checked — the import resolves cleanly.
+      expect(result.entriesSkipped).toBeGreaterThanOrEqual(1);
     });
   });
 });

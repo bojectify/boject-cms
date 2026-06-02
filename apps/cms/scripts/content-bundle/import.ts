@@ -12,6 +12,7 @@ import { validateBundle } from './validate';
 import { decodeDataRefs } from './portable';
 import { FIELD_TYPES } from '../../utils/fieldTypes';
 import { planEntryImport } from './planEntryImport';
+import { collectEntryRefs } from './collectEntryRefs';
 import {
   BundleImportValidationError,
   EntryImportReferenceError,
@@ -358,6 +359,16 @@ export async function importBundle(
               });
             }
           }
+        } else {
+          // Non-portable inserts raw UUID refs verbatim — validate they
+          // resolve (created here or already on the target) so a dangling
+          // reference fails loudly + rolls back instead of persisting silently.
+          await assertNonPortableRefsResolve(
+            tx,
+            pendingEntries,
+            fieldTypesByTypeId,
+            identifierToTypeId
+          );
         }
       }
 
@@ -377,6 +388,70 @@ export async function importBundle(
   }
 
   return captured;
+}
+
+/**
+ * Validate that every cross-entry reference written by a NON-PORTABLE import
+ * resolves to an entry that exists after this transaction commits — either an
+ * entry this import created/updated or one already on the target. Portable
+ * mode does this implicitly via decodeDataRefs (which throws on a miss); the
+ * non-portable path inserts raw UUIDs verbatim, so without this a dangling
+ * reference persists silently (JSONB has no foreign-key enforcement).
+ *
+ * Throws EntryImportReferenceError (→ HTTP 400 ENTRY_IMPORT_REFERENCE_INVALID)
+ * on the first miss, rolling back the whole transaction. Only the referenced
+ * ids are queried (not the entire table).
+ */
+async function assertNonPortableRefsResolve(
+  tx: Prisma.TransactionClient,
+  pendingEntries: Array<{
+    bundleEntry: BundleEntry;
+    rawDataArrays: Record<string, unknown>[];
+  }>,
+  fieldTypesByTypeId: Map<string, Record<string, FieldType>>,
+  identifierToTypeId: Map<string, string>
+): Promise<void> {
+  const refs: Array<{
+    source: string;
+    field: string;
+    contentTypeId: string;
+    entryId: string;
+  }> = [];
+
+  for (const pending of pendingEntries) {
+    const typeId = identifierToTypeId.get(
+      pending.bundleEntry.contentTypeIdentifier
+    );
+    const fieldTypes = typeId ? (fieldTypesByTypeId.get(typeId) ?? {}) : {};
+    const source = `${pending.bundleEntry.contentTypeIdentifier}:${pending.bundleEntry.entryKey}`;
+    for (const data of pending.rawDataArrays) {
+      for (const ref of collectEntryRefs(data, fieldTypes)) {
+        refs.push({
+          source,
+          field: ref.fieldIdentifier,
+          contentTypeId: ref.contentTypeId,
+          entryId: ref.entryId,
+        });
+      }
+    }
+  }
+
+  if (refs.length === 0) return;
+
+  const referencedIds = [...new Set(refs.map((r) => r.entryId))];
+  const existing = await tx.contentEntry.findMany({
+    where: { id: { in: referencedIds } },
+    select: { id: true },
+  });
+  const existingIds = new Set(existing.map((e) => e.id));
+
+  for (const ref of refs) {
+    if (!existingIds.has(ref.entryId)) {
+      throw new EntryImportReferenceError(
+        `Entry "${ref.source}" field "${ref.field}" references missing entry ${ref.contentTypeId}:${ref.entryId}`
+      );
+    }
+  }
 }
 
 function stripRelationFields(
