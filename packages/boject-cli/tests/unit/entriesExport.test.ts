@@ -142,4 +142,49 @@ describe('runEntriesExport', () => {
     expect(lastRequestUrl).toContain('includeDrafts=true');
     expect(lastRequestUrl).toContain('contentType=Note');
   });
+
+  it('strips a trailing slash from the url so the request hits /api (single slash)', async () => {
+    const bundle = bundleWithEntries(1);
+    responder.value = () =>
+      new Response(JSON.stringify(bundle), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+
+    const result = await runEntriesExport({
+      cwd: workDir,
+      apiKey: 'boject_test_key',
+      flags: {
+        url: `http://localhost:${port}/`,
+        out: join(workDir, 'out.json'),
+      },
+      stdout,
+      stderr,
+    });
+    expect(result.exitCode).toBe(0);
+    expect(lastRequestUrl).toBeDefined();
+    expect(lastRequestUrl!.startsWith('//')).toBe(false);
+    expect(lastRequestUrl!.startsWith('/api/content-bundle/export')).toBe(true);
+  });
+
+  it('exits 1 and writes no file when a 200 response body is not JSON', async () => {
+    responder.value = () =>
+      new Response('<!DOCTYPE html><html><body>not a bundle</body></html>', {
+        status: 200,
+        headers: { 'content-type': 'text/html' },
+      });
+
+    const outPath = join(workDir, 'out.json');
+    const result = await runEntriesExport({
+      cwd: workDir,
+      apiKey: 'boject_test_key',
+      flags: { out: outPath },
+      stdout,
+      stderr,
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(lines.some((l) => /Error/.test(l))).toBe(true);
+    await expect(readFile(outPath, 'utf8')).rejects.toThrow();
+  });
 });
