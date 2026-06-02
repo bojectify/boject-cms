@@ -599,7 +599,14 @@ describe('POST /api/content-bundle/import', () => {
       body: JSON.stringify({ bundle }),
     });
     expect(res.status).toBe(400);
-    const j = (await res.json()) as { data?: { error?: string } };
+    const j = (await res.json()) as {
+      message?: string;
+      data?: { error?: string; message?: string };
+    };
     expect(j.data?.error).toBe('ENTRY_IMPORT_REFERENCE_INVALID');
+    // The human-readable reason must be surfaced at the top-level `message`,
+    // not only under `data` — REST clients and the CLI (which reads the outer
+    // message) otherwise show a blank error.
+    expect(j.message).toContain('references missing entry');
   });
 });

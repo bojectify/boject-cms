@@ -55,6 +55,10 @@ export default defineEventHandler(async (event) => {
     if (err instanceof EntryImportConflictError) {
       throw createError({
         statusCode: 409,
+        // Set the top-level `message` too: h3 leaves it empty when only
+        // `data.message` is passed, and REST clients / the CLI read the
+        // outer message — otherwise they surface a blank error.
+        message: err.message,
         data: {
           error: err.code,
           contentTypeIdentifier: err.contentTypeIdentifier,
@@ -66,6 +70,7 @@ export default defineEventHandler(async (event) => {
     if (err instanceof EntryImportReferenceError) {
       throw createError({
         statusCode: 400,
+        message: err.message,
         data: { error: err.code, message: err.message },
       });
     }
