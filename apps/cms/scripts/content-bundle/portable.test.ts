@@ -5,30 +5,29 @@ import {
   encodeDataRefs,
   decodeDataRefs,
 } from './portable';
-import { FIELD_TYPES } from '../../utils/fieldTypes';
-
-const typeIdToIdent = new Map([['aaa-uuid-ct', 'BlogPost']]);
-const typeIdentToEntryKeys = new Map([
-  ['BlogPost', new Map([['post-uuid-1', 'hello']])],
-]);
-
-const identToTypeId = new Map([['BlogPost', 'aaa-uuid-ct']]);
-const typeIdentToKeyToEntry = new Map([
-  [
-    'BlogPost',
-    new Map<string, string>([
-      ['hello', 'post-uuid-1'],
-      ['Hello', 'post-uuid-1'],
-    ]),
-  ],
-]);
+import {
+  typeIdToIdentifier,
+  entryKeysByTypeIdentifier,
+  identifierToTypeId,
+  entryIdByTypeAndKey,
+  richtextFieldTypes,
+  relationRoundTripFieldTypes,
+  relationRoundTripData,
+  proseMirrorWithLegacyEmbed,
+  proseMirrorWithEmbed,
+  portableProseMirrorWithEmbed,
+  proseMirrorPlain,
+  proseMirrorNestedEmbed,
+  proseMirrorTwoEmbeds,
+  proseMirrorSingleEmbed,
+} from './portable.fixtures';
 
 describe('encodeRelationRef', () => {
   it('rewrites a UUID ref to identifier + slug', () => {
     const ref = encodeRelationRef(
       { contentTypeId: 'aaa-uuid-ct', entryId: 'post-uuid-1' },
-      typeIdToIdent,
-      typeIdentToEntryKeys
+      typeIdToIdentifier,
+      entryKeysByTypeIdentifier
     );
     expect(ref).toEqual({
       contentTypeIdentifier: 'BlogPost',
@@ -40,7 +39,7 @@ describe('encodeRelationRef', () => {
     expect(() =>
       encodeRelationRef(
         { contentTypeId: 'aaa-uuid-ct', entryId: 'post-uuid-1' },
-        typeIdToIdent,
+        typeIdToIdentifier,
         new Map([['BlogPost', new Map()]])
       )
     ).toThrow(/has no entryKey/);
@@ -50,8 +49,8 @@ describe('encodeRelationRef', () => {
     expect(() =>
       encodeRelationRef(
         { contentTypeId: 'missing', entryId: 'missing' },
-        typeIdToIdent,
-        typeIdentToEntryKeys
+        typeIdToIdentifier,
+        entryKeysByTypeIdentifier
       )
     ).toThrow();
   });
@@ -61,8 +60,8 @@ describe('decodeRelationRef', () => {
   it('resolves identifier + slug back to UUIDs', () => {
     const ref = decodeRelationRef(
       { contentTypeIdentifier: 'BlogPost', entryKey: 'hello' },
-      identToTypeId,
-      typeIdentToKeyToEntry
+      identifierToTypeId,
+      entryIdByTypeAndKey
     );
     expect(ref).toEqual({
       contentTypeId: 'aaa-uuid-ct',
@@ -74,8 +73,8 @@ describe('decodeRelationRef', () => {
     expect(() =>
       decodeRelationRef(
         { contentTypeIdentifier: 'BlogPost', entryKey: 'ghost' },
-        identToTypeId,
-        typeIdentToKeyToEntry
+        identifierToTypeId,
+        entryIdByTypeAndKey
       )
     ).toThrow();
   });
@@ -83,22 +82,14 @@ describe('decodeRelationRef', () => {
 
 describe('encodeDataRefs / decodeDataRefs round-trip', () => {
   it('walks and rewrites RELATION values inside data', () => {
-    const data = {
-      title: 'Post',
-      author: { contentTypeId: 'aaa-uuid-ct', entryId: 'post-uuid-1' },
-      tags: [{ contentTypeId: 'aaa-uuid-ct', entryId: 'post-uuid-1' }],
-    };
-    const fieldTypes = {
-      title: FIELD_TYPES.ENTRY_TITLE,
-      author: FIELD_TYPES.RELATION,
-      tags: FIELD_TYPES.MULTIRELATION,
-    };
+    const data = relationRoundTripData;
+    const fieldTypes = relationRoundTripFieldTypes;
 
     const encoded = encodeDataRefs(
       data,
       fieldTypes,
-      typeIdToIdent,
-      typeIdentToEntryKeys
+      typeIdToIdentifier,
+      entryKeysByTypeIdentifier
     );
     expect(encoded.author).toEqual({
       contentTypeIdentifier: 'BlogPost',
@@ -112,78 +103,45 @@ describe('encodeDataRefs / decodeDataRefs round-trip', () => {
     const decoded = decodeDataRefs(
       encoded,
       fieldTypes,
-      identToTypeId,
-      typeIdentToKeyToEntry
+      identifierToTypeId,
+      entryIdByTypeAndKey
     );
     expect(decoded).toEqual(data);
   });
 
   it('leaves RICHTEXT data untouched in portable mode (cmsEmbed nodes no longer rewritten)', () => {
-    const body = {
-      type: 'doc',
-      content: [
-        {
-          type: 'paragraph',
-          content: [{ type: 'text', text: 'Before embed.' }],
-        },
-        {
-          type: 'cmsEmbed',
-          attrs: {
-            embedType: '11111111-1111-1111-1111-111111111111',
-            embedId: '22222222-2222-2222-2222-222222222222',
-          },
-        },
-        {
-          type: 'paragraph',
-          content: [{ type: 'text', text: 'After embed.' }],
-        },
-      ],
-    };
+    const body = proseMirrorWithLegacyEmbed;
     const data = { body };
-    const fieldTypes = { body: FIELD_TYPES.RICHTEXT };
+    const fieldTypes = richtextFieldTypes;
 
     const encoded = encodeDataRefs(
       data,
       fieldTypes,
-      typeIdToIdent,
-      typeIdentToEntryKeys
+      typeIdToIdentifier,
+      entryKeysByTypeIdentifier
     );
     expect(encoded.body).toEqual(body);
 
     const decoded = decodeDataRefs(
       encoded,
       fieldTypes,
-      identToTypeId,
-      typeIdentToKeyToEntry
+      identifierToTypeId,
+      entryIdByTypeAndKey
     );
     expect(decoded.body).toEqual(body);
   });
 });
 
 describe('encode/decodeDataRefs — RICHTEXT embeds', () => {
-  const fieldTypes = { body: FIELD_TYPES.RICHTEXT };
-  const doc = {
-    type: 'doc',
-    content: [
-      {
-        type: 'paragraph',
-        content: [
-          { type: 'text', text: 'see ' },
-          {
-            type: 'cmsEmbed',
-            attrs: { contentTypeId: 'aaa-uuid-ct', entryId: 'post-uuid-1' },
-          },
-        ],
-      },
-    ],
-  };
+  const fieldTypes = richtextFieldTypes;
+  const doc = proseMirrorWithEmbed;
 
   it('encodes embed attrs to portable identifier/key', () => {
     const out = encodeDataRefs(
       { body: doc },
       fieldTypes,
-      typeIdToIdent,
-      typeIdentToEntryKeys
+      typeIdToIdentifier,
+      entryKeysByTypeIdentifier
     );
     const body = out.body as {
       content: { content: { attrs: unknown }[] }[];
@@ -196,28 +154,12 @@ describe('encode/decodeDataRefs — RICHTEXT embeds', () => {
   });
 
   it('decodes portable embed attrs back to uuid form', () => {
-    const portableDoc = {
-      type: 'doc',
-      content: [
-        {
-          type: 'paragraph',
-          content: [
-            {
-              type: 'cmsEmbed',
-              attrs: {
-                contentTypeIdentifier: 'BlogPost',
-                entryKey: 'hello',
-              },
-            },
-          ],
-        },
-      ],
-    };
+    const portableDoc = portableProseMirrorWithEmbed;
     const out = decodeDataRefs(
       { body: portableDoc },
       fieldTypes,
-      identToTypeId,
-      typeIdentToKeyToEntry
+      identifierToTypeId,
+      entryIdByTypeAndKey
     );
     const body = out.body as {
       content: { content: { attrs: unknown }[] }[];
@@ -230,47 +172,23 @@ describe('encode/decodeDataRefs — RICHTEXT embeds', () => {
   });
 
   it('passes through RICHTEXT values with no embeds untouched', () => {
-    const plain = {
-      type: 'doc',
-      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'x' }] }],
-    };
+    const plain = proseMirrorPlain;
     const out = encodeDataRefs(
       { body: plain },
       fieldTypes,
-      typeIdToIdent,
-      typeIdentToEntryKeys
+      typeIdToIdentifier,
+      entryKeysByTypeIdentifier
     );
     expect(out.body).toEqual(plain);
   });
 
   it('walks nested content (embed inside blockquote inside doc)', () => {
-    const nested = {
-      type: 'doc',
-      content: [
-        {
-          type: 'blockquote',
-          content: [
-            {
-              type: 'paragraph',
-              content: [
-                {
-                  type: 'cmsEmbed',
-                  attrs: {
-                    contentTypeId: 'aaa-uuid-ct',
-                    entryId: 'post-uuid-1',
-                  },
-                },
-              ],
-            },
-          ],
-        },
-      ],
-    };
+    const nested = proseMirrorNestedEmbed;
     const out = encodeDataRefs(
       { body: nested },
-      { body: FIELD_TYPES.RICHTEXT },
-      typeIdToIdent,
-      typeIdentToEntryKeys
+      richtextFieldTypes,
+      typeIdToIdentifier,
+      entryKeysByTypeIdentifier
     );
     const embed = (
       out.body as { content: { content: { content: unknown[] }[] }[] }
@@ -282,30 +200,12 @@ describe('encode/decodeDataRefs — RICHTEXT embeds', () => {
   });
 
   it('rewrites multiple embeds in the same document independently', () => {
-    const docTwo = {
-      type: 'doc',
-      content: [
-        {
-          type: 'paragraph',
-          content: [
-            {
-              type: 'cmsEmbed',
-              attrs: { contentTypeId: 'aaa-uuid-ct', entryId: 'post-uuid-1' },
-            },
-            { type: 'text', text: ' and ' },
-            {
-              type: 'cmsEmbed',
-              attrs: { contentTypeId: 'aaa-uuid-ct', entryId: 'post-uuid-1' },
-            },
-          ],
-        },
-      ],
-    };
+    const docTwo = proseMirrorTwoEmbeds;
     const out = encodeDataRefs(
       { body: docTwo },
-      { body: FIELD_TYPES.RICHTEXT },
-      typeIdToIdent,
-      typeIdentToEntryKeys
+      richtextFieldTypes,
+      typeIdToIdentifier,
+      entryKeysByTypeIdentifier
     );
     const para = (out.body as { content: { content: unknown[] }[] })
       .content[0]!;
@@ -322,26 +222,13 @@ describe('encode/decodeDataRefs — RICHTEXT embeds', () => {
   });
 
   it('does not mutate the input document', () => {
-    const original = {
-      type: 'doc',
-      content: [
-        {
-          type: 'paragraph',
-          content: [
-            {
-              type: 'cmsEmbed',
-              attrs: { contentTypeId: 'aaa-uuid-ct', entryId: 'post-uuid-1' },
-            },
-          ],
-        },
-      ],
-    };
+    const original = proseMirrorSingleEmbed;
     const snapshot = JSON.parse(JSON.stringify(original));
     encodeDataRefs(
       { body: original },
-      { body: FIELD_TYPES.RICHTEXT },
-      typeIdToIdent,
-      typeIdentToEntryKeys
+      richtextFieldTypes,
+      typeIdToIdentifier,
+      entryKeysByTypeIdentifier
     );
     expect(original).toEqual(snapshot);
   });

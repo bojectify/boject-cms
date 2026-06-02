@@ -4,10 +4,10 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../../generated/prisma/client';
 import { importBundle } from './import';
 import type { Bundle } from './types';
-import { BUNDLE_VERSION } from './types';
 import { getTestDatabaseUrl } from '../../test/dbUrl';
 import { FIELD_TYPES } from '../../utils/fieldTypes';
 import { CONTENT_STATUSES } from '../../utils/contentStatus';
+import * as fx from './import.integration.fixtures';
 
 const url = getTestDatabaseUrl();
 const adapter = new PrismaPg({ connectionString: url });
@@ -19,39 +19,7 @@ async function reset() {
   await prisma.contentType.deleteMany();
 }
 
-const schemaOnly: Bundle = {
-  version: 2,
-  exportedAt: '2026-04-14T10:00:00.000Z',
-  portable: true,
-  contentTypes: [
-    {
-      id: null,
-      identifier: 'BlogPost',
-      name: 'Blog Post',
-      description: null,
-      fields: [
-        {
-          id: null,
-          identifier: 'title',
-          name: 'Title',
-          type: FIELD_TYPES.ENTRY_TITLE,
-          required: true,
-          order: 0,
-          options: null,
-        },
-        {
-          id: null,
-          identifier: 'body',
-          name: 'Body',
-          type: FIELD_TYPES.TEXTAREA,
-          required: false,
-          order: 1,
-          options: null,
-        },
-      ],
-    },
-  ],
-};
+const schemaOnly = fx.schemaOnly;
 
 describe('importBundle', () => {
   beforeEach(async () => await reset());
@@ -78,99 +46,9 @@ describe('importBundle', () => {
   });
 
   it('imports entries with portable refs via two-pass resolution', async () => {
-    const withRelations: Bundle = {
-      version: 2,
-      exportedAt: '2026-04-14T10:00:00.000Z',
-      portable: true,
-      contentTypes: [
-        {
-          id: null,
-          identifier: 'Category',
-          name: 'Category',
-          description: null,
-          fields: [
-            {
-              id: null,
-              identifier: 'name',
-              name: 'Name',
-              type: FIELD_TYPES.ENTRY_TITLE,
-              required: true,
-              order: 0,
-              options: null,
-            },
-          ],
-        },
-        {
-          id: null,
-          identifier: 'BlogPost',
-          name: 'Blog Post',
-          description: null,
-          fields: [
-            {
-              id: null,
-              identifier: 'title',
-              name: 'Title',
-              type: FIELD_TYPES.ENTRY_TITLE,
-              required: true,
-              order: 0,
-              options: null,
-            },
-            {
-              id: null,
-              identifier: 'category',
-              name: 'Category',
-              type: FIELD_TYPES.RELATION,
-              required: false,
-              order: 1,
-              options: {
-                targetContentTypeIds: [null],
-                targetContentTypeIdentifiers: ['Category'],
-              },
-            },
-          ],
-        },
-      ],
-      entries: [
-        {
-          id: null,
-          contentTypeId: null,
-          contentTypeIdentifier: 'Category',
-          entryTitle: 'News',
-          entryKey: 'news',
-          slug: 'news',
-          versions: [
-            {
-              status: CONTENT_STATUSES.PUBLISHED,
-              publishedAt: null,
-              data: { name: 'News' },
-            },
-          ],
-        },
-        {
-          id: null,
-          contentTypeId: null,
-          contentTypeIdentifier: 'BlogPost',
-          entryTitle: 'Hello',
-          entryKey: 'hello',
-          slug: 'hello',
-          versions: [
-            {
-              status: CONTENT_STATUSES.DRAFT,
-              publishedAt: null,
-              data: {
-                title: 'Hello',
-                category: {
-                  contentTypeIdentifier: 'Category',
-                  entryKey: 'news',
-                },
-              },
-            },
-          ],
-        },
-      ],
-    };
-
-    const result = await importBundle(prisma, withRelations, { mode: 'all' });
+    const result = await importBundle(prisma, fx.withRelations, {
+      mode: 'all',
+    });
     expect(result.entriesCreated).toBe(2);
 
     const blog = await prisma.contentType.findUnique({
@@ -194,61 +72,7 @@ describe('importBundle', () => {
   });
 
   it('resolves RELATION field targets that forward-reference later content types', async () => {
-    const forwardRef: Bundle = {
-      version: 2,
-      exportedAt: '2026-04-14T10:00:00.000Z',
-      portable: true,
-      contentTypes: [
-        {
-          id: null,
-          identifier: 'TypeA',
-          name: 'Type A',
-          description: null,
-          fields: [
-            {
-              id: null,
-              identifier: 'title',
-              name: 'Title',
-              type: FIELD_TYPES.ENTRY_TITLE,
-              required: true,
-              order: 0,
-              options: null,
-            },
-            {
-              id: null,
-              identifier: 'bs',
-              name: 'Bs',
-              type: FIELD_TYPES.MULTIRELATION,
-              required: false,
-              order: 1,
-              options: {
-                targetContentTypeIds: [null],
-                targetContentTypeIdentifiers: ['TypeB'],
-              },
-            },
-          ],
-        },
-        {
-          id: null,
-          identifier: 'TypeB',
-          name: 'Type B',
-          description: null,
-          fields: [
-            {
-              id: null,
-              identifier: 'title',
-              name: 'Title',
-              type: FIELD_TYPES.ENTRY_TITLE,
-              required: true,
-              order: 0,
-              options: null,
-            },
-          ],
-        },
-      ],
-    };
-
-    const result = await importBundle(prisma, forwardRef, { mode: 'all' });
+    const result = await importBundle(prisma, fx.forwardRef, { mode: 'all' });
     expect(result.contentTypesCreated).toBe(2);
 
     const typeA = await prisma.contentType.findUnique({
@@ -270,120 +94,22 @@ describe('importBundle', () => {
   });
 
   it('throws a clear error when a RELATION field targets an undeclared content type', async () => {
-    const danglingRef: Bundle = {
-      version: 2,
-      exportedAt: '2026-04-14T10:00:00.000Z',
-      portable: true,
-      contentTypes: [
-        {
-          id: null,
-          identifier: 'Orphan',
-          name: 'Orphan',
-          description: null,
-          fields: [
-            {
-              id: null,
-              identifier: 'title',
-              name: 'Title',
-              type: FIELD_TYPES.ENTRY_TITLE,
-              required: true,
-              order: 0,
-              options: null,
-            },
-            {
-              id: null,
-              identifier: 'ref',
-              name: 'Ref',
-              type: FIELD_TYPES.RELATION,
-              required: false,
-              order: 1,
-              options: {
-                targetContentTypeIds: [null],
-                targetContentTypeIdentifiers: ['DoesNotExist'],
-              },
-            },
-          ],
-        },
-      ],
-    };
-
     await expect(
-      importBundle(prisma, danglingRef, { mode: 'schema' })
+      importBundle(prisma, fx.danglingRef, { mode: 'schema' })
     ).rejects.toThrow(
       /RELATION field "ref" targets unknown content type "DoesNotExist"/
     );
   });
 
   describe('entryKey handling on import (#205)', () => {
-    const baseTypeBundle: Bundle = {
-      version: 2,
-      exportedAt: '2026-05-13T10:00:00.000Z',
-      portable: true,
-      contentTypes: [
-        {
-          id: null,
-          identifier: 'KeyedType',
-          name: 'KeyedType',
-          description: null,
-          fields: [
-            {
-              id: null,
-              identifier: 'title',
-              name: 'Title',
-              type: FIELD_TYPES.ENTRY_TITLE,
-              required: true,
-              order: 0,
-              options: null,
-            },
-          ],
-        },
-      ],
-    };
-
     it('rejects a bundle whose entries lack entryKey', async () => {
-      const bundle = {
-        ...baseTypeBundle,
-        entries: [
-          {
-            id: null,
-            contentTypeId: null,
-            contentTypeIdentifier: 'KeyedType',
-            entryTitle: 'Imported',
-            // entryKey intentionally missing
-            slug: 'imported',
-            status: CONTENT_STATUSES.DRAFT,
-            publishedAt: null,
-            data: { title: 'Imported' },
-          },
-        ],
-      };
       await expect(
-        importBundle(prisma, bundle as never, { mode: 'all' })
+        importBundle(prisma, fx.missingEntryKeyBundle as never, { mode: 'all' })
       ).rejects.toThrow(/entryKey/);
     });
 
     it('writes entryKey straight from the bundle to the DB', async () => {
-      const bundle: Bundle = {
-        ...baseTypeBundle,
-        entries: [
-          {
-            id: null,
-            contentTypeId: null,
-            contentTypeIdentifier: 'KeyedType',
-            entryTitle: 'Imported',
-            entryKey: 'imported-key',
-            slug: 'imported',
-            versions: [
-              {
-                status: CONTENT_STATUSES.DRAFT,
-                publishedAt: null,
-                data: { title: 'Imported' },
-              },
-            ],
-          },
-        ],
-      };
-      await importBundle(prisma, bundle, { mode: 'all' });
+      await importBundle(prisma, fx.writesEntryKeyBundle, { mode: 'all' });
       const entry = await prisma.contentEntry.findFirstOrThrow({
         where: { entryKey: 'imported-key' },
       });
@@ -391,99 +117,9 @@ describe('importBundle', () => {
     });
 
     it('resolves portable RELATION refs via entryKey', async () => {
-      const bundle: Bundle = {
-        version: 2,
-        exportedAt: '2026-05-13T10:00:00.000Z',
-        portable: true,
-        contentTypes: [
-          {
-            id: null,
-            identifier: 'Category',
-            name: 'Category',
-            description: null,
-            fields: [
-              {
-                id: null,
-                identifier: 'name',
-                name: 'Name',
-                type: FIELD_TYPES.ENTRY_TITLE,
-                required: true,
-                order: 0,
-                options: null,
-              },
-            ],
-          },
-          {
-            id: null,
-            identifier: 'Post',
-            name: 'Post',
-            description: null,
-            fields: [
-              {
-                id: null,
-                identifier: 'title',
-                name: 'Title',
-                type: FIELD_TYPES.ENTRY_TITLE,
-                required: true,
-                order: 0,
-                options: null,
-              },
-              {
-                id: null,
-                identifier: 'category',
-                name: 'Category',
-                type: FIELD_TYPES.RELATION,
-                required: false,
-                order: 1,
-                options: {
-                  targetContentTypeIds: [null],
-                  targetContentTypeIdentifiers: ['Category'],
-                },
-              },
-            ],
-          },
-        ],
-        entries: [
-          {
-            id: null,
-            contentTypeId: null,
-            contentTypeIdentifier: 'Category',
-            entryTitle: 'News',
-            entryKey: 'news',
-            slug: 'news-cat',
-            versions: [
-              {
-                status: CONTENT_STATUSES.PUBLISHED,
-                publishedAt: null,
-                data: { name: 'News' },
-              },
-            ],
-          },
-          {
-            id: null,
-            contentTypeId: null,
-            contentTypeIdentifier: 'Post',
-            entryTitle: 'Hello',
-            entryKey: 'hello',
-            slug: 'hello-post',
-            versions: [
-              {
-                status: CONTENT_STATUSES.DRAFT,
-                publishedAt: null,
-                data: {
-                  title: 'Hello',
-                  category: {
-                    contentTypeIdentifier: 'Category',
-                    entryKey: 'news',
-                  },
-                },
-              },
-            ],
-          },
-        ],
-      };
-
-      await importBundle(prisma, bundle, { mode: 'all' });
+      await importBundle(prisma, fx.portableRelByEntryKeyBundle, {
+        mode: 'all',
+      });
 
       const category = await prisma.contentType.findUniqueOrThrow({
         where: { identifier: 'Category' },
@@ -507,53 +143,11 @@ describe('importBundle', () => {
 
     it('rejects bundle with conflicting entryKey on target', async () => {
       // First import creates a KeyedType + an entry with entryKey 'foo'.
-      const first: Bundle = {
-        ...baseTypeBundle,
-        entries: [
-          {
-            id: null,
-            contentTypeId: null,
-            contentTypeIdentifier: 'KeyedType',
-            entryTitle: 'Foo',
-            entryKey: 'foo',
-            slug: 'foo',
-            versions: [
-              {
-                status: CONTENT_STATUSES.DRAFT,
-                publishedAt: null,
-                data: { title: 'Foo' },
-              },
-            ],
-          },
-        ],
-      };
-      await importBundle(prisma, first, { mode: 'all' });
+      await importBundle(prisma, fx.conflictKeyFirstBundle, { mode: 'all' });
 
       // Second import targets the existing type and reuses entryKey 'foo'.
-      const second: Bundle = {
-        version: 2,
-        exportedAt: '2026-05-13T10:00:00.000Z',
-        portable: true,
-        entries: [
-          {
-            id: null,
-            contentTypeId: null,
-            contentTypeIdentifier: 'KeyedType',
-            entryTitle: 'Foo II',
-            entryKey: 'foo',
-            slug: 'foo-2',
-            versions: [
-              {
-                status: CONTENT_STATUSES.DRAFT,
-                publishedAt: null,
-                data: { title: 'Foo II' },
-              },
-            ],
-          },
-        ],
-      };
       await expect(
-        importBundle(prisma, second, { mode: 'entries' })
+        importBundle(prisma, fx.conflictKeySecondBundle, { mode: 'entries' })
       ).rejects.toThrow(/KeyedType:foo.*already exists/);
     });
   });
@@ -615,30 +209,7 @@ describe('importBundle', () => {
       });
       const seededUpdatedAt = seeded.updatedAt;
 
-      const bundle: Bundle = {
-        version: BUNDLE_VERSION,
-        exportedAt: '2026-05-30T00:00:00.000Z',
-        portable: false,
-        entries: [
-          {
-            id: null,
-            contentTypeId: null,
-            contentTypeIdentifier: 'PageSkipTest',
-            entryTitle: 'Conflicting Title',
-            entryKey: 'original-title',
-            slug: null,
-            versions: [
-              {
-                status: CONTENT_STATUSES.PUBLISHED,
-                data: { title: 'Conflicting Title' },
-                publishedAt: '2026-05-30T00:00:00.000Z',
-              },
-            ],
-          },
-        ],
-      };
-
-      const result = await importBundle(prisma, bundle, {
+      const result = await importBundle(prisma, fx.skipConflictBundle, {
         mode: 'entries',
         onConflict: 'skip',
       });
@@ -707,30 +278,7 @@ describe('importBundle', () => {
       const seededCreatedAt = seeded.createdAt;
       const oldVersionIds = seeded.versions.map((v) => v.id);
 
-      const bundle: Bundle = {
-        version: BUNDLE_VERSION,
-        exportedAt: '2026-05-30T00:00:00.000Z',
-        portable: false,
-        entries: [
-          {
-            id: null,
-            contentTypeId: null,
-            contentTypeIdentifier: 'PageReplaceTest',
-            entryTitle: 'Replaced',
-            entryKey: 'replace-target',
-            slug: 'replaced-slug',
-            versions: [
-              {
-                status: CONTENT_STATUSES.PUBLISHED,
-                data: { title: 'Replaced' },
-                publishedAt: '2026-05-30T00:00:00.000Z',
-              },
-            ],
-          },
-        ],
-      };
-
-      const result = await importBundle(prisma, bundle, {
+      const result = await importBundle(prisma, fx.replaceConflictBundle, {
         mode: 'entries',
         onConflict: 'replace',
         author: 'olly@example.com',
@@ -834,51 +382,7 @@ describe('importBundle', () => {
         },
       });
 
-      const bundle: Bundle = {
-        version: BUNDLE_VERSION,
-        exportedAt: '2026-05-30T00:00:00.000Z',
-        portable: true,
-        entries: [
-          {
-            id: null,
-            contentTypeId: null,
-            contentTypeIdentifier: 'AuthorReplaceTest',
-            entryTitle: 'Olly (replaced)',
-            entryKey: 'olly',
-            slug: 'olly',
-            versions: [
-              {
-                status: CONTENT_STATUSES.PUBLISHED,
-                data: { name: 'Olly (replaced)' },
-                publishedAt: '2026-05-30T00:00:00.000Z',
-              },
-            ],
-          },
-          {
-            id: null,
-            contentTypeId: null,
-            contentTypeIdentifier: 'ArticleReplaceTest',
-            entryTitle: 'My Article',
-            entryKey: 'my-article',
-            slug: 'my-article',
-            versions: [
-              {
-                status: CONTENT_STATUSES.PUBLISHED,
-                data: {
-                  title: 'My Article',
-                  author: {
-                    contentTypeIdentifier: 'AuthorReplaceTest',
-                    entryKey: 'olly',
-                  },
-                },
-                publishedAt: '2026-05-30T00:00:00.000Z',
-              },
-            ],
-          },
-        ],
-      };
-
-      await importBundle(prisma, bundle, {
+      await importBundle(prisma, fx.replacePortableRelationBundle, {
         mode: 'entries',
         onConflict: 'replace',
       });
@@ -943,45 +447,7 @@ describe('importBundle', () => {
         where: { contentTypeId: contentType.id },
       });
 
-      const bundle: Bundle = {
-        version: BUNDLE_VERSION,
-        exportedAt: '2026-05-30T00:00:00.000Z',
-        portable: false,
-        entries: [
-          {
-            id: null,
-            contentTypeId: null,
-            contentTypeIdentifier: 'PageDryRunTest',
-            entryTitle: 'Conflicting',
-            entryKey: 'dry-run-target',
-            slug: null,
-            versions: [
-              {
-                status: CONTENT_STATUSES.PUBLISHED,
-                data: { title: 'Conflicting' },
-                publishedAt: '2026-05-30T00:00:00.000Z',
-              },
-            ],
-          },
-          {
-            id: null,
-            contentTypeId: null,
-            contentTypeIdentifier: 'PageDryRunTest',
-            entryTitle: 'Brand New',
-            entryKey: 'dry-run-new',
-            slug: null,
-            versions: [
-              {
-                status: CONTENT_STATUSES.PUBLISHED,
-                data: { title: 'Brand New' },
-                publishedAt: '2026-05-30T00:00:00.000Z',
-              },
-            ],
-          },
-        ],
-      };
-
-      const result = await importBundle(prisma, bundle, {
+      const result = await importBundle(prisma, fx.dryRunBundle, {
         mode: 'entries',
         onConflict: 'replace',
         dryRun: true,
@@ -1019,71 +485,15 @@ describe('importBundle', () => {
     // an ENTRY_TITLE field and a self-targeting RELATION field "rel". Entries
     // carry real `id` UUIDs; `data.rel` is { contentTypeId: <typeId>, entryId }.
 
-    function selfRelBundle(
-      typeId: string,
-      typeIdentifier: string,
-      entries: Bundle['entries']
-    ): Bundle {
-      return {
-        version: BUNDLE_VERSION,
-        exportedAt: '2026-05-30T00:00:00.000Z',
-        portable: false,
-        contentTypes: [
-          {
-            id: typeId,
-            identifier: typeIdentifier,
-            name: typeIdentifier,
-            description: null,
-            fields: [
-              {
-                id: randomUUID(),
-                identifier: 'title',
-                name: 'Title',
-                type: FIELD_TYPES.ENTRY_TITLE,
-                required: true,
-                order: 0,
-                options: null,
-              },
-              {
-                id: randomUUID(),
-                identifier: 'rel',
-                name: 'Rel',
-                type: FIELD_TYPES.RELATION,
-                required: false,
-                order: 1,
-                options: { targetContentTypeIds: [typeId] },
-              },
-            ],
-          },
-        ],
-        entries,
-      };
-    }
-
     it('throws and persists nothing when a RELATION points at a missing entry', async () => {
       const typeId = randomUUID();
       const entryId = randomUUID();
       const missingId = randomUUID();
-      const danglingBundle = selfRelBundle(typeId, 'DanglingRelType', [
-        {
-          id: entryId,
-          contentTypeId: typeId,
-          contentTypeIdentifier: 'DanglingRelType',
-          entryTitle: 'Source',
-          entryKey: 'source',
-          slug: 'source',
-          versions: [
-            {
-              status: CONTENT_STATUSES.PUBLISHED,
-              publishedAt: '2026-05-30T00:00:00.000Z',
-              data: {
-                title: 'Source',
-                rel: { contentTypeId: typeId, entryId: missingId },
-              },
-            },
-          ],
-        },
-      ]);
+      const danglingBundle = fx.danglingRelationBundle(
+        typeId,
+        entryId,
+        missingId
+      );
 
       const before = await prisma.contentEntry.count();
       await expect(
@@ -1096,41 +506,7 @@ describe('importBundle', () => {
       const typeId = randomUUID();
       const idA = randomUUID();
       const idB = randomUUID();
-      const forwardRefBundle = selfRelBundle(typeId, 'ForwardRefType', [
-        {
-          id: idA,
-          contentTypeId: typeId,
-          contentTypeIdentifier: 'ForwardRefType',
-          entryTitle: 'A',
-          entryKey: 'a',
-          slug: 'a',
-          versions: [
-            {
-              status: CONTENT_STATUSES.PUBLISHED,
-              publishedAt: '2026-05-30T00:00:00.000Z',
-              data: {
-                title: 'A',
-                rel: { contentTypeId: typeId, entryId: idB },
-              },
-            },
-          ],
-        },
-        {
-          id: idB,
-          contentTypeId: typeId,
-          contentTypeIdentifier: 'ForwardRefType',
-          entryTitle: 'B',
-          entryKey: 'b',
-          slug: 'b',
-          versions: [
-            {
-              status: CONTENT_STATUSES.PUBLISHED,
-              publishedAt: '2026-05-30T00:00:00.000Z',
-              data: { title: 'B' },
-            },
-          ],
-        },
-      ]);
+      const forwardRefBundle = fx.forwardRefEntryBundle(typeId, idA, idB);
 
       await expect(
         importBundle(prisma, forwardRefBundle, { mode: 'all' })
@@ -1142,54 +518,16 @@ describe('importBundle', () => {
       const existingId = randomUUID();
 
       // Seed the content type + target entry B first via a schema+entries import.
-      await importBundle(
-        prisma,
-        selfRelBundle(typeId, 'PreExistingType', [
-          {
-            id: existingId,
-            contentTypeId: typeId,
-            contentTypeIdentifier: 'PreExistingType',
-            entryTitle: 'Existing',
-            entryKey: 'existing',
-            slug: 'existing',
-            versions: [
-              {
-                status: CONTENT_STATUSES.PUBLISHED,
-                publishedAt: '2026-05-30T00:00:00.000Z',
-                data: { title: 'Existing' },
-              },
-            ],
-          },
-        ]),
-        { mode: 'all' }
-      );
+      await importBundle(prisma, fx.preExistingSeedBundle(typeId, existingId), {
+        mode: 'all',
+      });
 
       // Now import a new entry whose rel points at the pre-existing entry.
-      const refToExistingBundle: Bundle = {
-        version: BUNDLE_VERSION,
-        exportedAt: '2026-05-30T00:00:00.000Z',
-        portable: false,
-        entries: [
-          {
-            id: randomUUID(),
-            contentTypeId: typeId,
-            contentTypeIdentifier: 'PreExistingType',
-            entryTitle: 'Referrer',
-            entryKey: 'referrer',
-            slug: 'referrer',
-            versions: [
-              {
-                status: CONTENT_STATUSES.PUBLISHED,
-                publishedAt: '2026-05-30T00:00:00.000Z',
-                data: {
-                  title: 'Referrer',
-                  rel: { contentTypeId: typeId, entryId: existingId },
-                },
-              },
-            ],
-          },
-        ],
-      };
+      const refToExistingBundle = fx.refToExistingBundle(
+        typeId,
+        randomUUID(),
+        existingId
+      );
 
       await expect(
         importBundle(prisma, refToExistingBundle, { mode: 'entries' })
@@ -1200,67 +538,11 @@ describe('importBundle', () => {
       const typeId = randomUUID();
       const entryId = randomUUID();
       const missingId = randomUUID();
-      const danglingRichtextBundle: Bundle = {
-        version: BUNDLE_VERSION,
-        exportedAt: '2026-05-30T00:00:00.000Z',
-        portable: false,
-        contentTypes: [
-          {
-            id: typeId,
-            identifier: 'RichtextDangleType',
-            name: 'RichtextDangleType',
-            description: null,
-            fields: [
-              {
-                id: randomUUID(),
-                identifier: 'title',
-                name: 'Title',
-                type: FIELD_TYPES.ENTRY_TITLE,
-                required: true,
-                order: 0,
-                options: null,
-              },
-              {
-                id: randomUUID(),
-                identifier: 'body',
-                name: 'Body',
-                type: FIELD_TYPES.RICHTEXT,
-                required: false,
-                order: 1,
-                options: { targetContentTypeIds: [typeId] },
-              },
-            ],
-          },
-        ],
-        entries: [
-          {
-            id: entryId,
-            contentTypeId: typeId,
-            contentTypeIdentifier: 'RichtextDangleType',
-            entryTitle: 'Source',
-            entryKey: 'source',
-            slug: 'source',
-            versions: [
-              {
-                status: CONTENT_STATUSES.PUBLISHED,
-                publishedAt: '2026-05-30T00:00:00.000Z',
-                data: {
-                  title: 'Source',
-                  body: {
-                    type: 'doc',
-                    content: [
-                      {
-                        type: 'cmsEmbed',
-                        attrs: { contentTypeId: typeId, entryId: missingId },
-                      },
-                    ],
-                  },
-                },
-              },
-            ],
-          },
-        ],
-      };
+      const danglingRichtextBundle = fx.danglingRichtextBundle(
+        typeId,
+        entryId,
+        missingId
+      );
 
       await expect(
         importBundle(prisma, danglingRichtextBundle, { mode: 'all' })
@@ -1276,63 +558,11 @@ describe('importBundle', () => {
       const typeId = randomUUID();
       const entryId = randomUUID();
       const missingId = randomUUID();
-      const danglingMrelBundle: Bundle = {
-        version: BUNDLE_VERSION,
-        exportedAt: '2026-05-30T00:00:00.000Z',
-        portable: false,
-        contentTypes: [
-          {
-            id: typeId,
-            identifier: 'DanglingMrelType',
-            name: 'DanglingMrelType',
-            description: null,
-            fields: [
-              {
-                id: randomUUID(),
-                identifier: 'title',
-                name: 'Title',
-                type: FIELD_TYPES.ENTRY_TITLE,
-                required: true,
-                order: 0,
-                options: null,
-              },
-              {
-                id: randomUUID(),
-                identifier: 'mrel',
-                name: 'Mrel',
-                type: FIELD_TYPES.MULTIRELATION,
-                required: false,
-                order: 1,
-                options: { targetContentTypeIds: [typeId] },
-              },
-            ],
-          },
-        ],
-        entries: [
-          {
-            id: entryId,
-            contentTypeId: typeId,
-            contentTypeIdentifier: 'DanglingMrelType',
-            entryTitle: 'Source',
-            entryKey: 'source',
-            slug: 'source',
-            versions: [
-              {
-                status: CONTENT_STATUSES.PUBLISHED,
-                publishedAt: '2026-05-30T00:00:00.000Z',
-                data: {
-                  title: 'Source',
-                  mrel: [
-                    // valid self-ref (resolves) + a dangling ref (missing)
-                    { contentTypeId: typeId, entryId: entryId },
-                    { contentTypeId: typeId, entryId: missingId },
-                  ],
-                },
-              },
-            ],
-          },
-        ],
-      };
+      const danglingMrelBundle = fx.danglingMultirelationBundle(
+        typeId,
+        entryId,
+        missingId
+      );
 
       const before = await prisma.contentEntry.count();
       await expect(
@@ -1407,28 +637,7 @@ describe('importBundle', () => {
 
       // Import a non-portable bundle (schema already present) carrying an entry
       // with the SAME identifier + entryKey 'dup' so it collides, using skip.
-      const collidingBundle: Bundle = {
-        version: BUNDLE_VERSION,
-        exportedAt: '2026-05-30T00:00:00.000Z',
-        portable: false,
-        entries: [
-          {
-            id: randomUUID(),
-            contentTypeId: ct.id,
-            contentTypeIdentifier: 'SkipDangleType',
-            entryTitle: 'Dup',
-            entryKey: 'dup',
-            slug: 'dup',
-            versions: [
-              {
-                status: CONTENT_STATUSES.PUBLISHED,
-                publishedAt: '2026-05-30T00:00:00.000Z',
-                data: { title: 'Dup' },
-              },
-            ],
-          },
-        ],
-      };
+      const collidingBundle = fx.skipDangleCollidingBundle(ct.id, randomUUID());
 
       const result = await importBundle(prisma, collidingBundle, {
         mode: 'entries',
