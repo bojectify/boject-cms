@@ -15,6 +15,7 @@ import type {
   BundleField,
 } from './types';
 import { BUNDLE_VERSION } from './types';
+import type { CurrentSchemaSnapshot } from './schemaPlan.types';
 
 /** The single canonical timestamp used across content-bundle fixtures. */
 export const FIXED_EXPORTED_AT = '2026-05-01T00:00:00.000Z';
@@ -26,6 +27,20 @@ export function makeBundle(parts: Partial<Bundle> = {}): Bundle {
     portable: true,
     ...parts,
   };
+}
+
+/**
+ * A CurrentSchemaSnapshot. `contentTypes` defaults to `[]`; `fieldUsage` to an
+ * empty Map. Pass a ready Map for `fieldUsage` — it is a Map, not an object,
+ * and `toStrictEqual` enforces that distinction. Snapshot content-type fields
+ * are a DIFFERENT shape than BundleField (required `id`/`unique`, an
+ * `entryCount` on the type), so build them with literals or a local snapshot
+ * helper — the bundle `field()`/`ct()` builders do NOT fit here.
+ */
+export function snapshot(
+  parts: Partial<CurrentSchemaSnapshot> = {}
+): CurrentSchemaSnapshot {
+  return { contentTypes: [], fieldUsage: new Map(), ...parts };
 }
 
 export function ct(
