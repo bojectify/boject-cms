@@ -16,6 +16,21 @@ import type { Bundle } from './types';
 import { getTestDatabaseUrl } from '../../test/dbUrl';
 import { FIELD_TYPES } from '../../utils/fieldTypes';
 import { CONTENT_STATUSES } from '../../utils/contentStatus';
+import {
+  articleWithTitleAndSlug,
+  articleRenamedWithTitle,
+  articleWithTitleAndTagline,
+  articleTitleOnly,
+  postWithUpdatedSelect,
+  articleWithRequiredTagline,
+  authorAndArticleWithRelation,
+  authorAndArticleWithResolvedRelation,
+  tagAndArticleWithMultirelation,
+  articleRenamedTitleOnly,
+  newTypeBundle,
+  dryRunArticleBundle,
+  blockedDryRunBundle,
+} from './applySchema.integration.fixtures';
 
 const url = getTestDatabaseUrl();
 const adapter = new PrismaPg({ connectionString: url });
@@ -129,15 +144,8 @@ describe('applySchema', () => {
         },
       });
 
-      const bundle: Bundle = {
-        version: 2,
-        exportedAt: '2026-05-01T00:00:00.000Z',
-        portable: true,
-        contentTypes: [],
-      };
-
       await expect(
-        applySchema(prisma, bundle, { allowDestructive: true })
+        applySchema(prisma, emptyBundle, { allowDestructive: true })
       ).rejects.toMatchObject({
         code: 'SCHEMA_APPLY_BLOCKED',
       });
@@ -188,15 +196,8 @@ describe('applySchema', () => {
         },
       });
 
-      const bundle: Bundle = {
-        version: 2,
-        exportedAt: '2026-05-01T00:00:00.000Z',
-        portable: true,
-        contentTypes: [],
-      };
-
       try {
-        await applySchema(prisma, bundle);
+        await applySchema(prisma, emptyBundle);
         throw new Error('expected applySchema to throw');
       } catch (e) {
         const err = e as { code: string; blockers: unknown[]; plan: unknown };
@@ -209,40 +210,7 @@ describe('applySchema', () => {
 
   describe('happy path — pass 1 (types)', () => {
     it('creates a new content type from an empty DB, with its fields embedded', async () => {
-      const bundle: Bundle = {
-        version: 2,
-        exportedAt: '2026-05-01T00:00:00.000Z',
-        portable: true,
-        contentTypes: [
-          {
-            id: null,
-            identifier: 'Article',
-            name: 'Article',
-            description: 'Blog article',
-            fields: [
-              {
-                id: null,
-                identifier: 'title',
-                name: 'Title',
-                type: FIELD_TYPES.ENTRY_TITLE,
-                required: true,
-                order: 0,
-                options: null,
-              },
-              {
-                id: null,
-                identifier: 'slug',
-                name: 'Slug',
-                type: FIELD_TYPES.SLUG,
-                required: false,
-                order: 1,
-                options: null,
-              },
-            ],
-          },
-        ],
-      };
-      const result = await applySchema(prisma, bundle);
+      const result = await applySchema(prisma, articleWithTitleAndSlug);
       expect(result.changed).toBe(true);
       expect(result.applied.contentTypesCreated).toBe(1);
 
@@ -283,31 +251,7 @@ describe('applySchema', () => {
         },
       });
 
-      const bundle: Bundle = {
-        version: 2,
-        exportedAt: '2026-05-01T00:00:00.000Z',
-        portable: true,
-        contentTypes: [
-          {
-            id: null,
-            identifier: 'Article',
-            name: 'New Name',
-            description: 'Renamed',
-            fields: [
-              {
-                id: null,
-                identifier: 'title',
-                name: 'Title',
-                type: FIELD_TYPES.ENTRY_TITLE,
-                required: true,
-                order: 0,
-                options: null,
-              },
-            ],
-          },
-        ],
-      };
-      const result = await applySchema(prisma, bundle);
+      const result = await applySchema(prisma, articleRenamedWithTitle);
       expect(result.changed).toBe(true);
       expect(result.applied.contentTypesUpdated).toBe(1);
 
@@ -340,13 +284,7 @@ describe('applySchema', () => {
         },
       });
 
-      const bundle: Bundle = {
-        version: 2,
-        exportedAt: '2026-05-01T00:00:00.000Z',
-        portable: true,
-        contentTypes: [],
-      };
-      const result = await applySchema(prisma, bundle, {
+      const result = await applySchema(prisma, emptyBundle, {
         allowDestructive: true,
       });
       expect(result.changed).toBe(true);
@@ -380,40 +318,7 @@ describe('applySchema', () => {
         },
       });
 
-      const bundle: Bundle = {
-        version: 2,
-        exportedAt: '2026-05-01T00:00:00.000Z',
-        portable: true,
-        contentTypes: [
-          {
-            id: null,
-            identifier: 'Article',
-            name: 'Article',
-            description: null,
-            fields: [
-              {
-                id: null,
-                identifier: 'title',
-                name: 'Title',
-                type: FIELD_TYPES.ENTRY_TITLE,
-                required: true,
-                order: 0,
-                options: null,
-              },
-              {
-                id: null,
-                identifier: 'tagline',
-                name: 'Tagline',
-                type: FIELD_TYPES.TEXT,
-                required: false,
-                order: 1,
-                options: null,
-              },
-            ],
-          },
-        ],
-      };
-      const result = await applySchema(prisma, bundle);
+      const result = await applySchema(prisma, articleWithTitleAndTagline);
       expect(result.changed).toBe(true);
       expect(result.applied.fieldsCreated).toBe(1);
 
@@ -446,31 +351,7 @@ describe('applySchema', () => {
         },
       });
 
-      const bundle: Bundle = {
-        version: 2,
-        exportedAt: '2026-05-01T00:00:00.000Z',
-        portable: true,
-        contentTypes: [
-          {
-            id: null,
-            identifier: 'Article',
-            name: 'Article',
-            description: null,
-            fields: [
-              {
-                id: null,
-                identifier: 'title',
-                name: 'Title',
-                type: FIELD_TYPES.ENTRY_TITLE,
-                required: true,
-                order: 0,
-                options: null,
-              },
-            ],
-          },
-        ],
-      };
-      const result = await applySchema(prisma, bundle);
+      const result = await applySchema(prisma, articleTitleOnly);
       expect(result.changed).toBe(true);
       expect(result.applied.fieldsUpdated).toBe(1);
 
@@ -510,40 +391,7 @@ describe('applySchema', () => {
         },
       });
 
-      const bundle: Bundle = {
-        version: 2,
-        exportedAt: '2026-05-01T00:00:00.000Z',
-        portable: true,
-        contentTypes: [
-          {
-            id: null,
-            identifier: 'Post',
-            name: 'Post',
-            description: null,
-            fields: [
-              {
-                id: null,
-                identifier: 'title',
-                name: 'Title',
-                type: FIELD_TYPES.ENTRY_TITLE,
-                required: true,
-                order: 0,
-                options: null,
-              },
-              {
-                id: null,
-                identifier: 'category',
-                name: 'Category',
-                type: FIELD_TYPES.SELECT,
-                required: false,
-                order: 1,
-                options: { choices: ['news', 'opinion'] },
-              },
-            ],
-          },
-        ],
-      };
-      const result = await applySchema(prisma, bundle);
+      const result = await applySchema(prisma, postWithUpdatedSelect);
       expect(result.changed).toBe(true);
       expect(result.applied.fieldsUpdated).toBe(1);
 
@@ -600,40 +448,7 @@ describe('applySchema', () => {
         },
       });
 
-      const bundle: Bundle = {
-        version: 2,
-        exportedAt: '2026-05-01T00:00:00.000Z',
-        portable: true,
-        contentTypes: [
-          {
-            id: null,
-            identifier: 'Article',
-            name: 'Article',
-            description: null,
-            fields: [
-              {
-                id: null,
-                identifier: 'title',
-                name: 'Title',
-                type: FIELD_TYPES.ENTRY_TITLE,
-                required: true,
-                order: 0,
-                options: null,
-              },
-              {
-                id: null,
-                identifier: 'tagline',
-                name: 'Tagline',
-                type: FIELD_TYPES.TEXT,
-                required: true,
-                order: 1,
-                options: null,
-              },
-            ],
-          },
-        ],
-      };
-      const result = await applySchema(prisma, bundle);
+      const result = await applySchema(prisma, articleWithRequiredTagline);
       expect(result.applied.fieldsUpdated).toBe(1);
 
       const f = await prisma.contentTypeField.findFirst({
@@ -672,31 +487,7 @@ describe('applySchema', () => {
         },
       });
 
-      const bundle: Bundle = {
-        version: 2,
-        exportedAt: '2026-05-01T00:00:00.000Z',
-        portable: true,
-        contentTypes: [
-          {
-            id: null,
-            identifier: 'Article',
-            name: 'Article',
-            description: null,
-            fields: [
-              {
-                id: null,
-                identifier: 'title',
-                name: 'Title',
-                type: FIELD_TYPES.ENTRY_TITLE,
-                required: true,
-                order: 0,
-                options: null,
-              },
-            ],
-          },
-        ],
-      };
-      const result = await applySchema(prisma, bundle, {
+      const result = await applySchema(prisma, articleTitleOnly, {
         allowDestructive: true,
       });
       expect(result.changed).toBe(true);
@@ -732,57 +523,7 @@ describe('applySchema', () => {
         },
       });
 
-      const bundle: Bundle = {
-        version: 2,
-        exportedAt: '2026-05-01T00:00:00.000Z',
-        portable: true,
-        contentTypes: [
-          {
-            id: null,
-            identifier: 'Author',
-            name: 'Author',
-            description: null,
-            fields: [
-              {
-                id: null,
-                identifier: 'name',
-                name: 'Name',
-                type: FIELD_TYPES.ENTRY_TITLE,
-                required: true,
-                order: 0,
-                options: null,
-              },
-            ],
-          },
-          {
-            id: null,
-            identifier: 'Article',
-            name: 'Article',
-            description: null,
-            fields: [
-              {
-                id: null,
-                identifier: 'title',
-                name: 'Title',
-                type: FIELD_TYPES.ENTRY_TITLE,
-                required: true,
-                order: 0,
-                options: null,
-              },
-              {
-                id: null,
-                identifier: 'author',
-                name: 'Author',
-                type: FIELD_TYPES.RELATION,
-                required: false,
-                order: 1,
-                options: { targetContentTypeIdentifiers: ['Author'] },
-              },
-            ],
-          },
-        ],
-      };
-      const result = await applySchema(prisma, bundle);
+      const result = await applySchema(prisma, authorAndArticleWithRelation);
       expect(result.changed).toBe(true);
       expect(result.applied.contentTypesCreated).toBe(1);
       expect(result.applied.fieldsCreated).toBe(1);
@@ -806,57 +547,7 @@ describe('applySchema', () => {
     });
 
     it('creates two content types that mutually relate in one apply', async () => {
-      const bundle: Bundle = {
-        version: 2,
-        exportedAt: '2026-05-01T00:00:00.000Z',
-        portable: true,
-        contentTypes: [
-          {
-            id: null,
-            identifier: 'Author',
-            name: 'Author',
-            description: null,
-            fields: [
-              {
-                id: null,
-                identifier: 'name',
-                name: 'Name',
-                type: FIELD_TYPES.ENTRY_TITLE,
-                required: true,
-                order: 0,
-                options: null,
-              },
-            ],
-          },
-          {
-            id: null,
-            identifier: 'Article',
-            name: 'Article',
-            description: null,
-            fields: [
-              {
-                id: null,
-                identifier: 'title',
-                name: 'Title',
-                type: FIELD_TYPES.ENTRY_TITLE,
-                required: true,
-                order: 0,
-                options: null,
-              },
-              {
-                id: null,
-                identifier: 'author',
-                name: 'Author',
-                type: FIELD_TYPES.RELATION,
-                required: false,
-                order: 1,
-                options: { targetContentTypeIdentifiers: ['Author'] },
-              },
-            ],
-          },
-        ],
-      };
-      const result = await applySchema(prisma, bundle);
+      const result = await applySchema(prisma, authorAndArticleWithRelation);
       expect(result.applied.contentTypesCreated).toBe(2);
       // Both types created with their fields embedded (no separate
       // pass 2 entries — both rode along with pass 1).
@@ -870,59 +561,7 @@ describe('applySchema', () => {
       // RELATION fields just because the DB stores UUIDs and the
       // bundle has identifiers.
       const { importBundle } = await import('./import');
-      const bundle: Bundle = {
-        version: 2,
-        exportedAt: '2026-05-01T00:00:00.000Z',
-        portable: true,
-        contentTypes: [
-          {
-            id: null,
-            identifier: 'Author',
-            name: 'Author',
-            description: null,
-            fields: [
-              {
-                id: null,
-                identifier: 'name',
-                name: 'Name',
-                type: FIELD_TYPES.ENTRY_TITLE,
-                required: true,
-                order: 0,
-                options: null,
-              },
-            ],
-          },
-          {
-            id: null,
-            identifier: 'Article',
-            name: 'Article',
-            description: null,
-            fields: [
-              {
-                id: null,
-                identifier: 'title',
-                name: 'Title',
-                type: FIELD_TYPES.ENTRY_TITLE,
-                required: true,
-                order: 0,
-                options: null,
-              },
-              {
-                id: null,
-                identifier: 'author',
-                name: 'Author',
-                type: FIELD_TYPES.RELATION,
-                required: false,
-                order: 1,
-                options: {
-                  targetContentTypeIds: [null],
-                  targetContentTypeIdentifiers: ['Author'],
-                },
-              },
-            ],
-          },
-        ],
-      };
+      const bundle = authorAndArticleWithResolvedRelation;
 
       await importBundle(prisma, bundle, { mode: 'all', author: 'system' });
 
@@ -932,59 +571,7 @@ describe('applySchema', () => {
     });
 
     it('is a no-op on second apply of the same portable bundle (RELATION targets resolve identically)', async () => {
-      const bundle: Bundle = {
-        version: 2,
-        exportedAt: '2026-05-01T00:00:00.000Z',
-        portable: true,
-        contentTypes: [
-          {
-            id: null,
-            identifier: 'Tag',
-            name: 'Tag',
-            description: null,
-            fields: [
-              {
-                id: null,
-                identifier: 'name',
-                name: 'Name',
-                type: FIELD_TYPES.ENTRY_TITLE,
-                required: true,
-                order: 0,
-                options: null,
-              },
-            ],
-          },
-          {
-            id: null,
-            identifier: 'Article',
-            name: 'Article',
-            description: null,
-            fields: [
-              {
-                id: null,
-                identifier: 'title',
-                name: 'Title',
-                type: FIELD_TYPES.ENTRY_TITLE,
-                required: true,
-                order: 0,
-                options: null,
-              },
-              {
-                id: null,
-                identifier: 'tags',
-                name: 'Tags',
-                type: FIELD_TYPES.MULTIRELATION,
-                required: false,
-                order: 1,
-                options: {
-                  targetContentTypeIds: [null],
-                  targetContentTypeIdentifiers: ['Tag'],
-                },
-              },
-            ],
-          },
-        ],
-      };
+      const bundle = tagAndArticleWithMultirelation;
 
       const first = await applySchema(prisma, bundle);
       expect(first.changed).toBe(true);
@@ -1043,32 +630,10 @@ describe('applySchema', () => {
         return real;
       });
 
-      const bundle: Bundle = {
-        version: 2,
-        exportedAt: '2026-05-01T00:00:00.000Z',
-        portable: true,
-        contentTypes: [
-          {
-            id: null,
-            identifier: 'Article',
-            name: 'Renamed',
-            description: null,
-            fields: [
-              {
-                id: null,
-                identifier: 'title',
-                name: 'Title',
-                type: FIELD_TYPES.ENTRY_TITLE,
-                required: true,
-                order: 0,
-                options: null,
-              },
-            ],
-          },
-        ],
-      };
       await expect(
-        applySchema(prisma, bundle, { allowDestructive: true })
+        applySchema(prisma, articleRenamedTitleOnly, {
+          allowDestructive: true,
+        })
       ).rejects.toMatchObject({ code: 'SCHEMA_CHANGED_DURING_APPLY' });
 
       spy.mockRestore();
@@ -1095,31 +660,7 @@ describe('applySchema', () => {
       const spy = vi.spyOn(schemaModule, 'invalidateSchema');
       spy.mockImplementation(() => {});
 
-      const bundle: Bundle = {
-        version: 2,
-        exportedAt: '2026-05-01T00:00:00.000Z',
-        portable: true,
-        contentTypes: [
-          {
-            id: null,
-            identifier: 'NewType',
-            name: 'NewType',
-            description: null,
-            fields: [
-              {
-                id: null,
-                identifier: 'title',
-                name: 'Title',
-                type: FIELD_TYPES.ENTRY_TITLE,
-                required: true,
-                order: 0,
-                options: null,
-              },
-            ],
-          },
-        ],
-      };
-      const result = await applySchema(prisma, bundle);
+      const result = await applySchema(prisma, newTypeBundle);
       expect(result.changed).toBe(true);
       expect(spy).toHaveBeenCalledTimes(1);
     });
@@ -1127,32 +668,9 @@ describe('applySchema', () => {
 
   describe('dryRun', () => {
     it('returns the plan and applied counts but rolls back the transaction', async () => {
-      const bundle: Bundle = {
-        version: 2,
-        exportedAt: '2026-05-01T00:00:00.000Z',
-        portable: true,
-        contentTypes: [
-          {
-            id: null,
-            identifier: 'DryRunArticle',
-            name: 'DryRunArticle',
-            description: null,
-            fields: [
-              {
-                id: null,
-                identifier: 'title',
-                name: 'Title',
-                type: FIELD_TYPES.ENTRY_TITLE,
-                required: true,
-                order: 0,
-                options: null,
-              },
-            ],
-          },
-        ],
-      };
-
-      const result = await applySchema(prisma, bundle, { dryRun: true });
+      const result = await applySchema(prisma, dryRunArticleBundle, {
+        dryRun: true,
+      });
 
       expect(result.changed).toBe(true);
       expect(result.applied.contentTypesCreated).toBe(1);
@@ -1174,30 +692,7 @@ describe('applySchema', () => {
 
     it('still surfaces blockers in dryRun mode (no rollback needed because tx never started mutating)', async () => {
       // Apply once to seed.
-      await applySchema(prisma, {
-        version: 2,
-        exportedAt: '2026-05-01T00:00:00.000Z',
-        portable: true,
-        contentTypes: [
-          {
-            id: null,
-            identifier: 'BlockedDryRun',
-            name: 'BlockedDryRun',
-            description: null,
-            fields: [
-              {
-                id: null,
-                identifier: 'title',
-                name: 'Title',
-                type: FIELD_TYPES.ENTRY_TITLE,
-                required: true,
-                order: 0,
-                options: null,
-              },
-            ],
-          },
-        ],
-      });
+      await applySchema(prisma, blockedDryRunBundle);
       // Seed an entry so removal is a destructive blocker.
       const ct = await prisma.contentType.findUniqueOrThrow({
         where: { identifier: 'BlockedDryRun' },
@@ -1219,16 +714,7 @@ describe('applySchema', () => {
       });
 
       await expect(
-        applySchema(
-          prisma,
-          {
-            version: 2,
-            exportedAt: '2026-05-01T00:00:00.000Z',
-            portable: true,
-            contentTypes: [],
-          },
-          { dryRun: true }
-        )
+        applySchema(prisma, emptyBundle, { dryRun: true })
       ).rejects.toMatchObject({ code: 'SCHEMA_APPLY_BLOCKED' });
     });
   });
