@@ -41,7 +41,8 @@ export interface ApiContext {
  *   command can switch on `.code` (e.g. `BUNDLE_INVALID`,
  *   `SCHEMA_APPLY_BLOCKED`) without re-implementing parsing. Nuxt's
  *   `createError({ data })` shape is unwrapped: the inner `data.error`
- *   becomes `code`, and the outer `message` is preserved.
+ *   becomes `code`, and the outer `message` is preserved — falling back to
+ *   `data.message` when the outer one is missing or empty.
  */
 async function callJson<T>(
   ctx: ApiContext,
@@ -88,10 +89,21 @@ async function callJson<T>(
       data && typeof data === 'object' && 'error' in data
         ? String((data as { error: string }).error)
         : `HTTP_${res.status}`;
+    // Prefer the top-level `message`, but fall back to `data.message` when
+    // it's missing or empty — some endpoints set the human-readable reason
+    // only under `data` and leave h3's outer `message` blank ("").
+    const topLevelMessage =
+      parsed && typeof parsed === 'object' && 'message' in parsed
+        ? String((parsed as { message: unknown }).message)
+        : '';
+    const dataMessage =
+      data && typeof data === 'object' && 'message' in data
+        ? String((data as { message: unknown }).message)
+        : '';
     const message =
-      (parsed && typeof parsed === 'object' && 'message' in parsed
-        ? String((parsed as { message: string }).message)
-        : null) ?? `${method} ${path} returned ${res.status}`;
+      (topLevelMessage.length > 0 ? topLevelMessage : null) ??
+      (dataMessage.length > 0 ? dataMessage : null) ??
+      `${method} ${path} returned ${res.status}`;
     throw new HttpError(res.status, code, message, data);
   }
   return parsed as T;

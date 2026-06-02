@@ -155,6 +155,29 @@ describe('runEntriesImport', () => {
     expect(lines.some((l) => /--on-conflict/.test(l))).toBe(true);
   });
 
+  it('falls back to data.message when the top-level message is empty', async () => {
+    handler.value = async () => ({
+      status: 400,
+      body: {
+        message: '',
+        data: {
+          error: 'ENTRY_IMPORT_REFERENCE_INVALID',
+          message:
+            'Entry "Article:home" field "author" references missing entry ct:bogus',
+        },
+      },
+    });
+    const r = await runEntriesImport({
+      cwd: workDir,
+      apiKey: 'k',
+      flags: { path: bundlePath },
+      stdout,
+      stderr,
+    });
+    expect(r.exitCode).toBe(1);
+    expect(lines.some((l) => /references missing entry/.test(l))).toBe(true);
+  });
+
   it('passes dryRun: true and prints a dry-run banner', async () => {
     handler.value = async () => ({ status: 200, body: SUCCESS_BODY });
     const r = await runEntriesImport({
