@@ -121,6 +121,44 @@ Reading `.git` is allowed so VS Code's Source Control / blame / diff / GitLens a
 
 Residual risk: a compromised dep can still read/write the bind-mounted working tree (everything except `.git/`). Mitigation is commit-and-push frequently so uncommitted changes are the only at-risk surface.
 
+### Native setup (no container)
+
+The container is an **opt-in** supply-chain hardening measure, not a hard requirement. Nothing in the repo enforces it — no CI gate, no commit hook checks for it. You can run the entire toolchain natively on the host instead: `pnpm install`, `pnpm dev`, `pnpm test`, `pnpm lint`, and `pnpm typecheck` all behave identically and produce the same valid commits and PRs. The only thing you give up is the host-secret isolation described above, and only for your own machine — it has no effect on the repo or on other maintainers.
+
+**Trade-off:** running natively means npm dependency code (install scripts, test dependencies) executes with normal access to your host environment (`~/.ssh`, `~/.aws`, `~/.npmrc`, etc.). If that's acceptable on your machine, native is simpler — there's no container round-trip on every command.
+
+**Pick one lane — don't mix native and container installs.** `node_modules` lives in the bind-mounted working tree; it is _not_ isolated in a separate volume, so the host and the `dev` container share the same directory. pnpm's symlinks point at whichever store ran the install (the container's `/pnpm-store` vs. your host store), and native modules are compiled per-platform (linux vs. macOS arm64). Installing through one and running through the other will fail to resolve. If you previously installed via the container, delete `node_modules` (root + each workspace) and reinstall natively — and vice versa.
+
+**Setup:**
+
+1. Install Node.js 24 and pnpm 11 natively to match the container (pnpm's `packageManager` field pins the exact version). **Do not** install the host shims (One-time setup step 3); if you already did, remove `~/.local/bin` from the front of your PATH or delete `~/.local/bin/pnpm` and `~/.local/bin/pnpx`. `which pnpm` should resolve to your real pnpm, not the shim.
+
+2. Install lefthook on the host as usual (`brew install lefthook && lefthook install`). The git hooks just call `pnpm lint` / `pnpm typecheck` / `pnpm test`, which resolve to native pnpm when the shim isn't on PATH — no container involved.
+
+3. Start only PostgreSQL — you don't need the `dev` service:
+
+   ```sh
+   docker compose up -d db
+   ```
+
+   (Or run your own Postgres 17 and point `DATABASE_URL` at it.)
+
+4. Install and bootstrap on the host:
+
+   ```sh
+   pnpm install
+   cp apps/cms/.env.example apps/cms/.env
+   pnpm --filter cms exec msw init public --no-save
+   pnpm --filter cms exec playwright install chromium chromium-headless-shell
+   pnpm prisma:migrate
+   BOJECT_ADMIN_EMAIL=admin@example.com \
+     BOJECT_ADMIN_PASSWORD='choose-a-strong-dev-password' \
+     pnpm dev:bootstrap-admin
+   pnpm dev
+   ```
+
+Everything else in this README applies unchanged — just ignore the host-shim and `dev`-alias instructions.
+
 ## Getting Started
 
 ```bash
