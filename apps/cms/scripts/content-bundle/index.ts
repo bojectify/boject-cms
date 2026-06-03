@@ -60,7 +60,9 @@ Flags:
   --entries      Only entries
   --all          Both content types and entries
   --portable     Rewrite UUID references to identifier/slug keys (export only)
-  --out <path>   Write export to a custom path
+  --out <path>   Write export to a custom path. A .tar.gz / .tgz target packs
+                 bundle.json + assets/ into one gzipped tar; a directory writes
+                 the sidecar layout; a .json writes references-only.
   --no-assets    With a directory --out, write bundle.json only (no asset
                  bytes). Use when source and target share one storage bucket.
   --max-asset-size <MB>   Per-asset size cap (default 25).
@@ -81,6 +83,8 @@ Examples:
   pnpm content:export --all --portable
   pnpm content:export --entries --out ./generated/entries.json
   pnpm content:export --all --out ./my-bundle/        # bundle.json + assets/
+  pnpm content:export --all --out ./my-bundle.tar.gz   # single gzipped artefact
+  pnpm content:import ./my-bundle.tar.gz               # auto-detected, restores bytes
   pnpm content:import ./generated/content-bundle-all.json --all
   pnpm content:import ./my-bundle/                    # restores entries + bytes
   pnpm content:validate ./starters/base.boject.json
