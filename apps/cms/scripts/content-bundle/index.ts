@@ -434,6 +434,55 @@ export async function runCli(argv: string[]): Promise<void> {
       }
       const path = args[0];
       if (!path) throw new Error('Usage: content-bundle validate <path>');
+
+      const absValidate = resolve(path);
+      let isValidateDir = false;
+      try {
+        isValidateDir = statSync(absValidate).isDirectory();
+      } catch {
+        isValidateDir = false;
+      }
+      if (!isValidateDir) {
+        const buf = readFileSync(absValidate);
+        if (isTarballPath(path) || looksGzipped(buf)) {
+          const { bundleJson, assetKeys } = await unpackBundleTarball(buf, {
+            assetBodies: false,
+          });
+          const bundle = JSON.parse(bundleJson);
+          const result = validateBundle(bundle);
+          if (!result.ok) {
+            console.error('Bundle failed validation:');
+            for (const err of result.errors) {
+              console.error(`  ${err.path}: ${err.message}`);
+            }
+            process.exit(1);
+            return;
+          }
+          if (bundle.contentTypes) {
+            const imageFields = buildImageFieldsFromContentTypes(
+              bundle.contentTypes
+            );
+            const referenced = collectImageStorageKeys(bundle, imageFields);
+            try {
+              assertAssetsComplete(referenced, new Set(assetKeys));
+              console.log(
+                `Bundle is valid (${referenced.length} asset(s) present).`
+              );
+            } catch (e) {
+              console.error(e instanceof Error ? e.message : String(e));
+              process.exit(1);
+              return;
+            }
+          } else {
+            console.log(
+              'Bundle is valid (entries-only: asset completeness not checked offline).'
+            );
+          }
+          process.exit(0);
+          return;
+        }
+      }
+
       const { bundlePath, assetsDir } = resolveImportSource(path);
       const raw = readFileSync(bundlePath, 'utf8');
       const bundle = JSON.parse(raw);

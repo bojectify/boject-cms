@@ -27,6 +27,7 @@ vi.mock('../../generated/prisma/client', () => ({
 }));
 
 import { runCli } from './index';
+import { packBundleTarball } from './archive';
 
 /** A valid v2 bundle with an Article content type carrying an IMAGE field. */
 function bundleWithImage(storageKey: string) {
@@ -162,6 +163,24 @@ describe('content-bundle CLI — validate offline asset completeness', () => {
     return dir;
   }
 
+  async function writeBundleTarball(
+    bundle: unknown,
+    assets: Record<string, string> = {}
+  ): Promise<string> {
+    const dir = mkdtempSync(join(tmpdir(), 'boject-validate-tar-'));
+    tmpDirs.push(dir);
+    const tar = await packBundleTarball({
+      bundleJson: JSON.stringify(bundle),
+      assets: Object.entries(assets).map(([key, contents]) => ({
+        key,
+        bytes: new TextEncoder().encode(contents),
+      })),
+    });
+    const file = join(dir, 'bundle.tar.gz');
+    writeFileSync(file, tar);
+    return file;
+  }
+
   it('reports valid when all referenced assets are present', async () => {
     const dir = writeBundleDir(bundleWithImage('k1.png'), {
       'k1.png': 'fake-bytes',
@@ -198,6 +217,46 @@ describe('content-bundle CLI — validate offline asset completeness', () => {
     });
 
     await runCli(['validate', dir]);
+
+    expect(exitSpy).toHaveBeenCalledWith(0);
+    const skipped = logSpy.mock.calls.find((c: unknown[]) =>
+      /entries-only/.test(String(c[0]))
+    );
+    expect(skipped).toBeDefined();
+  });
+
+  it('reports valid for a tarball when all referenced assets are present', async () => {
+    const file = await writeBundleTarball(bundleWithImage('k1.png'), {
+      'k1.png': 'fake-bytes',
+    });
+
+    await runCli(['validate', file]);
+
+    expect(exitSpy).toHaveBeenCalledWith(0);
+    const present = logSpy.mock.calls.find((c: unknown[]) =>
+      /asset\(s\) present/.test(String(c[0]))
+    );
+    expect(present).toBeDefined();
+  });
+
+  it('errors and exits 1 for a tarball missing a referenced asset', async () => {
+    const file = await writeBundleTarball(bundleWithImage('k1.png'), {
+      'other.png': 'fake-bytes',
+    });
+
+    await runCli(['validate', file]);
+
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    const missing = errorSpy.mock.calls.find((c: unknown[]) =>
+      String(c[0]).includes('k1.png')
+    );
+    expect(missing).toBeDefined();
+  });
+
+  it('skips the asset check for an entries-only tarball', async () => {
+    const file = await writeBundleTarball(entriesOnlyBundle());
+
+    await runCli(['validate', file]);
 
     expect(exitSpy).toHaveBeenCalledWith(0);
     const skipped = logSpy.mock.calls.find((c: unknown[]) =>
