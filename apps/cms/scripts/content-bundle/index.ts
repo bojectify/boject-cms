@@ -19,9 +19,11 @@ import {
   exportAssets,
   importAssets,
   listAssetKeys,
+  readBundleAssets,
   type AssetCaps,
   type ImageFieldsByType,
 } from './assets';
+import { isTarballPath, packBundleTarball } from './archive';
 import { exportBundle } from './export';
 import { importBundle } from './import';
 import { validateBundle } from './validate';
@@ -224,6 +226,30 @@ export async function runCli(argv: string[]): Promise<void> {
         `${DEFAULT_OUT_DIR}/content-bundle${mode === 'all' ? '' : `-${mode}`}.json`;
 
       const bundle = await exportBundle(prisma, { mode, portable });
+
+      if (isTarballPath(out)) {
+        const storageKeys = noAssets
+          ? []
+          : collectImageStorageKeys(bundle, await imageFieldsFromDb(prisma));
+        const { assets, totalBytes } = await readBundleAssets({
+          storage: createBundleStorage(),
+          storageKeys,
+          caps: parseCaps(args),
+        });
+        const tar = await packBundleTarball({
+          bundleJson: JSON.stringify(bundle, null, 2),
+          assets,
+        });
+        const abs = resolve(out);
+        mkdirSync(dirname(abs), { recursive: true });
+        writeFileSync(abs, tar);
+        console.log(
+          `Wrote tarball to ${abs} with ${assets.length} asset(s) ` +
+            `(${totalBytes} bytes).`
+        );
+        process.exit(0);
+        return;
+      }
 
       const dirTarget = isDirectoryTarget(out);
       if (dirTarget && !noAssets) {
