@@ -93,4 +93,42 @@ describe('fetchDisplayVersions', () => {
     });
     expect(byEntry.size).toBe(0);
   });
+
+  it('groups versions per entry without cross-contamination', async () => {
+    const ct = await prisma.contentType.findUniqueOrThrow({
+      where: { identifier: 'FetchThing' },
+    });
+
+    const second = await prisma.contentEntry.create({
+      data: {
+        contentTypeId: ct.id,
+        entryTitle: 'Second',
+        entryKey: 'second',
+        slug: 'second',
+        versions: {
+          create: [
+            {
+              data: { title: 'Second' },
+              entryTitle: 'Second',
+              status: CONTENT_STATUSES.PUBLISHED,
+              publishedAt: new Date(),
+            },
+          ],
+        },
+      },
+    });
+    const secondId = second.id;
+
+    const byEntry = await fetchDisplayVersions(prisma, [entryId, secondId], {
+      includeData: false,
+    });
+
+    expect(byEntry.size).toBe(2);
+    expect(new Set((byEntry.get(entryId) ?? []).map((r) => r.status))).toEqual(
+      new Set(['PUBLISHED', 'CHANGED', 'ARCHIVED'])
+    );
+    expect(new Set((byEntry.get(secondId) ?? []).map((r) => r.status))).toEqual(
+      new Set(['PUBLISHED'])
+    );
+  });
 });

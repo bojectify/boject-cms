@@ -78,11 +78,26 @@ export async function fetchDisplayVersions(
   // DISTINCT ON (entryId, status), latest-by-updatedAt within each group.
   // Bounds the fetch to <=1 row per status per entry (<=4/entry) regardless of
   // how many ARCHIVED versions exist. Distinct columns must lead the orderBy.
+  // The trailing `{ id: 'asc' }` makes the DISTINCT ON winner a total order, so
+  // two rows sharing the same `updatedAt` resolve deterministically rather than
+  // letting Postgres pick arbitrarily.
+  //
+  // The `entryId IN (...)` lookup is intentionally not separately indexed here:
+  // a covering index on ContentEntryVersion is deferred to #256 (the cursor /
+  // covering-index work), and this change must not add a migration. entryIds is
+  // bounded to one page (<= perPage <= 100), and this already fetches strictly
+  // fewer rows than the `versions: true` eager-load it replaces, so it is a
+  // pure improvement over the prior plan at current scale.
   const rows = opts.includeData
     ? await prisma.contentEntryVersion.findMany({
         where: { entryId: { in: entryIds } },
         distinct: ['entryId', 'status'],
-        orderBy: [{ entryId: 'asc' }, { status: 'asc' }, { updatedAt: 'desc' }],
+        orderBy: [
+          { entryId: 'asc' },
+          { status: 'asc' },
+          { updatedAt: 'desc' },
+          { id: 'asc' },
+        ],
         select: {
           id: true,
           entryId: true,
@@ -96,7 +111,12 @@ export async function fetchDisplayVersions(
     : await prisma.contentEntryVersion.findMany({
         where: { entryId: { in: entryIds } },
         distinct: ['entryId', 'status'],
-        orderBy: [{ entryId: 'asc' }, { status: 'asc' }, { updatedAt: 'desc' }],
+        orderBy: [
+          { entryId: 'asc' },
+          { status: 'asc' },
+          { updatedAt: 'desc' },
+          { id: 'asc' },
+        ],
         select: { id: true, entryId: true, status: true },
       });
 
