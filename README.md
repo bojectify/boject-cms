@@ -190,7 +190,7 @@ All commands run from the repo root — the workspace forwards them to `apps/cms
 
 The app runs at http://localhost:4000. The GraphQL playground (GraphiQL) is available at http://localhost:4000/api/graphql in development.
 
-For everything CMS-specific (architecture, GraphQL surface, API keys, schema-as-code, testing, Docker image, env vars), see [`apps/cms/README.md`](apps/cms/README.md).
+For everything CMS-specific (architecture, GraphQL surface, API keys, schema-as-code, testing, Docker image, backup & disaster recovery, env vars), see [`apps/cms/README.md`](apps/cms/README.md).
 
 ## Apps and packages
 

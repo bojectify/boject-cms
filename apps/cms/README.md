@@ -318,6 +318,53 @@ docker run ... \
 apps/cms/docker/smoke-test.sh
 ```
 
+## Backup & disaster recovery
+
+A boject-cms deployment has two independent stores. Back them up together and restore them together.
+
+1. **PostgreSQL** — every content type, entry, version, user, API key, webhook, and delivery record, with all timestamps and authorship preserved. The only state that lives outside Postgres is the session cookie, which is encrypted and held client-side — there is nothing server-side to back up.
+2. **The asset store** — original uploaded image bytes. Where it lives depends on `STORAGE_DRIVER` (see [Environment Variables](#environment-variables)).
+
+> **Content bundles are not a backup format.** `pnpm content:export` (and `boject entries export`) produce _portable_ bundles for seeding and cross-instance migration — they deliberately drop UUIDs, system timestamps, authorship, users, and API keys. For disaster recovery use `pg_dump`, which captures every table automatically and stays correct as the schema evolves.
+
+### Back up PostgreSQL
+
+Local docker-compose database (service `db`, user/db `boject`):
+
+```bash
+docker compose exec -T db pg_dump -U boject -Fc boject > boject-$(date +%F).dump
+```
+
+Any reachable Postgres (managed / production), straight from `DATABASE_URL`:
+
+```bash
+pg_dump -Fc "$DATABASE_URL" > boject-$(date +%F).dump
+```
+
+`-Fc` writes the compressed custom format that `pg_restore` reads. Put this on a schedule (cron, or your managed provider's automated snapshots) and ship the dump off-host.
+
+### Back up the asset store
+
+| `STORAGE_DRIVER`  | What to back up                                                                                        | How                                                                             |
+| ----------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------- |
+| `local` (default) | The `STORAGE_LOCAL_BASE` directory (container: the volume mounted at `/app/storage`; dev: `./storage`) | Snapshot the Docker volume, or `tar`/`rsync` the directory off-host             |
+| `s3` / `r2`       | The configured bucket                                                                                  | Bucket versioning + replication, or `aws s3 sync s3://<bucket> ./assets-backup` |
+
+Only `images/originals/` is source-of-truth. `images/transforms/` is a regenerable cache that `GET /api/files/:storageKey/transform` rebuilds on demand, so it is safe to exclude from backups.
+
+### Restore
+
+1. Provision a fresh, empty Postgres and point `DATABASE_URL` at it.
+2. Restore the dump:
+   ```bash
+   pg_restore --no-owner -d "$DATABASE_URL" boject-2026-01-01.dump
+   ```
+   A full dump recreates the schema and the Prisma migration history, so the restored database is already at the right migration state — the entrypoint's `prisma migrate deploy` is a no-op on next boot. Always restore into a **virgin** database (or pass `--clean --if-exists`) to avoid colliding with an existing schema.
+3. Restore the asset store to the same `STORAGE_DRIVER` location (volume restore, or `aws s3 sync` back into the bucket).
+4. Start the CMS. Because the dump preserves every UUID, existing API keys, persisted GraphQL queries, and asset URLs keep resolving unchanged.
+
+Postgres major-version upgrades and host migrations use this same `pg_dump` / `pg_restore` path — it is the canonical tool for both.
+
 ## CMS scripts
 
 These scripts are forwarded from the workspace root to `apps/cms/` via `pnpm --filter cms`.
