@@ -18,10 +18,18 @@ import {
   createBundleStorage,
   exportAssets,
   importAssets,
+  importAssetBuffers,
   listAssetKeys,
+  readBundleAssets,
   type AssetCaps,
   type ImageFieldsByType,
 } from './assets';
+import {
+  isTarballPath,
+  looksGzipped,
+  packBundleTarball,
+  unpackBundleTarball,
+} from './archive';
 import { exportBundle } from './export';
 import { importBundle } from './import';
 import { validateBundle } from './validate';
@@ -52,7 +60,9 @@ Flags:
   --entries      Only entries
   --all          Both content types and entries
   --portable     Rewrite UUID references to identifier/slug keys (export only)
-  --out <path>   Write export to a custom path
+  --out <path>   Write export to a custom path. A .tar.gz / .tgz target packs
+                 bundle.json + assets/ into one gzipped tar; a directory writes
+                 the sidecar layout; a .json writes references-only.
   --no-assets    With a directory --out, write bundle.json only (no asset
                  bytes). Use when source and target share one storage bucket.
   --max-asset-size <MB>   Per-asset size cap (default 25).
@@ -73,6 +83,8 @@ Examples:
   pnpm content:export --all --portable
   pnpm content:export --entries --out ./generated/entries.json
   pnpm content:export --all --out ./my-bundle/        # bundle.json + assets/
+  pnpm content:export --all --out ./my-bundle.tar.gz   # single gzipped artefact
+  pnpm content:import ./my-bundle.tar.gz               # auto-detected, restores bytes
   pnpm content:import ./generated/content-bundle-all.json --all
   pnpm content:import ./my-bundle/                    # restores entries + bytes
   pnpm content:validate ./starters/base.boject.json
@@ -158,31 +170,36 @@ function resolveImportSource(path: string): {
   };
 }
 
+type AssetSource =
+  | { kind: 'dir'; assetsDir: string }
+  | { kind: 'buffers'; assets: Map<string, Buffer> };
+
 /**
- * Restore sidecar asset bytes into storage before the DB import. Builds the
- * IMAGE-field map from the bundle's own contentTypes unioned with the target
- * DB's (so entries-only bundles are covered), verifies completeness, then
- * writes bytes (skip-if-exists). Dry-run logs the present count without
- * writing.
+ * Restore sidecar/tarball asset bytes into storage before the DB import. Builds
+ * the IMAGE-field map from the bundle's own contentTypes unioned with the
+ * target DB's (so entries-only bundles are covered), verifies completeness,
+ * then writes bytes (skip-if-exists). Dry-run logs the present count without
+ * writing. Works for both a directory source and in-memory buffers.
  */
 async function restoreAssets(
   prisma: import('#prisma').PrismaClient,
   bundle: Bundle,
-  assetsDir: string,
+  source: AssetSource,
   opts: { dryRun: boolean }
 ): Promise<void> {
+  const presentKeys =
+    source.kind === 'dir'
+      ? new Set(listAssetKeys(source.assetsDir))
+      : new Set(source.assets.keys());
+
   if (opts.dryRun) {
-    console.log(
-      `Assets: ${listAssetKeys(assetsDir).length} present (not written — dry run).`
-    );
+    console.log(`Assets: ${presentKeys.size} present (not written — dry run).`);
     return;
   }
-  const presentKeys = new Set(listAssetKeys(assetsDir));
+
   const imageFields = buildImageFieldsFromContentTypes(
     bundle.contentTypes ?? []
   );
-  // Union the target DB's IMAGE fields so entries-only bundles (no
-  // contentTypes) are still covered.
   for (const [identifier, fields] of await imageFieldsFromDb(prisma)) {
     const existing = imageFields.get(identifier);
     if (existing) for (const f of fields) existing.add(f);
@@ -190,9 +207,56 @@ async function restoreAssets(
   }
   const referenced = collectImageStorageKeys(bundle, imageFields);
   assertAssetsComplete(referenced, presentKeys);
+
   const storage = createBundleStorage();
-  const { written, skipped } = await importAssets({ storage, assetsDir });
+  const { written, skipped } =
+    source.kind === 'dir'
+      ? await importAssets({ storage, assetsDir: source.assetsDir })
+      : await importAssetBuffers({ storage, assets: source.assets });
   console.log(`Assets: ${written} written, ${skipped} skipped.`);
+}
+
+/**
+ * Load an import source into the parsed bundle + an optional asset source,
+ * transparently across a tarball (.tar.gz/.tgz or gzip magic bytes), a sidecar
+ * directory, or a single .json file.
+ */
+async function loadImportSource(path: string): Promise<{
+  bundle: Bundle;
+  assetSource: AssetSource | null;
+}> {
+  const abs = resolve(path);
+  let isDir = false;
+  try {
+    isDir = statSync(abs).isDirectory();
+  } catch {
+    isDir = false;
+  }
+
+  if (isDir) {
+    const assetsDir = join(abs, 'assets');
+    const bundle = JSON.parse(
+      readFileSync(join(abs, 'bundle.json'), 'utf8')
+    ) as Bundle;
+    return {
+      bundle,
+      assetSource: existsSync(assetsDir) ? { kind: 'dir', assetsDir } : null,
+    };
+  }
+
+  const buf = readFileSync(abs);
+  if (isTarballPath(path) || looksGzipped(buf)) {
+    const { bundleJson, assets } = await unpackBundleTarball(buf);
+    return {
+      bundle: JSON.parse(bundleJson) as Bundle,
+      assetSource: { kind: 'buffers', assets },
+    };
+  }
+
+  return {
+    bundle: JSON.parse(buf.toString('utf8')) as Bundle,
+    assetSource: null,
+  };
 }
 
 // Each branch follows process.exit() with `return` so tests that mock
@@ -224,6 +288,30 @@ export async function runCli(argv: string[]): Promise<void> {
         `${DEFAULT_OUT_DIR}/content-bundle${mode === 'all' ? '' : `-${mode}`}.json`;
 
       const bundle = await exportBundle(prisma, { mode, portable });
+
+      if (isTarballPath(out)) {
+        const storageKeys = noAssets
+          ? []
+          : collectImageStorageKeys(bundle, await imageFieldsFromDb(prisma));
+        const { assets, totalBytes } = await readBundleAssets({
+          storage: createBundleStorage(),
+          storageKeys,
+          caps: parseCaps(args),
+        });
+        const tar = await packBundleTarball({
+          bundleJson: JSON.stringify(bundle, null, 2),
+          assets,
+        });
+        const abs = resolve(out);
+        mkdirSync(dirname(abs), { recursive: true });
+        writeFileSync(abs, tar);
+        console.log(
+          `Wrote tarball to ${abs} with ${assets.length} asset(s) ` +
+            `(${totalBytes} bytes).`
+        );
+        process.exit(0);
+        return;
+      }
 
       const dirTarget = isDirectoryTarget(out);
       if (dirTarget && !noAssets) {
@@ -259,9 +347,7 @@ export async function runCli(argv: string[]): Promise<void> {
       }
       const path = args[0];
       if (!path) throw new Error('Usage: content-bundle import <path>');
-      const { bundlePath, assetsDir } = resolveImportSource(path);
-      const raw = readFileSync(bundlePath, 'utf8');
-      const bundle = JSON.parse(raw);
+      const { bundle, assetSource } = await loadImportSource(path);
       const defaultMode: BundleMode =
         bundle.contentTypes && bundle.entries
           ? 'all'
@@ -322,8 +408,8 @@ export async function runCli(argv: string[]): Promise<void> {
       // transactional with Prisma, so writing first means a DB rollback
       // leaves only unreferenced blobs (harmless, idempotent) rather than
       // entries pointing at missing bytes.
-      if (assetsDir) {
-        await restoreAssets(prisma, bundle, assetsDir, { dryRun });
+      if (assetSource) {
+        await restoreAssets(prisma, bundle, assetSource, { dryRun });
       }
 
       const author = flagValue(args, '--author');
@@ -352,6 +438,55 @@ export async function runCli(argv: string[]): Promise<void> {
       }
       const path = args[0];
       if (!path) throw new Error('Usage: content-bundle validate <path>');
+
+      const absValidate = resolve(path);
+      let isValidateDir = false;
+      try {
+        isValidateDir = statSync(absValidate).isDirectory();
+      } catch {
+        isValidateDir = false;
+      }
+      if (!isValidateDir) {
+        const buf = readFileSync(absValidate);
+        if (isTarballPath(path) || looksGzipped(buf)) {
+          const { bundleJson, assetKeys } = await unpackBundleTarball(buf, {
+            assetBodies: false,
+          });
+          const bundle = JSON.parse(bundleJson);
+          const result = validateBundle(bundle);
+          if (!result.ok) {
+            console.error('Bundle failed validation:');
+            for (const err of result.errors) {
+              console.error(`  ${err.path}: ${err.message}`);
+            }
+            process.exit(1);
+            return;
+          }
+          if (bundle.contentTypes) {
+            const imageFields = buildImageFieldsFromContentTypes(
+              bundle.contentTypes
+            );
+            const referenced = collectImageStorageKeys(bundle, imageFields);
+            try {
+              assertAssetsComplete(referenced, new Set(assetKeys));
+              console.log(
+                `Bundle is valid (${referenced.length} asset(s) present).`
+              );
+            } catch (e) {
+              console.error(e instanceof Error ? e.message : String(e));
+              process.exit(1);
+              return;
+            }
+          } else {
+            console.log(
+              'Bundle is valid (entries-only: asset completeness not checked offline).'
+            );
+          }
+          process.exit(0);
+          return;
+        }
+      }
+
       const { bundlePath, assetsDir } = resolveImportSource(path);
       const raw = readFileSync(bundlePath, 'utf8');
       const bundle = JSON.parse(raw);

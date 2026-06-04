@@ -158,14 +158,81 @@ export interface ExportAssetsResult {
 }
 
 /**
+ * Read one asset from storage, enforcing the unsafe-key guard and per-asset
+ * cap. `priorTotal` is the cumulative size BEFORE this asset (the per-bundle
+ * cap is checked against priorTotal + size). Throws on an unsafe key, a missing
+ * byte, or a cap breach. Pure read — does no I/O beyond `getItemRaw`.
+ */
+async function readAssetByte(
+  storage: Storage,
+  key: string,
+  priorTotal: number,
+  caps: AssetCaps
+): Promise<Buffer> {
+  if (key.includes('/') || key.includes('\\') || key.includes('..')) {
+    throw new Error(
+      `Refusing to export asset with an unsafe storage key "${key}" ` +
+        `(contains a path separator or "..").`
+    );
+  }
+  const raw = await storage.getItemRaw<Buffer | Uint8Array | ArrayBuffer>(key);
+  if (raw == null) {
+    throw new Error(
+      `Cannot export bundle: storage has no bytes for image storage key ` +
+        `"${key}". Repair the drift or remove the reference, then retry.`
+    );
+  }
+  // s3 returns ArrayBuffer; fs/memory return Buffer. Wrap ArrayBuffer in a
+  // typed-array view so Buffer.from picks the ArrayLike<number> overload.
+  const buffer = Buffer.isBuffer(raw)
+    ? raw
+    : Buffer.from(raw instanceof ArrayBuffer ? new Uint8Array(raw) : raw);
+  assertWithinCaps(key, buffer.length, priorTotal, caps);
+  return buffer;
+}
+
+export interface ReadBundleAssetsArgs {
+  storage: Storage;
+  storageKeys: string[];
+  caps: AssetCaps;
+}
+
+export interface ReadBundleAssetsResult {
+  assets: { key: string; bytes: Buffer }[];
+  totalBytes: number;
+}
+
+/**
+ * Read every referenced byte into memory, enforcing caps + the unsafe-key
+ * guard, fail-fast on a missing byte. Used by the tarball export, which needs
+ * all buffers at once to build the archive. (The directory export streams
+ * instead — see `exportAssets`.)
+ */
+export async function readBundleAssets(
+  args: ReadBundleAssetsArgs
+): Promise<ReadBundleAssetsResult> {
+  const { storage, storageKeys, caps } = args;
+  let totalBytes = 0;
+  const assets: { key: string; bytes: Buffer }[] = [];
+  for (const key of storageKeys) {
+    const bytes = await readAssetByte(storage, key, totalBytes, caps);
+    totalBytes += bytes.length;
+    assets.push({ key, bytes });
+  }
+  return { assets, totalBytes };
+}
+
+/**
  * Read each referenced byte from `storage` and write it to `assetsDir` on
- * disk. Fail-fast on a missing byte or a cap breach. The assets dir is only
- * created once the first byte is about to be written, so a fail-fast on the
- * very first key leaves no empty dir behind.
+ * disk, streaming one asset at a time (constant memory). Fail-fast on a missing
+ * byte or a cap breach. The assets dir is created only when the first byte is
+ * about to be written, so a fail-fast on the very first key leaves no empty dir
+ * behind. On a mid-stream failure, assets written for earlier keys are left on
+ * disk — the caller owns cleanup of the output directory.
  *
- * On a mid-stream failure (missing byte or cap breach), assets already written
- * for earlier keys are left on disk — the caller owns cleanup of the output
- * directory.
+ * Each asset read (unsafe-key guard + missing-byte fail-fast + per-asset/bundle
+ * cap) is delegated to `readAssetByte`, the primitive shared with the tarball
+ * export's `readBundleAssets` collect-all path.
  */
 export async function exportAssets(
   args: ExportAssetsArgs
@@ -176,31 +243,8 @@ export async function exportAssets(
   let dirReady = false;
 
   for (const key of storageKeys) {
-    if (key.includes('/') || key.includes('\\') || key.includes('..')) {
-      throw new Error(
-        `Refusing to export asset with an unsafe storage key "${key}" ` +
-          `(contains a path separator or "..").`
-      );
-    }
-    const raw = await storage.getItemRaw<Buffer | Uint8Array | ArrayBuffer>(
-      key
-    );
-    if (raw == null) {
-      throw new Error(
-        `Cannot export bundle: storage has no bytes for image storage key ` +
-          `"${key}". Repair the drift or remove the reference, then retry.`
-      );
-    }
-    // s3 returns ArrayBuffer; fs/memory return Buffer. Wrap ArrayBuffer in a
-    // typed-array view so Buffer.from picks the ArrayLike<number> overload.
-    const buffer = Buffer.isBuffer(raw)
-      ? raw
-      : Buffer.from(raw instanceof ArrayBuffer ? new Uint8Array(raw) : raw);
-    // assertWithinCaps takes the PRE-asset running total and checks
-    // priorTotal + size internally, so assert BEFORE incrementing.
-    assertWithinCaps(key, buffer.length, totalBytes, caps);
+    const buffer = await readAssetByte(storage, key, totalBytes, caps);
     totalBytes += buffer.length;
-
     if (!dirReady) {
       mkdirSync(assetsDir, { recursive: true });
       dirReady = true;
@@ -252,5 +296,33 @@ export async function importAssets(
     written++;
   }
 
+  return { written, skipped };
+}
+
+export interface ImportAssetBuffersArgs {
+  storage: Storage;
+  assets: Map<string, Buffer>;
+}
+
+/**
+ * Write every in-memory asset buffer into `storage` under its key, skipping
+ * keys already present. The in-memory sibling of `importAssets` (used by the
+ * tarball import path). Idempotent — storage keys are random UUIDs, so a
+ * collision means the same bytes are already there.
+ */
+export async function importAssetBuffers(
+  args: ImportAssetBuffersArgs
+): Promise<ImportAssetsResult> {
+  const { storage, assets } = args;
+  let written = 0;
+  let skipped = 0;
+  for (const [key, bytes] of assets) {
+    if (await storage.hasItem(key)) {
+      skipped++;
+      continue;
+    }
+    await storage.setItemRaw(key, bytes);
+    written++;
+  }
   return { written, skipped };
 }

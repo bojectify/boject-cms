@@ -1,5 +1,5 @@
 /* eslint-disable import/first -- vi.mock calls must precede the imports they intercept */
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -54,6 +54,7 @@ vi.mock('./assets', async (importActual) => {
 });
 
 import { runCli } from './index';
+import { unpackBundleTarball } from './archive';
 
 describe('content-bundle CLI — export directory orchestration', () => {
   let exitSpy: ReturnType<typeof vi.spyOn>;
@@ -114,5 +115,25 @@ describe('content-bundle CLI — export directory orchestration', () => {
     expect(existsSync(join(dir, 'assets'))).toBe(false);
     expect(exitSpy).toHaveBeenCalledWith(0);
     expect(errorSpy).not.toHaveBeenCalled();
+  });
+
+  it('writes a .tar.gz target containing bundle.json', async () => {
+    const dir = tmp();
+    const out = join(dir, 'bundle.tar.gz');
+    await runCli(['export', '--all', '--out', out]);
+
+    expect(existsSync(out)).toBe(true);
+    expect(exitSpy).toHaveBeenCalledWith(0);
+
+    const unpacked = await unpackBundleTarball(readFileSync(out));
+    const bundle = JSON.parse(unpacked.bundleJson);
+    expect(bundle.version).toBe(2);
+    // mocked exportBundle returns no entries → no assets in the archive
+    expect(unpacked.assetKeys).toEqual([]);
+
+    const logged = logSpy.mock.calls.find((c: unknown[]) =>
+      /tarball/i.test(String(c[0]))
+    );
+    expect(logged).toBeDefined();
   });
 });

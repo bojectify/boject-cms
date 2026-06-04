@@ -22,7 +22,13 @@ export function buildStorageConfig(): StorageSpec {
   const driver = process.env.STORAGE_DRIVER ?? STORAGE_DRIVERS.LOCAL;
 
   if (driver === STORAGE_DRIVERS.LOCAL) {
-    const base = process.env.STORAGE_LOCAL_BASE ?? '/app/storage';
+    // Default to a CWD-relative `./storage`, matching the Nitro `devStorage`
+    // override in nuxt.config.ts so the dev server and the standalone bundle
+    // CLI (createBundleStorage) read/write the same directory. The container
+    // image sets STORAGE_LOCAL_BASE=/app/storage explicitly (apps/cms/Dockerfile),
+    // so production never relies on this default; `/app/storage` is a
+    // container-only absolute path that would be wrong anywhere else.
+    const base = process.env.STORAGE_LOCAL_BASE ?? './storage';
     return {
       'images:originals': {
         driver: 'fs',

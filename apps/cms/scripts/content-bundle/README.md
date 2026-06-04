@@ -71,6 +71,35 @@ references only — image bytes are not bundled (status quo).
   file in `assets/` (offline; only for bundles that carry contentTypes).
 - Originals only — transforms regenerate on demand.
 
+## Tarball wire format
+
+A `.tar.gz` / `.tgz` `--out` target packs the **same sidecar layout** into one
+gzipped tar — a single portable file:
+
+    bundle.tar.gz   (gzip → tar)
+    ├── bundle.json
+    └── assets/
+        └── <storageKey>
+
+```bash
+# Export everything as one archive (bundle.json + image bytes inside)
+pnpm content:export --all --out ./my-bundle.tar.gz
+
+# Import it — auto-detected by extension or gzip magic bytes; restores bytes
+pnpm content:import ./my-bundle.tar.gz
+
+# Validate an archive offline (shape + asset completeness)
+pnpm content:validate ./my-bundle.tar.gz
+```
+
+- The archive is byte-for-byte the sidecar directory, just compressed — same
+  caps (`--max-asset-size` / `--max-bundle-size`), same completeness checks.
+- `--no-assets` with a `.tar.gz` target packs only `bundle.json`.
+- Import / validate auto-detect a tarball by the `.tar.gz` / `.tgz` extension or
+  the gzip magic bytes (so a renamed archive still works).
+- Local-CLI only: the tarball is a file you move yourself. The remote
+  `/api/content-bundle/*` endpoints stay references-only (no byte transfer).
+
 ## Related
 
 - `scripts/content-bundle/fixtures/` — test-only bundles used by unit tests in this module.

@@ -12,15 +12,15 @@ describe('buildStorageConfig', () => {
     process.env = { ...SAVED };
   });
 
-  it('defaults to the local fs driver under /app/storage', () => {
+  it('defaults to the local fs driver under ./storage', () => {
     const spec = buildStorageConfig();
     expect(spec['images:originals']).toEqual({
       driver: 'fs',
-      base: '/app/storage/images/originals',
+      base: './storage/images/originals',
     });
     expect(spec['images:transforms']).toEqual({
       driver: 'fs',
-      base: '/app/storage/images/transforms',
+      base: './storage/images/transforms',
     });
   });
 

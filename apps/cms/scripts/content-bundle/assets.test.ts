@@ -20,6 +20,8 @@ import {
   exportAssets,
   importAssets,
   listAssetKeys,
+  readBundleAssets,
+  importAssetBuffers,
 } from './assets';
 import { makeAssetsBundle } from './assets.fixtures';
 
@@ -243,5 +245,76 @@ describe('importAssets', () => {
 
   it('listAssetKeys returns [] when the dir does not exist', () => {
     expect(listAssetKeys(join(tmpdir(), 'definitely-not-here-31'))).toEqual([]);
+  });
+});
+
+describe('readBundleAssets', () => {
+  it('reads every key into a buffer and reports total size', async () => {
+    const storage = createStorage({ driver: memoryDriver() });
+    await storage.setItemRaw('k1.png', Buffer.from('hello'));
+    await storage.setItemRaw('k2.png', Buffer.from('world!!'));
+
+    const { assets, totalBytes } = await readBundleAssets({
+      storage,
+      storageKeys: ['k1.png', 'k2.png'],
+      caps: DEFAULT_ASSET_CAPS,
+    });
+    expect(totalBytes).toBe(12);
+    expect(assets.map((a) => a.key)).toEqual(['k1.png', 'k2.png']);
+    expect(assets[0]!.bytes.toString()).toBe('hello');
+  });
+
+  it('fails fast on a missing byte', async () => {
+    const storage = createStorage({ driver: memoryDriver() });
+    await expect(
+      readBundleAssets({
+        storage,
+        storageKeys: ['gone.png'],
+        caps: DEFAULT_ASSET_CAPS,
+      })
+    ).rejects.toThrow(/gone\.png/);
+  });
+
+  it('enforces the per-asset cap and rejects unsafe keys', async () => {
+    const storage = createStorage({ driver: memoryDriver() });
+    await storage.setItemRaw('big.png', Buffer.alloc(2048));
+    await storage.setItemRaw('ok.png', Buffer.from('x'));
+    await expect(
+      readBundleAssets({
+        storage,
+        storageKeys: ['big.png'],
+        caps: { perAsset: 1024, perBundle: 1024 * 1024 },
+      })
+    ).rejects.toThrow(/big\.png/);
+    await expect(
+      readBundleAssets({
+        storage,
+        storageKeys: ['../escape.png'],
+        caps: DEFAULT_ASSET_CAPS,
+      })
+    ).rejects.toThrow(/unsafe storage key/);
+  });
+});
+
+describe('importAssetBuffers', () => {
+  it('writes each buffer to storage, skipping ones already present', async () => {
+    const storage = createStorage({ driver: memoryDriver() });
+    await storage.setItemRaw('existing.png', Buffer.from('OLD'));
+
+    const result = await importAssetBuffers({
+      storage,
+      assets: new Map([
+        ['new.png', Buffer.from('NEW')],
+        ['existing.png', Buffer.from('SHOULD-NOT-OVERWRITE')],
+      ]),
+    });
+    expect(result.written).toBe(1);
+    expect(result.skipped).toBe(1);
+    expect((await storage.getItemRaw<Buffer>('new.png'))!.toString()).toBe(
+      'NEW'
+    );
+    expect((await storage.getItemRaw<Buffer>('existing.png'))!.toString()).toBe(
+      'OLD'
+    );
   });
 });
