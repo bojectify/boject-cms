@@ -1,8 +1,9 @@
-import type { Prisma } from '#prisma';
+import type { Prisma, ContentStatus } from '#prisma';
 import {
   CONTENT_STATUSES,
   type ContentStatusName,
 } from '../../utils/contentStatus';
+import { getVersionForContext } from './resolveVersion';
 
 export const VALID_ARCHIVE_FILTERS = ['active', 'archived', 'all'] as const;
 export type ArchiveFilter = (typeof VALID_ARCHIVE_FILTERS)[number];
@@ -41,4 +42,20 @@ export function buildEntryListWhere(
     where.versions = { some: { status: CONTENT_STATUSES.PUBLISHED } };
   }
   return where;
+}
+
+export function resolveDisplayVersion<V extends { status: ContentStatus }>(
+  versions: V[],
+  opts: { isCms: boolean; archiveFilter: ArchiveFilter }
+): V | null {
+  const { isCms, archiveFilter } = opts;
+  if (isCms && archiveFilter === 'archived') {
+    return versions.find((v) => v.status === CONTENT_STATUSES.ARCHIVED) ?? null;
+  }
+  let version = getVersionForContext(versions, isCms);
+  if (!version && isCms && archiveFilter === 'all') {
+    version =
+      versions.find((v) => v.status === CONTENT_STATUSES.ARCHIVED) ?? null;
+  }
+  return version ?? null;
 }
