@@ -1,8 +1,15 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { setup, $fetch, fetch } from '@nuxt/test-utils/e2e';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { PrismaClient } from '../../../generated/prisma/client';
 import { TEST_USERNAME, TEST_PASSWORD } from '../../test/credentials';
+import { getTestDatabaseUrl } from '../../../test/dbUrl';
 import { FIELD_TYPES } from '../../../utils/fieldTypes';
 import { CONTENT_STATUSES } from '../../../utils/contentStatus';
+
+const prismaUrl = getTestDatabaseUrl();
+const prismaAdapter = new PrismaPg({ connectionString: prismaUrl });
+const prisma = new PrismaClient({ adapter: prismaAdapter });
 
 const TEST_API_KEY = 'boject_test_key_for_integration_tests_only';
 
@@ -353,6 +360,103 @@ describe('Content API filters', async () => {
             i.status === CONTENT_STATUSES.DRAFT
         )
       ).toBe(true);
+    });
+  });
+
+  // ── Many-version resolution (#264) ────────────────────────────
+
+  describe('resolves one version per entry regardless of version count (#264)', () => {
+    it('returns the draft-priority version + unchanged item shape for an entry with many ARCHIVED versions', async () => {
+      const cookie = await getSessionCookie();
+
+      // Dedicated content type so the count assertions are unaffected by
+      // the shared fixtures seeded in beforeAll.
+      const manyVersionType = await $fetch<ContentTypeResponse>(
+        '/api/content-types',
+        {
+          method: 'POST',
+          headers: { cookie },
+          body: {
+            name: `Content Filter Many Versions ${Date.now()}`,
+            fields: [
+              {
+                identifier: 'title',
+                name: 'Title',
+                type: FIELD_TYPES.ENTRY_TITLE,
+                required: true,
+              },
+            ],
+          },
+        }
+      );
+
+      const entryTitle = `Many Versions Entry ${Date.now()}`;
+      const entry = await prisma.contentEntry.create({
+        data: {
+          contentTypeId: manyVersionType.id,
+          entryTitle,
+          entryKey: `many-versions-entry-${Date.now()}`,
+        },
+      });
+
+      // One PUBLISHED version, one CHANGED draft (draft-priority winner for
+      // session/CMS auth), plus ~25 ARCHIVED versions to prove resolution
+      // does not depend on eager-loading every version row.
+      await prisma.contentEntryVersion.create({
+        data: {
+          entryId: entry.id,
+          data: { title: entryTitle },
+          entryTitle,
+          status: CONTENT_STATUSES.PUBLISHED,
+          publishedAt: new Date(),
+        },
+      });
+      await prisma.contentEntryVersion.create({
+        data: {
+          entryId: entry.id,
+          data: { title: entryTitle },
+          entryTitle,
+          status: CONTENT_STATUSES.CHANGED,
+        },
+      });
+      await prisma.contentEntryVersion.createMany({
+        data: Array.from({ length: 25 }, () => ({
+          entryId: entry.id,
+          data: { title: entryTitle },
+          entryTitle,
+          status: CONTENT_STATUSES.ARCHIVED,
+          publishedAt: new Date(),
+        })),
+      });
+
+      // archiveFilter=all so the entry surfaces despite carrying ARCHIVED
+      // versions (the default 'active' filter excludes any entry with an
+      // archived version at the WHERE level). draft-priority then picks the
+      // CHANGED version over PUBLISHED.
+      const { items } = await getContent(
+        {
+          contentType: manyVersionType.identifier,
+          perPage: 50,
+          archiveFilter: 'all',
+        },
+        'session'
+      );
+
+      const found = items.find((i) => i.id === entry.id);
+      expect(found).toBeDefined();
+      // Session/CMS auth resolves draft-priority: CHANGED beats PUBLISHED.
+      expect(found!.status).toBe(CONTENT_STATUSES.CHANGED);
+      // Response item shape is unchanged.
+      expect(Object.keys(found!).sort()).toEqual([
+        'contentType',
+        'contentTypeId',
+        'createdAt',
+        'entryKey',
+        'entryTitle',
+        'id',
+        'status',
+        'updatedAt',
+      ]);
     });
   });
 });

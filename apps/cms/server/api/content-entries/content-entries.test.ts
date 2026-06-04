@@ -3816,4 +3816,112 @@ describe('Content Entry endpoints', async () => {
       expect(responses).toContain(429);
     }, 30_000);
   });
+
+  describe('GET /api/content-entries — single-version fetch (#264)', () => {
+    it('returns draft-priority version + flatten keys with many ARCHIVED versions', async () => {
+      const cookie = await getSessionCookie();
+
+      const ct = await prisma.contentType.create({
+        data: {
+          identifier: `SingleVersion264_${Date.now()}`,
+          name: `Single Version 264 ${Date.now()}`,
+          fields: {
+            create: [
+              {
+                identifier: 'title',
+                name: 'Title',
+                type: FIELD_TYPES.ENTRY_TITLE,
+                order: 0,
+                required: true,
+                unique: true,
+              },
+            ],
+          },
+        },
+      });
+
+      const archivedTitles = Array.from(
+        { length: 25 },
+        (_, i) => `Archived payload ${i}`
+      );
+
+      const entry = await prisma.contentEntry.create({
+        data: {
+          contentTypeId: ct.id,
+          entryTitle: 'Published title',
+          entryKey: 'single-version-264',
+          slug: null,
+          versions: {
+            create: [
+              {
+                status: CONTENT_STATUSES.PUBLISHED,
+                entryTitle: 'Published title',
+                data: { title: 'Published title' },
+                publishedAt: new Date(),
+              },
+              {
+                status: CONTENT_STATUSES.CHANGED,
+                entryTitle: 'Changed title',
+                data: { title: 'Changed title' },
+              },
+              ...archivedTitles.map((title) => ({
+                status: CONTENT_STATUSES.ARCHIVED,
+                entryTitle: title,
+                data: { title },
+              })),
+            ],
+          },
+        },
+      });
+
+      // archiveFilter=all: this entry has ARCHIVED versions, so the default
+      // `active` filter excludes the whole envelope (`versions: { none:
+      // ARCHIVED }`). `all` keeps it visible and exercises draft-priority
+      // (CHANGED) version resolution against the multi-version row.
+      const defaultRes = await fetch(
+        `/api/content-entries?contentTypeId=${ct.id}&archiveFilter=all`,
+        { headers: { Cookie: cookie } }
+      );
+      const defaultBody = (await defaultRes.json()) as {
+        items: Array<Record<string, unknown>>;
+      };
+      const item = defaultBody.items.find((i) => i.id === entry.id);
+      expect(item).toBeDefined();
+      expect(item!.status).toBe(CONTENT_STATUSES.CHANGED);
+      expect(item!.data).toEqual({ title: 'Changed title' });
+      // flattenEntryWithVersion key surface.
+      for (const key of [
+        'id',
+        'contentTypeId',
+        'data',
+        'entryTitle',
+        'entryKey',
+        'slug',
+        'status',
+        'publishedAt',
+        'createdBy',
+        'updatedBy',
+        'createdAt',
+        'updatedAt',
+      ]) {
+        expect(item).toHaveProperty(key);
+      }
+
+      // archiveFilter=archived: returns an ARCHIVED version whose data is one
+      // of the seeded archived payloads. The specific version is the latest by
+      // updatedAt, which can't be controlled deterministically on create, so we
+      // only assert status + membership in the archived set.
+      const archivedRes = await fetch(
+        `/api/content-entries?contentTypeId=${ct.id}&archiveFilter=archived`,
+        { headers: { Cookie: cookie } }
+      );
+      const archivedBody = (await archivedRes.json()) as {
+        items: Array<{ id: string; status: string; data: { title: string } }>;
+      };
+      const archivedItem = archivedBody.items.find((i) => i.id === entry.id);
+      expect(archivedItem).toBeDefined();
+      expect(archivedItem!.status).toBe(CONTENT_STATUSES.ARCHIVED);
+      expect(archivedTitles).toContain(archivedItem!.data.title);
+    });
+  });
 });
