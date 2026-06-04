@@ -1,5 +1,6 @@
 import type { FieldType } from '#prisma';
 import { FIELD_TYPES } from '../../utils/fieldTypes';
+import { EntryImportReferenceError } from './importErrors';
 
 export interface UuidRelationRef {
   contentTypeId: string;
@@ -41,14 +42,17 @@ export function decodeRelationRef(
 ): UuidRelationRef {
   const contentTypeId = identifierToTypeId.get(ref.contentTypeIdentifier);
   if (!contentTypeId) {
-    throw new Error(
+    // Typed (→ HTTP 400 ENTRY_IMPORT_REFERENCE_INVALID) so a dangling ref in a
+    // portable bundle surfaces the same clean status + shape as the
+    // non-portable guard (assertNonPortableRefsResolve) rather than an h3 500.
+    throw new EntryImportReferenceError(
       `Cannot decode relation ref: unknown identifier ${ref.contentTypeIdentifier}`
     );
   }
   const keyMap = typeIdentifierToKeyToEntry.get(ref.contentTypeIdentifier);
   const entryId = keyMap?.get(ref.entryKey);
   if (!entryId) {
-    throw new Error(
+    throw new EntryImportReferenceError(
       `Cannot decode relation ref: entry ${ref.contentTypeIdentifier}:${ref.entryKey} not found`
     );
   }
