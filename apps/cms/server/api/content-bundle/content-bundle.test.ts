@@ -609,4 +609,57 @@ describe('POST /api/content-bundle/import', () => {
     // message) otherwise show a blank error.
     expect(j.message).toContain('references missing entry');
   });
+
+  it('400 ENTRY_IMPORT_REFERENCE_INVALID on a dangling PORTABLE RELATION (parity with non-portable), and rolls back', async () => {
+    const { typeId } = await seedLinkerType();
+    const key = await makeKey(['content:import']);
+    const bundle = {
+      version: 2,
+      exportedAt: '2026-06-01T00:00:00.000Z',
+      portable: true,
+      entries: [
+        {
+          id: null,
+          contentTypeId: null,
+          contentTypeIdentifier: 'Linker',
+          entryTitle: 'A',
+          entryKey: 'a',
+          slug: null,
+          versions: [
+            {
+              status: 'PUBLISHED',
+              data: {
+                title: 'A',
+                // entryKey 'ghost' resolves to no entry in the bundle nor on
+                // the target — the portable decode path must fail the same way
+                // the non-portable guard does: a clean 400, not an h3 500.
+                rel: { contentTypeIdentifier: 'Linker', entryKey: 'ghost' },
+              },
+              publishedAt: null,
+            },
+          ],
+        },
+      ],
+    };
+    const res = await fetch('/api/content-bundle/import', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ bundle }),
+    });
+    expect(res.status).toBe(400);
+    const j = (await res.json()) as {
+      message?: string;
+      data?: { error?: string; message?: string };
+    };
+    expect(j.data?.error).toBe('ENTRY_IMPORT_REFERENCE_INVALID');
+    expect(j.message).toContain('not found');
+    // The entry is created before the dangling ref is decoded; a clean
+    // rollback means nothing persists.
+    expect(
+      await prisma.contentEntry.count({ where: { contentTypeId: typeId } })
+    ).toBe(0);
+  });
 });
