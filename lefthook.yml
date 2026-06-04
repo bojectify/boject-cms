@@ -17,6 +17,7 @@ pre-commit:
 pre-push:
   jobs:
     - name: test
+      glob: '*.{js,mjs,ts,vue,prisma}'
       run: pnpm test
 
     - name: storybook-test

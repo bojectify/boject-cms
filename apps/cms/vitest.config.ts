@@ -17,7 +17,6 @@ export default defineConfig({
     },
   },
   test: {
-    fileParallelism: false,
     setupFiles: [
       fileURLToPath(new URL('./vitest.workerSetup.ts', import.meta.url)),
     ],
@@ -46,6 +45,12 @@ export default defineConfig({
         extends: true,
         test: {
           name: 'integration',
+          // Scoped here (not root) so only this project runs serially. Each
+          // integration file boots a Nuxt dev server via setup({ dev: true })
+          // and shares the boject_test database, so parallel files would
+          // collide on ports and DB state. The unit and storybook projects
+          // have no such shared state and run with default file parallelism.
+          fileParallelism: false,
           include: [
             'server/api/**/*.test.ts',
             'server/middleware/**/*.test.ts',
