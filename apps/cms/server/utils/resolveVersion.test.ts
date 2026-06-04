@@ -6,6 +6,7 @@ import {
 } from './resolveVersion';
 import type { ContentStatusName } from '../../utils/contentStatus';
 import { CONTENT_STATUSES } from '../../utils/contentStatus';
+import type { ContentStatus } from '#prisma';
 
 const makeVersion = (
   status: string,
@@ -95,5 +96,16 @@ describe('getVersionForContext', () => {
   it('external: returns null when no published', () => {
     const versions = [makeVersion(CONTENT_STATUSES.DRAFT)];
     expect(getVersionForContext(versions, false)).toBeNull();
+  });
+});
+
+describe('getVersionForContext (generic over { status })', () => {
+  it('accepts and returns minimal status-only rows', () => {
+    const rows = [
+      { status: 'PUBLISHED' as ContentStatus },
+      { status: 'CHANGED' as ContentStatus },
+    ];
+    expect(getVersionForContext(rows, true)).toEqual({ status: 'CHANGED' });
+    expect(getVersionForContext(rows, false)).toEqual({ status: 'PUBLISHED' });
   });
 });

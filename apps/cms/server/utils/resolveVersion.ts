@@ -1,14 +1,14 @@
 import type { H3Event } from 'h3';
-import type { ContentEntryVersion, ContentEntry } from '#prisma';
+import type { ContentEntryVersion, ContentEntry, ContentStatus } from '#prisma';
 import { CONTENT_STATUSES } from '../../utils/contentStatus';
 
 export function isCmsRequest(event: H3Event): boolean {
   return event.context.authMethod === 'session';
 }
 
-export function getDraftVersion(
-  versions: ContentEntryVersion[]
-): ContentEntryVersion | null {
+export function getDraftVersion<V extends { status: ContentStatus }>(
+  versions: V[]
+): V | null {
   return (
     versions.find((v) => v.status === CONTENT_STATUSES.CHANGED) ??
     versions.find((v) => v.status === CONTENT_STATUSES.DRAFT) ??
@@ -16,16 +16,16 @@ export function getDraftVersion(
   );
 }
 
-export function getPublishedVersion(
-  versions: ContentEntryVersion[]
-): ContentEntryVersion | null {
+export function getPublishedVersion<V extends { status: ContentStatus }>(
+  versions: V[]
+): V | null {
   return versions.find((v) => v.status === CONTENT_STATUSES.PUBLISHED) ?? null;
 }
 
-export function getVersionForContext(
-  versions: ContentEntryVersion[],
+export function getVersionForContext<V extends { status: ContentStatus }>(
+  versions: V[],
   isCms: boolean
-): ContentEntryVersion | null {
+): V | null {
   if (isCms) {
     return getDraftVersion(versions) ?? getPublishedVersion(versions);
   }
@@ -34,7 +34,10 @@ export function getVersionForContext(
 
 export function flattenEntryWithVersion(
   entry: ContentEntry & { versions?: ContentEntryVersion[] },
-  version: ContentEntryVersion,
+  version: Pick<
+    ContentEntryVersion,
+    'data' | 'status' | 'publishedAt' | 'createdBy' | 'updatedBy'
+  >,
   extras?: Record<string, unknown>
 ): Record<string, unknown> {
   return {
