@@ -1,13 +1,12 @@
-import type { Prisma, ContentEntryVersion } from '#prisma';
-import { isCmsRequest, getVersionForContext } from '../utils/resolveVersion';
+import type { ContentStatusName } from '../../utils/contentStatus';
+import { CONTENT_STATUSES_SET } from '../../utils/contentStatus';
+import { isCmsRequest } from '../utils/resolveVersion';
 import {
-  CONTENT_STATUSES,
-  CONTENT_STATUSES_SET,
-  type ContentStatusName,
-} from '../../utils/contentStatus';
-
-const VALID_ARCHIVE_FILTERS = ['active', 'archived', 'all'] as const;
-type ArchiveFilter = (typeof VALID_ARCHIVE_FILTERS)[number];
+  buildEntryListWhere,
+  fetchDisplayVersions,
+  parseArchiveFilter,
+  resolveDisplayVersion,
+} from '../utils/listEntries';
 
 export default defineEventHandler(async (event) => {
   const query = getQuery(event);
@@ -16,6 +15,7 @@ export default defineEventHandler(async (event) => {
   const offset = (page - 1) * perPage;
 
   const isCms = isCmsRequest(event);
+  const archiveFilter = parseArchiveFilter(query.archiveFilter);
 
   let contentTypeId: string | null = null;
   if (typeof query.contentType === 'string' && query.contentType.length > 0) {
@@ -27,38 +27,18 @@ export default defineEventHandler(async (event) => {
     else return { items: [], total: 0 };
   }
 
-  const where: Prisma.ContentEntryWhereInput = {};
-  if (contentTypeId) where.contentTypeId = contentTypeId;
+  const status =
+    typeof query.status === 'string' &&
+    CONTENT_STATUSES_SET.has(query.status as ContentStatusName)
+      ? (query.status as ContentStatusName)
+      : null;
 
-  const archiveFilter: ArchiveFilter =
-    typeof query.archiveFilter === 'string' &&
-    (VALID_ARCHIVE_FILTERS as readonly string[]).includes(query.archiveFilter)
-      ? (query.archiveFilter as ArchiveFilter)
-      : 'active';
-
-  if (isCms) {
-    // CMS: filter by status on versions if requested
-    const status =
-      typeof query.status === 'string' &&
-      CONTENT_STATUSES_SET.has(query.status as ContentStatusName)
-        ? (query.status as ContentStatusName)
-        : null;
-    if (status) {
-      where.versions = {
-        some: {
-          status,
-        },
-      };
-    } else if (archiveFilter === 'archived') {
-      where.versions = { some: { status: CONTENT_STATUSES.ARCHIVED } };
-    } else if (archiveFilter === 'active') {
-      where.versions = { none: { status: CONTENT_STATUSES.ARCHIVED } };
-    }
-    // 'all': leave where.versions alone
-  } else {
-    // API key: only show entries with a PUBLISHED version
-    where.versions = { some: { status: CONTENT_STATUSES.PUBLISHED } };
-  }
+  const where = buildEntryListWhere({
+    isCms,
+    archiveFilter,
+    status,
+    contentTypeId,
+  });
 
   const [rows, total] = await Promise.all([
     prisma.contentEntry.findMany({
@@ -66,29 +46,31 @@ export default defineEventHandler(async (event) => {
       orderBy: { updatedAt: 'desc' },
       skip: offset,
       take: perPage,
-      include: {
-        versions: true,
+      select: {
+        id: true,
+        entryTitle: true,
+        entryKey: true,
+        createdAt: true,
+        updatedAt: true,
+        contentTypeId: true,
         contentType: { select: { name: true } },
       },
     }),
     prisma.contentEntry.count({ where }),
   ]);
 
+  const versionsByEntry = await fetchDisplayVersions(
+    prisma,
+    rows.map((r) => r.id),
+    { includeData: false }
+  );
+
   const items = rows
     .map((r) => {
-      let version: ContentEntryVersion | undefined;
-      if (isCms && archiveFilter === 'archived') {
-        version = r.versions.find(
-          (v) => v.status === CONTENT_STATUSES.ARCHIVED
-        );
-      } else {
-        version = getVersionForContext(r.versions, isCms) ?? undefined;
-        if (!version && isCms && archiveFilter === 'all') {
-          version = r.versions.find(
-            (v) => v.status === CONTENT_STATUSES.ARCHIVED
-          );
-        }
-      }
+      const version = resolveDisplayVersion(versionsByEntry.get(r.id) ?? [], {
+        isCms,
+        archiveFilter,
+      });
       if (!version) return null;
       return {
         id: r.id,
