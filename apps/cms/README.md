@@ -393,18 +393,31 @@ These scripts are forwarded from the workspace root to `apps/cms/` via `pnpm --f
 
 For workspace-wide scripts (`db:up`, `lint`, `format`, `test`), see the [repo root README](../../README.md#workspace-scripts).
 
+## Search
+
+Full-text search is backed by [Meilisearch](https://www.meilisearch.com/), run as a sidecar container alongside Postgres (`docker compose up -d` starts both). The CMS connects via the `meili` client singleton; on boot it idempotently creates a single global `entries` index. Downstream Search-epic work populates the index from content webhooks and exposes `/api/search`.
+
+**Operator setup:**
+
+- **Dev:** nothing to configure — the `meilisearch` service in `docker-compose.yml` runs in development mode (no master key) and is reachable at `http://localhost:7700`.
+- **Production:** set `MEILI_MASTER_KEY` to a strong secret on both the Meilisearch container and the CMS. The CMS fails fast at boot if it is unset. Point `MEILI_URL` at your engine if it is not co-located on `localhost:7700`.
+
+Search is treated as non-essential: if Meilisearch is unreachable, `/api/health` reports `search: "unavailable"` and the CMS keeps serving everything else. (Once admin search lands later in the epic, the list view will fall back to its type/status/archive filters when the engine is unreachable.) Check reachability any time with `curl http://localhost:7700/health`.
+
 ## Environment Variables
 
-| Variable                             | Description                                                                                    | Default                                            |
-| ------------------------------------ | ---------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| `DATABASE_URL`                       | PostgreSQL connection string                                                                   | `postgresql://boject:boject@localhost:5432/boject` |
-| `NUXT_SESSION_PASSWORD`              | Session encryption key (required in prod)                                                      | Auto-generated in dev                              |
-| `BOJECT_SCHEMA_DIR`                  | Directory of `*.boject.json` files applied on every container boot.                            | unset (skips the step)                             |
-| `BOJECT_SCHEMA_READONLY`             | Set to `true` to disable schema-editing endpoints + UI affordances.                            | unset                                              |
-| `BOJECT_ALLOW_DESTRUCTIVE_SCHEMA`    | Set to `true` to let the entrypoint applier remove content types / fields on bundle changes.   | unset                                              |
-| `BOJECT_API_KEY`                     | Used by [`@boject/cli`](../../packages/boject-cli/README.md). Not consumed by the running CMS. | unset                                              |
-| `BOJECT_GRAPHQL_COMPLEXITY_MAX_COST` | Per-query complexity cap on `/api/graphql`. See [Query complexity](#query-complexity).         | `1000`                                             |
-| `BOJECT_GRAPHQL_COMPLEXITY_LOG_ONLY` | Set to `true` to log over-cap queries without rejecting (safe rollout).                        | unset                                              |
-| `GRAPHQL_RATE_LIMIT_RPS`             | Per-API-key sliding-window rate cap on `/api/graphql`.                                         | `1000`                                             |
+| Variable                             | Description                                                                                                     | Default                                            |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| `DATABASE_URL`                       | PostgreSQL connection string                                                                                    | `postgresql://boject:boject@localhost:5432/boject` |
+| `NUXT_SESSION_PASSWORD`              | Session encryption key (required in prod)                                                                       | Auto-generated in dev                              |
+| `MEILI_URL`                          | Meilisearch connection URL for the search sidecar.                                                              | `http://localhost:7700`                            |
+| `MEILI_MASTER_KEY`                   | Meilisearch API key. Required in production (CMS refuses to boot without it); dev sidecar runs unauthenticated. | unset (dev) / required (prod)                      |
+| `BOJECT_SCHEMA_DIR`                  | Directory of `*.boject.json` files applied on every container boot.                                             | unset (skips the step)                             |
+| `BOJECT_SCHEMA_READONLY`             | Set to `true` to disable schema-editing endpoints + UI affordances.                                             | unset                                              |
+| `BOJECT_ALLOW_DESTRUCTIVE_SCHEMA`    | Set to `true` to let the entrypoint applier remove content types / fields on bundle changes.                    | unset                                              |
+| `BOJECT_API_KEY`                     | Used by [`@boject/cli`](../../packages/boject-cli/README.md). Not consumed by the running CMS.                  | unset                                              |
+| `BOJECT_GRAPHQL_COMPLEXITY_MAX_COST` | Per-query complexity cap on `/api/graphql`. See [Query complexity](#query-complexity).                          | `1000`                                             |
+| `BOJECT_GRAPHQL_COMPLEXITY_LOG_ONLY` | Set to `true` to log over-cap queries without rejecting (safe rollout).                                         | unset                                              |
+| `GRAPHQL_RATE_LIMIT_RPS`             | Per-API-key sliding-window rate cap on `/api/graphql`.                                                          | `1000`                                             |
 
 Create a `.env` file in the project root. Nuxt loads it automatically in development.
