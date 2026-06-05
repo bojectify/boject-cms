@@ -12,12 +12,6 @@ interface CreatedWebhook {
   secret: string;
 }
 
-interface EventOption {
-  value: 'ENTRY_PUBLISHED' | 'ENTRY_UNPUBLISHED' | 'ENTRY_DELETED';
-  label: string;
-  description: string;
-}
-
 const { data: contentTypes } = await useAuthedFetch<{
   items: ContentTypeOption[];
 }>('/api/content-types');
@@ -27,7 +21,7 @@ const form = ref({
   url: '',
   enabled: true,
   contentTypeIds: [] as string[],
-  events: ['ENTRY_PUBLISHED'] as EventOption['value'][],
+  events: ['ENTRY_PUBLISHED'] as WebhookEventName[],
 });
 const error = ref<string | null>(null);
 const submitting = ref(false);
@@ -53,27 +47,7 @@ async function onSubmit() {
   }
 }
 
-const EVENTS: EventOption[] = [
-  {
-    value: 'ENTRY_PUBLISHED',
-    label: 'Entry published',
-    description:
-      'Fires whenever an entry is first published or a change is republished.',
-  },
-  {
-    value: 'ENTRY_DELETED',
-    label: 'Entry deleted',
-    description: 'Fires when a previously-published entry is deleted.',
-  },
-  {
-    value: 'ENTRY_UNPUBLISHED',
-    label: 'Entry unpublished',
-    description:
-      'Fires when an entry is demoted from published (via Unpublish or Archive).',
-  },
-];
-
-function toggleEvent(value: EventOption['value']) {
+function toggleEvent(value: WebhookEventName) {
   if (form.value.events.includes(value)) {
     form.value.events = form.value.events.filter((e) => e !== value);
   } else {
@@ -161,7 +135,7 @@ const availableContentTypes = computed(() =>
       <UFormField label="Events" class="mb-4">
         <div class="flex flex-col gap-2">
           <button
-            v-for="ev in EVENTS"
+            v-for="ev in WEBHOOK_EVENT_OPTIONS"
             :key="ev.value"
             type="button"
             :class="[

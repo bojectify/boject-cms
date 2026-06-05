@@ -16,7 +16,7 @@ interface Webhook {
 interface Delivery {
   id: string;
   event: string;
-  entryId: string;
+  entryId: string | null;
   status: string;
   attempts: number;
   lastRequestHeaders: Record<string, string> | null;
@@ -185,33 +185,7 @@ async function deleteWebhook() {
   navigateTo('/webhooks');
 }
 
-interface EventOption {
-  value: 'ENTRY_PUBLISHED' | 'ENTRY_UNPUBLISHED' | 'ENTRY_DELETED';
-  label: string;
-  description: string;
-}
-
-const EVENTS: EventOption[] = [
-  {
-    value: 'ENTRY_PUBLISHED',
-    label: 'Entry published',
-    description:
-      'Fires whenever an entry is first published or a change is republished.',
-  },
-  {
-    value: 'ENTRY_DELETED',
-    label: 'Entry deleted',
-    description: 'Fires when a previously-published entry is deleted.',
-  },
-  {
-    value: 'ENTRY_UNPUBLISHED',
-    label: 'Entry unpublished',
-    description:
-      'Fires when an entry is demoted from published (via Unpublish or Archive).',
-  },
-];
-
-function toggleEvent(value: EventOption['value']) {
+function toggleEvent(value: WebhookEventName) {
   if (!data.value) return;
   if (data.value.events.includes(value)) {
     data.value.events = data.value.events.filter((e) => e !== value);
@@ -324,7 +298,7 @@ const statusColor = (s: string) =>
       <UFormField label="Events" class="mb-4">
         <div class="flex flex-col gap-2">
           <button
-            v-for="ev in EVENTS"
+            v-for="ev in WEBHOOK_EVENT_OPTIONS"
             :key="ev.value"
             type="button"
             :class="[
