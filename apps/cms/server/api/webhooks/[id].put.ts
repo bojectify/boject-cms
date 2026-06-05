@@ -4,12 +4,9 @@ import { isCmsRequest } from '../../utils/resolveVersion';
 import { enforceMutationRateLimit } from '../../utils/rateLimitEndpoint';
 import { assertWebhookUrl } from '../../utils/webhookUrl';
 import { withPrismaErrors } from '../../utils/prismaErrors';
+import { WEBHOOK_EVENT_NAMES } from '../../../utils/webhookEvents';
 
-const VALID_EVENTS: readonly WebhookEvent[] = [
-  'ENTRY_PUBLISHED',
-  'ENTRY_UNPUBLISHED',
-  'ENTRY_DELETED',
-];
+const VALID_EVENTS: readonly string[] = WEBHOOK_EVENT_NAMES;
 
 export default defineEventHandler(async (event) => {
   if (!isCmsRequest(event)) {
@@ -44,7 +41,7 @@ export default defineEventHandler(async (event) => {
       });
     }
     data.events = body.events.map((e, i) => {
-      if (typeof e !== 'string' || !VALID_EVENTS.includes(e as WebhookEvent)) {
+      if (typeof e !== 'string' || !VALID_EVENTS.includes(e)) {
         throw createError({
           statusCode: 400,
           statusMessage: `events[${i}] is not a valid WebhookEvent`,
