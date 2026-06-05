@@ -41,3 +41,30 @@ export const meili = globalForMeili.meili ?? meiliClientSingleton();
 if (process.env.NODE_ENV !== 'production') {
   globalForMeili.meili = meili;
 }
+
+/**
+ * Probe Meilisearch reachability for /api/health. NEVER throws: returns false
+ * on any error or timeout so the liveness probe can report "unavailable"
+ * without coupling container liveness to search uptime (graceful degradation).
+ * `isHealthy()` already resolves false on error; the timeout race additionally
+ * bounds a hung socket so /api/health can't stall.
+ */
+export async function checkMeiliHealth(
+  client: Meilisearch = meili,
+  timeoutMs = 2000
+): Promise<boolean> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const healthy = await Promise.race([
+      client.isHealthy(),
+      new Promise<false>((resolve) => {
+        timer = setTimeout(() => resolve(false), timeoutMs);
+      }),
+    ]);
+    return healthy === true;
+  } catch {
+    return false;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}

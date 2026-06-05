@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { resolveMeiliConfig } from './meili';
+import { resolveMeiliConfig, checkMeiliHealth } from './meili';
 
 const ENV_KEYS = ['MEILI_URL', 'MEILI_MASTER_KEY', 'NODE_ENV'] as const;
 
@@ -48,5 +48,43 @@ describe('resolveMeiliConfig', () => {
     process.env.NODE_ENV = 'production';
     process.env.MEILI_MASTER_KEY = 'prod-key';
     expect(resolveMeiliConfig().apiKey).toBe('prod-key');
+  });
+});
+
+describe('checkMeiliHealth', () => {
+  type FakeHealthClient = Parameters<typeof checkMeiliHealth>[0];
+
+  it('returns true when the client reports healthy', async () => {
+    // Minimal fake: only isHealthy is exercised; insufficient overlap with the
+    // full Meilisearch surface requires the double cast.
+    // eslint-disable-next-line no-restricted-syntax
+    const fake = { isHealthy: async () => true } as unknown as FakeHealthClient;
+    expect(await checkMeiliHealth(fake)).toBe(true);
+  });
+
+  it('returns false when the client reports unhealthy', async () => {
+    // eslint-disable-next-line no-restricted-syntax
+    const fake = {
+      isHealthy: async () => false,
+    } as unknown as FakeHealthClient;
+    expect(await checkMeiliHealth(fake)).toBe(false);
+  });
+
+  it('returns false when the client throws', async () => {
+    // eslint-disable-next-line no-restricted-syntax
+    const fake = {
+      isHealthy: async () => {
+        throw new Error('connection refused');
+      },
+    } as unknown as FakeHealthClient;
+    expect(await checkMeiliHealth(fake)).toBe(false);
+  });
+
+  it('returns false when the probe exceeds the timeout', async () => {
+    // eslint-disable-next-line no-restricted-syntax
+    const fake = {
+      isHealthy: () => new Promise<boolean>(() => {}), // never resolves
+    } as unknown as FakeHealthClient;
+    expect(await checkMeiliHealth(fake, 10)).toBe(false);
   });
 });
