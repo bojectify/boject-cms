@@ -10,6 +10,7 @@ import {
   getFieldOptionsErrorShape,
 } from '../../../../../utils/fieldOptions';
 import { FIELD_TYPES, isFieldTypeName } from '../../../../../utils/fieldTypes';
+import { enqueueContentTypeSchemaChanged } from '../../../../utils/webhooks';
 
 export default defineEventHandler(async (event) => {
   assertSchemaEditable(event);
@@ -21,6 +22,7 @@ export default defineEventHandler(async (event) => {
   // Verify field exists and belongs to this content type
   const field = await prisma.contentTypeField.findUnique({
     where: { id: fieldId },
+    include: { contentType: { select: { id: true, identifier: true } } },
   });
   if (!field || field.contentTypeId !== contentTypeId) {
     throw createError({
@@ -183,9 +185,15 @@ export default defineEventHandler(async (event) => {
 
   const updated = await withPrismaErrors(
     () =>
-      prisma.contentTypeField.update({
-        where: { id: fieldId },
-        data,
+      prisma.$transaction(async (tx) => {
+        const f = await tx.contentTypeField.update({
+          where: { id: fieldId },
+          data,
+        });
+        await enqueueContentTypeSchemaChanged(tx, {
+          contentType: field.contentType,
+        });
+        return f;
       }),
     {
       uniqueMessage:

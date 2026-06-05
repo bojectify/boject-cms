@@ -171,7 +171,7 @@ The sole content modelling layer — all content types and entries are user-defi
 
 - **Webhook** — Outbound HTTP subscription. Fields: `name`, `url`, `secret` (32-byte base64, plaintext — HMAC keys can't be hashed; returned once on create/rotate), `enabled` (default true), `contentTypeIds` (string array; empty = all types), `events` (WebhookEvent array). Has many `WebhookDelivery`s, cascade on delete.
 - **WebhookDelivery** — One queued/delivered attempt-chain. Fields: `webhookId`, `event`, `contentTypeId`, `entryId`, `payload` (JSONB, snapshotted on enqueue; replayed byte-for-byte on every retry), `status` (`DeliveryStatus` enum: PENDING/SUCCESS/FAILED/DEAD_LETTERED), `attempts`, `nextAttemptAt`, `lastResponseCode`, `lastResponseBody` (truncated to 2KB), `lastError`, `isTest`, `completedAt`. Indexed on `(status, nextAttemptAt)` for the worker poll and `(webhookId, createdAt)` for the log.
-- **WebhookEvent enum** — `ENTRY_PUBLISHED`, `ENTRY_UNPUBLISHED`, `ENTRY_DELETED`.
+- **WebhookEvent enum** — `ENTRY_PUBLISHED`, `ENTRY_UNPUBLISHED`, `ENTRY_DELETED`, `CONTENT_TYPE_SCHEMA_CHANGED`. The last is a non-entry event fired by the four `ContentTypeField` mutation endpoints (add / update / delete / reorder) via `enqueueContentTypeSchemaChanged(tx, { contentType })`, enqueued atomically inside the mutation's transaction. Its deliveries carry `entryId: null` (the `WebhookDelivery.entryId` column is nullable — `WebhookDelivery` is a general resource-event bus, not entry-only) and a flat payload `{ event, deliveryId, contentTypeId, contentTypeIdentifier, occurredAt }`. Content-type create/update/delete and the boot-time `applySchema` applier deliberately do NOT fire it (create/delete have no indexed entries; update only touches display name/description; `applySchema` converges on boot). The subscribable-event list is a pure mirror at `apps/cms/utils/webhookEvents.ts` (object-const `WEBHOOK_EVENTS` + `isWebhookEventName` guard + `WEBHOOK_EVENT_OPTIONS`) — the single source of truth consumed by both webhook pages AND the webhook create/update endpoints' `events` validation (via `isWebhookEventName`).
 - **DeliveryStatus enum** — `PENDING`, `SUCCESS`, `FAILED`, `DEAD_LETTERED`.
 
 ## GraphQL
@@ -372,7 +372,8 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder. The schema is
 - `apps/cms/scripts/content-bundle/fixtures/minimal.boject.json` — Minimal valid bundle (Page content type, no entries)
 - `apps/cms/scripts/content-bundle/fixtures/with-relations.boject.json` — Bundle with a RELATION field and cross-referenced entries
 - `apps/cms/scripts/content-bundle/fixtures/with-richtext.boject.json` — Bundle with a RICHTEXT field and ProseMirror JSON
-- `apps/cms/server/utils/webhooks.ts` — `enqueueWebhookDeliveries` + `generateWebhookSecret`
+- `apps/cms/server/utils/webhooks.ts` — `enqueueWebhookDeliveries` (entry events) + `enqueueContentTypeSchemaChanged` (schema event) over a shared `insertDeliveries` core + `generateWebhookSecret`
+- `apps/cms/utils/webhookEvents.ts` — pure subscribable-event registry (object-const `WEBHOOK_EVENTS` + `WebhookEventName` + `WEBHOOK_EVENT_NAMES` + `isWebhookEventName` + `WEBHOOK_EVENT_OPTIONS`) mirroring the `WebhookEvent` enum; drives the webhook UI + the create/update endpoints' validation
 - `apps/cms/server/utils/webhookWorker.ts` — `runWorkerTick`, `startWorker`, `stopWorker`
 - `apps/cms/server/utils/webhookBackoff.ts` — retry schedule (`MAX_ATTEMPTS = 6`, `backoffMs(n)`)
 - `apps/cms/server/utils/webhookUrl.ts` — SSRF-aware URL validator

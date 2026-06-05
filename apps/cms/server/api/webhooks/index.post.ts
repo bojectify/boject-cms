@@ -1,15 +1,9 @@
-import type { WebhookEvent } from '#prisma';
 import { isCmsRequest } from '../../utils/resolveVersion';
 import { enforceMutationRateLimit } from '../../utils/rateLimitEndpoint';
 import { assertStringLength } from '../../utils/validation';
 import { assertWebhookUrl } from '../../utils/webhookUrl';
 import { generateWebhookSecret } from '../../utils/webhooks';
-
-const VALID_EVENTS: readonly WebhookEvent[] = [
-  'ENTRY_PUBLISHED',
-  'ENTRY_UNPUBLISHED',
-  'ENTRY_DELETED',
-];
+import { isWebhookEventName } from '../../../utils/webhookEvents';
 
 export default defineEventHandler(async (event) => {
   if (!isCmsRequest(event)) {
@@ -32,13 +26,13 @@ export default defineEventHandler(async (event) => {
     });
   }
   const events = body.events.map((e, i) => {
-    if (typeof e !== 'string' || !VALID_EVENTS.includes(e as WebhookEvent)) {
+    if (!isWebhookEventName(e)) {
       throw createError({
         statusCode: 400,
         statusMessage: `events[${i}] is not a valid WebhookEvent`,
       });
     }
-    return e as WebhookEvent;
+    return e;
   });
 
   const contentTypeIds = Array.isArray(body.contentTypeIds)

@@ -14,6 +14,7 @@ import {
   getFieldOptionsErrorShape,
 } from '../../../../../utils/fieldOptions';
 import { FIELD_TYPES, isFieldTypeName } from '../../../../../utils/fieldTypes';
+import { enqueueContentTypeSchemaChanged } from '../../../../utils/webhooks';
 
 export default defineEventHandler(async (event) => {
   assertSchemaEditable(event);
@@ -153,17 +154,27 @@ export default defineEventHandler(async (event) => {
 
   const created = await withPrismaErrors(
     () =>
-      prisma.contentTypeField.create({
-        data: {
-          contentTypeId,
-          identifier: fieldIdentifier,
-          name,
-          type,
-          required: typeof body.required === 'boolean' ? body.required : false,
-          unique: uniqueFlag,
-          order: maxOrder + 1,
-          options: body.options ?? undefined,
-        },
+      prisma.$transaction(async (tx) => {
+        const field = await tx.contentTypeField.create({
+          data: {
+            contentTypeId,
+            identifier: fieldIdentifier,
+            name,
+            type,
+            required:
+              typeof body.required === 'boolean' ? body.required : false,
+            unique: uniqueFlag,
+            order: maxOrder + 1,
+            options: body.options ?? undefined,
+          },
+        });
+        await enqueueContentTypeSchemaChanged(tx, {
+          contentType: {
+            id: contentType.id,
+            identifier: contentType.identifier,
+          },
+        });
+        return field;
       }),
     {
       uniqueMessage:

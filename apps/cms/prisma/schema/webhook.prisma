@@ -2,6 +2,7 @@ enum WebhookEvent {
   ENTRY_PUBLISHED
   ENTRY_UNPUBLISHED
   ENTRY_DELETED
+  CONTENT_TYPE_SCHEMA_CHANGED
 }
 
 enum DeliveryStatus {
@@ -30,7 +31,7 @@ model WebhookDelivery {
   webhookId        String
   event            WebhookEvent
   contentTypeId    String
-  entryId          String
+  entryId          String?
   payload          Json
   status           DeliveryStatus @default(PENDING)
   attempts         Int            @default(0)
