@@ -57,3 +57,25 @@ export function buildWebhookPayload(
     },
   };
 }
+
+export interface SchemaChangedPayload {
+  event: 'CONTENT_TYPE_SCHEMA_CHANGED';
+  deliveryId: string;
+  contentTypeId: string;
+  contentTypeIdentifier: string;
+  occurredAt: string;
+}
+
+export function buildSchemaChangedPayload(input: {
+  deliveryId: string;
+  occurredAt: Date;
+  contentType: { id: string; identifier: string };
+}): SchemaChangedPayload {
+  return {
+    event: 'CONTENT_TYPE_SCHEMA_CHANGED',
+    deliveryId: input.deliveryId,
+    contentTypeId: input.contentType.id,
+    contentTypeIdentifier: input.contentType.identifier,
+    occurredAt: input.occurredAt.toISOString(),
+  };
+}

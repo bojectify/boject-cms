@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { buildWebhookPayload } from './webhookPayload';
+import {
+  buildWebhookPayload,
+  buildSchemaChangedPayload,
+} from './webhookPayload';
 import { CONTENT_STATUSES } from '../../utils/contentStatus';
 
 describe('buildWebhookPayload', () => {
@@ -63,5 +66,22 @@ describe('buildWebhookPayload', () => {
       entry: { ...entry, slug: null },
     });
     expect(payload.entry.slug).toBeNull();
+  });
+});
+
+describe('buildSchemaChangedPayload', () => {
+  it('returns the flat schema-changed shape with an ISO occurredAt', () => {
+    const payload = buildSchemaChangedPayload({
+      deliveryId: 'd-9',
+      occurredAt: new Date('2026-05-14T08:30:00Z'),
+      contentType: { id: 'ct-7', identifier: 'Article' },
+    });
+    expect(payload).toEqual({
+      event: 'CONTENT_TYPE_SCHEMA_CHANGED',
+      deliveryId: 'd-9',
+      contentTypeId: 'ct-7',
+      contentTypeIdentifier: 'Article',
+      occurredAt: '2026-05-14T08:30:00.000Z',
+    });
   });
 });
