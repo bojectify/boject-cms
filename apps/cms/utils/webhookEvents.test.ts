@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { WEBHOOK_EVENT_OPTIONS, WEBHOOK_EVENT_NAMES } from './webhookEvents';
+import {
+  WEBHOOK_EVENT_OPTIONS,
+  WEBHOOK_EVENT_NAMES,
+  isWebhookEventName,
+} from './webhookEvents';
 
 describe('webhookEvents registry', () => {
   it('lists all four events in order with labels and descriptions', () => {
@@ -21,5 +25,13 @@ describe('webhookEvents registry', () => {
     expect([...WEBHOOK_EVENT_OPTIONS.map((o) => o.value)].sort()).toEqual(
       [...WEBHOOK_EVENT_NAMES].sort()
     );
+  });
+
+  it('isWebhookEventName accepts registry values and rejects others', () => {
+    expect(isWebhookEventName('CONTENT_TYPE_SCHEMA_CHANGED')).toBe(true);
+    expect(isWebhookEventName('ENTRY_PUBLISHED')).toBe(true);
+    expect(isWebhookEventName('NOT_AN_EVENT')).toBe(false);
+    expect(isWebhookEventName(42)).toBe(false);
+    expect(isWebhookEventName(null)).toBe(false);
   });
 });
