@@ -35,6 +35,11 @@ describe('ensureEntriesIndex', () => {
     const { client, calls } = makeFakeClient([]);
     await ensureEntriesIndex(client);
 
+    // Membership is probed with an explicit high limit so the single global
+    // index is never missed behind Meilisearch's default-20 pagination.
+    const list = calls.find((c) => c.method === 'getIndexes');
+    expect(list!.args).toEqual([{ limit: 1000 }]);
+
     const create = calls.find((c) => c.method === 'createIndex');
     expect(create).toBeDefined();
     expect(create!.args).toEqual([ENTRIES_INDEX, { primaryKey: 'id' }]);
@@ -42,6 +47,12 @@ describe('ensureEntriesIndex', () => {
     const settings = calls.find((c) => c.method === 'updateSettings');
     expect(settings).toBeDefined();
     expect(settings!.args).toEqual([ENTRIES_INDEX, ENTRIES_INDEX_SETTINGS]);
+
+    // create must precede settings: applying settings to a not-yet-created
+    // index would fail, so this ordering is the idempotency barrier.
+    const createIdx = calls.findIndex((c) => c.method === 'createIndex');
+    const settingsIdx = calls.findIndex((c) => c.method === 'updateSettings');
+    expect(createIdx).toBeLessThan(settingsIdx);
   });
 
   it('does not create the index when it already exists, but still converges settings', async () => {
