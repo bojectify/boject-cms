@@ -46,9 +46,10 @@ const MAX_RICHTEXT_DEPTH = 1000;
  *
  * Keeps the `text` of every text node (so the visible text of `cmsLink`,
  * external-link, and formatting marks survives — marks wrap text nodes) and
- * recurses into every node's `content`. Each container node emits a single
- * space boundary so words don't fuse across blocks / table cells. Atom nodes
- * with no text — notably `cmsEmbed` — contribute nothing and are thereby
+ * recurses into every node's `content`. Each non-text node — a container OR a
+ * void leaf like `hardBreak` — emits a single space boundary so words don't
+ * fuse across blocks, table cells, or inline breaks. Atom nodes with no text —
+ * notably `cmsEmbed` — contribute nothing and are thereby
  * stripped. Whitespace runs collapse to one space; the result is trimmed.
  * Recursion is capped at depth 1000 (matching `collectRichtextReferences`);
  * any non-object input yields an empty string.
@@ -61,12 +62,21 @@ export function richtextToPlainText(doc: unknown): string {
     if (!node || typeof node !== 'object') return;
     const n = node as { text?: unknown; content?: unknown };
 
-    if (typeof n.text === 'string') parts.push(n.text);
+    if (typeof n.text === 'string') {
+      // Text nodes are leaves; emit no boundary so inline text flows naturally
+      // (mark-wrapped link / bold text stays joined to its surroundings).
+      parts.push(n.text);
+      return;
+    }
 
     if (Array.isArray(n.content)) {
       for (const child of n.content) walk(child, depth + 1);
-      parts.push(' '); // block boundary
     }
+    // Any non-text node — a container (block / table cell) OR a void leaf
+    // (hardBreak, horizontalRule, a cmsEmbed atom) — emits a single space
+    // boundary so words don't fuse across blocks, cells, or inline breaks.
+    // Redundant spaces are collapsed away below.
+    parts.push(' ');
   }
 
   walk(doc, 0);
@@ -79,7 +89,13 @@ function asObject(value: unknown): Record<string, unknown> {
     : {};
 }
 
-/** Extract a single relation's target entryId, or null if malformed. */
+/**
+ * Extract a single relation's target entryId, or null if malformed. Only the
+ * entryId is kept: it is a globally unique UUID, so it alone facets "entries
+ * relating to X", and the field's own targetContentTypeIds already scopes the
+ * type — matching how the GraphQL relation filters compare on entryId
+ * (jsonbFilters.ts). contentTypeId is intentionally dropped.
+ */
 function relationEntryId(value: unknown): string | null {
   const rel = asObject(value);
   return typeof rel.entryId === 'string' && rel.entryId !== ''

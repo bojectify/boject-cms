@@ -95,6 +95,23 @@ describe('richtextToPlainText', () => {
     expect(richtextToPlainText(doc)).toBe('before after');
   });
 
+  it('treats a hardBreak as a word boundary (no fusing)', () => {
+    const doc = {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: 'line1' },
+            { type: 'hardBreak' },
+            { type: 'text', text: 'line2' },
+          ],
+        },
+      ],
+    };
+    expect(richtextToPlainText(doc)).toBe('line1 line2');
+  });
+
   it('flattens table cells separated by spaces', () => {
     const doc = {
       type: 'doc',
