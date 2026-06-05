@@ -1,0 +1,5 @@
+-- AlterEnum
+ALTER TYPE "WebhookEvent" ADD VALUE 'CONTENT_TYPE_SCHEMA_CHANGED';
+
+-- AlterTable
+ALTER TABLE "WebhookDelivery" ALTER COLUMN "entryId" DROP NOT NULL;
