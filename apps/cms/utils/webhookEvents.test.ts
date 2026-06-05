@@ -16,4 +16,10 @@ describe('webhookEvents registry', () => {
     expect(schema?.description).toBeTruthy();
     expect(WEBHOOK_EVENT_OPTIONS).toHaveLength(4);
   });
+
+  it('keeps WEBHOOK_EVENT_OPTIONS values in sync with WEBHOOK_EVENT_NAMES (same set)', () => {
+    expect([...WEBHOOK_EVENT_OPTIONS.map((o) => o.value)].sort()).toEqual(
+      [...WEBHOOK_EVENT_NAMES].sort()
+    );
+  });
 });
