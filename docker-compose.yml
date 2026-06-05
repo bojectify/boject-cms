@@ -12,6 +12,7 @@ services:
       - '127.0.0.1:6006:6006' # Storybook (forwarded to dev)
       - '127.0.0.1:5555:5555' # Prisma Studio (forwarded to dev)
       - '127.0.0.1:24678:24678' # Vite HMR websocket (forwarded to dev)
+      - '127.0.0.1:7700:7700' # Meilisearch (forwarded to dev via shared db namespace)
     environment:
       POSTGRES_USER: boject
       POSTGRES_PASSWORD: boject
@@ -70,8 +71,34 @@ services:
       # host-side `PERF_DATABASE_URL=... pnpm perf:sweep` so the override
       # reaches the container.
       PERF_DATABASE_URL: ${PERF_DATABASE_URL:-}
+      # Search sidecar. Defaults work out of the box: the meilisearch service
+      # below runs in dev mode (no master key) and shares db's network
+      # namespace, so MEILI_URL=http://localhost:7700 with an empty key just
+      # works. Override on the host to point dev/tests at a remote engine.
+      MEILI_URL: ${MEILI_URL:-}
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-}
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.45.2
+    restart: unless-stopped
+    # Share db's network namespace (same reasoning as `dev`): `localhost:7700`
+    # inside dev — and on the host, via db's published 7700 port — resolves to
+    # Meilisearch. Keeps MEILI_URL=http://localhost:7700 identical for
+    # containerised and native dev with no .env rewriting.
+    network_mode: 'service:db'
+    depends_on:
+      - db
+    environment:
+      # Dev mode: all routes unauthenticated, no master key required. The CMS
+      # dev process connects with an empty key. Production runs a separate
+      # config with MEILI_ENV=production + a strong MEILI_MASTER_KEY.
+      MEILI_ENV: development
+      MEILI_NO_ANALYTICS: 'true'
+    volumes:
+      - meilidata:/meili_data
 
 volumes:
   pgdata:
   pnpm-store:
   playwright-cache:
+  meilidata:
