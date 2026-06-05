@@ -4,6 +4,7 @@ import { enforceMutationRateLimit } from '../../../../utils/rateLimitEndpoint';
 import { invalidateSchema } from '../../../../graphql/schema';
 import { assertSchemaEditable } from '../../../../utils/schemaReadOnly';
 import { FIELD_TYPES } from '../../../../../utils/fieldTypes';
+import { enqueueContentTypeSchemaChanged } from '../../../../utils/webhooks';
 
 export default defineEventHandler(async (event) => {
   assertSchemaEditable(event);
@@ -14,6 +15,7 @@ export default defineEventHandler(async (event) => {
   // Verify field exists and belongs to this content type
   const field = await prisma.contentTypeField.findUnique({
     where: { id: fieldId },
+    include: { contentType: { select: { id: true, identifier: true } } },
   });
   if (!field || field.contentTypeId !== contentTypeId) {
     throw createError({
@@ -37,7 +39,13 @@ export default defineEventHandler(async (event) => {
   }
 
   await withPrismaErrors(
-    () => prisma.contentTypeField.delete({ where: { id: fieldId } }),
+    () =>
+      prisma.$transaction(async (tx) => {
+        await tx.contentTypeField.delete({ where: { id: fieldId } });
+        await enqueueContentTypeSchemaChanged(tx, {
+          contentType: field.contentType,
+        });
+      }),
     { notFoundMessage: 'Field not found' }
   );
 

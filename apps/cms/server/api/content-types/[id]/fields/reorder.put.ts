@@ -2,6 +2,7 @@ import { assertUuid, assertNonNegativeInt } from '../../../../utils/validation';
 import { withPrismaErrors } from '../../../../utils/prismaErrors';
 import { enforceMutationRateLimit } from '../../../../utils/rateLimitEndpoint';
 import { assertSchemaEditable } from '../../../../utils/schemaReadOnly';
+import { enqueueContentTypeSchemaChanged } from '../../../../utils/webhooks';
 
 const MAX_REORDER_ITEMS = 500;
 
@@ -54,15 +55,27 @@ export default defineEventHandler(async (event) => {
     });
   }
 
+  const contentType = await prisma.contentType.findUnique({
+    where: { id: contentTypeId },
+    select: { id: true, identifier: true },
+  });
+
   const updated = await withPrismaErrors(() =>
-    prisma.$transaction(
-      validated.map((item) =>
-        prisma.contentTypeField.update({
-          where: { id: item.id },
-          data: { order: item.order },
-        })
-      )
-    )
+    prisma.$transaction(async (tx) => {
+      const result = [];
+      for (const item of validated) {
+        result.push(
+          await tx.contentTypeField.update({
+            where: { id: item.id },
+            data: { order: item.order },
+          })
+        );
+      }
+      if (validated.length > 0 && contentType) {
+        await enqueueContentTypeSchemaChanged(tx, { contentType });
+      }
+      return result;
+    })
   );
 
   return updated;
