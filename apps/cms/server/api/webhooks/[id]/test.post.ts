@@ -14,6 +14,13 @@ export default defineEventHandler(async (event) => {
   if (!webhook) {
     throw createError({ statusCode: 404, statusMessage: 'Webhook not found' });
   }
+  if (webhook.kind === 'INTERNAL') {
+    throw createError({
+      statusCode: 409,
+      statusMessage:
+        'The internal search-sync webhook is managed by boject and cannot be tested',
+    });
+  }
 
   const now = new Date();
   const placeholder = await prisma.webhookDelivery.create({

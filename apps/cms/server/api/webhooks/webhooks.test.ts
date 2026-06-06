@@ -690,5 +690,33 @@ describe('Webhooks REST', async () => {
         await prisma.webhook.delete({ where: { id: internal.id } });
       }
     });
+
+    it('POST /rotate refuses an internal webhook (409)', async () => {
+      const cookie = await getSessionCookie();
+      const internal = await createInternalWebhook();
+      try {
+        const res = await fetch(`/api/webhooks/${internal.id}/rotate`, {
+          method: 'POST',
+          headers: { Cookie: cookie },
+        });
+        expect(res.status).toBe(409);
+      } finally {
+        await prisma.webhook.delete({ where: { id: internal.id } });
+      }
+    });
+
+    it('POST /test refuses an internal webhook (409)', async () => {
+      const cookie = await getSessionCookie();
+      const internal = await createInternalWebhook();
+      try {
+        const res = await fetch(`/api/webhooks/${internal.id}/test`, {
+          method: 'POST',
+          headers: { Cookie: cookie },
+        });
+        expect(res.status).toBe(409);
+      } finally {
+        await prisma.webhook.delete({ where: { id: internal.id } });
+      }
+    });
   });
 });
