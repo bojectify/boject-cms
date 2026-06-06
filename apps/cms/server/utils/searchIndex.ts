@@ -17,21 +17,30 @@ export function resolveEntriesIndex(): string {
 }
 
 /**
- * Skeleton index configuration. Downstream issues expand these per
- * content-type field: #222 (transformer) defines the document shape, #225
- * (sync) populates it, #227 (query API) reads it. This establishes the
- * baseline so the index exists with sane defaults:
+ * Index configuration. Downstream issues expand these per content-type field:
+ * #222 (transformer) defines the document shape, #225 (sync) populates it, #227
+ * (query API) reads it. This establishes the baseline so the index exists with
+ * sane defaults:
  *
- * - searchableAttributes: entryTitle only (highest-priority text field).
+ * - searchableAttributes: entryTitle (highest-priority text field) + the nested
+ *   `fields` parent (covers every per-field value).
  * - filterableAttributes: contentType (cross-type query scoping) + entryKey
- *   (exact-match lookups).
+ *   (exact-match lookups) + the nested `fields` parent (covers every per-field
+ *   value).
  * - sortableAttributes: publishedAt.
  * - rankingRules: Meilisearch's documented defaults, set explicitly so the
  *   baseline is self-describing for downstream tuning.
  */
 export const ENTRIES_INDEX_SETTINGS: Settings = {
-  searchableAttributes: ['entryTitle'],
-  filterableAttributes: ['contentType', 'entryKey'],
+  // `entryTitle` is the highest-priority text field; `fields` makes every
+  // per-field value (TEXT/TEXTAREA/RICHTEXT body text, etc.) searchable via
+  // Meili's nested-attribute matching — covers any content type's fields with
+  // no per-field config. Consumers narrow with `attributesToSearchOn`.
+  searchableAttributes: ['entryTitle', 'fields'],
+  // `contentType`/`entryKey` for envelope filters; `fields` makes every nested
+  // field value filterable (RELATION/MULTIRELATION/SELECT/etc.) so `/api/search`
+  // can filter `fields.author = "x"`, `fields.tags = "y"` (array membership).
+  filterableAttributes: ['contentType', 'entryKey', 'fields'],
   sortableAttributes: ['publishedAt'],
   rankingRules: [
     'words',
