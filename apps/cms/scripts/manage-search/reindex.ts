@@ -21,11 +21,8 @@ import 'dotenv/config';
 import { parseArgs } from 'node:util';
 import type { Index } from 'meilisearch';
 import type { PrismaClient } from '../../generated/prisma/client';
-import {
-  toSearchDocument,
-  type SearchableFieldDef,
-  type SearchDocument,
-} from '../../server/utils/searchDocument';
+import type { SearchDocument } from '../../server/utils/searchDocument';
+import { buildEntrySearchDocument } from '../../server/utils/buildEntrySearchDocument';
 import { CONTENT_STATUSES } from '../../utils/contentStatus';
 
 const DEFAULT_BATCH_SIZE = 1000;
@@ -107,27 +104,9 @@ export async function runReindex(
   const byContentType: Record<string, number> = {};
 
   const documents: SearchDocument[] = entries.map((entry) => {
-    const version = entry.versions[0]!; // guaranteed by the `some` filter
     const identifier = entry.contentType.identifier;
     byContentType[identifier] = (byContentType[identifier] ?? 0) + 1;
-
-    const fields: SearchableFieldDef[] = entry.contentType.fields.map(
-      (field) => ({ identifier: field.identifier, type: field.type })
-    );
-
-    return toSearchDocument(
-      {
-        id: entry.id,
-        entryKey: entry.entryKey,
-        contentType: identifier,
-        entryTitle: version.entryTitle,
-        publishedAt: version.publishedAt
-          ? version.publishedAt.toISOString()
-          : null,
-        data: version.data,
-      },
-      fields
-    );
+    return buildEntrySearchDocument(entry);
   });
 
   if (dryRun) {
