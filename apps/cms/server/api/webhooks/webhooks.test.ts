@@ -593,4 +593,130 @@ describe('Webhooks REST', async () => {
       expect(res.status).toBe(403);
     });
   });
+
+  describe('internal webhook guards', () => {
+    async function createInternalWebhook() {
+      return prisma.webhook.create({
+        data: {
+          name: 'Search index sync',
+          kind: 'INTERNAL',
+          url: null,
+          secret: null,
+          enabled: true,
+          contentTypeIds: [],
+          events: ['ENTRY_PUBLISHED'],
+        },
+      });
+    }
+
+    it('GET list and detail expose kind', async () => {
+      const cookie = await getSessionCookie();
+      const internal = await createInternalWebhook();
+      try {
+        const list = await fetch('/api/webhooks', {
+          headers: { Cookie: cookie },
+        });
+        const listBody = await list.json();
+        const row = listBody.items.find(
+          (w: { id: string }) => w.id === internal.id
+        );
+        expect(row.kind).toBe('INTERNAL');
+
+        const detail = await fetch(`/api/webhooks/${internal.id}`, {
+          headers: { Cookie: cookie },
+        });
+        const detailBody = await detail.json();
+        expect(detailBody.kind).toBe('INTERNAL');
+      } finally {
+        await prisma.webhook.delete({ where: { id: internal.id } });
+      }
+    });
+
+    it('DELETE refuses an internal webhook (409) and the row survives', async () => {
+      const cookie = await getSessionCookie();
+      const internal = await createInternalWebhook();
+      try {
+        const res = await fetch(`/api/webhooks/${internal.id}`, {
+          method: 'DELETE',
+          headers: { Cookie: cookie },
+        });
+        expect(res.status).toBe(409);
+        const still = await prisma.webhook.findUnique({
+          where: { id: internal.id },
+        });
+        expect(still).not.toBeNull();
+      } finally {
+        await prisma.webhook.delete({ where: { id: internal.id } });
+      }
+    });
+
+    it('PUT allows toggling enabled on an internal webhook', async () => {
+      const cookie = await getSessionCookie();
+      const internal = await createInternalWebhook();
+      try {
+        const res = await fetch(`/api/webhooks/${internal.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Cookie: cookie },
+          body: JSON.stringify({ enabled: false }),
+        });
+        expect(res.status).toBe(200);
+        const updated = await prisma.webhook.findUnique({
+          where: { id: internal.id },
+        });
+        expect(updated?.enabled).toBe(false);
+      } finally {
+        await prisma.webhook.delete({ where: { id: internal.id } });
+      }
+    });
+
+    it('PUT rejects changing url/events on an internal webhook (400)', async () => {
+      const cookie = await getSessionCookie();
+      const internal = await createInternalWebhook();
+      try {
+        const urlRes = await fetch(`/api/webhooks/${internal.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Cookie: cookie },
+          body: JSON.stringify({ url: 'https://evil.example.com' }),
+        });
+        expect(urlRes.status).toBe(400);
+
+        const eventsRes = await fetch(`/api/webhooks/${internal.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Cookie: cookie },
+          body: JSON.stringify({ events: ['ENTRY_DELETED'] }),
+        });
+        expect(eventsRes.status).toBe(400);
+      } finally {
+        await prisma.webhook.delete({ where: { id: internal.id } });
+      }
+    });
+
+    it('POST /rotate refuses an internal webhook (409)', async () => {
+      const cookie = await getSessionCookie();
+      const internal = await createInternalWebhook();
+      try {
+        const res = await fetch(`/api/webhooks/${internal.id}/rotate`, {
+          method: 'POST',
+          headers: { Cookie: cookie },
+        });
+        expect(res.status).toBe(409);
+      } finally {
+        await prisma.webhook.delete({ where: { id: internal.id } });
+      }
+    });
+
+    it('POST /test refuses an internal webhook (409)', async () => {
+      const cookie = await getSessionCookie();
+      const internal = await createInternalWebhook();
+      try {
+        const res = await fetch(`/api/webhooks/${internal.id}/test`, {
+          method: 'POST',
+          headers: { Cookie: cookie },
+        });
+        expect(res.status).toBe(409);
+      } finally {
+        await prisma.webhook.delete({ where: { id: internal.id } });
+      }
+    });
+  });
 });

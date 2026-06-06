@@ -1,5 +1,9 @@
 import { prisma } from '../utils/prisma';
 import { startWorker, stopWorker } from '../utils/webhookWorker';
+import { meili } from '../utils/meili';
+import { resolveEntriesIndex } from '../utils/searchIndex';
+import { syncToSearchIndex } from '../utils/syncToSearchIndex';
+import type { SearchDocument } from '../utils/searchDocument';
 
 // `prisma` is imported explicitly here because Nuxt server auto-imports do
 // not consistently resolve inside `defineNitroPlugin` callbacks in the
@@ -29,6 +33,11 @@ export default defineNitroPlugin((nitroApp) => {
     fetch: (url, init) =>
       fetch(url, init as RequestInit & { dispatcher?: unknown }),
     allowPrivate,
+    syncToSearchIndex: (payload) =>
+      syncToSearchIndex(
+        { prisma, index: meili.index<SearchDocument>(resolveEntriesIndex()) },
+        payload
+      ),
   });
 
   nitroApp.hooks.hookOnce('close', () => {

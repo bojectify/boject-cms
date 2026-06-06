@@ -1,0 +1,7 @@
+-- CreateEnum
+CREATE TYPE "WebhookKind" AS ENUM ('EXTERNAL', 'INTERNAL');
+
+-- AlterTable
+ALTER TABLE "Webhook" ADD COLUMN     "kind" "WebhookKind" NOT NULL DEFAULT 'EXTERNAL',
+ALTER COLUMN "url" DROP NOT NULL,
+ALTER COLUMN "secret" DROP NOT NULL;

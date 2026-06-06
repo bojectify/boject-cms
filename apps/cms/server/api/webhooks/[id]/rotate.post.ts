@@ -10,6 +10,22 @@ export default defineEventHandler(async (event) => {
   }
   enforceMutationRateLimit(event, 'webhooks.rotate');
   const id = assertUuid(getRouterParam(event, 'id'), 'id');
+
+  const webhook = await prisma.webhook.findUnique({
+    where: { id },
+    select: { kind: true },
+  });
+  if (!webhook) {
+    throw createError({ statusCode: 404, statusMessage: 'Webhook not found' });
+  }
+  if (webhook.kind === 'INTERNAL') {
+    throw createError({
+      statusCode: 409,
+      statusMessage:
+        'The internal search-sync webhook is managed by boject and cannot be rotated',
+    });
+  }
+
   const secret = generateWebhookSecret();
   const updated = await withPrismaErrors(
     () =>

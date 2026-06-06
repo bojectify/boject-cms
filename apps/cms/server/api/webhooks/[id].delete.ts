@@ -1,7 +1,6 @@
 import { assertUuid } from '../../utils/validation';
 import { isCmsRequest } from '../../utils/resolveVersion';
 import { enforceMutationRateLimit } from '../../utils/rateLimitEndpoint';
-import { withPrismaErrors } from '../../utils/prismaErrors';
 
 export default defineEventHandler(async (event) => {
   if (!isCmsRequest(event)) {
@@ -10,8 +9,20 @@ export default defineEventHandler(async (event) => {
   enforceMutationRateLimit(event, 'webhooks.delete');
   const id = assertUuid(getRouterParam(event, 'id'), 'id');
 
-  await withPrismaErrors(() => prisma.webhook.delete({ where: { id } }), {
-    notFoundMessage: 'Webhook not found',
+  const webhook = await prisma.webhook.findUnique({
+    where: { id },
+    select: { kind: true },
   });
+  if (!webhook) {
+    throw createError({ statusCode: 404, statusMessage: 'Webhook not found' });
+  }
+  if (webhook.kind === 'INTERNAL') {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'The internal search-sync webhook cannot be deleted',
+    });
+  }
+
+  await prisma.webhook.delete({ where: { id } });
   return { success: true };
 });

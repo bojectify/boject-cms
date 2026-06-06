@@ -32,7 +32,12 @@ type DeliveryRow = {
   createdAt: Date;
   completedAt: Date | null;
 };
-type WebhookRow = { id: string; url: string; secret: string };
+type WebhookRow = {
+  id: string;
+  kind: 'EXTERNAL' | 'INTERNAL';
+  url: string | null;
+  secret: string | null;
+};
 
 function makeFakePrisma(deliveries: DeliveryRow[], webhooks: WebhookRow[]) {
   return {
@@ -87,7 +92,14 @@ describe('runWorkerTick', () => {
 
   beforeEach(() => {
     deliveries = [{ ...baseDelivery }];
-    webhooks = [{ id: 'w1', url: 'https://example.com/hook', secret: 'sek' }];
+    webhooks = [
+      {
+        id: 'w1',
+        kind: 'EXTERNAL',
+        url: 'https://example.com/hook',
+        secret: 'sek',
+      },
+    ];
   });
 
   it('marks delivery SUCCESS on 2xx and sets completedAt', async () => {
@@ -189,7 +201,14 @@ describe('runWorkerTick — DNS resolution + IP pinning', () => {
 
   beforeEach(() => {
     deliveries = [{ ...baseDelivery }];
-    webhooks = [{ id: 'w1', url: 'https://example.com/hook', secret: 'sek' }];
+    webhooks = [
+      {
+        id: 'w1',
+        kind: 'EXTERNAL',
+        url: 'https://example.com/hook',
+        secret: 'sek',
+      },
+    ];
     mockResolve.mockReset();
     mockResolve.mockResolvedValue({ addresses: ['203.0.113.5'] });
   });
@@ -217,7 +236,14 @@ describe('runWorkerTick — DNS resolution + IP pinning', () => {
   });
 
   it('skips DNS resolution when URL hostname is an IP literal', async () => {
-    webhooks = [{ id: 'w1', url: 'https://203.0.113.5/hook', secret: 'sek' }];
+    webhooks = [
+      {
+        id: 'w1',
+        kind: 'EXTERNAL',
+        url: 'https://203.0.113.5/hook',
+        secret: 'sek',
+      },
+    ];
     const fetchImpl = vi.fn(async () => new Response('ok', { status: 200 }));
     const prisma = makeFakePrisma(deliveries, webhooks);
     await runWorkerTick({
@@ -321,5 +347,77 @@ describe('runWorkerTick — DNS resolution + IP pinning', () => {
     expect(deliveries[0]!.status).toBe('FAILED');
     expect(deliveries[0]!.attempts).toBe(1);
     expect(deliveries[0]!.lastError).toMatch(/timed out/i);
+  });
+});
+
+describe('runWorkerTick — internal (search sync) dispatch', () => {
+  let deliveries: DeliveryRow[];
+  let webhooks: WebhookRow[];
+
+  beforeEach(() => {
+    deliveries = [{ ...baseDelivery, webhookId: 'wi' }];
+    webhooks = [{ id: 'wi', kind: 'INTERNAL', url: null, secret: null }];
+  });
+
+  const okFetch = () =>
+    vi.fn(async () => new Response('', { status: 200, statusText: 'OK' }));
+
+  it('calls syncToSearchIndex and marks SUCCESS without any HTTP fetch', async () => {
+    const sync = vi.fn(async () => {});
+    const fetchSpy = okFetch();
+    const prisma = makeFakePrisma(deliveries, webhooks);
+    await runWorkerTick({
+      prisma,
+      fetch: fetchSpy,
+      now: () => new Date(),
+      syncToSearchIndex: sync,
+    });
+    expect(sync).toHaveBeenCalledWith(deliveries[0]!.payload);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(deliveries[0]!.status).toBe('SUCCESS');
+    expect(deliveries[0]!.attempts).toBe(1);
+    expect(deliveries[0]!.completedAt).toBeInstanceOf(Date);
+    expect(deliveries[0]!.nextAttemptAt).toBeNull();
+  });
+
+  it('reschedules with backoff when syncToSearchIndex throws (attempts < MAX)', async () => {
+    const now = new Date('2026-04-22T12:00:00Z');
+    const sync = vi.fn(async () => {
+      throw new Error('meili down');
+    });
+    const prisma = makeFakePrisma(deliveries, webhooks);
+    await runWorkerTick({
+      prisma,
+      fetch: okFetch(),
+      now: () => now,
+      syncToSearchIndex: sync,
+    });
+    expect(deliveries[0]!.status).toBe('PENDING');
+    expect(deliveries[0]!.attempts).toBe(1);
+    expect(deliveries[0]!.lastError).toContain('meili down');
+    expect(deliveries[0]!.nextAttemptAt?.getTime()).toBe(now.getTime() + 1_000);
+  });
+
+  it('dead-letters after MAX attempts when sync keeps throwing', async () => {
+    deliveries[0]!.attempts = 5;
+    const sync = vi.fn(async () => {
+      throw new Error('still down');
+    });
+    const prisma = makeFakePrisma(deliveries, webhooks);
+    await runWorkerTick({
+      prisma,
+      fetch: okFetch(),
+      now: () => new Date(),
+      syncToSearchIndex: sync,
+    });
+    expect(deliveries[0]!.status).toBe('DEAD_LETTERED');
+    expect(deliveries[0]!.attempts).toBe(6);
+  });
+
+  it('dead-letters an internal delivery when no syncToSearchIndex dep is wired', async () => {
+    const prisma = makeFakePrisma(deliveries, webhooks);
+    await runWorkerTick({ prisma, fetch: okFetch(), now: () => new Date() });
+    expect(deliveries[0]!.status).toBe('DEAD_LETTERED');
+    expect(deliveries[0]!.lastError).toContain('not configured');
   });
 });
