@@ -1,7 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import type { Meilisearch } from 'meilisearch';
 import {
   ensureEntriesIndex,
+  resolveEntriesIndex,
   ENTRIES_INDEX,
   ENTRIES_INDEX_SETTINGS,
 } from './searchIndex';
@@ -33,7 +34,7 @@ function makeFakeClient(existingUids: string[]) {
 describe('ensureEntriesIndex', () => {
   it('creates the index with primaryKey id then applies settings when absent', async () => {
     const { client, calls } = makeFakeClient([]);
-    await ensureEntriesIndex(client);
+    await ensureEntriesIndex(client, ENTRIES_INDEX);
 
     // Membership is probed with an explicit high limit so the single global
     // index is never missed behind Meilisearch's default-20 pagination.
@@ -57,7 +58,7 @@ describe('ensureEntriesIndex', () => {
 
   it('does not create the index when it already exists, but still converges settings', async () => {
     const { client, calls } = makeFakeClient([ENTRIES_INDEX]);
-    await ensureEntriesIndex(client);
+    await ensureEntriesIndex(client, ENTRIES_INDEX);
 
     expect(calls.some((c) => c.method === 'createIndex')).toBe(false);
     expect(calls.some((c) => c.method === 'updateSettings')).toBe(true);
@@ -71,5 +72,44 @@ describe('ensureEntriesIndex', () => {
       },
     } as unknown as Meilisearch;
     await expect(ensureEntriesIndex(client)).rejects.toThrow(/ECONNREFUSED/);
+  });
+});
+
+describe('resolveEntriesIndex', () => {
+  const original = process.env.MEILI_INDEX;
+  afterEach(() => {
+    if (original === undefined) delete process.env.MEILI_INDEX;
+    else process.env.MEILI_INDEX = original;
+  });
+
+  it('defaults to ENTRIES_INDEX when MEILI_INDEX is unset', () => {
+    delete process.env.MEILI_INDEX;
+    expect(resolveEntriesIndex()).toBe(ENTRIES_INDEX);
+  });
+
+  it('falls back to ENTRIES_INDEX when MEILI_INDEX is an empty string', () => {
+    process.env.MEILI_INDEX = '';
+    expect(resolveEntriesIndex()).toBe(ENTRIES_INDEX);
+  });
+
+  it('returns the MEILI_INDEX override when set', () => {
+    process.env.MEILI_INDEX = 'entries_test';
+    expect(resolveEntriesIndex()).toBe('entries_test');
+  });
+});
+
+describe('ensureEntriesIndex index resolution', () => {
+  const original = process.env.MEILI_INDEX;
+  afterEach(() => {
+    if (original === undefined) delete process.env.MEILI_INDEX;
+    else process.env.MEILI_INDEX = original;
+  });
+
+  it('creates the index named by resolveEntriesIndex() when no index arg is given', async () => {
+    process.env.MEILI_INDEX = 'entries_test';
+    const { client, calls } = makeFakeClient([]);
+    await ensureEntriesIndex(client);
+    const create = calls.find((c) => c.method === 'createIndex');
+    expect(create!.args).toEqual(['entries_test', { primaryKey: 'id' }]);
   });
 });
