@@ -14,6 +14,25 @@ export default defineEventHandler(async (event) => {
   const id = assertUuid(getRouterParam(event, 'id'), 'id');
   const body = await readBody<Record<string, unknown>>(event);
 
+  const existing = await prisma.webhook.findUnique({
+    where: { id },
+    select: { kind: true },
+  });
+  if (!existing) {
+    throw createError({ statusCode: 404, statusMessage: 'Webhook not found' });
+  }
+  if (existing.kind === 'INTERNAL') {
+    const disallowed = Object.keys(body).filter((k) => k !== 'enabled');
+    if (disallowed.length > 0) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: `Only 'enabled' can be changed on the internal webhook (rejected: ${disallowed.join(
+          ', '
+        )})`,
+      });
+    }
+  }
+
   const data: Prisma.WebhookUpdateInput = {};
   if ('name' in body) {
     data.name = assertStringLength(body.name, 'name', 200);
@@ -76,6 +95,7 @@ export default defineEventHandler(async (event) => {
           name: true,
           url: true,
           enabled: true,
+          kind: true,
           contentTypeIds: true,
           events: true,
           createdAt: true,
