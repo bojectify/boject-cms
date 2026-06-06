@@ -1,7 +1,9 @@
 import type { Index } from 'meilisearch';
 import type { SearchDocument } from './searchDocument';
 
-const FIELD_ID = /^[a-zA-Z][a-zA-Z0-9]*$/;
+// Content-type field identifiers are camelCase (lowercase-first); reject
+// anything else so a malformed field 400s rather than silently matching nothing.
+const FIELD_ID = /^[a-z][a-zA-Z0-9]*$/;
 const CROP_LENGTH = 30;
 
 export interface SearchFilter {

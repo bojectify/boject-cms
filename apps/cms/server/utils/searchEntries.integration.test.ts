@@ -115,4 +115,24 @@ describe('runSearch', () => {
       })
     ).rejects.toThrow(/field/i);
   });
+
+  it('treats a filter value with quote/operator characters as a literal (no injection)', async () => {
+    // An adversarial author value that, unescaped, would break out of the
+    // filter literal and OR-in everything.
+    const evil = '" OR fields.author = "author-1';
+    await addTestDocuments([
+      doc('evil', 'Article', 'Evil entry', { body: 'x', author: evil }),
+    ]);
+
+    // Filtering for the literal evil value must match ONLY the evil doc — never
+    // a1 (whose author is 'author-1'); if escaping were broken the OR would pull
+    // a1 in.
+    const res = await runSearch(index, {
+      q: '',
+      filters: [{ field: 'author', value: evil }],
+      offset: 0,
+      limit: 20,
+    });
+    expect(res.hits.map((h) => h.id)).toEqual(['evil']);
+  });
 });
