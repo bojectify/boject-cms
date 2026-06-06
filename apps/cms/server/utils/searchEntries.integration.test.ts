@@ -105,6 +105,28 @@ describe('runSearch', () => {
     expect(res.hits.map((h) => h.id)).toEqual(['p1']);
   });
 
+  it('rejects an unknown attributesToSearchOn value', async () => {
+    await expect(
+      runSearch(index, {
+        q: 'whatever',
+        attributesToSearchOn: ['notARealAttribute'],
+        offset: 0,
+        limit: 20,
+      })
+    ).rejects.toThrow(/attributesToSearchOn/i);
+  });
+
+  it('accepts a nested fields.<id> attributesToSearchOn path', async () => {
+    // valid path — should NOT throw and should run a real search
+    const res = await runSearch(index, {
+      q: 'whatever',
+      attributesToSearchOn: ['entryTitle', 'fields.body'],
+      offset: 0,
+      limit: 20,
+    });
+    expect(Array.isArray(res.hits)).toBe(true);
+  });
+
   it('rejects a malformed field identifier', async () => {
     await expect(
       runSearch(index, {

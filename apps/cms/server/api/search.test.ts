@@ -162,6 +162,13 @@ describe('GET /api/search', async () => {
     expect(res.hits[0]!.id).toBe('title-match');
   });
 
+  it('returns 400 (not 503) for an unknown attributesToSearchOn', async () => {
+    const res = await fetch('/api/search?q=x&attributesToSearchOn=notReal', {
+      headers: { Authorization: `Bearer ${TEST_API_KEY}` },
+    });
+    expect(res.status).toBe(400);
+  });
+
   it('returns 403 for an API key without content:read', async () => {
     const rawKey = `boject_test_no_read_${Date.now()}`;
     const keyHash = createHash('sha256').update(rawKey).digest('hex');

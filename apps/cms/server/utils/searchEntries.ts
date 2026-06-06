@@ -4,6 +4,10 @@ import type { SearchDocument } from './searchDocument';
 // Content-type field identifiers are camelCase (lowercase-first); reject
 // anything else so a malformed field 400s rather than silently matching nothing.
 const FIELD_ID = /^[a-z][a-zA-Z0-9]*$/;
+// Allowed `attributesToSearchOn` values: the envelope title, the whole `fields`
+// bucket, or a single nested field path `fields.<camelCase>`. Anything else is
+// a caller mistake (would make Meili 400) — reject it up-front as 400, not 503.
+const SEARCHABLE_ATTR = /^(entryTitle|fields(\.[a-z][a-zA-Z0-9]*)?)$/;
 const CROP_LENGTH = 30;
 
 export interface SearchFilter {
@@ -98,6 +102,11 @@ export async function runSearch(
   params: RunSearchParams
 ): Promise<RunSearchResult> {
   const filter = buildFilter(params);
+  for (const attr of params.attributesToSearchOn ?? []) {
+    if (!SEARCHABLE_ATTR.test(attr)) {
+      throw new SearchInputError(`Invalid attributesToSearchOn "${attr}"`);
+    }
+  }
   const res = await index.search(params.q, {
     filter,
     ...(params.attributesToSearchOn
