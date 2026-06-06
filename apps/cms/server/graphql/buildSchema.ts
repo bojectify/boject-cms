@@ -2,6 +2,7 @@ import type { GraphQLSchema } from 'graphql';
 import { createBuilder } from './builder';
 import { registerContentStatusEnum } from './types/contentStatus';
 import { registerDynamicTypes } from './dynamicTypes';
+import { registerSearchQuery } from './searchQuery';
 import { prisma } from '../utils/prisma';
 
 export async function buildSchema(): Promise<GraphQLSchema> {
@@ -17,6 +18,7 @@ export async function buildSchema(): Promise<GraphQLSchema> {
     include: { fields: { orderBy: { order: 'asc' } } },
   });
   registerDynamicTypes(builder, contentTypes, ContentStatusEnum);
+  registerSearchQuery(builder);
 
   return builder.toSchema();
 }
