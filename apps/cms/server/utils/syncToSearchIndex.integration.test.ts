@@ -194,4 +194,82 @@ describe('syncToSearchIndex', () => {
     );
     expect(await getAllDocuments()).toEqual([]);
   });
+
+  it('ENTRY_PUBLISHED deletes a stale doc when the entry has only a DRAFT version', async () => {
+    // Entry envelope exists but has NO published version (only DRAFT) — the
+    // `entry.versions.length === 0` arm (distinct from the missing-entry arm).
+    const ctId = await createType('Article');
+    const e = await prisma.contentEntry.create({
+      data: {
+        contentTypeId: ctId,
+        entryTitle: 'Drafty',
+        entryKey: 'drafty',
+        slug: 'drafty',
+        versions: {
+          create: {
+            data: { title: 'Drafty', body: 'x' },
+            entryTitle: 'Drafty',
+            status: CONTENT_STATUSES.DRAFT,
+            publishedAt: null,
+          },
+        },
+      },
+    });
+    const stale: SearchDocument = {
+      id: e.id,
+      entryKey: 'drafty',
+      contentType: 'Article',
+      entryTitle: 'Drafty',
+      publishedAt: null,
+      fields: {},
+    };
+    await addTestDocuments([stale]);
+    await syncToSearchIndex(
+      deps,
+      entryPayload('ENTRY_PUBLISHED', { id: ctId, identifier: 'Article' }, e.id)
+    );
+    expect(await getAllDocuments()).toEqual([]);
+  });
+
+  it('CONTENT_TYPE_SCHEMA_CHANGED with no published entries is a no-op', async () => {
+    const ctId = await createType('Article');
+    const keep: SearchDocument = {
+      id: 'keep1',
+      entryKey: 'keep1',
+      contentType: 'Other',
+      entryTitle: 'K',
+      publishedAt: null,
+      fields: {},
+    };
+    await addTestDocuments([keep]);
+    await syncToSearchIndex(deps, {
+      event: 'CONTENT_TYPE_SCHEMA_CHANGED',
+      deliveryId: 'd3',
+      contentTypeId: ctId,
+      contentTypeIdentifier: 'Article',
+      occurredAt: '2026-01-01T00:00:00.000Z',
+    });
+    expect((await getAllDocuments()).map((d) => d.id)).toEqual(['keep1']);
+  });
+
+  it('ignores an unknown event (no-op, leaves the index untouched)', async () => {
+    const keep: SearchDocument = {
+      id: 'keep2',
+      entryKey: 'keep2',
+      contentType: 'Other',
+      entryTitle: 'K2',
+      publishedAt: null,
+      fields: {},
+    };
+    await addTestDocuments([keep]);
+    await syncToSearchIndex(
+      deps,
+      entryPayload(
+        'SOMETHING_ELSE',
+        { id: 'x', identifier: 'Article' },
+        'keep2'
+      )
+    );
+    expect((await getAllDocuments()).map((d) => d.id)).toEqual(['keep2']);
+  });
 });
