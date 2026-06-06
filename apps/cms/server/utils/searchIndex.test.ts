@@ -75,6 +75,22 @@ describe('ensureEntriesIndex', () => {
   });
 });
 
+describe('ENTRIES_INDEX_SETTINGS', () => {
+  it('makes entryTitle + nested fields searchable', () => {
+    expect(ENTRIES_INDEX_SETTINGS.searchableAttributes).toEqual([
+      'entryTitle',
+      'fields',
+    ]);
+  });
+  it('makes contentType, entryKey, and nested fields filterable', () => {
+    expect(ENTRIES_INDEX_SETTINGS.filterableAttributes).toEqual([
+      'contentType',
+      'entryKey',
+      'fields',
+    ]);
+  });
+});
+
 describe('resolveEntriesIndex', () => {
   const original = process.env.MEILI_INDEX;
   afterEach(() => {

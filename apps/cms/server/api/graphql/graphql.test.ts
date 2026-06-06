@@ -4,6 +4,8 @@ import { TEST_USERNAME, TEST_PASSWORD } from '../../test/credentials';
 import { getTestDatabaseUrl } from '../../../test/dbUrl';
 import { FIELD_TYPES } from '../../../utils/fieldTypes';
 import { CONTENT_STATUSES } from '../../../utils/contentStatus';
+import { addTestDocuments, clearTestIndex } from '../../test/meiliTestUtils';
+import type { SearchDocument } from '../../utils/searchDocument';
 
 const TEST_API_KEY = 'boject_test_key_for_integration_tests_only';
 
@@ -33,6 +35,14 @@ function gql<T>(query: string) {
   return $fetch<GqlResponse<T>>('/api/graphql', {
     method: 'POST',
     body: { query },
+    headers: { Authorization: `Bearer ${TEST_API_KEY}` },
+  });
+}
+
+function gqlVars<T>(query: string, variables: Record<string, unknown>) {
+  return $fetch<GqlResponse<T>>('/api/graphql', {
+    method: 'POST',
+    body: { query, variables },
     headers: { Authorization: `Bearer ${TEST_API_KEY}` },
   });
 }
@@ -2791,6 +2801,140 @@ describe('GraphQL API', async () => {
       expect(body.data?.__typename).toBe('Query');
       expect(body.extensions?.queryCost?.cost).toBe(cost);
       expect(body.extensions?.queryCost?.cap).toBeGreaterThan(0);
+    });
+  });
+
+  describe('searchEntries query', () => {
+    type SearchHitNode = {
+      id: string;
+      entryKey: string;
+      contentType: string;
+      entryTitle: string;
+      snippet: string | null;
+      publishedAt: string | null;
+    };
+
+    const SEARCH_QUERY = `
+      query ($q: String!, $contentType: String, $filters: [SearchFilterInput!]) {
+        searchEntries(
+          q: $q
+          first: 10
+          contentType: $contentType
+          filters: $filters
+        ) {
+          edges { node { id entryKey contentType entryTitle snippet publishedAt } cursor }
+          pageInfo { hasNextPage endCursor }
+        }
+      }
+    `;
+
+    beforeAll(async () => {
+      await clearTestIndex();
+      const docs: SearchDocument[] = [
+        {
+          id: 'g1',
+          entryKey: 'g1',
+          contentType: 'Article',
+          entryTitle: 'Coffee guide',
+          publishedAt: null,
+          fields: { body: 'whatever brew', author: 'author-1', tags: ['t-x'] },
+        },
+        {
+          id: 'g2',
+          entryKey: 'g2',
+          contentType: 'Page',
+          entryTitle: 'About whatever',
+          publishedAt: null,
+          fields: { body: 'page' },
+        },
+      ];
+      await addTestDocuments(docs);
+    });
+
+    it('returns matching hits across content types as a Relay connection', async () => {
+      const { data } = await gqlVars<{
+        searchEntries: Connection<SearchHitNode>;
+      }>(SEARCH_QUERY, { q: 'whatever' });
+
+      const ids = data.searchEntries.edges.map((e) => e.node.id).sort();
+      expect(ids).toEqual(['g1', 'g2']);
+
+      // Connection shape: each edge has a cursor; pageInfo is present.
+      data.searchEntries.edges.forEach((e) => {
+        expect(typeof e.cursor).toBe('string');
+      });
+      expect(typeof data.searchEntries.pageInfo.hasNextPage).toBe('boolean');
+
+      // g1's snippet highlights the matched term.
+      const g1 = data.searchEntries.edges.find((e) => e.node.id === 'g1');
+      expect(g1).toBeDefined();
+      expect(g1!.node.snippet).toContain('<em>whatever</em>');
+      expect(g1!.node.entryKey).toBe('g1');
+      expect(g1!.node.contentType).toBe('Article');
+      expect(g1!.node.entryTitle).toBe('Coffee guide');
+      expect(g1!.node.publishedAt).toBeNull();
+    });
+
+    it('scopes results to a single content type via contentType', async () => {
+      const { data } = await gqlVars<{
+        searchEntries: Connection<SearchHitNode>;
+      }>(SEARCH_QUERY, { q: 'whatever', contentType: 'Article' });
+
+      const ids = data.searchEntries.edges.map((e) => e.node.id);
+      expect(ids).toEqual(['g1']);
+    });
+
+    it('applies a per-field filter', async () => {
+      const { data } = await gqlVars<{
+        searchEntries: Connection<SearchHitNode>;
+      }>(SEARCH_QUERY, {
+        q: 'whatever',
+        filters: [{ field: 'author', value: 'author-1' }],
+      });
+
+      const ids = data.searchEntries.edges.map((e) => e.node.id);
+      expect(ids).toEqual(['g1']);
+    });
+
+    it('paginates the connection with first/after (hasNextPage + cursor traversal)', async () => {
+      const PAGE_QUERY = `
+        query ($q: String!, $first: Int!, $after: String) {
+          searchEntries(q: $q, first: $first, after: $after) {
+            edges { node { id } cursor }
+            pageInfo { hasNextPage endCursor }
+          }
+        }
+      `;
+
+      // First page: 1 of 2 → hasNextPage true.
+      const { data: page1 } = await gqlVars<{
+        searchEntries: Connection<SearchHitNode>;
+      }>(PAGE_QUERY, { q: 'whatever', first: 1 });
+      const conn1 = page1.searchEntries;
+      expect(conn1.edges).toHaveLength(1);
+      expect(conn1.pageInfo.hasNextPage).toBe(true);
+      expect(conn1.pageInfo.endCursor).toBeTruthy();
+
+      // Second page via the cursor → the other doc, hasNextPage false.
+      const { data: page2 } = await gqlVars<{
+        searchEntries: Connection<SearchHitNode>;
+      }>(PAGE_QUERY, {
+        q: 'whatever',
+        first: 1,
+        after: conn1.pageInfo.endCursor,
+      });
+      const conn2 = page2.searchEntries;
+      expect(conn2.edges).toHaveLength(1);
+      expect(conn2.pageInfo.hasNextPage).toBe(false);
+
+      const id1 = conn1.edges[0]!.node.id;
+      const id2 = conn2.edges[0]!.node.id;
+
+      // The two pages returned different docs.
+      expect(id2).not.toBe(id1);
+
+      // Together they cover both seeded docs.
+      expect([id1, id2].sort()).toEqual(['g1', 'g2']);
     });
   });
 });
