@@ -87,7 +87,8 @@ export type RateLimitKind =
   | 'mutation'
   | 'login'
   | 'password'
-  | 'transform';
+  | 'transform'
+  | 'search';
 
 export const RATE_LIMIT_SUGGESTIONS: Record<RateLimitKind, string> = {
   graphql:
@@ -100,6 +101,7 @@ export const RATE_LIMIT_SUGGESTIONS: Record<RateLimitKind, string> = {
     'Wait before retrying. The password endpoint is heavily rate-limited per IP to deter brute-force.',
   transform:
     'Honour Retry-After. Cache transformed images at your edge; the public transform endpoint is not designed for hot-path serving.',
+  search: 'Slow your search request rate, or cache results client-side.',
 };
 
 export interface RateLimitedBody {

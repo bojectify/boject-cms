@@ -54,6 +54,7 @@ export default defineEventHandler(async (event) => {
   if (result.valid) {
     event.context.authMethod = 'apikey';
     event.context.apiKeyScopes = result.scopes;
+    event.context.apiKeyId = result.apiKeyId;
     const method = getMethod(event);
     if (method !== 'GET' && method !== 'HEAD' && !isApiKeyWritablePath(path)) {
       throw createError({
