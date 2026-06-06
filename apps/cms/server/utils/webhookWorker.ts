@@ -26,9 +26,12 @@ interface DeliveryRow {
 export interface WorkerPrisma {
   $queryRaw: (...args: unknown[]) => Promise<DeliveryRow[]>;
   webhook: {
-    findUnique: (args: {
-      where: { id: string };
-    }) => Promise<{ id: string; url: string; secret: string } | null>;
+    findUnique: (args: { where: { id: string } }) => Promise<{
+      id: string;
+      kind: 'EXTERNAL' | 'INTERNAL';
+      url: string | null;
+      secret: string | null;
+    } | null>;
   };
   webhookDelivery: {
     update: (args: {
@@ -52,6 +55,12 @@ export interface RunWorkerTickDeps {
    * Default is `true` so existing tests with no flag behave like dev.
    */
   allowPrivate?: boolean;
+  /**
+   * Called for INTERNAL webhooks instead of an HTTP POST. The plugin injects a
+   * closure over the real prisma + entries index. Undefined in unit tests that
+   * don't exercise internal delivery (and in that case an internal row dead-letters).
+   */
+  syncToSearchIndex?: (payload: unknown) => Promise<void>;
 }
 
 const DEFAULT_BATCH = 10;
@@ -122,6 +131,25 @@ async function dispatch(
 
   const attempts = row.attempts + 1;
   const now = deps.now();
+
+  if (webhook.kind === 'INTERNAL') {
+    return dispatchInternal(deps, row, attempts, now);
+  }
+
+  // EXTERNAL rows must have a URL + secret (DB allows null only for INTERNAL).
+  if (!webhook.url || !webhook.secret) {
+    await deps.prisma.webhookDelivery.update({
+      where: { id: row.id },
+      data: {
+        status: 'DEAD_LETTERED',
+        attempts,
+        lastError: 'External webhook is missing a URL or secret',
+        completedAt: now,
+        nextAttemptAt: null,
+      },
+    });
+    return;
+  }
 
   // Dispatch-time DNS guard: re-resolve the hostname and pin the verified IP
   // into the outbound connection. Defeats DNS rebinding between validate-time
@@ -241,6 +269,74 @@ async function dispatch(
         lastResponseBody: responseBody,
         lastError: transportError,
         nextAttemptAt: new Date(now.getTime() + delay),
+      },
+    });
+  }
+}
+
+async function dispatchInternal(
+  deps: RunWorkerTickDeps,
+  row: DeliveryRow,
+  attempts: number,
+  now: Date
+): Promise<void> {
+  if (!deps.syncToSearchIndex) {
+    // Infra not wired (shouldn't happen in production) — dead-letter rather
+    // than retry-storm against a permanently-missing handler.
+    await deps.prisma.webhookDelivery.update({
+      where: { id: row.id },
+      data: {
+        status: 'DEAD_LETTERED',
+        attempts,
+        lastError: 'Internal sync handler not configured',
+        completedAt: now,
+        nextAttemptAt: null,
+      },
+    });
+    return;
+  }
+
+  let error: string | null = null;
+  try {
+    await deps.syncToSearchIndex(row.payload);
+  } catch (err) {
+    error = err instanceof Error ? err.message.slice(0, 500) : String(err);
+  }
+
+  if (error === null) {
+    await deps.prisma.webhookDelivery.update({
+      where: { id: row.id },
+      data: {
+        status: 'SUCCESS',
+        attempts,
+        lastError: null,
+        completedAt: now,
+        nextAttemptAt: null,
+      },
+    });
+    return;
+  }
+
+  if (attempts < MAX_ATTEMPTS) {
+    const delay = backoffMs(attempts)!;
+    await deps.prisma.webhookDelivery.update({
+      where: { id: row.id },
+      data: {
+        status: 'PENDING',
+        attempts,
+        lastError: error,
+        nextAttemptAt: new Date(now.getTime() + delay),
+      },
+    });
+  } else {
+    await deps.prisma.webhookDelivery.update({
+      where: { id: row.id },
+      data: {
+        status: 'DEAD_LETTERED',
+        attempts,
+        lastError: error,
+        completedAt: now,
+        nextAttemptAt: null,
       },
     });
   }
