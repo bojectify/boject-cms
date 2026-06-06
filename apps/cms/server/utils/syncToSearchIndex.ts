@@ -1,6 +1,7 @@
 import type { Index } from 'meilisearch';
 import type { PrismaClient } from '#prisma';
 import { CONTENT_STATUSES } from '../../utils/contentStatus';
+import { WEBHOOK_EVENTS } from '../../utils/webhookEvents';
 import { buildEntrySearchDocument } from './buildEntrySearchDocument';
 import type { SearchDocument } from './searchDocument';
 
@@ -48,7 +49,7 @@ export async function syncToSearchIndex(
   const event = readEvent(payload);
 
   switch (event) {
-    case 'ENTRY_PUBLISHED': {
+    case WEBHOOK_EVENTS.ENTRY_PUBLISHED: {
       const entryId = readEntryId(payload);
       if (!entryId) return;
       const entry = await prisma.contentEntry.findUnique({
@@ -65,15 +66,15 @@ export async function syncToSearchIndex(
       return;
     }
 
-    case 'ENTRY_UNPUBLISHED':
-    case 'ENTRY_DELETED': {
+    case WEBHOOK_EVENTS.ENTRY_UNPUBLISHED:
+    case WEBHOOK_EVENTS.ENTRY_DELETED: {
       const entryId = readEntryId(payload);
       if (!entryId) return;
       await index.deleteDocument(entryId).waitTask();
       return;
     }
 
-    case 'CONTENT_TYPE_SCHEMA_CHANGED': {
+    case WEBHOOK_EVENTS.CONTENT_TYPE_SCHEMA_CHANGED: {
       const contentTypeId = readContentTypeId(payload);
       if (!contentTypeId) return;
       const entries = await prisma.contentEntry.findMany({
