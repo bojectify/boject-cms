@@ -165,12 +165,17 @@ async function save() {
 async function saveEnabled() {
   if (!data.value) return;
   saving.value = true;
-  await $fetch(`/api/webhooks/${id}`, {
-    method: 'PUT',
-    body: { enabled: data.value.enabled },
-  });
-  saving.value = false;
-  await refresh();
+  try {
+    await $fetch(`/api/webhooks/${id}`, {
+      method: 'PUT',
+      body: { enabled: data.value.enabled },
+    });
+  } finally {
+    saving.value = false;
+    // Re-sync the switch with the persisted state. On a failed PUT this reverts
+    // the optimistic v-model flip rather than leaving the toggle out of sync.
+    await refresh();
+  }
 }
 
 async function rotate() {
