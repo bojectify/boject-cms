@@ -29,6 +29,7 @@
     "apikey:create": "tsx scripts/manage-api-keys/index.ts create",
     "apikey:list": "tsx scripts/manage-api-keys/index.ts list",
     "apikey:revoke": "tsx scripts/manage-api-keys/index.ts revoke",
+    "search:reindex": "tsx scripts/manage-search/reindex.ts",
     "content:export": "tsx scripts/content-bundle/index.ts export",
     "content:import": "tsx scripts/content-bundle/index.ts import",
     "content:validate": "tsx scripts/content-bundle/index.ts validate",

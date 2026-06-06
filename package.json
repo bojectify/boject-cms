@@ -39,6 +39,7 @@
     "apikey:create": "pnpm --filter cms apikey:create",
     "apikey:list": "pnpm --filter cms apikey:list",
     "apikey:revoke": "pnpm --filter cms apikey:revoke",
+    "search:reindex": "pnpm --filter cms search:reindex",
     "content:export": "pnpm --filter cms content:export",
     "content:import": "pnpm --filter cms content:import",
     "content:validate": "pnpm --filter cms content:validate",
