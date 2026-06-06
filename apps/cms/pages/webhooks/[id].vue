@@ -5,8 +5,9 @@ import { useRoute } from 'vue-router';
 interface Webhook {
   id: string;
   name: string;
-  url: string;
+  url: string | null;
   enabled: boolean;
+  kind: 'EXTERNAL' | 'INTERNAL';
   contentTypeIds: string[];
   events: string[];
   createdAt: string;
@@ -46,6 +47,18 @@ const { data: deliveriesData, refresh: refreshDeliveries } =
 const { data: contentTypes } = await useAuthedFetch<{
   items: Array<{ id: string; name: string }>;
 }>('/api/content-types');
+
+// INTERNAL webhooks (e.g. the system-managed search-index sync row) render
+// read-only: no URL/secret/rotate/delete affordances and the events list is
+// shown but not editable. Only the `enabled` toggle stays editable.
+const isInternal = computed(() => data.value?.kind === 'INTERNAL');
+
+// The subset of subscribable events the webhook is subscribed to, used for the
+// read-only events list on INTERNAL webhooks.
+const subscribedEventOptions = computed(() => {
+  const subscribed = data.value?.events ?? [];
+  return WEBHOOK_EVENT_OPTIONS.filter((o) => subscribed.includes(o.value));
+});
 
 const pendingSecret = useState<string | null>(
   'webhooks:pendingSecret',
@@ -147,6 +160,19 @@ async function save() {
   await refresh();
 }
 
+// INTERNAL webhooks only accept `enabled` on PUT (the server rejects any other
+// key with 400), so the `enabled` toggle persists via its own minimal body.
+async function saveEnabled() {
+  if (!data.value) return;
+  saving.value = true;
+  await $fetch(`/api/webhooks/${id}`, {
+    method: 'PUT',
+    body: { enabled: data.value.enabled },
+  });
+  saving.value = false;
+  await refresh();
+}
+
 async function rotate() {
   if (
     !confirm('Rotate the secret? The old secret will stop working immediately.')
@@ -243,8 +269,13 @@ const statusColor = (s: string) =>
 <template>
   <div v-if="data" class="p-6 max-w-6xl">
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-2xl font-semibold">{{ data.name }}</h1>
-      <div class="flex gap-2">
+      <div class="flex items-center gap-2">
+        <h1 class="text-2xl font-semibold">{{ data.name }}</h1>
+        <UBadge v-if="isInternal" color="neutral" variant="subtle">
+          Internal
+        </UBadge>
+      </div>
+      <div v-if="!isInternal" class="flex gap-2">
         <UButton variant="subtle" @click="sendTest">Send test payload</UButton>
         <UButton variant="subtle" color="warning" @click="rotate">
           Rotate secret
@@ -252,13 +283,56 @@ const statusColor = (s: string) =>
       </div>
     </div>
 
+    <UAlert
+      v-if="isInternal"
+      color="info"
+      variant="subtle"
+      icon="i-lucide-lock"
+      title="Managed by boject"
+      description="This is an internal, system-managed webhook. Only the enabled toggle is editable."
+      class="mb-6"
+    />
+
     <WebhookSecretReveal
-      v-if="rotatedSecret"
+      v-if="!isInternal && rotatedSecret"
       :secret="rotatedSecret"
       class="mb-6"
     />
 
-    <UForm :state="data" class="mb-10" @submit="save">
+    <!-- Internal webhooks: read-only view. Only the enabled toggle persists. -->
+    <div v-if="isInternal" class="mb-10">
+      <UFormField label="Events" class="mb-4">
+        <div class="flex flex-col gap-2">
+          <div
+            v-for="ev in subscribedEventOptions"
+            :key="ev.value"
+            class="flex items-start gap-2.5 rounded-md py-3 px-3.5 text-left border border-default"
+          >
+            <span
+              class="shrink-0 mt-0.5 flex items-center justify-center rounded-sm size-4 bg-primary"
+            >
+              <UIcon name="i-lucide-check" class="size-3 text-white" />
+            </span>
+            <span class="flex flex-col gap-0.5">
+              <span class="text-sm text-default font-medium">{{
+                ev.label
+              }}</span>
+              <span class="text-xs text-muted">{{ ev.description }}</span>
+            </span>
+          </div>
+        </div>
+      </UFormField>
+      <UFormField class="mb-6">
+        <USwitch
+          v-model="data.enabled"
+          label="Enabled"
+          :loading="saving"
+          @update:model-value="saveEnabled"
+        />
+      </UFormField>
+    </div>
+
+    <UForm v-else :state="data" class="mb-10" @submit="save">
       <UFormField label="Name" class="mb-4">
         <UInput v-model="data.name" class="w-full" />
       </UFormField>
@@ -435,7 +509,7 @@ const statusColor = (s: string) =>
       </template>
     </UTable>
 
-    <div class="mt-12 border-t pt-6">
+    <div v-if="!isInternal" class="mt-12 border-t pt-6">
       <h2
         class="text-xs font-semibold uppercase tracking-wide text-red-700 dark:text-red-400 mb-2"
       >

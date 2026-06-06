@@ -4,8 +4,9 @@ import type { TableColumn } from '@nuxt/ui';
 interface WebhookListItem {
   id: string;
   name: string;
-  url: string;
+  url: string | null;
   enabled: boolean;
+  kind: 'EXTERNAL' | 'INTERNAL';
   contentTypeIds: string[];
   events: string[];
   createdAt: string;
@@ -42,15 +43,28 @@ const columns: TableColumn<WebhookListItem>[] = [
       :loading="status === 'pending'"
     >
       <template #name-cell="{ row }">
-        <NuxtLink
-          :to="`/webhooks/${row.original.id}`"
-          class="text-primary hover:underline font-medium"
-        >
-          {{ row.original.name }}
-        </NuxtLink>
+        <div class="flex items-center gap-2">
+          <NuxtLink
+            :to="`/webhooks/${row.original.id}`"
+            class="text-primary hover:underline font-medium"
+          >
+            {{ row.original.name }}
+          </NuxtLink>
+          <UBadge
+            v-if="row.original.kind === 'INTERNAL'"
+            color="neutral"
+            variant="subtle"
+            size="sm"
+          >
+            Internal
+          </UBadge>
+        </div>
       </template>
       <template #url-cell="{ row }">
-        <code class="text-xs break-all">{{ row.original.url }}</code>
+        <code v-if="row.original.url" class="text-xs break-all">{{
+          row.original.url
+        }}</code>
+        <span v-else class="text-muted">—</span>
       </template>
       <template #events-cell="{ row }">
         <div class="flex flex-wrap gap-1">
