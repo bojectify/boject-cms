@@ -7,6 +7,14 @@ import { getTestDatabaseUrl } from './test/dbUrl';
 // Tests use a separate database so dev data is never touched.
 process.env.DATABASE_URL = getTestDatabaseUrl();
 
+// Tests target a separate Meilisearch index (`entries_test`) so a `pnpm test`
+// run never clobbers the dev `entries` index on the shared local Meilisearch
+// container. resolveEntriesIndex() (server/utils/searchIndex.ts) reads
+// MEILI_INDEX; the Nitro dev server booted by integration tests inherits it
+// from this process, exactly as it inherits DATABASE_URL above. A host-set
+// MEILI_INDEX still wins (parallel runners / dedicated engines).
+process.env.MEILI_INDEX = process.env.MEILI_INDEX || 'entries_test';
+
 export default defineConfig({
   resolve: {
     alias: {
