@@ -11,6 +11,11 @@
 // a document for an entry that lost its PUBLISHED version *before* this runs is
 // not pruned here — the sync worker handles deletions going forward. A future
 // --prune flag could diff index ids vs. current PUBLISHED ids if needed.
+//
+// Scale note: the matching entries are loaded into memory in one findMany
+// before batching (batchSize chunks only the Meili write, not the DB read), so
+// peak memory scales with the corpus. Fine for first-adoption/recovery; a
+// keyset-paginated DB read is the follow-up if this is run on a very large set.
 
 import 'dotenv/config';
 import { parseArgs } from 'node:util';
