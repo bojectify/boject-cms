@@ -12,11 +12,17 @@ enum DeliveryStatus {
   DEAD_LETTERED
 }
 
+enum WebhookKind {
+  EXTERNAL
+  INTERNAL
+}
+
 model Webhook {
   id             String            @id @default(uuid())
   name           String
-  url            String
-  secret         String
+  kind           WebhookKind       @default(EXTERNAL)
+  url            String?
+  secret         String?
   enabled        Boolean           @default(true)
   contentTypeIds String[]
   events         WebhookEvent[]
