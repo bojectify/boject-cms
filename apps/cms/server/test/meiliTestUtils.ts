@@ -37,24 +37,36 @@ export async function waitForIndexing(timeoutMs = 5000): Promise<void> {
   const index = resolveEntriesIndex();
   const deadline = Date.now() + timeoutMs;
   for (;;) {
-    const { results } = await meili.tasks.getTasks({
+    // `total` is the count of tasks matching the filter; limit: 1 keeps the
+    // payload tiny since we only care whether any remain.
+    const { total } = await meili.tasks.getTasks({
       indexUids: [index],
       statuses: ['enqueued', 'processing'],
-      limit: 20,
+      limit: 1,
     });
-    if (results.length === 0) return;
+    if (total === 0) return;
     if (Date.now() > deadline) {
       throw new Error(
-        `waitForIndexing: index "${index}" still had ${results.length} pending task(s) after ${timeoutMs}ms`
+        `waitForIndexing: index "${index}" still had ${total} pending task(s) after ${timeoutMs}ms`
       );
     }
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
 }
 
-/** Fetch every document currently in the test index (small index — one page). */
+/**
+ * Fetch every document currently in the test index. Reads a single 1000-doc
+ * page (tests keep the index small) and fails loud if the index has grown
+ * beyond that page rather than silently truncating.
+ */
 export async function getAllDocuments(): Promise<SearchDocument[]> {
-  const { results } = await testIndex().getDocuments({ limit: 1000 });
+  const { results, total } = await testIndex().getDocuments({ limit: 1000 });
+  if (total > results.length) {
+    throw new Error(
+      `getAllDocuments: test index has ${total} documents, exceeding the ${results.length}-document page. ` +
+        `Tests should keep the index small; paginate this helper if a larger corpus is genuinely needed.`
+    );
+  }
   return results;
 }
 
