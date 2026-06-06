@@ -2895,5 +2895,46 @@ describe('GraphQL API', async () => {
       const ids = data.searchEntries.edges.map((e) => e.node.id);
       expect(ids).toEqual(['g1']);
     });
+
+    it('paginates the connection with first/after (hasNextPage + cursor traversal)', async () => {
+      const PAGE_QUERY = `
+        query ($q: String!, $first: Int!, $after: String) {
+          searchEntries(q: $q, first: $first, after: $after) {
+            edges { node { id } cursor }
+            pageInfo { hasNextPage endCursor }
+          }
+        }
+      `;
+
+      // First page: 1 of 2 → hasNextPage true.
+      const { data: page1 } = await gqlVars<{
+        searchEntries: Connection<SearchHitNode>;
+      }>(PAGE_QUERY, { q: 'whatever', first: 1 });
+      const conn1 = page1.searchEntries;
+      expect(conn1.edges).toHaveLength(1);
+      expect(conn1.pageInfo.hasNextPage).toBe(true);
+      expect(conn1.pageInfo.endCursor).toBeTruthy();
+
+      // Second page via the cursor → the other doc, hasNextPage false.
+      const { data: page2 } = await gqlVars<{
+        searchEntries: Connection<SearchHitNode>;
+      }>(PAGE_QUERY, {
+        q: 'whatever',
+        first: 1,
+        after: conn1.pageInfo.endCursor,
+      });
+      const conn2 = page2.searchEntries;
+      expect(conn2.edges).toHaveLength(1);
+      expect(conn2.pageInfo.hasNextPage).toBe(false);
+
+      const id1 = conn1.edges[0]!.node.id;
+      const id2 = conn2.edges[0]!.node.id;
+
+      // The two pages returned different docs.
+      expect(id2).not.toBe(id1);
+
+      // Together they cover both seeded docs.
+      expect([id1, id2].sort()).toEqual(['g1', 'g2']);
+    });
   });
 });
