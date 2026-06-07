@@ -83,6 +83,8 @@ export function reduce(prev: BuilderState, action: Action): BuilderState {
       return {
         ...s,
         step: 'contentType',
+        draft: null,
+        text: '',
         query: { contentType: undefined, q: s.query.q, filters: [] },
       };
 

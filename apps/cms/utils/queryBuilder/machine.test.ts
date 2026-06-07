@@ -69,4 +69,27 @@ describe('builder machine', () => {
     const out = reduce(s, { kind: 'removeContentType' });
     expect(out.intent).toEqual({ kind: 'broaden', q: 'keep me' });
   });
+
+  it('run emits a one-shot run intent', () => {
+    const s = initState({
+      contentTypes: [article],
+      lockedContentType: article,
+    });
+    const ran = reduce(s, { kind: 'run' });
+    expect(ran.intent).toEqual({ kind: 'run' });
+    // one-shot: the next dispatch clears it
+    expect(reduce(ran, { kind: 'setFreeText', q: 'x' }).intent).toBeNull();
+  });
+
+  it('removing an unlocked content type resets the step and clears draft/filters', () => {
+    let s = initState({ contentTypes: [article] });
+    s = reduce(s, { kind: 'pickContentType', contentType: article });
+    s = reduce(s, { kind: 'pickField', field: article.fields[0]! });
+    s = reduce(s, { kind: 'removeContentType' });
+    expect(s.step).toBe('contentType');
+    expect(s.query.contentType).toBeUndefined();
+    expect(s.draft).toBeNull();
+    expect(s.text).toBe('');
+    expect(s.intent).toBeNull();
+  });
 });
