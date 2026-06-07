@@ -59,8 +59,15 @@ export const BooleanValue: Story = {
     await userEvent.click(canvas.getByText('Article'));
     await userEvent.click(canvas.getByText('Featured'));
     await userEvent.click(canvas.getByText('True')); // boolean value picked
-    await expect(canvas.getByText(/Featured/)).toBeVisible(); // chip committed
-    expect(args['onUpdate:modelValue']).toHaveBeenCalled();
+    // chip committed: only the chip's value segment renders "true" (the
+    // re-rendered field list behind it does not), so this proves the commit
+    await expect(canvas.getByText('true')).toBeVisible();
+    // and the emitted query carries the real boolean value, not the string
+    expect(args['onUpdate:modelValue']).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        filters: [expect.objectContaining({ field: 'featured', value: true })],
+      })
+    );
   },
 };
 
