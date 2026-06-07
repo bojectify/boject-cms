@@ -64,10 +64,15 @@ export function reduce(prev: BuilderState, action: Action): BuilderState {
   const s = { ...prev, intent: null };
   switch (action.kind) {
     case 'setFreeText':
+      // At the value step, `text` is the filter value being typed — don't let it
+      // leak into the global free-text `query.q`.
       return {
         ...s,
         text: action.q,
-        query: { ...s.query, q: action.q || undefined },
+        query:
+          s.step === 'value'
+            ? s.query
+            : { ...s.query, q: action.q || undefined },
       };
 
     case 'pickContentType':

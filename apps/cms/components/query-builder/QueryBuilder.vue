@@ -3,7 +3,9 @@ import { useQueryBuilder } from '~/composables/useQueryBuilder';
 import QueryDropdown from './QueryDropdown.vue';
 import ContentTypeChip from './ContentTypeChip.vue';
 import FilterChip from './FilterChip.vue';
-import type { QueryBuilderProps } from './queryBuilder.types';
+import ValueEditor from './ValueEditor.vue';
+import type { QueryBuilderProps, EntryOption } from './queryBuilder.types';
+import type { SearchFilter } from '~/utils/queryBuilder/types';
 
 const props = withDefaults(defineProps<QueryBuilderProps>(), {
   enableRichOperators: false,
@@ -17,11 +19,24 @@ const { state, dispatch } = useQueryBuilder({
   initialQuery: props.modelValue,
 });
 
+/**
+ * entryId -> display title, captured when a relation value is chosen, so the
+ * chip can show the title while the filter value stays the id (the engine
+ * filters relations by entry id).
+ */
+const relationLabels = ref<Record<string, string>>({});
+
 function handle(action: Parameters<typeof dispatch>[0]) {
   const intent = dispatch(action);
   emit('update:modelValue', state.value.query);
   if (intent?.kind === 'run') emit('run', state.value.query);
   if (intent?.kind === 'broaden') emit('broaden', { q: intent.q });
+}
+
+function onChooseEntry(e: EntryOption) {
+  relationLabels.value[e.id] = e.entryTitle;
+  handle({ kind: 'setValue', value: e.id });
+  handle({ kind: 'commitValue' });
 }
 
 const ct = computed(() =>
@@ -33,6 +48,16 @@ const placeholder = computed(() =>
     : 'Search everything…'
 );
 
+/**
+ * Human-readable chip value: relation ids resolve to their captured title;
+ * everything else stringifies. Null/undefined hides the chip's value segment.
+ */
+function displayValue(f: SearchFilter): string | null {
+  if (f.value == null) return null;
+  const key = String(f.value);
+  return relationLabels.value[key] ?? key;
+}
+
 function onInput(e: Event) {
   handle({ kind: 'setFreeText', q: (e.target as HTMLInputElement).value });
 }
@@ -42,6 +67,14 @@ function onKeydown(e: KeyboardEvent) {
     handle({ kind: 'run' });
   } else if (e.key === 'Backspace' && state.value.text === '') {
     handle({ kind: 'backspace' });
+  } else if (
+    e.key === 'ArrowRight' &&
+    state.value.step === 'value' &&
+    state.value.text !== ''
+  ) {
+    e.preventDefault();
+    handle({ kind: 'setValue', value: state.value.text });
+    handle({ kind: 'commitValue' });
   }
   // Tab / Shift+Tab intentionally fall through to native focus handling.
 }
@@ -64,7 +97,7 @@ function onKeydown(e: KeyboardEvent) {
         :key="i"
         :field="f.field"
         :operator="f.op"
-        :value="String(f.value)"
+        :value="displayValue(f)"
         @remove="handle({ kind: 'removeFilter', index: i })"
       />
       <input
@@ -98,7 +131,17 @@ function onKeydown(e: KeyboardEvent) {
       "
       @pick-operator="(op) => handle({ kind: 'pickOperator', op })"
     >
-      <template #value><!-- ValueEditor slot, Task 9 --></template>
+      <template #value>
+        <ValueEditor
+          v-if="state.draft"
+          :draft="state.draft"
+          :text="state.text"
+          :search-entries="searchEntries"
+          @set-value="(v) => handle({ kind: 'setValue', value: v })"
+          @commit="handle({ kind: 'commitValue' })"
+          @choose-entry="onChooseEntry"
+        />
+      </template>
     </QueryDropdown>
 
     <div

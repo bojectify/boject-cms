@@ -51,3 +51,51 @@ export const PickContentType: Story = {
     await expect(canvas.getByText('Status')).toBeVisible();
   },
 };
+
+export const BooleanValue: Story = {
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await userEvent.type(canvas.getByRole('combobox'), 'art');
+    await userEvent.click(canvas.getByText('Article'));
+    await userEvent.click(canvas.getByText('Featured'));
+    await userEvent.click(canvas.getByText('True')); // boolean value picked
+    await expect(canvas.getByText(/Featured/)).toBeVisible(); // chip committed
+    expect(args['onUpdate:modelValue']).toHaveBeenCalled();
+  },
+};
+
+export const SelectValue: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.type(canvas.getByRole('combobox'), 'art');
+    await userEvent.click(canvas.getByText('Article'));
+    await userEvent.click(canvas.getByText('Status'));
+    await userEvent.click(canvas.getByText('Active'));
+    await expect(canvas.getByText(/Active/)).toBeVisible();
+  },
+};
+
+export const TextValueCommitsWithArrow: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.type(canvas.getByRole('combobox'), 'art');
+    await userEvent.click(canvas.getByText('Article'));
+    await userEvent.click(canvas.getByText('Summary'));
+    await userEvent.type(canvas.getByRole('combobox'), 'playoff');
+    await userEvent.keyboard('{ArrowRight}'); // → commits the value
+    await expect(canvas.getByText(/playoff/)).toBeVisible();
+  },
+};
+
+export const RelationValue: Story = {
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await userEvent.type(canvas.getByRole('combobox'), 'art');
+    await userEvent.click(canvas.getByText('Article'));
+    await userEvent.click(canvas.getByText('Author'));
+    await userEvent.type(canvas.getByRole('combobox'), 'ja');
+    expect(args.searchEntries).toHaveBeenCalledWith(['au1'], 'ja');
+    await userEvent.click(await canvas.findByText('Jamie Rivera'));
+    await expect(canvas.getByText(/Jamie Rivera/)).toBeVisible();
+  },
+};

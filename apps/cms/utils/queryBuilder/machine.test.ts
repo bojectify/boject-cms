@@ -54,6 +54,15 @@ describe('builder machine', () => {
     expect(s.step).toBe('field'); // back to field step, ready for the next filter
   });
 
+  it('setFreeText at the value step updates text but not query.q (no free-text pollution)', () => {
+    let s = initState({ contentTypes: [article], lockedContentType: article });
+    s = reduce(s, { kind: 'pickField', field: article.fields[0]! }); // TEXT -> value step (eq auto-locked)
+    expect(s.step).toBe('value');
+    s = reduce(s, { kind: 'setFreeText', q: 'playoff' });
+    expect(s.text).toBe('playoff');
+    expect(s.query.q).toBeUndefined();
+  });
+
   it('removes the last chip with backspace on an empty input', () => {
     let s = initState({ contentTypes: [article], lockedContentType: article });
     s = reduce(s, { kind: 'pickField', field: article.fields[0]! });
