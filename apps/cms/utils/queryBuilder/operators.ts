@@ -17,7 +17,7 @@ const EQ: Operator = {
 };
 
 // Operators per field type. `eq` is always first (the v1 locked default).
-const REGISTRY: Record<string, Operator[]> = {
+const REGISTRY: Partial<Record<FieldTypeName, Operator[]>> = {
   TEXT: [
     EQ,
     { id: 'neq', label: 'is not', description: 'Excludes matches', rich: true },

@@ -18,6 +18,9 @@ export function serializeQuery(query: SearchQuery): RouteParams {
   return params;
 }
 
+// NOTE: values always parse back as strings — `field:op:value` is a string wire
+// format. Typed coercion by field type (number/boolean/array) is the consumer's
+// job (#301), so parseQuery(serializeQuery(x)) is an identity only for string values.
 export function parseQuery(params: RouteParams): SearchQuery {
   const raw = params.filter
     ? Array.isArray(params.filter)

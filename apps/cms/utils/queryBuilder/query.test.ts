@@ -33,6 +33,20 @@ describe('query serialization', () => {
     });
     expect(q.filters).toEqual([{ field: 'status', op: 'eq', value: 'Active' }]);
   });
+
+  it('preserves colon-containing values through the round-trip', () => {
+    const q: SearchQuery = {
+      contentType: 'Event',
+      filters: [{ field: 'startsAt', op: 'eq', value: '12:30:00' }],
+    };
+    expect(parseQuery(serializeQuery(q))).toEqual(q);
+  });
+
+  it('degrades a malformed filter string to empty field/op/value', () => {
+    expect(parseQuery({ filter: 'lonely' }).filters).toEqual([
+      { field: 'lonely', op: '', value: '' },
+    ]);
+  });
 });
 
 describe('filter mutation (immutable)', () => {
