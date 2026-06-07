@@ -44,3 +44,14 @@ export const RemoveButton: Story = {
     await expect(args.onRemove).toHaveBeenCalledTimes(1);
   },
 };
+
+export const EditSegment: Story = {
+  play: async ({ canvasElement, args }) => {
+    // clicking a segment emits editSegment with that segment's name
+    const fieldSeg = canvasElement.querySelector<HTMLButtonElement>(
+      '[data-segment="field"]'
+    )!;
+    await userEvent.click(fieldSeg);
+    await expect(args.onEditSegment).toHaveBeenCalledWith('field');
+  },
+};
