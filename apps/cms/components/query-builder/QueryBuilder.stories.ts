@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import { expect, fn, userEvent, within } from 'storybook/test';
 import QueryBuilder from './QueryBuilder.vue';
-import { CONTENT_TYPES } from '~/utils/queryBuilder/fixtures';
+import { CONTENT_TYPES, ARTICLE_CT } from '~/utils/queryBuilder/fixtures';
 
 const meta: Meta<typeof QueryBuilder> = {
   title: 'Search/QueryBuilder',
@@ -104,5 +104,54 @@ export const RelationValue: Story = {
     expect(args.searchEntries).toHaveBeenCalledWith(['au1'], 'ja');
     await userEvent.click(await canvas.findByText('Jamie Rivera'));
     await expect(canvas.getByText(/Jamie Rivera/)).toBeVisible();
+  },
+};
+
+export const FullQueryRun: Story = {
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await userEvent.type(canvas.getByRole('combobox'), 'art');
+    await userEvent.click(canvas.getByText('Article'));
+    await userEvent.click(canvas.getByText('Status'));
+    await userEvent.click(canvas.getByText('Active'));
+    // refocus the input (clicking the Active option moved focus off it) so the
+    // {Enter} keydown reaches the combobox's run handler
+    await userEvent.click(canvas.getByRole('combobox'));
+    await userEvent.keyboard('{Enter}'); // run
+    // exact match: no leftover free-text q from typing "art" to find the type
+    expect(args.onRun).toHaveBeenLastCalledWith({
+      contentType: 'Article',
+      filters: [{ field: 'status', op: 'eq', value: 'Active' }],
+    });
+  },
+};
+
+export const BackspaceDeletesChip: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.type(canvas.getByRole('combobox'), 'art');
+    await userEvent.click(canvas.getByText('Article'));
+    await userEvent.click(canvas.getByText('Status'));
+    await userEvent.click(canvas.getByText('Active'));
+    await expect(canvas.getByText(/Active/)).toBeVisible();
+    await userEvent.click(canvas.getByRole('combobox'));
+    await userEvent.keyboard('{Backspace}'); // empty input -> delete the Status chip
+    await expect(canvas.queryByText(/Active/)).toBeNull();
+  },
+};
+
+export const Locked: Story = {
+  args: { lockedContentType: ARTICLE_CT },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    // pre-scoped: chip present, dropdown already on fields
+    await expect(canvas.getByText('Article')).toBeVisible();
+    await expect(canvas.getByText('Summary')).toBeVisible();
+    // ✕ on the pinned chip broadens, keeping q
+    await userEvent.type(canvas.getByRole('combobox'), 'goal');
+    await userEvent.click(
+      canvas.getByRole('button', { name: /remove content type/i })
+    );
+    expect(args.onBroaden).toHaveBeenCalledWith({ q: 'goal' });
   },
 };

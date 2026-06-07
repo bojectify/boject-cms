@@ -76,11 +76,19 @@ export function reduce(prev: BuilderState, action: Action): BuilderState {
       };
 
     case 'pickContentType':
+      // The text typed at the contentType step was used to find this type in
+      // the list, not as a free-text query for the now-scoped search. Clear it
+      // from both the input and query.q so the visible input and the emitted
+      // query stay in sync. (Free-text at the field step is unaffected.)
       return {
         ...s,
         step: 'field',
         text: '',
-        query: { ...s.query, contentType: action.contentType.identifier },
+        query: {
+          ...s.query,
+          contentType: action.contentType.identifier,
+          q: undefined,
+        },
       };
 
     case 'removeContentType':

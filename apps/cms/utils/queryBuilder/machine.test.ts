@@ -90,6 +90,16 @@ describe('builder machine', () => {
     expect(reduce(ran, { kind: 'setFreeText', q: 'x' }).intent).toBeNull();
   });
 
+  it('picking a content type clears the type-search text from query.q', () => {
+    let s = initState({ contentTypes: [article] });
+    s = reduce(s, { kind: 'setFreeText', q: 'art' });
+    expect(s.query.q).toBe('art');
+    s = reduce(s, { kind: 'pickContentType', contentType: article });
+    expect(s.text).toBe('');
+    expect(s.query.q).toBeUndefined();
+    expect(s.query.contentType).toBe(article.identifier);
+  });
+
   it('removing an unlocked content type resets the step and clears draft/filters', () => {
     let s = initState({ contentTypes: [article] });
     s = reduce(s, { kind: 'pickContentType', contentType: article });
