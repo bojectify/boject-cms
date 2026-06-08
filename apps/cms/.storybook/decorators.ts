@@ -9,10 +9,10 @@ import type { Decorator } from '@storybook/vue3-vite';
  *
  * @example
  * const meta: Meta<typeof QueryBuilder> = {
- *   decorators: [withWidth(700)],
+ *   decorators: [ContainerDecorator(700)],
  * };
  */
-export function withWidth(width: number | string): Decorator {
+export function ContainerDecorator(width: number | string): Decorator {
   const w = typeof width === 'number' ? `${width}px` : width;
   return () => ({
     setup: () => ({ w }),
