@@ -2,10 +2,13 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import { expect, fn, userEvent, within } from 'storybook/test';
 import QueryBuilder from './QueryBuilder.vue';
 import { CONTENT_TYPES, ARTICLE_CT } from '~/utils/queryBuilder/fixtures';
+import { withWidth } from '../../.storybook/decorators';
 
 const meta: Meta<typeof QueryBuilder> = {
   title: 'Search/QueryBuilder',
   component: QueryBuilder,
+  // The palette fills its container; bound it to a realistic width in isolation.
+  decorators: [withWidth(700)],
   args: {
     contentTypes: CONTENT_TYPES,
     searchEntries: fn(async () => [

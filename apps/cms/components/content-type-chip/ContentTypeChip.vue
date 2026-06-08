@@ -1,11 +1,17 @@
 <script setup lang="ts">
-defineProps<{ name: string; locked?: boolean }>();
+import type { ContentTypeChipProps } from './contentTypeChip.types';
+import { QA_CONTENT_TYPE_CHIP } from './contentTypeChip.config';
+
+withDefaults(defineProps<ContentTypeChipProps>(), {
+  testId: QA_CONTENT_TYPE_CHIP.COMPONENT,
+});
 const emit = defineEmits<{ remove: [] }>();
 </script>
 
 <template>
   <div
-    class="flex items-center gap-1.5 h-7 pl-2 pr-2 rounded-lg bg-elevated border border-default shrink-0"
+    :data-testid="testId"
+    class="inline-flex items-center gap-1.5 h-7 px-2 rounded-lg bg-elevated border border-default shrink-0"
   >
     <UIcon v-if="locked" name="i-lucide-pin" class="size-3 text-dimmed" />
     <span class="text-[13px] font-semibold text-highlighted">{{ name }}</span>

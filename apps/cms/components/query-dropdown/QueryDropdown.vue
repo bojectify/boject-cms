@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import type { BuilderState } from '~/utils/queryBuilder/machine';
 import {
   availableOperators,
   FILTERABLE_FIELD_TYPES,
 } from '~/utils/queryBuilder/operators';
+import type { QueryDropdownProps } from './queryDropdown.types';
+import { QA_QUERY_DROPDOWN } from './queryDropdown.config';
 
-const props = defineProps<{ state: BuilderState }>();
+const props = withDefaults(defineProps<QueryDropdownProps>(), {
+  testId: QA_QUERY_DROPDOWN.COMPONENT,
+});
 const emit = defineEmits<{
   runFreeText: [];
   pickContentType: [id: string];
@@ -38,7 +41,7 @@ const operators = computed(() =>
 </script>
 
 <template>
-  <div class="flex flex-col p-2 gap-0.5">
+  <div :data-testid="testId" class="flex flex-col p-2 gap-0.5">
     <button
       v-if="state.step === 'contentType' && state.text"
       type="button"

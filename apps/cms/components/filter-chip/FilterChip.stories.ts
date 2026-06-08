@@ -1,10 +1,13 @@
 import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import { expect, fn, userEvent, within } from 'storybook/test';
 import FilterChip from './FilterChip.vue';
+import { withWidth } from '../../.storybook/decorators';
 
 const meta: Meta<typeof FilterChip> = {
   title: 'Search/FilterChip',
   component: FilterChip,
+  // A wide container proves the chip hugs its content rather than stretching.
+  decorators: [withWidth(360)],
   args: {
     field: 'Summary',
     operator: 'contains',

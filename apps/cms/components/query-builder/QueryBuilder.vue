@@ -1,14 +1,15 @@
 <script setup lang="ts">
 import { useQueryBuilder } from '~/composables/useQueryBuilder';
-import QueryDropdown from './QueryDropdown.vue';
-import ContentTypeChip from './ContentTypeChip.vue';
-import FilterChip from './FilterChip.vue';
-import ValueEditor from './ValueEditor.vue';
 import type { QueryBuilderProps, EntryOption } from './queryBuilder.types';
+import { QA_QUERY_BUILDER } from './queryBuilder.config';
 import type { SearchFilter } from '~/utils/queryBuilder/types';
+
+// QueryDropdown / ContentTypeChip / FilterChip / ValueEditor are auto-registered
+// (Nuxt + Storybook scan components/), so they need no explicit import.
 
 const props = withDefaults(defineProps<QueryBuilderProps>(), {
   enableRichOperators: false,
+  testId: QA_QUERY_BUILDER.COMPONENT,
 });
 const emit = defineEmits(['update:modelValue', 'run', 'broaden']);
 
@@ -82,7 +83,8 @@ function onKeydown(e: KeyboardEvent) {
 
 <template>
   <div
-    class="flex flex-col w-[700px] rounded-2xl border border-default bg-default shadow-xl overflow-clip font-sans"
+    :data-testid="testId"
+    class="flex flex-col w-full rounded-2xl border border-default bg-default shadow-xl overflow-clip font-sans"
   >
     <div class="flex items-center gap-3 px-4 py-4 border-b border-default">
       <UIcon name="i-lucide-search" class="size-[18px] text-dimmed shrink-0" />
@@ -116,20 +118,20 @@ function onKeydown(e: KeyboardEvent) {
       :state="state"
       @run-free-text="handle({ kind: 'run' })"
       @pick-content-type="
-        (id) =>
+        (id: string) =>
           handle({
             kind: 'pickContentType',
             contentType: contentTypes.find((c) => c.id === id)!,
           })
       "
       @pick-field="
-        (id) =>
+        (id: string) =>
           handle({
             kind: 'pickField',
             field: ct!.fields.find((f) => f.identifier === id)!,
           })
       "
-      @pick-operator="(op) => handle({ kind: 'pickOperator', op })"
+      @pick-operator="(op: string) => handle({ kind: 'pickOperator', op })"
     >
       <template #value>
         <ValueEditor
@@ -137,7 +139,7 @@ function onKeydown(e: KeyboardEvent) {
           :draft="state.draft"
           :text="state.text"
           :search-entries="searchEntries"
-          @set-value="(v) => handle({ kind: 'setValue', value: v })"
+          @set-value="(v: unknown) => handle({ kind: 'setValue', value: v })"
           @commit="handle({ kind: 'commitValue' })"
           @choose-entry="onChooseEntry"
         />

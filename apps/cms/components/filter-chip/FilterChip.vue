@@ -1,29 +1,36 @@
 <script setup lang="ts">
-defineProps<{
-  field: string;
-  operator: string;
-  value?: string | null;
-  /** which segment shows the focus ring */
-  activeSegment?: 'field' | 'operator' | 'value' | null;
-}>();
+import type { FilterChipProps, ChipSegment } from './filterChip.types';
+import { QA_FILTER_CHIP } from './filterChip.config';
+
+withDefaults(defineProps<FilterChipProps>(), {
+  testId: QA_FILTER_CHIP.COMPONENT,
+});
 const emit = defineEmits<{
   remove: [];
-  editSegment: [segment: 'field' | 'operator' | 'value'];
+  editSegment: [segment: ChipSegment];
 }>();
-function ringIf(seg: string, active?: string | null) {
+
+function ringIf(seg: ChipSegment, active?: ChipSegment | null) {
   return active === seg ? 'bg-elevated ring-2 ring-inset ring-primary' : '';
 }
 </script>
 
 <template>
+  <!--
+    inline-flex + shrink-0 hugs the chip to its content inside the search bar's
+    flex row. The edge segments carry the rounding (instead of `overflow-clip`
+    on the wrapper) so the active segment's inset focus ring follows the rounded
+    corner rather than being clipped by it.
+  -->
   <div
-    class="flex items-stretch h-7 rounded-lg border border-default overflow-clip text-xs"
+    :data-testid="testId"
+    class="inline-flex shrink-0 items-stretch h-7 rounded-lg border border-default text-xs"
   >
     <button
       type="button"
       data-segment="field"
       :class="[
-        'px-2 flex items-center font-semibold text-highlighted',
+        'px-2 flex items-center rounded-l-[7px] font-semibold text-highlighted',
         ringIf('field', activeSegment),
       ]"
       @click="emit('editSegment', 'field')"
@@ -60,7 +67,7 @@ function ringIf(seg: string, active?: string | null) {
     <button
       type="button"
       aria-label="Remove filter"
-      class="px-1.5 flex items-center text-dimmed hover:text-highlighted"
+      class="px-1.5 flex items-center rounded-r-[7px] text-dimmed hover:text-highlighted"
       @click="emit('remove')"
     >
       <UIcon name="i-lucide-x" class="size-3" />

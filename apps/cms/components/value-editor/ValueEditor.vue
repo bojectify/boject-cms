@@ -1,13 +1,12 @@
 <script setup lang="ts">
 import { valueInputKind } from '~/utils/queryBuilder/operators';
-import type { DraftFilter } from '~/utils/queryBuilder/machine';
-import type { EntryOption } from './queryBuilder.types';
+import type { ValueEditorProps } from './valueEditor.types';
+import type { EntryOption } from '../query-builder/queryBuilder.types';
+import { QA_VALUE_EDITOR } from './valueEditor.config';
 
-const props = defineProps<{
-  draft: DraftFilter;
-  text: string;
-  searchEntries?: (ids: string[], q: string) => Promise<EntryOption[]>;
-}>();
+const props = withDefaults(defineProps<ValueEditorProps>(), {
+  testId: QA_VALUE_EDITOR.COMPONENT,
+});
 const emit = defineEmits<{
   setValue: [value: unknown];
   commit: [];
@@ -36,7 +35,7 @@ function choose(v: unknown) {
 </script>
 
 <template>
-  <div class="flex flex-col gap-0.5">
+  <div :data-testid="testId" class="flex flex-col gap-0.5">
     <template v-if="kind === 'boolean'">
       <button
         v-for="opt in [
