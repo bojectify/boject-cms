@@ -56,6 +56,10 @@ export default defineNuxtConfig({
 
   vite: {
     server: {
+      // Allow any client dev container to reach this dev server via
+      // host.docker.internal. Vite's default allowedHosts guard 403s unknown
+      // Host headers otherwise. Dev-server only (no production impact).
+      allowedHosts: ['host.docker.internal'],
       // During tests, sequential dev servers fight over the default HMR
       // WebSocket port (24678). Disable HMR entirely — tests don't need it.
       ...(process.env.VITEST ? { hmr: false, ws: false } : {}),
