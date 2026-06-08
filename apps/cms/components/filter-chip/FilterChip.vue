@@ -29,6 +29,7 @@ function ringIf(seg: ChipSegment, active?: ChipSegment | null) {
     <button
       type="button"
       data-segment="field"
+      :data-testid="QA_FILTER_CHIP.FIELD_SEGMENT"
       :class="[
         'px-2 flex items-center rounded-l-[7px] font-semibold text-highlighted',
         ringIf('field', activeSegment),
@@ -41,6 +42,7 @@ function ringIf(seg: ChipSegment, active?: ChipSegment | null) {
     <button
       type="button"
       data-segment="operator"
+      :data-testid="QA_FILTER_CHIP.OPERATOR_SEGMENT"
       :class="[
         'px-2 flex items-center text-muted',
         ringIf('operator', activeSegment),
@@ -54,6 +56,7 @@ function ringIf(seg: ChipSegment, active?: ChipSegment | null) {
       <button
         type="button"
         data-segment="value"
+        :data-testid="QA_FILTER_CHIP.VALUE_SEGMENT"
         :class="[
           'px-2 flex items-center text-highlighted',
           ringIf('value', activeSegment),
@@ -67,6 +70,7 @@ function ringIf(seg: ChipSegment, active?: ChipSegment | null) {
     <button
       type="button"
       aria-label="Remove filter"
+      :data-testid="QA_FILTER_CHIP.REMOVE_BUTTON"
       class="px-1.5 flex items-center rounded-r-[7px] text-dimmed hover:text-highlighted"
       @click="emit('remove')"
     >

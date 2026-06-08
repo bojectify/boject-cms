@@ -92,6 +92,7 @@ function onKeydown(e: KeyboardEvent) {
         v-if="ct"
         :name="ct.name"
         :locked="state.locked"
+        :test-id="QA_QUERY_BUILDER.CONTENT_TYPE_CHIP"
         @remove="handle({ kind: 'removeContentType' })"
       />
       <FilterChip
@@ -100,9 +101,12 @@ function onKeydown(e: KeyboardEvent) {
         :field="f.field"
         :operator="f.op"
         :value="displayValue(f)"
+        :test-id="QA_QUERY_BUILDER.FILTER_CHIP(i)"
         @remove="handle({ kind: 'removeFilter', index: i })"
       />
       <input
+        :id="QA_QUERY_BUILDER.INPUT"
+        :data-testid="QA_QUERY_BUILDER.INPUT"
         role="combobox"
         :aria-expanded="true"
         class="flex-1 bg-transparent outline-none text-[15px] text-highlighted placeholder:text-dimmed"
@@ -116,6 +120,7 @@ function onKeydown(e: KeyboardEvent) {
 
     <QueryDropdown
       :state="state"
+      :test-id="QA_QUERY_BUILDER.DROPDOWN"
       @run-free-text="handle({ kind: 'run' })"
       @pick-content-type="
         (id: string) =>
@@ -148,6 +153,7 @@ function onKeydown(e: KeyboardEvent) {
 
     <div
       class="flex items-center gap-4 px-4 py-3 border-t border-default text-xs text-dimmed"
+      :data-testid="QA_QUERY_BUILDER.FOOTER"
     >
       <span><UKbd value="↵" /> Search</span>
       <span><UKbd value="esc" /> Close</span>

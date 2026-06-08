@@ -46,6 +46,7 @@ const operators = computed(() =>
       v-if="state.step === 'contentType' && state.text"
       type="button"
       class="flex items-center gap-2.5 h-11 px-3 rounded-lg bg-elevated text-left"
+      :data-testid="QA_QUERY_DROPDOWN.FREE_TEXT_ACTION"
       @click="emit('runFreeText')"
     >
       <span
@@ -68,10 +69,11 @@ const operators = computed(() =>
         Content types
       </div>
       <button
-        v-for="c in typeMatches"
+        v-for="(c, i) in typeMatches"
         :key="c.id"
         type="button"
         class="flex items-center h-12 px-3 rounded-lg text-left hover:bg-elevated"
+        :data-testid="QA_QUERY_DROPDOWN.OPTION(i)"
         @click="emit('pickContentType', c.id)"
       >
         <span class="text-highlighted text-[13px] font-medium">{{
@@ -87,10 +89,11 @@ const operators = computed(() =>
         Filter {{ ct?.name }} by field
       </div>
       <button
-        v-for="f in fields"
+        v-for="(f, i) in fields"
         :key="f.identifier"
         type="button"
         class="flex items-center justify-between h-11 px-3 rounded-lg text-left hover:bg-elevated"
+        :data-testid="QA_QUERY_DROPDOWN.OPTION(i)"
         @click="emit('pickField', f.identifier)"
       >
         <span class="text-highlighted text-[13px] font-medium">{{
@@ -101,10 +104,11 @@ const operators = computed(() =>
 
     <template v-else-if="state.step === 'operator'">
       <button
-        v-for="o in operators"
+        v-for="(o, i) in operators"
         :key="o.id"
         type="button"
         class="flex items-center justify-between h-10 px-3 rounded-lg text-left hover:bg-elevated"
+        :data-testid="QA_QUERY_DROPDOWN.OPTION(i)"
         @click="emit('pickOperator', o.id)"
       >
         <span class="text-highlighted text-[13px]">{{ o.label }}</span>

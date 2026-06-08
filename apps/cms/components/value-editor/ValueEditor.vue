@@ -38,13 +38,14 @@ function choose(v: unknown) {
   <div :data-testid="testId" class="flex flex-col gap-0.5">
     <template v-if="kind === 'boolean'">
       <button
-        v-for="opt in [
+        v-for="(opt, i) in [
           ['True', true],
           ['False', false],
         ]"
         :key="String(opt[1])"
         type="button"
         class="flex items-center gap-2.5 h-10 px-3 rounded-lg hover:bg-elevated text-left"
+        :data-testid="QA_VALUE_EDITOR.OPTION(i)"
         @click="choose(opt[1])"
       >
         <span
@@ -57,10 +58,11 @@ function choose(v: unknown) {
 
     <template v-else-if="kind === 'select'">
       <button
-        v-for="c in draft.field.choices ?? []"
+        v-for="(c, i) in draft.field.choices ?? []"
         :key="c.value"
         type="button"
         class="flex items-center gap-2.5 h-10 px-3 rounded-lg hover:bg-elevated text-left"
+        :data-testid="QA_VALUE_EDITOR.OPTION(i)"
         @click="choose(c.value)"
       >
         <span class="text-[13px] text-highlighted">{{ c.label }}</span>
@@ -69,10 +71,11 @@ function choose(v: unknown) {
 
     <template v-else-if="kind === 'entry'">
       <button
-        v-for="e in entries"
+        v-for="(e, i) in entries"
         :key="e.id"
         type="button"
         class="flex items-center gap-2.5 h-12 px-3 rounded-lg hover:bg-elevated text-left"
+        :data-testid="QA_VALUE_EDITOR.OPTION(i)"
         @click="emit('chooseEntry', e)"
       >
         <span class="text-[13px] font-medium text-highlighted">{{
@@ -86,7 +89,10 @@ function choose(v: unknown) {
 
     <template v-else>
       <!-- text / number / datetime: free entry committed via → / Enter from the bar -->
-      <div class="px-3 py-2 text-xs text-dimmed">
+      <div
+        class="px-3 py-2 text-xs text-dimmed"
+        :data-testid="QA_VALUE_EDITOR.HINT"
+      >
         Type a value, then <UKbd value="→" /> to add the filter.
       </div>
     </template>

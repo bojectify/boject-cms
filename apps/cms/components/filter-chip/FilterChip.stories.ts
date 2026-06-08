@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import { expect, fn, userEvent, within } from 'storybook/test';
 import FilterChip from './FilterChip.vue';
+import { QA_FILTER_CHIP } from './filterChip.config.js';
 
 const meta: Meta<typeof FilterChip> = {
   title: 'Search/FilterChip',
@@ -21,17 +22,33 @@ type Story = StoryObj<typeof FilterChip>;
 export const Locked: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByText('Summary')).toBeVisible();
-    await expect(canvas.getByText('contains')).toBeVisible();
-    await expect(canvas.getByText(/playoff/)).toBeVisible();
+    await expect(
+      canvas.getByTestId(QA_FILTER_CHIP.FIELD_SEGMENT)
+    ).toBeVisible();
+    await expect(
+      canvas.getByTestId(QA_FILTER_CHIP.FIELD_SEGMENT)
+    ).toHaveTextContent('Summary');
+    await expect(
+      canvas.getByTestId(QA_FILTER_CHIP.OPERATOR_SEGMENT)
+    ).toBeVisible();
+    await expect(
+      canvas.getByTestId(QA_FILTER_CHIP.OPERATOR_SEGMENT)
+    ).toHaveTextContent('contains');
+    await expect(
+      canvas.getByTestId(QA_FILTER_CHIP.VALUE_SEGMENT)
+    ).toBeVisible();
+    await expect(
+      canvas.getByTestId(QA_FILTER_CHIP.VALUE_SEGMENT)
+    ).toHaveTextContent('playoff');
   },
 };
 
 export const ValueActive: Story = {
   args: { activeSegment: 'value' },
   play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
     // active segment carries the focus-ring class
-    const seg = canvasElement.querySelector('[data-segment="value"]')!;
+    const seg = canvas.getByTestId(QA_FILTER_CHIP.VALUE_SEGMENT);
     await expect(seg.className).toMatch(/ring/);
   },
 };
@@ -39,19 +56,16 @@ export const ValueActive: Story = {
 export const RemoveButton: Story = {
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
-    await userEvent.click(
-      canvas.getByRole('button', { name: /remove filter/i })
-    );
+    await userEvent.click(canvas.getByTestId(QA_FILTER_CHIP.REMOVE_BUTTON));
     await expect(args.onRemove).toHaveBeenCalledTimes(1);
   },
 };
 
 export const EditSegment: Story = {
   play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
     // clicking a segment emits editSegment with that segment's name
-    const fieldSeg = canvasElement.querySelector<HTMLButtonElement>(
-      '[data-segment="field"]'
-    )!;
+    const fieldSeg = canvas.getByTestId(QA_FILTER_CHIP.FIELD_SEGMENT);
     await userEvent.click(fieldSeg);
     await expect(args.onEditSegment).toHaveBeenCalledWith('field');
   },

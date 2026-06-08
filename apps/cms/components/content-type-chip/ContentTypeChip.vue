@@ -18,6 +18,7 @@ const emit = defineEmits<{ remove: [] }>();
     <button
       type="button"
       aria-label="Remove content type"
+      :data-testid="QA_CONTENT_TYPE_CHIP.REMOVE_BUTTON"
       class="text-dimmed hover:text-highlighted"
       @click="emit('remove')"
     >
