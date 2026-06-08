@@ -38,12 +38,21 @@ async function searchEntries(
   targetContentTypeIds: string[],
   q: string
 ): Promise<EntryOption[]> {
+  // /api/content filters on the content-type IDENTIFIER, not its id — resolve
+  // each target id via the loaded content types so the picker is scoped.
+  const identifiers = targetContentTypeIds
+    .map((id) => contentTypes.value.find((c) => c.id === id)?.identifier)
+    .filter((identifier): identifier is string => !!identifier);
   const lists = await Promise.all(
-    targetContentTypeIds.map((id) =>
+    identifiers.map((identifier) =>
       $fetch<{
         items: Array<{ id: string; entryTitle: string; contentType: string }>;
       }>('/api/content', {
-        query: { contentTypeId: id, perPage: 50, archiveFilter: 'active' },
+        query: {
+          contentType: identifier,
+          perPage: 50,
+          archiveFilter: 'active',
+        },
       }).catch(() => ({ items: [] }))
     )
   );
