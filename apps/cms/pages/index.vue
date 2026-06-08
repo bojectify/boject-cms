@@ -1,8 +1,42 @@
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui';
+import { routeToSearchQuery, compileQuery } from '~/utils/queryBuilder/compile';
+import type { RouteQuery } from '~/utils/queryBuilder/compile';
+import type { SearchQuery } from '~/utils/queryBuilder/types';
 
 type ArchiveFilter = 'active' | 'archived' | 'all';
 
+const route = useRoute();
+const router = useRouter();
+const { open } = useSearchPalette();
+
+// --- Search mode (cross-type: no scoped content type) ---
+const {
+  searchMode,
+  hits,
+  total: searchTotal,
+  loading: searchLoading,
+  unavailable,
+  page: searchPage,
+} = useEntrySearch(() => undefined);
+
+const searchQuery = computed<SearchQuery>(() =>
+  routeToSearchQuery(route.query as RouteQuery, undefined)
+);
+
+function onClear() {
+  router.push({ path: '/', query: {} });
+}
+function onRemoveFilter(index: number) {
+  const next: SearchQuery = {
+    ...searchQuery.value,
+    filters: searchQuery.value.filters.filter((_, i) => i !== index),
+  };
+  const params = compileQuery(next);
+  router.push({ path: '/', query: { ...(params.q ? { q: params.q } : {}) } });
+}
+
+// --- Browse mode (existing behaviour, unchanged) ---
 const page = ref(1);
 const archiveFilter = ref<ArchiveFilter>('active');
 
@@ -27,7 +61,20 @@ const filterOptions: Array<{ label: string; value: ArchiveFilter }> = [
 </script>
 
 <template>
+  <SearchResults
+    v-if="searchMode"
+    v-model:page="searchPage"
+    :query="searchQuery"
+    :hits="hits"
+    :total="searchTotal"
+    :loading="searchLoading"
+    :unavailable="unavailable"
+    @edit="open()"
+    @clear="onClear"
+    @remove-filter="onRemoveFilter"
+  />
   <ContentTable
+    v-else
     v-model:page="page"
     title="All Content"
     :data="data?.items ?? []"
