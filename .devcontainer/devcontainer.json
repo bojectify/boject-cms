@@ -21,7 +21,7 @@
       }
     }
   },
-  "forwardPorts": [4000, 6006, 5555, 24678],
+  "forwardPorts": [4000, 6006, 5050, 24678],
   "overrideCommand": false,
   "postCreateCommand": "pnpm install",
   "remoteUser": "node"

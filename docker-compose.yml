@@ -10,7 +10,7 @@ services:
       - '127.0.0.1:5432:5432'
       - '127.0.0.1:4000:4000' # Nuxt dev server (forwarded to dev)
       - '127.0.0.1:6006:6006' # Storybook (forwarded to dev)
-      - '127.0.0.1:5555:5555' # Prisma Studio (forwarded to dev)
+      - '127.0.0.1:5050:5050' # Prisma Studio (forwarded to dev; 5050 keeps host 5555 free for the dev Docker registry in docker-compose.dev.yml)
       - '127.0.0.1:24678:24678' # Vite HMR websocket (forwarded to dev)
       - '127.0.0.1:7700:7700' # Meilisearch (forwarded to dev via shared db namespace)
     environment:
