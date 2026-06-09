@@ -40,6 +40,12 @@ const searchQuery = computed<SearchQuery>(() =>
   routeToSearchQuery(route.query as RouteQuery, contentType.value?.identifier)
 );
 
+const { relationLabels: chipRelationLabels, pending: chipLabelsPending } =
+  useFilterChipLabels(
+    () => searchQuery.value,
+    () => contentType.value?.fields ?? []
+  );
+
 // Hits → ContentTable rows. Scoped, so no Type column (all one type).
 const searchRows = computed(() =>
   hits.value.map((h) => ({
@@ -125,6 +131,8 @@ const filterOptions: Array<{ label: string; value: ArchiveFilter }> = [
         :query="searchQuery"
         :content-type-name="contentType?.name"
         :fields="contentType?.fields ?? []"
+        :relation-labels="chipRelationLabels"
+        :relation-labels-pending="chipLabelsPending"
         @edit="open()"
         @clear="onClear"
         @remove-filter="onRemoveFilter"
