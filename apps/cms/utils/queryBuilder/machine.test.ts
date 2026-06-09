@@ -54,6 +54,77 @@ describe('builder machine', () => {
     expect(s.step).toBe('field'); // back to field step, ready for the next filter
   });
 
+  it('editFilter re-opens a committed filter at the value step (free-entry value pre-filled)', () => {
+    let s = initState({ contentTypes: [article], lockedContentType: article });
+    s = reduce(s, { kind: 'pickField', field: article.fields[0]! }); // summary (TEXT)
+    s = reduce(s, { kind: 'setValue', value: 'first' });
+    s = reduce(s, { kind: 'commitValue' });
+    expect(s.query.filters).toHaveLength(1);
+    s = reduce(s, { kind: 'editFilter', index: 0, segment: 'value' });
+    expect(s.step).toBe('value');
+    expect(s.editingIndex).toBe(0);
+    expect(s.draft).toEqual({
+      field: article.fields[0],
+      op: 'eq',
+      value: 'first',
+    });
+    expect(s.text).toBe('first'); // free-entry value pre-filled for editing
+    // original filter untouched until commit
+    expect(s.query.filters).toEqual([
+      { field: 'summary', op: 'eq', value: 'first' },
+    ]);
+  });
+
+  it('committing a re-edit replaces the filter in place (no duplicate, same index)', () => {
+    let s = initState({ contentTypes: [article], lockedContentType: article });
+    s = reduce(s, { kind: 'pickField', field: article.fields[0]! }); // summary
+    s = reduce(s, { kind: 'setValue', value: 'first' });
+    s = reduce(s, { kind: 'commitValue' });
+    s = reduce(s, { kind: 'pickField', field: article.fields[1]! }); // status
+    s = reduce(s, { kind: 'setValue', value: 'Active' });
+    s = reduce(s, { kind: 'commitValue' });
+    expect(s.query.filters).toHaveLength(2);
+    s = reduce(s, { kind: 'editFilter', index: 0, segment: 'value' });
+    s = reduce(s, { kind: 'setValue', value: 'changed' });
+    s = reduce(s, { kind: 'commitValue' });
+    expect(s.query.filters).toEqual([
+      { field: 'summary', op: 'eq', value: 'changed' },
+      { field: 'status', op: 'eq', value: 'Active' },
+    ]);
+    expect(s.editingIndex).toBeNull();
+    expect(s.step).toBe('field');
+  });
+
+  it('cancelling a re-edit (backspace on empty) leaves the original filter untouched', () => {
+    let s = initState({ contentTypes: [article], lockedContentType: article });
+    s = reduce(s, { kind: 'pickField', field: article.fields[0]! });
+    s = reduce(s, { kind: 'setValue', value: 'keep' });
+    s = reduce(s, { kind: 'commitValue' });
+    s = reduce(s, { kind: 'editFilter', index: 0, segment: 'value' });
+    s = reduce(s, { kind: 'setFreeText', q: '' }); // clear the input
+    s = reduce(s, { kind: 'backspace' }); // cancel
+    expect(s.draft).toBeNull();
+    expect(s.editingIndex).toBeNull();
+    expect(s.query.filters).toEqual([
+      { field: 'summary', op: 'eq', value: 'keep' },
+    ]);
+  });
+
+  it('removeFilter shifts editingIndex when an earlier filter is removed', () => {
+    let s = initState({ contentTypes: [article], lockedContentType: article });
+    s = reduce(s, { kind: 'pickField', field: article.fields[0]! }); // filter 0
+    s = reduce(s, { kind: 'setValue', value: 'a' });
+    s = reduce(s, { kind: 'commitValue' });
+    s = reduce(s, { kind: 'pickField', field: article.fields[1]! }); // filter 1
+    s = reduce(s, { kind: 'setValue', value: 'Active' });
+    s = reduce(s, { kind: 'commitValue' });
+    s = reduce(s, { kind: 'editFilter', index: 1, segment: 'value' });
+    expect(s.editingIndex).toBe(1);
+    s = reduce(s, { kind: 'removeFilter', index: 0 });
+    expect(s.editingIndex).toBe(0); // followed the filter down
+    expect(s.query.filters).toHaveLength(1);
+  });
+
   it('setFreeText at the value step updates text but not query.q (no free-text pollution)', () => {
     let s = initState({ contentTypes: [article], lockedContentType: article });
     s = reduce(s, { kind: 'pickField', field: article.fields[0]! }); // TEXT -> value step (eq auto-locked)

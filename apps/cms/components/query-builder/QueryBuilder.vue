@@ -188,19 +188,31 @@ function onKeydown(e: KeyboardEvent) {
         :test-id="QA_QUERY_BUILDER.CONTENT_TYPE_CHIP"
         @remove="handle({ kind: 'removeContentType' })"
       />
-      <FilterChip
-        v-for="(f, i) in state.query.filters"
-        :key="i"
-        :field="committedFieldLabel(f)"
-        :operator="committedOperatorLabel(f)"
-        :value="displayValue(f)"
-        :test-id="QA_QUERY_BUILDER.FILTER_CHIP(i)"
-        @remove="handle({ kind: 'removeFilter', index: i })"
-      />
       <!--
-        The in-progress draft renders as a chip with field + operator labels and
-        an editable, auto-focused value segment — so picking a field drops a chip
-        in place with the cursor on its value (per the search design).
+        Committed chips. The one being re-edited is hidden here and rendered as
+        the editable draft chip below instead (it's replaced in place on commit).
+        Clicking a chip's segment re-opens that filter for editing.
+      -->
+      <template v-for="(f, i) in state.query.filters" :key="i">
+        <FilterChip
+          v-if="state.editingIndex !== i"
+          :field="committedFieldLabel(f)"
+          :operator="committedOperatorLabel(f)"
+          :value="displayValue(f)"
+          :test-id="QA_QUERY_BUILDER.FILTER_CHIP(i)"
+          @remove="handle({ kind: 'removeFilter', index: i })"
+          @edit-segment="
+            (seg: 'field' | 'operator' | 'value') =>
+              handle({ kind: 'editFilter', index: i, segment: seg })
+          "
+        />
+      </template>
+      <!--
+        The draft chip — a NEW filter being added OR an existing one being
+        re-edited — renders with field + operator labels and an editable,
+        auto-focused value segment (so picking/editing lands the cursor on the
+        value). Keeping the value input here (one element, not in the v-for)
+        keeps `valueInput` a single ref rather than a per-row array.
       -->
       <FilterChip
         v-if="state.draft"
