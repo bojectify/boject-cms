@@ -124,6 +124,15 @@ function commitTypedValue() {
   handle({ kind: 'commitValue' });
 }
 
+/** True when the caret sits at the very end of the input with no selection. */
+function caretAtEnd(e: KeyboardEvent): boolean {
+  const el = e.target as HTMLInputElement;
+  return (
+    el.selectionStart === el.selectionEnd &&
+    el.selectionStart === el.value.length
+  );
+}
+
 function onValueInput(e: Event) {
   handle({ kind: 'setFreeText', q: (e.target as HTMLInputElement).value });
 }
@@ -136,9 +145,12 @@ function onValueKeydown(e: KeyboardEvent) {
   } else if (
     e.key === 'ArrowRight' &&
     isFreeEntry.value &&
-    state.value.text !== ''
+    state.value.text !== '' &&
+    caretAtEnd(e)
   ) {
-    // → locks the value in and returns to the field step for the next filter.
+    // → locks the value in and returns to the field step for the next filter —
+    // but ONLY at the end of the text, so mid-value arrows still move the caret
+    // (editing a multi-word value otherwise fights the commit gesture).
     e.preventDefault();
     commitTypedValue();
   } else if (e.key === 'Backspace' && state.value.text === '') {

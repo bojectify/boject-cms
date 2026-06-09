@@ -128,10 +128,30 @@ export const TextValueCommitsWithArrow: Story = {
     // the value is typed into the draft chip's value segment, not the main input
     const valueInput = canvas.getByTestId(QA_QUERY_BUILDER.VALUE_INPUT);
     await userEvent.type(valueInput, 'playoff');
-    await userEvent.keyboard('{ArrowRight}'); // → commits the value
+    await userEvent.keyboard('{ArrowRight}'); // → at end of text commits the value
     await expect(
       canvas.getByTestId(QA_FILTER_CHIP.VALUE_SEGMENT)
     ).toHaveTextContent('playoff');
+  },
+};
+
+// → only commits when the caret is at the end — mid-text it just moves the
+// cursor, so editing a multi-word value doesn't fight the lock gesture.
+export const ArrowRightMidTextDoesNotCommit: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.type(canvas.getByTestId(QA_QUERY_BUILDER.INPUT), 'art');
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))); // Article
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))); // Summary (TEXT)
+    const valueInput = canvas.getByTestId(
+      QA_QUERY_BUILDER.VALUE_INPUT
+    ) as HTMLInputElement;
+    await userEvent.type(valueInput, 'playoff');
+    valueInput.setSelectionRange(3, 3); // caret mid-text
+    await userEvent.keyboard('{ArrowRight}');
+    // no filter committed; still editing the draft chip
+    await expect(canvas.queryByTestId(QA_FILTER_CHIP.VALUE_SEGMENT)).toBeNull();
+    await expect(canvas.getByTestId(QA_QUERY_BUILDER.DRAFT_CHIP)).toBeVisible();
   },
 };
 
