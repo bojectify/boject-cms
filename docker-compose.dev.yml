@@ -1,3 +1,9 @@
+# Separate Compose project name so these dev registries don't collide with the
+# main stack (docker-compose.yml, project `boject-cms`). Without it both files
+# default to the directory name and each `up` warns about the other's
+# containers as orphans.
+name: boject-cms-registries
+
 services:
   registry:
     image: registry:2
