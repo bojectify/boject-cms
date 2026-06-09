@@ -213,3 +213,21 @@ export const Locked: Story = {
     expect(args.onBroaden).toHaveBeenCalledWith({ q: 'goal' });
   },
 };
+
+// Scoped to a type, typing free text offers a "Search <Type> for 'X'" run
+// action — the full-text path (incl. searching by entry title) from a per-type
+// page, since envelope fields aren't structured filters.
+export const ScopedFieldStepFreeText: Story = {
+  args: { lockedContentType: ARTICLE_CT },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await userEvent.type(canvas.getByTestId(QA_QUERY_BUILDER.INPUT), 'goal');
+    const action = canvas.getByTestId(QA_QUERY_DROPDOWN.FREE_TEXT_ACTION);
+    await expect(action).toHaveTextContent('Article'); // "Search Article for …"
+    await expect(action).toHaveTextContent('goal');
+    await userEvent.keyboard('{Enter}'); // runs free text within the scope
+    expect(args.onRun).toHaveBeenLastCalledWith(
+      expect.objectContaining({ contentType: 'Article', q: 'goal' })
+    );
+  },
+};

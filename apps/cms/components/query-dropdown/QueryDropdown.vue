@@ -27,9 +27,20 @@ const ct = computed(() =>
   )
 );
 const fields = computed(() =>
-  (ct.value?.fields ?? []).filter((f) =>
-    FILTERABLE_FIELD_TYPES.includes(f.type)
-  )
+  (ct.value?.fields ?? [])
+    .filter((f) => FILTERABLE_FIELD_TYPES.includes(f.type))
+    .filter((f) =>
+      f.name.toLowerCase().includes(props.state.text.toLowerCase())
+    )
+);
+// The free-text "Search …" run action shows whenever the user is typing at a
+// step where free text is a valid query: unscoped (contentType step) or scoped
+// (field step). It is how you full-text search a content type — including by
+// entry title — without picking a structured field.
+const showFreeTextAction = computed(
+  () =>
+    !!props.state.text &&
+    (props.state.step === 'contentType' || props.state.step === 'field')
 );
 const operators = computed(() =>
   props.state.draft
@@ -43,7 +54,7 @@ const operators = computed(() =>
 <template>
   <div :data-testid="testId" class="flex flex-col p-2 gap-0.5">
     <button
-      v-if="state.step === 'contentType' && state.text"
+      v-if="showFreeTextAction"
       type="button"
       class="flex items-center gap-2.5 h-11 px-3 rounded-lg bg-elevated text-left"
       :data-testid="QA_QUERY_DROPDOWN.FREE_TEXT_ACTION"
@@ -55,7 +66,7 @@ const operators = computed(() =>
         <UIcon name="i-lucide-search" class="size-3.5" />
       </span>
       <span class="text-muted text-sm"
-        >Search for
+        >Search<template v-if="ct"> {{ ct.name }}</template> for
         <span class="font-semibold text-highlighted"
           >“{{ state.text }}”</span
         ></span
