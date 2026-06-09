@@ -1,17 +1,12 @@
 <script setup lang="ts">
 import { useQueryBuilder } from '~/composables/useQueryBuilder';
 import type { QueryBuilderProps, EntryOption } from './queryBuilder.types';
+import type { ChipSegment } from '~/components/filter-chip/filterChip.types';
 import { QA_QUERY_BUILDER } from './queryBuilder.config';
 import { QUERY_LISTBOX_ID } from '../query-dropdown/queryDropdown.config';
-import type { SearchFilter } from '~/utils/queryBuilder/types';
 import { operatorLabel, valueInputKind } from '~/utils/queryBuilder/operators';
-import {
-  chipFieldName,
-  chipOperatorLabel,
-  chipValueDisplay,
-} from '~/utils/queryBuilder/chipLabels';
 
-// QueryDropdown / ContentTypeChip / FilterChip / ValueEditor are auto-registered
+// QueryChips / QueryDropdown / FilterChip / ValueEditor are auto-registered
 // (Nuxt + Storybook scan components/), so they need no explicit import.
 
 const props = withDefaults(defineProps<QueryBuilderProps>(), {
@@ -166,17 +161,6 @@ const placeholder = computed(() =>
     : 'Search everything…'
 );
 
-// --- Chip display labels (shared with the read-only summary bar via chipLabels) ---
-function committedFieldLabel(f: SearchFilter): string {
-  return chipFieldName(ct.value?.fields ?? [], f.field);
-}
-function committedOperatorLabel(f: SearchFilter): string {
-  return chipOperatorLabel(ct.value?.fields ?? [], f);
-}
-function displayValue(f: SearchFilter): string | null {
-  return chipValueDisplay(f.value, relationLabels.value);
-}
-
 // --- Draft (in-progress) chip value input ---
 const draftKind = computed(() =>
   state.value.draft
@@ -279,32 +263,20 @@ function onKeydown(e: KeyboardEvent) {
   >
     <div class="flex items-center gap-2 px-4 py-4 border-b border-default">
       <UIcon name="i-lucide-search" class="size-[18px] text-dimmed shrink-0" />
-      <ContentTypeChip
-        v-if="ct"
-        :name="ct.name"
+      <QueryChips
+        :content-type-name="ct?.name"
         :locked="state.locked"
-        :test-id="QA_QUERY_BUILDER.CONTENT_TYPE_CHIP"
-        @remove="onRemoveContentType"
+        :filters="state.query.filters"
+        :fields="ct?.fields ?? []"
+        :relation-labels="relationLabels"
+        :editing-index="state.editingIndex"
+        @remove-content-type="onRemoveContentType"
+        @remove-filter="onRemoveFilter"
+        @edit-segment="
+          (i: number, seg: ChipSegment) =>
+            handle({ kind: 'editFilter', index: i, segment: seg })
+        "
       />
-      <!--
-        Committed chips. The one being re-edited is hidden here and rendered as
-        the editable draft chip below instead (it's replaced in place on commit).
-        Clicking a chip's segment re-opens that filter for editing.
-      -->
-      <template v-for="(f, i) in state.query.filters" :key="i">
-        <FilterChip
-          v-if="state.editingIndex !== i"
-          :field="committedFieldLabel(f)"
-          :operator="committedOperatorLabel(f)"
-          :value="displayValue(f)"
-          :test-id="QA_QUERY_BUILDER.FILTER_CHIP(i)"
-          @remove="onRemoveFilter(i)"
-          @edit-segment="
-            (seg: 'field' | 'operator' | 'value') =>
-              handle({ kind: 'editFilter', index: i, segment: seg })
-          "
-        />
-      </template>
       <!--
         The draft chip — a NEW filter being added OR an existing one being
         re-edited — renders with field + operator labels and an editable,

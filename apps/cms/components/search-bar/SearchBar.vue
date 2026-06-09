@@ -1,11 +1,6 @@
 <script setup lang="ts">
 import type { SearchBarProps } from './searchBar.types';
 import { QA_SEARCH_BAR } from './searchBar.config';
-import {
-  chipFieldName,
-  chipOperatorLabel,
-  chipValueDisplay,
-} from '~/utils/queryBuilder/chipLabels';
 
 const props = withDefaults(defineProps<SearchBarProps>(), {
   testId: QA_SEARCH_BAR.COMPONENT,
@@ -18,15 +13,15 @@ defineEmits<{
   removeFilter: [index: number];
 }>();
 
-// ContentTypeChip / FilterChip are auto-registered.
+// QueryChips is auto-registered (Nuxt + Storybook scan components/).
 const fields = computed(() => props.fields ?? []);
 </script>
 
 <template>
   <!--
-    Summary mode: the read-only active query. Chips wrap (no overflow); field /
-    operator labels come from the shared chipLabels helpers (relation values
-    still show the id until the resolution follow-up lands).
+    Summary mode: the read-only active query. QueryChips renders the content-type
+    + filter chips (its field / operator / value labels come from the shared
+    chipLabels helpers); relation values still show the id until #322 lands.
   -->
   <div
     v-if="query"
@@ -34,19 +29,12 @@ const fields = computed(() => props.fields ?? []);
     class="flex items-center flex-wrap gap-2 w-full min-h-11 px-3 py-2 rounded-lg border border-default bg-default"
   >
     <UIcon name="i-lucide-search" class="size-[18px] text-dimmed shrink-0" />
-    <ContentTypeChip
-      v-if="contentTypeName"
-      :name="contentTypeName"
-      @remove="$emit('clear')"
-    />
-    <FilterChip
-      v-for="(f, i) in query.filters"
-      :key="i"
-      :field="chipFieldName(fields, f.field)"
-      :operator="chipOperatorLabel(fields, f)"
-      :value="chipValueDisplay(f.value)"
-      :test-id="QA_SEARCH_BAR.FILTER_CHIP(i)"
-      @remove="$emit('removeFilter', i)"
+    <QueryChips
+      :content-type-name="contentTypeName"
+      :filters="query.filters"
+      :fields="fields"
+      @remove-content-type="$emit('clear')"
+      @remove-filter="(i: number) => $emit('removeFilter', i)"
     />
     <span v-if="query.q" class="text-sm text-muted">“{{ query.q }}”</span>
     <div class="ml-auto flex items-center gap-2">
