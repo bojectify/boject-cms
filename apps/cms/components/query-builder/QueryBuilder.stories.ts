@@ -4,6 +4,7 @@ import QueryBuilder from './QueryBuilder.vue';
 import { CONTENT_TYPES, ARTICLE_CT } from '~/utils/queryBuilder/fixtures';
 import { ContainerDecorator } from '../../.storybook/decorators';
 import { QA_QUERY_BUILDER } from './queryBuilder.config.js';
+import { QA_QUERY_CHIPS } from '../query-chips/queryChips.config.js';
 import { QA_QUERY_DROPDOWN } from '../query-dropdown/queryDropdown.config.js';
 import { QA_FILTER_CHIP } from '../filter-chip/filterChip.config.js';
 import { QA_VALUE_EDITOR } from '../value-editor/valueEditor.config.js';
@@ -60,7 +61,7 @@ export const PickContentType: Story = {
     await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))); // Article
     // chip appears; dropdown now lists Article's fields
     await expect(
-      canvas.getByTestId(QA_QUERY_BUILDER.CONTENT_TYPE_CHIP)
+      canvas.getByTestId(QA_QUERY_CHIPS.CONTENT_TYPE_CHIP)
     ).toHaveTextContent('Article');
     await expect(
       canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))
@@ -241,12 +242,12 @@ export const BackspaceDeletesChip: Story = {
     await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(1))); // Status
     await userEvent.click(canvas.getByTestId(QA_VALUE_EDITOR.OPTION(1))); // Active (2nd choice)
     await expect(
-      canvas.getByTestId(QA_QUERY_BUILDER.FILTER_CHIP(0))
+      canvas.getByTestId(QA_QUERY_CHIPS.FILTER_CHIP(0))
     ).toBeVisible();
     await userEvent.click(input);
     await userEvent.keyboard('{Backspace}'); // empty input -> delete the Status chip
     await expect(
-      canvas.queryByTestId(QA_QUERY_BUILDER.FILTER_CHIP(0))
+      canvas.queryByTestId(QA_QUERY_CHIPS.FILTER_CHIP(0))
     ).toBeNull();
   },
 };
@@ -257,7 +258,7 @@ export const Locked: Story = {
     const canvas = within(canvasElement);
     // pre-scoped: chip present, dropdown already on fields
     await expect(
-      canvas.getByTestId(QA_QUERY_BUILDER.CONTENT_TYPE_CHIP)
+      canvas.getByTestId(QA_QUERY_CHIPS.CONTENT_TYPE_CHIP)
     ).toHaveTextContent('Article');
     await expect(
       canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))
@@ -300,7 +301,7 @@ export const KeyboardNavigation: Story = {
     await userEvent.keyboard('{ArrowDown}'); // Article
     await userEvent.keyboard(' ');
     await expect(
-      canvas.getByTestId(QA_QUERY_BUILDER.CONTENT_TYPE_CHIP)
+      canvas.getByTestId(QA_QUERY_CHIPS.CONTENT_TYPE_CHIP)
     ).toHaveTextContent('Article');
     // field step: ↓↓ to Status, Space opens it
     await waitFor(() => expect(input).toHaveFocus());
@@ -327,10 +328,10 @@ export const MouseRemoveKeepsFocus: Story = {
     await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(1))); // Status
     await userEvent.click(canvas.getByTestId(QA_VALUE_EDITOR.OPTION(1))); // Active → committed chip
     // click the committed chip's ✕ with the mouse
-    const chip = within(canvas.getByTestId(QA_QUERY_BUILDER.FILTER_CHIP(0)));
+    const chip = within(canvas.getByTestId(QA_QUERY_CHIPS.FILTER_CHIP(0)));
     await userEvent.click(chip.getByTestId(QA_FILTER_CHIP.REMOVE_BUTTON));
     await expect(
-      canvas.queryByTestId(QA_QUERY_BUILDER.FILTER_CHIP(0))
+      canvas.queryByTestId(QA_QUERY_CHIPS.FILTER_CHIP(0))
     ).toBeNull();
     // focus returned to the input → Enter runs the search
     await waitFor(() => expect(input).toHaveFocus());
