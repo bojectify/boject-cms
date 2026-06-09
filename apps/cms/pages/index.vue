@@ -83,6 +83,9 @@ const filterOptions: Array<{ label: string; value: ArchiveFilter }> = [
     :total="data?.total ?? 0"
     :row-link="(row) => `/entries/${row.id}`"
   >
+    <template #toolbar>
+      <SearchBar placeholder="Search all content…" @open="open" />
+    </template>
     <template #actions>
       <UFieldGroup>
         <UButton
