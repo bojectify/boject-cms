@@ -152,6 +152,15 @@ export function reduce(prev: BuilderState, action: Action): BuilderState {
       return { ...s, query: removeFilter(s.query, action.index) };
 
     case 'backspace':
+      // An empty input backs out the current draft first (cancel the in-progress
+      // filter, return to field selection), then deletes the last committed chip.
+      if (s.text === '' && s.draft) {
+        return {
+          ...s,
+          draft: null,
+          step: s.query.contentType ? 'field' : 'contentType',
+        };
+      }
       if (s.text === '' && !s.draft && s.query.filters.length) {
         return {
           ...s,

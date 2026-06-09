@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/vue3-vite';
-import { expect, fn, userEvent, within } from 'storybook/test';
+import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import QueryBuilder from './QueryBuilder.vue';
 import { CONTENT_TYPES, ARTICLE_CT } from '~/utils/queryBuilder/fixtures';
 import { ContainerDecorator } from '../../.storybook/decorators';
@@ -103,18 +103,55 @@ export const SelectValue: Story = {
   },
 };
 
+// Picking a field drops a draft chip into the bar with the cursor on its value
+// segment — the core of the search interaction.
+export const DraftChipFocusOnFieldSelect: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.type(canvas.getByTestId(QA_QUERY_BUILDER.INPUT), 'art');
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))); // Article
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))); // Summary (TEXT)
+    const chip = await canvas.findByTestId(QA_QUERY_BUILDER.DRAFT_CHIP);
+    await expect(chip).toHaveTextContent('Summary'); // field display name
+    await expect(chip).toHaveTextContent('is'); // operator label (eq -> "is")
+    const valueInput = canvas.getByTestId(QA_QUERY_BUILDER.VALUE_INPUT);
+    await waitFor(() => expect(valueInput).toHaveFocus());
+  },
+};
+
 export const TextValueCommitsWithArrow: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const input = canvas.getByTestId(QA_QUERY_BUILDER.INPUT);
-    await userEvent.type(input, 'art');
+    await userEvent.type(canvas.getByTestId(QA_QUERY_BUILDER.INPUT), 'art');
     await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))); // Article
     await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))); // Summary (TEXT)
-    await userEvent.type(input, 'playoff');
-    await userEvent.keyboard('{ArrowRight}'); // → commits the value
+    // the value is typed into the draft chip's value segment, not the main input
+    const valueInput = canvas.getByTestId(QA_QUERY_BUILDER.VALUE_INPUT);
+    await userEvent.type(valueInput, 'playoff');
+    await userEvent.keyboard('{ArrowRight}'); // → at end of text commits the value
     await expect(
       canvas.getByTestId(QA_FILTER_CHIP.VALUE_SEGMENT)
     ).toHaveTextContent('playoff');
+  },
+};
+
+// → only commits when the caret is at the end — mid-text it just moves the
+// cursor, so editing a multi-word value doesn't fight the lock gesture.
+export const ArrowRightMidTextDoesNotCommit: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.type(canvas.getByTestId(QA_QUERY_BUILDER.INPUT), 'art');
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))); // Article
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))); // Summary (TEXT)
+    const valueInput = canvas.getByTestId(
+      QA_QUERY_BUILDER.VALUE_INPUT
+    ) as HTMLInputElement;
+    await userEvent.type(valueInput, 'playoff');
+    valueInput.setSelectionRange(3, 3); // caret mid-text
+    await userEvent.keyboard('{ArrowRight}');
+    // no filter committed; still editing the draft chip
+    await expect(canvas.queryByTestId(QA_FILTER_CHIP.VALUE_SEGMENT)).toBeNull();
+    await expect(canvas.getByTestId(QA_QUERY_BUILDER.DRAFT_CHIP)).toBeVisible();
   },
 };
 
@@ -124,7 +161,11 @@ export const RelationValue: Story = {
     await userEvent.type(canvas.getByTestId(QA_QUERY_BUILDER.INPUT), 'art');
     await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))); // Article
     await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(2))); // Author (RELATION)
-    await userEvent.type(canvas.getByTestId(QA_QUERY_BUILDER.INPUT), 'ja');
+    // entries load on open; typing into the value segment narrows
+    await userEvent.type(
+      canvas.getByTestId(QA_QUERY_BUILDER.VALUE_INPUT),
+      'ja'
+    );
     expect(args.searchEntries).toHaveBeenCalledWith(['au1'], 'ja');
     await userEvent.click(await canvas.findByTestId(QA_VALUE_EDITOR.OPTION(0))); // Jamie Rivera (async result)
     // the chip shows the captured title, not the stored entry id
@@ -190,5 +231,23 @@ export const Locked: Story = {
       canvas.getByTestId(QA_CONTENT_TYPE_CHIP.REMOVE_BUTTON)
     );
     expect(args.onBroaden).toHaveBeenCalledWith({ q: 'goal' });
+  },
+};
+
+// Scoped to a type, typing free text offers a "Search <Type> for 'X'" run
+// action — the full-text path (incl. searching by entry title) from a per-type
+// page, since envelope fields aren't structured filters.
+export const ScopedFieldStepFreeText: Story = {
+  args: { lockedContentType: ARTICLE_CT },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await userEvent.type(canvas.getByTestId(QA_QUERY_BUILDER.INPUT), 'goal');
+    const action = canvas.getByTestId(QA_QUERY_DROPDOWN.FREE_TEXT_ACTION);
+    await expect(action).toHaveTextContent('Article'); // "Search Article for …"
+    await expect(action).toHaveTextContent('goal');
+    await userEvent.keyboard('{Enter}'); // runs free text within the scope
+    expect(args.onRun).toHaveBeenLastCalledWith(
+      expect.objectContaining({ contentType: 'Article', q: 'goal' })
+    );
   },
 };

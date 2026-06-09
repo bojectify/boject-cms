@@ -1,6 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import { expect, fn, userEvent, within } from 'storybook/test';
-import { ref, onMounted } from 'vue';
 import ValueEditor from './ValueEditor.vue';
 import { QA_VALUE_EDITOR } from './valueEditor.config.js';
 import { ARTICLE_CT } from '~/utils/queryBuilder/fixtures';
@@ -62,8 +61,8 @@ export const SelectValue: Story = {
   },
 };
 
-// RELATION — async entry search. ValueEditor only searches when `text` changes,
-// so the harness nudges it after mount to populate results.
+// RELATION — async entry search. The editor loads entries when its value step
+// opens (immediate watch), so results appear with no typing — no harness nudge.
 export const EntryValue: Story = {
   args: {
     draft: draftFor('author'),
@@ -72,20 +71,10 @@ export const EntryValue: Story = {
       { id: 'e2', entryTitle: 'Sam Okafor', contentTypeName: 'Author' },
     ]),
   },
-  render: (args) => ({
-    components: { ValueEditor },
-    setup() {
-      const text = ref('');
-      onMounted(() => {
-        text.value = 'ja';
-      });
-      return { args, text };
-    },
-    template: `<ValueEditor v-bind="args" :text="text" />`,
-  }),
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
-    expect(args.searchEntries).toHaveBeenCalledWith(['au1'], 'ja');
+    // initial load on open: searched with empty text, scoped to the target type
+    expect(args.searchEntries).toHaveBeenCalledWith(['au1'], '');
     const first = await canvas.findByTestId(QA_VALUE_EDITOR.OPTION(0));
     await expect(first).toHaveTextContent('Jamie Rivera');
     await userEvent.click(first);
@@ -95,7 +84,7 @@ export const EntryValue: Story = {
   },
 };
 
-// TEXT / NUMBER / DATETIME — no rows, just the "type a value, then →" hint.
+// TEXT / NUMBER / DATETIME, empty — the "type a value, then →" hint.
 export const TextHint: Story = {
   args: { draft: draftFor('summary') },
   play: async ({ canvasElement }) => {
@@ -103,5 +92,20 @@ export const TextHint: Story = {
     const hint = canvas.getByTestId(QA_VALUE_EDITOR.HINT);
     await expect(hint).toBeVisible();
     await expect(hint).toHaveTextContent(/Type a value/);
+  },
+};
+
+// TEXT / NUMBER / DATETIME, with text — the "Add filter — …" confirm row;
+// clicking it emits setValue(<text>) + commit.
+export const TextConfirm: Story = {
+  args: { draft: draftFor('summary'), text: 'playoff' },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const confirm = canvas.getByTestId(QA_VALUE_EDITOR.CONFIRM);
+    await expect(confirm).toHaveTextContent(/Add filter/);
+    await expect(confirm).toHaveTextContent('playoff');
+    await userEvent.click(confirm);
+    expect(args.onSetValue).toHaveBeenLastCalledWith('playoff');
+    expect(args.onCommit).toHaveBeenCalled();
   },
 };

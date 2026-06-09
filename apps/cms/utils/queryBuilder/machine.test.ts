@@ -63,6 +63,17 @@ describe('builder machine', () => {
     expect(s.query.q).toBeUndefined();
   });
 
+  it('backspace on an empty value input cancels the draft, back to field step', () => {
+    let s = initState({ contentTypes: [article], lockedContentType: article });
+    s = reduce(s, { kind: 'pickField', field: article.fields[0]! }); // -> value step, draft set
+    expect(s.step).toBe('value');
+    expect(s.draft).not.toBeNull();
+    s = reduce(s, { kind: 'backspace' }); // empty input, draft present -> cancel
+    expect(s.draft).toBeNull();
+    expect(s.step).toBe('field');
+    expect(s.query.filters).toHaveLength(0); // no committed chip touched
+  });
+
   it('removes the last chip with backspace on an empty input', () => {
     let s = initState({ contentTypes: [article], lockedContentType: article });
     s = reduce(s, { kind: 'pickField', field: article.fields[0]! });

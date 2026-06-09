@@ -119,13 +119,17 @@ export async function runSearch(
     cropLength: CROP_LENGTH,
   });
 
+  // A snippet is a highlighted excerpt of the free-text match. With filters only
+  // (no `q`) there is nothing to highlight, and Meili's crop would surface an
+  // arbitrary field value — so omit the snippet entirely unless `q` is present.
+  const hasQuery = params.q.trim().length > 0;
   const hits: SearchHit[] = res.hits.map((h) => ({
     id: h.id,
     entryKey: h.entryKey,
     contentType: h.contentType,
     entryTitle: h.entryTitle,
     publishedAt: h.publishedAt,
-    snippet: buildSnippet(h._formatted),
+    snippet: hasQuery ? buildSnippet(h._formatted) : null,
   }));
 
   return {

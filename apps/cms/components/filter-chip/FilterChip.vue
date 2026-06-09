@@ -4,6 +4,7 @@ import { QA_FILTER_CHIP } from './filterChip.config';
 
 withDefaults(defineProps<FilterChipProps>(), {
   testId: QA_FILTER_CHIP.COMPONENT,
+  showRemove: true,
 });
 const emit = defineEmits<{
   remove: [];
@@ -51,7 +52,26 @@ function ringIf(seg: ChipSegment, active?: ChipSegment | null) {
     >
       {{ operator }}
     </button>
-    <template v-if="value != null">
+    <!--
+      Editing (draft) chip: the value segment hosts an input via the #value slot
+      (a div, not a button, so the input nests legally). It is the last segment
+      when no ✕ follows, so it carries the right-hand rounding.
+    -->
+    <template v-if="$slots.value">
+      <div class="w-px self-stretch bg-default" />
+      <div
+        data-segment="value"
+        :class="[
+          'px-2 flex items-center text-highlighted',
+          ringIf('value', activeSegment),
+          showRemove ? '' : 'rounded-r-[7px]',
+        ]"
+      >
+        <slot name="value" />
+      </div>
+    </template>
+    <!-- Display chip: the committed value renders as a clickable segment. -->
+    <template v-else-if="value != null">
       <div class="w-px self-stretch bg-default" />
       <button
         type="button"
@@ -60,21 +80,24 @@ function ringIf(seg: ChipSegment, active?: ChipSegment | null) {
         :class="[
           'px-2 flex items-center text-highlighted',
           ringIf('value', activeSegment),
+          showRemove ? '' : 'rounded-r-[7px]',
         ]"
         @click="emit('editSegment', 'value')"
       >
         {{ value }}
       </button>
     </template>
-    <div class="w-px self-stretch bg-default" />
-    <button
-      type="button"
-      aria-label="Remove filter"
-      :data-testid="QA_FILTER_CHIP.REMOVE_BUTTON"
-      class="px-1.5 flex items-center rounded-r-[7px] text-dimmed hover:text-highlighted"
-      @click="emit('remove')"
-    >
-      <UIcon name="i-lucide-x" class="size-3" />
-    </button>
+    <template v-if="showRemove">
+      <div class="w-px self-stretch bg-default" />
+      <button
+        type="button"
+        aria-label="Remove filter"
+        :data-testid="QA_FILTER_CHIP.REMOVE_BUTTON"
+        class="px-1.5 flex items-center rounded-r-[7px] text-dimmed hover:text-highlighted"
+        @click="emit('remove')"
+      >
+        <UIcon name="i-lucide-x" class="size-3" />
+      </button>
+    </template>
   </div>
 </template>

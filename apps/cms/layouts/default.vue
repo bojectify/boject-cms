@@ -84,17 +84,6 @@ const userMenuItems = computed<DropdownMenuItem[][]>(() => [
       <template #header>
         <UDashboardNavbar>
           <template #right>
-            <UButton
-              icon="i-lucide-search"
-              color="neutral"
-              variant="outline"
-              size="sm"
-              @click="useSearchPalette().open()"
-            >
-              Search
-              <UKbd value="meta" />
-              <UKbd value="k" />
-            </UButton>
             <UDropdownMenu :items="userMenuItems" size="xl">
               <UAvatar :alt="fullName" size="xl" />
             </UDropdownMenu>

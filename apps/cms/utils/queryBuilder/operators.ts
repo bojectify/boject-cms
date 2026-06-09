@@ -52,15 +52,11 @@ const REGISTRY: Partial<Record<FieldTypeName, Operator[]>> = {
       rich: true,
     },
   ],
-  ENTRY_TITLE: [
-    EQ,
-    {
-      id: 'contains',
-      label: 'contains',
-      description: 'Matches part of the value',
-      rich: true,
-    },
-  ],
+  // ENTRY_TITLE is intentionally absent: its value is folded into the search
+  // index envelope (`entryTitle`), never under `fields.<id>`, so a structured
+  // `fields.title = …` filter matches nothing. Title is searched via free-text
+  // `q` (the index ranks `entryTitle` highest). Filtering by envelope/system
+  // fields (id, entryKey, entryTitle) is a deferred follow-up.
   NUMBER: [
     { id: 'eq', label: '=', description: 'Equals', rich: false },
     { id: 'neq', label: '≠', description: 'Not equal', rich: true },
@@ -146,11 +142,15 @@ export function defaultOperator(type: FieldTypeName): Operator {
   return (REGISTRY[type] ?? [EQ])[0] ?? EQ;
 }
 
+/** The display label for an operator id within a field type (e.g. eq -> "is"). */
+export function operatorLabel(type: FieldTypeName, id: string): string {
+  return (REGISTRY[type] ?? [EQ]).find((o) => o.id === id)?.label ?? id;
+}
+
 const VALUE_KIND: Partial<Record<FieldTypeName, ValueInputKind>> = {
   TEXT: 'text',
   TEXTAREA: 'text',
   SLUG: 'text',
-  ENTRY_TITLE: 'text',
   NUMBER: 'number',
   BOOLEAN: 'boolean',
   SELECT: 'select',

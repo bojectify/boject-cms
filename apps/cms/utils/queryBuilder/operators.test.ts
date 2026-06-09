@@ -35,8 +35,11 @@ describe('operators registry', () => {
     expect(valueInputKind('TEXT', 'eq')).toBe('text');
   });
 
-  it('excludes RICHTEXT and IMAGE from filterable types', () => {
+  it('excludes RICHTEXT, IMAGE, and ENTRY_TITLE from filterable types', () => {
     expect(FILTERABLE_FIELD_TYPES).not.toContain('RICHTEXT');
     expect(FILTERABLE_FIELD_TYPES).not.toContain('IMAGE');
+    // ENTRY_TITLE lives in the index envelope, not under `fields.<id>`, so it
+    // is not filterable — title is searched via free-text `q`.
+    expect(FILTERABLE_FIELD_TYPES).not.toContain('ENTRY_TITLE');
   });
 });

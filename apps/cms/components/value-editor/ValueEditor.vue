@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { valueInputKind } from '~/utils/queryBuilder/operators';
+import { valueInputKind, operatorLabel } from '~/utils/queryBuilder/operators';
 import type { ValueEditorProps } from './valueEditor.types';
 import type { EntryOption } from '../query-builder/queryBuilder.types';
 import { QA_VALUE_EDITOR } from './valueEditor.config';
@@ -16,17 +16,28 @@ const emit = defineEmits<{
 const kind = computed(() =>
   valueInputKind(props.draft.field.type, props.draft.op)
 );
+const opLabel = computed(() =>
+  operatorLabel(props.draft.field.type, props.draft.op)
+);
+function confirmTyped() {
+  emit('setValue', props.text);
+  emit('commit');
+}
 const entries = ref<EntryOption[]>([]);
+// Fire on mount (immediate) AND on every draft/text change, so a relation field
+// shows its entries the moment its value step opens — not only after the user
+// types. Watching `draft` too covers switching directly between relation fields.
 watch(
-  () => props.text,
-  async (q) => {
+  [() => props.draft, () => props.text],
+  async () => {
     if (kind.value === 'entry' && props.searchEntries) {
       entries.value = await props.searchEntries(
         props.draft.field.targetContentTypeIds ?? [],
-        q
+        props.text
       );
     }
-  }
+  },
+  { immediate: true }
 );
 function choose(v: unknown) {
   emit('setValue', v);
@@ -88,12 +99,34 @@ function choose(v: unknown) {
     </template>
 
     <template v-else>
-      <!-- text / number / datetime: free entry committed via → / Enter from the bar -->
+      <!-- text / number / datetime: free entry typed into the chip's value
+           segment. A confirm row appears once something is typed; clicking it
+           (or → / Enter from the value segment) commits the filter. -->
+      <button
+        v-if="text"
+        type="button"
+        class="flex items-center gap-2.5 h-11 px-3 rounded-lg hover:bg-elevated text-left"
+        :data-testid="QA_VALUE_EDITOR.CONFIRM"
+        @click="confirmTyped"
+      >
+        <span
+          class="flex items-center justify-center size-7 rounded-md bg-primary text-inverted shrink-0"
+        >
+          <UIcon name="i-lucide-plus" class="size-3.5" />
+        </span>
+        <span class="text-muted text-sm">
+          Add filter — {{ draft.field.name }} {{ opLabel }}
+          <span class="font-semibold text-highlighted">“{{ text }}”</span>
+        </span>
+        <UKbd value="→" class="ml-auto shrink-0" />
+      </button>
       <div
+        v-else
         class="px-3 py-2 text-xs text-dimmed"
         :data-testid="QA_VALUE_EDITOR.HINT"
       >
-        Type a value, then <UKbd value="→" /> to add the filter.
+        Type a value, then <UKbd value="→" /> to add the filter, or
+        <UKbd value="↵" /> to search.
       </div>
     </template>
   </div>

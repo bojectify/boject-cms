@@ -15,7 +15,7 @@ const emit = defineEmits<{
 const slots = defineSlots();
 
 const tableSlots = computed(() => {
-  const { actions: _, ...rest } = slots;
+  const { actions: _actions, toolbar: _toolbar, ...rest } = slots;
   return rest;
 });
 
@@ -35,6 +35,11 @@ const allColumns = computed<TableColumn<Record<string, unknown>>[]>(() => [
     <div class="flex items-center justify-between mb-4">
       <h1 class="text-2xl font-bold">{{ title }}</h1>
       <slot name="actions" />
+    </div>
+    <!-- Toolbar row (e.g. the search launcher bar) sits below the header,
+         above the table — per the search design. -->
+    <div v-if="$slots.toolbar" class="mb-4">
+      <slot name="toolbar" />
     </div>
     <UTable :data="data" :columns="allColumns" :loading="loading">
       <template #entryTitle-cell="{ row }">

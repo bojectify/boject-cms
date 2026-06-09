@@ -85,6 +85,18 @@ describe('runSearch', () => {
     expect(hit.entryTitle).toBe('Coffee brewing guide'); // raw, not highlighted
   });
 
+  it('omits the snippet when there is no free-text query (filters only)', async () => {
+    const res = await runSearch(index, {
+      q: '',
+      contentType: 'Article',
+      filters: [{ field: 'author', value: 'author-1' }],
+      offset: 0,
+      limit: 20,
+    });
+    expect(res.hits.length).toBeGreaterThan(0);
+    for (const hit of res.hits) expect(hit.snippet).toBeNull();
+  });
+
   it('paginates with offset/limit', async () => {
     const p1 = await runSearch(index, { q: 'whatever', offset: 0, limit: 1 });
     const p2 = await runSearch(index, { q: 'whatever', offset: 1, limit: 1 });
