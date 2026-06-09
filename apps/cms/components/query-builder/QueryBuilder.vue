@@ -37,20 +37,31 @@ const relationLabels = ref<Record<string, string>>({});
 const mainInput = ref<HTMLInputElement>();
 const valueInput = ref<HTMLInputElement>();
 
-// Focus follows the step: the draft chip's value-segment input while a filter's
-// value is being entered, the main input otherwise. This is what lands the
-// cursor on the value segment the instant a field is picked.
-watch(
-  () => state.value.step,
-  async (step) => {
-    await nextTick();
-    if (step === 'value') valueInput.value?.focus();
+// Focus the active input: the draft chip's value segment while a filter's value
+// is being entered, the main input otherwise. Driven by step changes AND by a
+// mouse chip removal (which does NOT change the step) — so removing a chip with
+// the ✕ keeps the input focused and Enter still runs the search.
+function focusActiveInput() {
+  nextTick(() => {
+    if (state.value.step === 'value') valueInput.value?.focus();
     else mainInput.value?.focus();
-  },
-  // immediate so the input is focused when the palette opens (incl. pre-scoped),
-  // not just on later step changes — the modal's auto-focus is suppressed below.
-  { immediate: true }
-);
+  });
+}
+// immediate so the input is focused when the palette opens (incl. pre-scoped),
+// not just on later step changes — the modal's auto-focus is suppressed below.
+watch(() => state.value.step, focusActiveInput, { immediate: true });
+
+// Removing a chip with the mouse leaves focus on the now-gone ✕ button; re-home
+// it to the active input so Enter keeps working. (removeFilter doesn't change
+// the step, so the focus watcher wouldn't otherwise fire.)
+function onRemoveFilter(index: number) {
+  handle({ kind: 'removeFilter', index });
+  focusActiveInput();
+}
+function onRemoveContentType() {
+  handle({ kind: 'removeContentType' });
+  focusActiveInput();
+}
 
 function handle(action: Parameters<typeof dispatch>[0]) {
   const intent = dispatch(action);
@@ -273,7 +284,7 @@ function onKeydown(e: KeyboardEvent) {
         :name="ct.name"
         :locked="state.locked"
         :test-id="QA_QUERY_BUILDER.CONTENT_TYPE_CHIP"
-        @remove="handle({ kind: 'removeContentType' })"
+        @remove="onRemoveContentType"
       />
       <!--
         Committed chips. The one being re-edited is hidden here and rendered as
@@ -287,7 +298,7 @@ function onKeydown(e: KeyboardEvent) {
           :operator="committedOperatorLabel(f)"
           :value="displayValue(f)"
           :test-id="QA_QUERY_BUILDER.FILTER_CHIP(i)"
-          @remove="handle({ kind: 'removeFilter', index: i })"
+          @remove="onRemoveFilter(i)"
           @edit-segment="
             (seg: 'field' | 'operator' | 'value') =>
               handle({ kind: 'editFilter', index: i, segment: seg })

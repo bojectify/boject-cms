@@ -316,3 +316,25 @@ export const KeyboardNavigation: Story = {
     ).toHaveTextContent('Active');
   },
 };
+
+// Removing a chip with the mouse keeps focus on the input, so Enter still runs.
+export const MouseRemoveKeepsFocus: Story = {
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const input = canvas.getByTestId(QA_QUERY_BUILDER.INPUT);
+    await userEvent.type(input, 'art');
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))); // Article
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(1))); // Status
+    await userEvent.click(canvas.getByTestId(QA_VALUE_EDITOR.OPTION(1))); // Active → committed chip
+    // click the committed chip's ✕ with the mouse
+    const chip = within(canvas.getByTestId(QA_QUERY_BUILDER.FILTER_CHIP(0)));
+    await userEvent.click(chip.getByTestId(QA_FILTER_CHIP.REMOVE_BUTTON));
+    await expect(
+      canvas.queryByTestId(QA_QUERY_BUILDER.FILTER_CHIP(0))
+    ).toBeNull();
+    // focus returned to the input → Enter runs the search
+    await waitFor(() => expect(input).toHaveFocus());
+    await userEvent.keyboard('{Enter}');
+    expect(args.onRun).toHaveBeenCalled();
+  },
+};
