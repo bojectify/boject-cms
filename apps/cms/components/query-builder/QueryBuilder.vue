@@ -40,7 +40,10 @@ watch(
     await nextTick();
     if (step === 'value') valueInput.value?.focus();
     else mainInput.value?.focus();
-  }
+  },
+  // immediate so the input is focused when the palette opens (incl. pre-scoped),
+  // not just on later step changes — the modal's auto-focus is suppressed below.
+  { immediate: true }
 );
 
 function handle(action: Parameters<typeof dispatch>[0]) {
