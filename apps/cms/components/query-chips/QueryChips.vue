@@ -1,19 +1,31 @@
 <script setup lang="ts">
 import type { QueryChipsProps } from './queryChips.types';
 import type { ChipSegment } from '~/components/filter-chip/filterChip.types';
+import type { SearchFilter } from '~/utils/queryBuilder/types';
 import { QA_QUERY_CHIPS } from './queryChips.config';
 import {
   chipFieldName,
   chipOperatorLabel,
   chipValueDisplay,
+  isRelationFieldType,
 } from '~/utils/queryBuilder/chipLabels';
 
-defineProps<QueryChipsProps>();
+const props = defineProps<QueryChipsProps>();
 const emit = defineEmits<{
   removeContentType: [];
   removeFilter: [index: number];
   editSegment: [index: number, segment: ChipSegment];
 }>();
+
+/** A relation chip whose id has no resolved label yet, while resolution is pending. */
+function valueLoadingFor(f: SearchFilter): boolean {
+  if (!props.relationLabelsPending) return false;
+  if (typeof f.value !== 'string' || !f.value) return false;
+  const type = props.fields.find((x) => x.identifier === f.field)?.type;
+  return (
+    !!type && isRelationFieldType(type) && !props.relationLabels?.[f.value]
+  );
+}
 
 // ContentTypeChip / FilterChip are auto-registered (Nuxt + Storybook scan components/).
 </script>
@@ -39,6 +51,7 @@ const emit = defineEmits<{
       :field="chipFieldName(fields, f.field)"
       :operator="chipOperatorLabel(fields, f)"
       :value="chipValueDisplay(f.value, relationLabels)"
+      :value-loading="valueLoadingFor(f)"
       :test-id="QA_QUERY_CHIPS.FILTER_CHIP(i)"
       @remove="emit('removeFilter', i)"
       @edit-segment="(seg: ChipSegment) => emit('editSegment', i, seg)"

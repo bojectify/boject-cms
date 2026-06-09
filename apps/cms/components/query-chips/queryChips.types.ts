@@ -12,6 +12,8 @@ export type QueryChipsProps = {
   fields: ChipLabelField[];
   /** entryId → title map for relation-valued chips (falls back to the id when absent). */
   relationLabels?: Record<string, string>;
+  /** True while relation values are resolving; drives the per-chip value skeleton. */
+  relationLabelsPending?: boolean;
   /**
    * The filter being re-edited in place — its committed chip is NOT rendered here
    * (the consumer renders it as the editable draft chip instead). Omitted / null

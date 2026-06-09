@@ -120,3 +120,49 @@ export const RelationLabelMissingFallsBackToId: Story = {
     ).toHaveTextContent('e1');
   },
 };
+
+// A relation value still resolving shows a skeleton (pending + no label yet).
+export const RelationLabelPending: Story = {
+  args: {
+    filters: [{ field: 'author', op: 'eq', value: 'e1' }],
+    relationLabelsPending: true,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const chip = within(canvas.getByTestId(QA_QUERY_CHIPS.FILTER_CHIP(0)));
+    await expect(chip.getByTestId(QA_FILTER_CHIP.VALUE_SKELETON)).toBeVisible();
+  },
+};
+
+// Pending but already resolved → show the title, not a skeleton.
+export const RelationLabelPendingButResolved: Story = {
+  args: {
+    filters: [{ field: 'author', op: 'eq', value: 'e1' }],
+    relationLabels: { e1: 'Jamie Rivera' },
+    relationLabelsPending: true,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const chip = within(canvas.getByTestId(QA_QUERY_CHIPS.FILTER_CHIP(0)));
+    await expect(chip.queryByTestId(QA_FILTER_CHIP.VALUE_SKELETON)).toBeNull();
+    await expect(
+      chip.getByTestId(QA_FILTER_CHIP.VALUE_SEGMENT)
+    ).toHaveTextContent('Jamie Rivera');
+  },
+};
+
+// Pending only skeletonizes RELATION fields — a non-relation chip shows its value.
+export const PendingNonRelationNoSkeleton: Story = {
+  args: {
+    filters: [{ field: 'summary', op: 'eq', value: 'goal' }],
+    relationLabelsPending: true,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const chip = within(canvas.getByTestId(QA_QUERY_CHIPS.FILTER_CHIP(0)));
+    await expect(chip.queryByTestId(QA_FILTER_CHIP.VALUE_SKELETON)).toBeNull();
+    await expect(
+      chip.getByTestId(QA_FILTER_CHIP.VALUE_SEGMENT)
+    ).toHaveTextContent('goal');
+  },
+};
