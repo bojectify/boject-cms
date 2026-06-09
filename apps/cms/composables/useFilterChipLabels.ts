@@ -32,6 +32,9 @@ export function useFilterChipLabels(
       // No relation filters (e.g. every non-search route, since SearchPalette
       // is global) → nothing to resolve, no fetch.
       if (ids.value.length === 0) return {};
+      // Bounded fan-out: v1 equality is one id per relation filter, so this is a
+      // handful of requests. #301 array operators (containsAny/All) could make a
+      // single chip carry many ids — batch or cap concurrency then.
       const results = await Promise.all(
         ids.value.map((id) =>
           request$fetch<ChipEntryResponse>(`/api/content-entries/${id}`)
