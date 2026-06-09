@@ -3,6 +3,7 @@ import { useQueryBuilder } from '~/composables/useQueryBuilder';
 import type { QueryBuilderProps, EntryOption } from './queryBuilder.types';
 import { QA_QUERY_BUILDER } from './queryBuilder.config';
 import type { SearchFilter } from '~/utils/queryBuilder/types';
+import { operatorLabel, valueInputKind } from '~/utils/queryBuilder/operators';
 
 // QueryDropdown / ContentTypeChip / FilterChip / ValueEditor are auto-registered
 // (Nuxt + Storybook scan components/), so they need no explicit import.
@@ -27,6 +28,21 @@ const { state, dispatch } = useQueryBuilder({
  */
 const relationLabels = ref<Record<string, string>>({});
 
+const mainInput = ref<HTMLInputElement>();
+const valueInput = ref<HTMLInputElement>();
+
+// Focus follows the step: the draft chip's value-segment input while a filter's
+// value is being entered, the main input otherwise. This is what lands the
+// cursor on the value segment the instant a field is picked.
+watch(
+  () => state.value.step,
+  async (step) => {
+    await nextTick();
+    if (step === 'value') valueInput.value?.focus();
+    else mainInput.value?.focus();
+  }
+);
+
 function handle(action: Parameters<typeof dispatch>[0]) {
   const intent = dispatch(action);
   emit('update:modelValue', state.value.query);
@@ -49,6 +65,18 @@ const placeholder = computed(() =>
     : 'Search everything…'
 );
 
+// --- Chip display labels (field/operator render as display names, not raw ids) ---
+function fieldByIdentifier(identifier: string) {
+  return ct.value?.fields.find((f) => f.identifier === identifier);
+}
+function committedFieldLabel(f: SearchFilter): string {
+  return fieldByIdentifier(f.field)?.name ?? f.field;
+}
+function committedOperatorLabel(f: SearchFilter): string {
+  const type = fieldByIdentifier(f.field)?.type;
+  return type ? operatorLabel(type, f.op) : f.op;
+}
+
 /**
  * Human-readable chip value: relation ids resolve to their captured title;
  * everything else stringifies. Null/undefined hides the chip's value segment.
@@ -59,6 +87,64 @@ function displayValue(f: SearchFilter): string | null {
   return relationLabels.value[key] ?? key;
 }
 
+// --- Draft (in-progress) chip value input ---
+const draftKind = computed(() =>
+  state.value.draft
+    ? valueInputKind(state.value.draft.field.type, state.value.draft.op)
+    : null
+);
+const valuePlaceholder = computed(() => {
+  switch (draftKind.value) {
+    case 'entry':
+      return 'Search entries…';
+    case 'select':
+      return 'Pick a value…';
+    case 'boolean':
+      return 'true / false';
+    case 'datetime':
+      return 'YYYY-MM-DD…';
+    default:
+      return 'Enter a value…';
+  }
+});
+// Free-entry kinds carry an uncommitted typed value; entry/select/boolean commit
+// via the dropdown (click), so there is no pending text to lock in for them.
+const isFreeEntry = computed(
+  () =>
+    draftKind.value === 'text' ||
+    draftKind.value === 'number' ||
+    draftKind.value === 'datetime'
+);
+
+function commitTypedValue() {
+  handle({ kind: 'setValue', value: state.value.text });
+  handle({ kind: 'commitValue' });
+}
+
+function onValueInput(e: Event) {
+  handle({ kind: 'setFreeText', q: (e.target as HTMLInputElement).value });
+}
+function onValueKeydown(e: KeyboardEvent) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    // ↵ runs the search now, locking in a pending typed value first.
+    if (isFreeEntry.value && state.value.text !== '') commitTypedValue();
+    handle({ kind: 'run' });
+  } else if (
+    e.key === 'ArrowRight' &&
+    isFreeEntry.value &&
+    state.value.text !== ''
+  ) {
+    // → locks the value in and returns to the field step for the next filter.
+    e.preventDefault();
+    commitTypedValue();
+  } else if (e.key === 'Backspace' && state.value.text === '') {
+    // Empty value input + Backspace cancels the draft, back to field selection.
+    handle({ kind: 'backspace' });
+  }
+}
+
+// --- Main (free-text / content-type / field-pick) input ---
 function onInput(e: Event) {
   handle({ kind: 'setFreeText', q: (e.target as HTMLInputElement).value });
 }
@@ -68,14 +154,6 @@ function onKeydown(e: KeyboardEvent) {
     handle({ kind: 'run' });
   } else if (e.key === 'Backspace' && state.value.text === '') {
     handle({ kind: 'backspace' });
-  } else if (
-    e.key === 'ArrowRight' &&
-    state.value.step === 'value' &&
-    state.value.text !== ''
-  ) {
-    e.preventDefault();
-    handle({ kind: 'setValue', value: state.value.text });
-    handle({ kind: 'commitValue' });
   }
   // Tab / Shift+Tab intentionally fall through to native focus handling.
 }
@@ -86,7 +164,7 @@ function onKeydown(e: KeyboardEvent) {
     :data-testid="testId"
     class="flex flex-col w-full rounded-2xl border border-default bg-default shadow-xl overflow-clip font-sans"
   >
-    <div class="flex items-center gap-3 px-4 py-4 border-b border-default">
+    <div class="flex items-center gap-2 px-4 py-4 border-b border-default">
       <UIcon name="i-lucide-search" class="size-[18px] text-dimmed shrink-0" />
       <ContentTypeChip
         v-if="ct"
@@ -98,24 +176,52 @@ function onKeydown(e: KeyboardEvent) {
       <FilterChip
         v-for="(f, i) in state.query.filters"
         :key="i"
-        :field="f.field"
-        :operator="f.op"
+        :field="committedFieldLabel(f)"
+        :operator="committedOperatorLabel(f)"
         :value="displayValue(f)"
         :test-id="QA_QUERY_BUILDER.FILTER_CHIP(i)"
         @remove="handle({ kind: 'removeFilter', index: i })"
       />
+      <!--
+        The in-progress draft renders as a chip with field + operator labels and
+        an editable, auto-focused value segment — so picking a field drops a chip
+        in place with the cursor on its value (per the search design).
+      -->
+      <FilterChip
+        v-if="state.draft"
+        :field="state.draft.field.name"
+        :operator="operatorLabel(state.draft.field.type, state.draft.op)"
+        :active-segment="'value'"
+        :show-remove="false"
+        :test-id="QA_QUERY_BUILDER.DRAFT_CHIP"
+      >
+        <template #value>
+          <input
+            ref="valueInput"
+            :data-testid="QA_QUERY_BUILDER.VALUE_INPUT"
+            style="field-sizing: content"
+            class="min-w-[3rem] max-w-[16rem] bg-transparent outline-none text-xs text-highlighted placeholder:text-dimmed"
+            :placeholder="valuePlaceholder"
+            :value="state.text"
+            @input="onValueInput"
+            @keydown="onValueKeydown"
+          />
+        </template>
+      </FilterChip>
       <input
+        v-show="state.step !== 'value'"
         :id="QA_QUERY_BUILDER.INPUT"
+        ref="mainInput"
         :data-testid="QA_QUERY_BUILDER.INPUT"
         role="combobox"
         :aria-expanded="true"
-        class="flex-1 bg-transparent outline-none text-[15px] text-highlighted placeholder:text-dimmed"
+        class="flex-1 min-w-[6rem] bg-transparent outline-none text-[15px] text-highlighted placeholder:text-dimmed"
         :placeholder="placeholder"
         :value="state.text"
         @input="onInput"
         @keydown="onKeydown"
       />
-      <UKbd value="esc" />
+      <UKbd value="esc" class="shrink-0" />
     </div>
 
     <QueryDropdown

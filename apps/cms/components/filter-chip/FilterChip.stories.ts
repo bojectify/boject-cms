@@ -70,3 +70,27 @@ export const EditSegment: Story = {
     await expect(args.onEditSegment).toHaveBeenCalledWith('field');
   },
 };
+
+// Draft mode: the value segment hosts a slotted input (the editable value) and
+// the ✕ remove button is hidden (a draft is cancelled, not removed).
+export const Editing: Story = {
+  args: { value: null, activeSegment: 'value', showRemove: false },
+  render: (args) => ({
+    components: { FilterChip },
+    setup: () => ({ args }),
+    template: `
+      <FilterChip v-bind="args">
+        <template #value>
+          <input data-testid="draft-value" value="playoff" />
+        </template>
+      </FilterChip>`,
+  }),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByTestId('draft-value')).toBeVisible();
+    await expect(canvas.queryByTestId(QA_FILTER_CHIP.REMOVE_BUTTON)).toBeNull();
+    await expect(
+      canvas.getByTestId(QA_FILTER_CHIP.FIELD_SEGMENT)
+    ).toHaveTextContent('Summary');
+  },
+};

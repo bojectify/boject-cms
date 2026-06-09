@@ -142,6 +142,11 @@ export function defaultOperator(type: FieldTypeName): Operator {
   return (REGISTRY[type] ?? [EQ])[0] ?? EQ;
 }
 
+/** The display label for an operator id within a field type (e.g. eq -> "is"). */
+export function operatorLabel(type: FieldTypeName, id: string): string {
+  return (REGISTRY[type] ?? [EQ]).find((o) => o.id === id)?.label ?? id;
+}
+
 const VALUE_KIND: Partial<Record<FieldTypeName, ValueInputKind>> = {
   TEXT: 'text',
   TEXTAREA: 'text',

@@ -8,4 +8,9 @@ export type FilterChipProps = BasicComponentProps & {
   value?: string | null;
   /** Which segment shows the focus ring. */
   activeSegment?: ChipSegment | null;
+  /**
+   * Show the trailing ✕ remove button. False for an in-progress draft chip
+   * (cancel via Backspace, not a ✕).
+   */
+  showRemove?: boolean;
 };

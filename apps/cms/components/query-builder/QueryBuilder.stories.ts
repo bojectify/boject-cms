@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/vue3-vite';
-import { expect, fn, userEvent, within } from 'storybook/test';
+import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import QueryBuilder from './QueryBuilder.vue';
 import { CONTENT_TYPES, ARTICLE_CT } from '~/utils/queryBuilder/fixtures';
 import { ContainerDecorator } from '../../.storybook/decorators';
@@ -103,14 +103,31 @@ export const SelectValue: Story = {
   },
 };
 
+// Picking a field drops a draft chip into the bar with the cursor on its value
+// segment — the core of the search interaction.
+export const DraftChipFocusOnFieldSelect: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.type(canvas.getByTestId(QA_QUERY_BUILDER.INPUT), 'art');
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))); // Article
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))); // Summary (TEXT)
+    const chip = await canvas.findByTestId(QA_QUERY_BUILDER.DRAFT_CHIP);
+    await expect(chip).toHaveTextContent('Summary'); // field display name
+    await expect(chip).toHaveTextContent('is'); // operator label (eq -> "is")
+    const valueInput = canvas.getByTestId(QA_QUERY_BUILDER.VALUE_INPUT);
+    await waitFor(() => expect(valueInput).toHaveFocus());
+  },
+};
+
 export const TextValueCommitsWithArrow: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const input = canvas.getByTestId(QA_QUERY_BUILDER.INPUT);
-    await userEvent.type(input, 'art');
+    await userEvent.type(canvas.getByTestId(QA_QUERY_BUILDER.INPUT), 'art');
     await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))); // Article
     await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))); // Summary (TEXT)
-    await userEvent.type(input, 'playoff');
+    // the value is typed into the draft chip's value segment, not the main input
+    const valueInput = canvas.getByTestId(QA_QUERY_BUILDER.VALUE_INPUT);
+    await userEvent.type(valueInput, 'playoff');
     await userEvent.keyboard('{ArrowRight}'); // → commits the value
     await expect(
       canvas.getByTestId(QA_FILTER_CHIP.VALUE_SEGMENT)
@@ -124,7 +141,11 @@ export const RelationValue: Story = {
     await userEvent.type(canvas.getByTestId(QA_QUERY_BUILDER.INPUT), 'art');
     await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))); // Article
     await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(2))); // Author (RELATION)
-    await userEvent.type(canvas.getByTestId(QA_QUERY_BUILDER.INPUT), 'ja');
+    // entries load on open; typing into the value segment narrows
+    await userEvent.type(
+      canvas.getByTestId(QA_QUERY_BUILDER.VALUE_INPUT),
+      'ja'
+    );
     expect(args.searchEntries).toHaveBeenCalledWith(['au1'], 'ja');
     await userEvent.click(await canvas.findByTestId(QA_VALUE_EDITOR.OPTION(0))); // Jamie Rivera (async result)
     // the chip shows the captured title, not the stored entry id

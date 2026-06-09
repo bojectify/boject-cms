@@ -84,7 +84,7 @@ export const EntryValue: Story = {
   },
 };
 
-// TEXT / NUMBER / DATETIME — no rows, just the "type a value, then →" hint.
+// TEXT / NUMBER / DATETIME, empty — the "type a value, then →" hint.
 export const TextHint: Story = {
   args: { draft: draftFor('summary') },
   play: async ({ canvasElement }) => {
@@ -92,5 +92,20 @@ export const TextHint: Story = {
     const hint = canvas.getByTestId(QA_VALUE_EDITOR.HINT);
     await expect(hint).toBeVisible();
     await expect(hint).toHaveTextContent(/Type a value/);
+  },
+};
+
+// TEXT / NUMBER / DATETIME, with text — the "Add filter — …" confirm row;
+// clicking it emits setValue(<text>) + commit.
+export const TextConfirm: Story = {
+  args: { draft: draftFor('summary'), text: 'playoff' },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const confirm = canvas.getByTestId(QA_VALUE_EDITOR.CONFIRM);
+    await expect(confirm).toHaveTextContent(/Add filter/);
+    await expect(confirm).toHaveTextContent('playoff');
+    await userEvent.click(confirm);
+    expect(args.onSetValue).toHaveBeenLastCalledWith('playoff');
+    expect(args.onCommit).toHaveBeenCalled();
   },
 };
