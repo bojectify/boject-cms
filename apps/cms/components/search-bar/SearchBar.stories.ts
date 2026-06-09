@@ -72,3 +72,26 @@ export const Summary: Story = {
     expect(args.onClear).toHaveBeenCalled();
   },
 };
+
+// A RELATION filter resolved via relationLabels shows the entry title.
+export const SummaryRelationResolved: Story = {
+  args: {
+    query: {
+      contentType: 'Article',
+      filters: [{ field: 'author', op: 'eq', value: 'e1' }],
+    },
+    contentTypeName: 'Article',
+    fields: ARTICLE_CT.fields,
+    relationLabels: { e1: 'Jamie Rivera' },
+    onEdit: fn(),
+    onClear: fn(),
+    onRemoveFilter: fn(),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const chip = within(canvas.getByTestId(QA_QUERY_CHIPS.FILTER_CHIP(0)));
+    await expect(
+      chip.getByTestId(QA_FILTER_CHIP.VALUE_SEGMENT)
+    ).toHaveTextContent('Jamie Rivera');
+  },
+};

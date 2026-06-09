@@ -14,4 +14,8 @@ export type SearchBarProps = BasicComponentProps & {
   contentTypeName?: string;
   /** Scoped content type's fields, for chip field/operator display labels. */
   fields?: ChipLabelField[];
+  /** Resolved relation entry-id → title map (for filter-chip display labels). */
+  relationLabels?: Record<string, string>;
+  /** True while relation labels are resolving (drives the chip value skeleton). */
+  relationLabelsPending?: boolean;
 };
