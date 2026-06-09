@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import { expect, fn, userEvent, within } from 'storybook/test';
 import SearchBar from './SearchBar.vue';
 import { QA_SEARCH_BAR } from './searchBar.config.js';
+import { QA_QUERY_CHIPS } from '../query-chips/queryChips.config.js';
 import { QA_FILTER_CHIP } from '../filter-chip/filterChip.config.js';
 import { ARTICLE_CT } from '~/utils/queryBuilder/fixtures';
 import { ContainerDecorator } from '../../.storybook/decorators';
@@ -52,7 +53,7 @@ export const Summary: Story = {
     await expect(bar).toHaveTextContent('Article');
     await expect(bar).toHaveTextContent('playoff');
     // the chip renders display labels (Status / is / Active), not raw ids
-    const chip = within(canvas.getByTestId(QA_SEARCH_BAR.FILTER_CHIP(0)));
+    const chip = within(canvas.getByTestId(QA_QUERY_CHIPS.FILTER_CHIP(0)));
     await expect(
       chip.getByTestId(QA_FILTER_CHIP.FIELD_SEGMENT)
     ).toHaveTextContent('Status');
