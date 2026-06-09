@@ -5,6 +5,11 @@ import { QA_QUERY_BUILDER } from './queryBuilder.config';
 import { QUERY_LISTBOX_ID } from '../query-dropdown/queryDropdown.config';
 import type { SearchFilter } from '~/utils/queryBuilder/types';
 import { operatorLabel, valueInputKind } from '~/utils/queryBuilder/operators';
+import {
+  chipFieldName,
+  chipOperatorLabel,
+  chipValueDisplay,
+} from '~/utils/queryBuilder/chipLabels';
 
 // QueryDropdown / ContentTypeChip / FilterChip / ValueEditor are auto-registered
 // (Nuxt + Storybook scan components/), so they need no explicit import.
@@ -150,26 +155,15 @@ const placeholder = computed(() =>
     : 'Search everything…'
 );
 
-// --- Chip display labels (field/operator render as display names, not raw ids) ---
-function fieldByIdentifier(identifier: string) {
-  return ct.value?.fields.find((f) => f.identifier === identifier);
-}
+// --- Chip display labels (shared with the read-only summary bar via chipLabels) ---
 function committedFieldLabel(f: SearchFilter): string {
-  return fieldByIdentifier(f.field)?.name ?? f.field;
+  return chipFieldName(ct.value?.fields ?? [], f.field);
 }
 function committedOperatorLabel(f: SearchFilter): string {
-  const type = fieldByIdentifier(f.field)?.type;
-  return type ? operatorLabel(type, f.op) : f.op;
+  return chipOperatorLabel(ct.value?.fields ?? [], f);
 }
-
-/**
- * Human-readable chip value: relation ids resolve to their captured title;
- * everything else stringifies. Null/undefined hides the chip's value segment.
- */
 function displayValue(f: SearchFilter): string | null {
-  if (f.value == null) return null;
-  const key = String(f.value);
-  return relationLabels.value[key] ?? key;
+  return chipValueDisplay(f.value, relationLabels.value);
 }
 
 // --- Draft (in-progress) chip value input ---

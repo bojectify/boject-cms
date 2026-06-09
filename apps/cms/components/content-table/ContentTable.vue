@@ -3,6 +3,8 @@ import type { TableColumn } from '@nuxt/ui';
 import { useContentTable } from '~/composables/useContentTable';
 import type { ContentTableProps } from './contentTable.types';
 import { QA_CONTENT_TABLE } from './contentTable.config';
+import { DEFAULT_CONTENT_COLUMNS } from './contentTable.columns';
+import { highlightToSafeHtml } from '~/utils/searchSnippet';
 
 const props = withDefaults(defineProps<ContentTableProps>(), {
   testId: QA_CONTENT_TABLE.COMPONENT,
@@ -21,13 +23,12 @@ const tableSlots = computed(() => {
 
 const { formatDate, statusColor } = useContentTable();
 
-const allColumns = computed<TableColumn<Record<string, unknown>>[]>(() => [
-  { accessorKey: 'entryTitle', header: 'Entry Title' },
-  { accessorKey: 'createdAt', header: 'Created' },
-  { accessorKey: 'updatedAt', header: 'Updated' },
-  { accessorKey: 'status', header: 'Status' },
-  ...(props.columns ?? []),
-]);
+// `columns`, when provided, is the full column set (the page owns it); otherwise
+// the default browse columns. The cell templates below cover every accessorKey
+// either set can use — unused ones simply don't render.
+const allColumns = computed<TableColumn<Record<string, unknown>>[]>(
+  () => props.columns ?? DEFAULT_CONTENT_COLUMNS
+);
 </script>
 
 <template>
@@ -51,6 +52,14 @@ const allColumns = computed<TableColumn<Record<string, unknown>>[]>(() => [
           {{ row.original.entryTitle }}
         </NuxtLink>
         <span v-else>{{ row.original.entryTitle }}</span>
+        <!-- A search hit carries a highlighted snippet; browse rows don't. -->
+        <!-- eslint-disable vue/no-v-html -- sanitised by highlightToSafeHtml -->
+        <p
+          v-if="row.original.snippet"
+          class="text-sm text-muted search-snippet mt-0.5"
+          v-html="highlightToSafeHtml(row.original.snippet as string)"
+        />
+        <!-- eslint-enable vue/no-v-html -->
       </template>
       <template #createdAt-cell="{ row }">
         {{ formatDate(row.original.createdAt as string) }}
@@ -66,6 +75,13 @@ const allColumns = computed<TableColumn<Record<string, unknown>>[]>(() => [
         >
           {{ row.original.status }}
         </UBadge>
+      </template>
+      <template #publishedAt-cell="{ row }">
+        {{
+          row.original.publishedAt
+            ? formatDate(row.original.publishedAt as string)
+            : '—'
+        }}
       </template>
       <template v-for="(_, name) in tableSlots" :key="name" #[name]="slotProps">
         <slot :name="name" v-bind="slotProps" />
@@ -88,3 +104,15 @@ const allColumns = computed<TableColumn<Record<string, unknown>>[]>(() => [
     </div>
   </div>
 </template>
+
+<style scoped>
+@reference '~/assets/css/main.css';
+
+/* Search-snippet highlight: <em> tokens come from Meili's match cropping
+   (highlightToSafeHtml). Render upright with a soft amber wash using the
+   semantic `warning` utilities; @reference pulls the theme so they resolve in
+   this scoped block (mirrors RichTextEditor). */
+.search-snippet :deep(em) {
+  @apply not-italic bg-warning/15 text-warning rounded-xs px-px;
+}
+</style>

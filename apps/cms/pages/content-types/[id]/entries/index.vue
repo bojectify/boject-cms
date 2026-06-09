@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { TableColumn } from '@nuxt/ui';
 import { routeToSearchQuery, compileQuery } from '~/utils/queryBuilder/compile';
 import type { RouteQuery } from '~/utils/queryBuilder/compile';
 import type { SearchQuery } from '~/utils/queryBuilder/types';
@@ -10,7 +11,7 @@ const router = useRouter();
 const { open } = useSearchPalette();
 const contentTypeId = route.params.id as string;
 
-// Content type: name + identifier + ENTRY_TITLE field
+// Content type: name + identifier + fields (fields drive the summary chip labels)
 const { data: contentType } = await useAuthedFetch<{
   id: string;
   identifier: string;
@@ -39,6 +40,20 @@ const searchQuery = computed<SearchQuery>(() =>
   routeToSearchQuery(route.query as RouteQuery, contentType.value?.identifier)
 );
 
+// Hits → ContentTable rows. Scoped, so no Type column (all one type).
+const searchRows = computed(() =>
+  hits.value.map((h) => ({
+    id: h.id,
+    entryTitle: h.entryTitle,
+    snippet: h.snippet,
+    publishedAt: h.publishedAt,
+  }))
+);
+const searchColumns: TableColumn<Record<string, unknown>>[] = [
+  { accessorKey: 'entryTitle', header: 'Entry Title' },
+  { accessorKey: 'publishedAt', header: 'Published' },
+];
+
 function onClear() {
   router.push({ path: `/content-types/${contentTypeId}/entries`, query: {} });
 }
@@ -54,7 +69,7 @@ function onRemoveFilter(index: number) {
   router.push({ path: `/content-types/${contentTypeId}/entries`, query });
 }
 
-// --- Browse mode (existing behaviour, unchanged) ---
+// --- Browse mode (existing behaviour) ---
 const page = ref(1);
 const archiveFilter = ref<ArchiveFilter>('active');
 watch(archiveFilter, () => {
@@ -95,19 +110,49 @@ const filterOptions: Array<{ label: string; value: ArchiveFilter }> = [
 </script>
 
 <template>
-  <SearchResults
+  <ContentTable
     v-if="searchMode"
     v-model:page="searchPage"
-    :query="searchQuery"
-    :content-type-name="contentType?.name"
-    :hits="hits"
-    :total="searchTotal"
+    :title="contentType?.name ?? 'Entries'"
+    :data="searchRows"
     :loading="searchLoading"
-    :unavailable="unavailable"
-    @edit="open()"
-    @clear="onClear"
-    @remove-filter="onRemoveFilter"
-  />
+    :columns="searchColumns"
+    :total="searchTotal"
+    :row-link="(row) => `/entries/${row.id}`"
+  >
+    <template #toolbar>
+      <SearchBar
+        :query="searchQuery"
+        :content-type-name="contentType?.name"
+        :fields="contentType?.fields ?? []"
+        @edit="open()"
+        @clear="onClear"
+        @remove-filter="onRemoveFilter"
+      />
+    </template>
+    <template #empty>
+      <div class="flex flex-col items-center gap-2 py-10 text-center">
+        <UIcon
+          :name="unavailable ? 'i-lucide-search-x' : 'i-lucide-search'"
+          class="size-8 text-dimmed"
+        />
+        <p class="text-highlighted font-medium">
+          {{
+            unavailable
+              ? 'Search is temporarily unavailable'
+              : 'No matching entries'
+          }}
+        </p>
+        <p class="text-sm text-muted">
+          {{
+            unavailable
+              ? 'The search service is down. Clear search to keep browsing.'
+              : 'Try removing a filter or broadening your search.'
+          }}
+        </p>
+      </div>
+    </template>
+  </ContentTable>
   <ContentTable
     v-else
     v-model:page="page"
