@@ -1,5 +1,6 @@
 import type { FieldTypeName } from '../fieldTypes';
-import type { SearchFilter } from './types';
+import { FIELD_TYPES } from '../fieldTypes';
+import type { SearchFilter, SearchQuery } from './types';
 import { operatorLabel } from './operators';
 
 /** Minimal field shape needed to render a filter chip's labels. */
@@ -38,4 +39,34 @@ export function chipValueDisplay(
   if (value == null) return null;
   const key = String(value);
   return relationLabels?.[key] ?? key;
+}
+
+/** True for RELATION / MULTIRELATION field types (their filter value is an entry id). */
+export function isRelationFieldType(type: string): boolean {
+  return type === FIELD_TYPES.RELATION || type === FIELD_TYPES.MULTIRELATION;
+}
+
+/**
+ * Unique entry ids referenced by a query's RELATION/MULTIRELATION equality
+ * filters. v1 equality stores a single id string per filter; array values
+ * (rich containsAny/All operators) are #301 and ignored here.
+ */
+export function collectRelationFilterIds(
+  query: SearchQuery | undefined,
+  fields: ChipLabelField[]
+): string[] {
+  if (!query) return [];
+  const seen = new Set<string>();
+  for (const f of query.filters) {
+    const type = fields.find((x) => x.identifier === f.field)?.type;
+    if (
+      type &&
+      isRelationFieldType(type) &&
+      typeof f.value === 'string' &&
+      f.value
+    ) {
+      seen.add(f.value);
+    }
+  }
+  return [...seen];
 }
