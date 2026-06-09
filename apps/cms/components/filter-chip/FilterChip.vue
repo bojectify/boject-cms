@@ -70,6 +70,20 @@ function ringIf(seg: ChipSegment, active?: ChipSegment | null) {
         <slot name="value" />
       </div>
     </template>
+    <!-- Loading: a relation value is still resolving — show a skeleton, never the raw id. -->
+    <template v-else-if="valueLoading">
+      <div class="w-px self-stretch bg-default" />
+      <div
+        data-segment="value"
+        :class="['px-2 flex items-center', showRemove ? '' : 'rounded-r-[7px]']"
+      >
+        <span
+          :data-testid="QA_FILTER_CHIP.VALUE_SKELETON"
+          aria-hidden="true"
+          class="inline-block h-3 w-12 rounded bg-elevated animate-pulse"
+        />
+      </div>
+    </template>
     <!-- Display chip: the committed value renders as a clickable segment. -->
     <template v-else-if="value != null">
       <div class="w-px self-stretch bg-default" />
