@@ -1,26 +1,21 @@
 <script setup lang="ts">
+import { routeToSearchQuery, compileQuery } from '~/utils/queryBuilder/compile';
+import type { RouteQuery } from '~/utils/queryBuilder/compile';
+import type { SearchQuery } from '~/utils/queryBuilder/types';
+
 type ArchiveFilter = 'active' | 'archived' | 'all';
 
 const route = useRoute();
+const router = useRouter();
+const { open } = useSearchPalette();
 const contentTypeId = route.params.id as string;
 
-const page = ref(1);
-const archiveFilter = ref<ArchiveFilter>('active');
-
-// Reset to page 1 when filter changes
-watch(archiveFilter, () => {
-  page.value = 1;
-});
-
-// Fetch the content type to get the name and ENTRY_TITLE field
+// Content type: name + identifier + ENTRY_TITLE field
 const { data: contentType } = await useAuthedFetch<{
   id: string;
+  identifier: string;
   name: string;
-  fields: Array<{
-    identifier: string;
-    name: string;
-    type: string;
-  }>;
+  fields: Array<{ identifier: string; name: string; type: string }>;
 }>(`/api/content-types/${contentTypeId}`);
 
 const entryTitleFieldIdentifier = computed(() => {
@@ -30,7 +25,42 @@ const entryTitleFieldIdentifier = computed(() => {
   return field?.identifier ?? 'title';
 });
 
-// Fetch entries
+// --- Search mode (scoped to this type) ---
+const {
+  searchMode,
+  hits,
+  total: searchTotal,
+  loading: searchLoading,
+  unavailable,
+  page: searchPage,
+} = useEntrySearch(() => contentType.value?.identifier);
+
+const searchQuery = computed<SearchQuery>(() =>
+  routeToSearchQuery(route.query as RouteQuery, contentType.value?.identifier)
+);
+
+function onClear() {
+  router.push({ path: `/content-types/${contentTypeId}/entries`, query: {} });
+}
+function onRemoveFilter(index: number) {
+  const next: SearchQuery = {
+    ...searchQuery.value,
+    filters: searchQuery.value.filters.filter((_, i) => i !== index),
+  };
+  const params = compileQuery(next);
+  const query: Record<string, string | string[]> = {};
+  if (params.q) query.q = params.q;
+  if (params.filter) query.filter = params.filter;
+  router.push({ path: `/content-types/${contentTypeId}/entries`, query });
+}
+
+// --- Browse mode (existing behaviour, unchanged) ---
+const page = ref(1);
+const archiveFilter = ref<ArchiveFilter>('active');
+watch(archiveFilter, () => {
+  page.value = 1;
+});
+
 const { data, status } = await useAuthedFetch<{
   items: Array<{
     id: string;
@@ -46,7 +76,6 @@ const { data, status } = await useAuthedFetch<{
   watch: [page, archiveFilter],
 });
 
-// Map entries to ContentTable format (extract entryTitle from JSONB data)
 const tableData = computed(() =>
   (data.value?.items ?? []).map((item) => ({
     id: item.id,
@@ -66,7 +95,21 @@ const filterOptions: Array<{ label: string; value: ArchiveFilter }> = [
 </script>
 
 <template>
+  <SearchResults
+    v-if="searchMode"
+    v-model:page="searchPage"
+    :query="searchQuery"
+    :content-type-name="contentType?.name"
+    :hits="hits"
+    :total="searchTotal"
+    :loading="searchLoading"
+    :unavailable="unavailable"
+    @edit="open()"
+    @clear="onClear"
+    @remove-filter="onRemoveFilter"
+  />
   <ContentTable
+    v-else
     v-model:page="page"
     :title="contentType?.name ?? 'Entries'"
     :data="tableData"
