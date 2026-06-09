@@ -43,6 +43,9 @@ function choose(v: unknown) {
   emit('setValue', v);
   emit('commit');
 }
+
+/** Whether an option id is the keyboard-highlighted one. */
+const isActive = (id: string) => props.activeId === id;
 </script>
 
 <template>
@@ -53,9 +56,13 @@ function choose(v: unknown) {
           ['True', true],
           ['False', false],
         ]"
+        :id="`qb-opt-bool-${i}`"
         :key="String(opt[1])"
         type="button"
+        role="option"
+        :aria-selected="isActive(`qb-opt-bool-${i}`)"
         class="flex items-center gap-2.5 h-10 px-3 rounded-lg hover:bg-elevated text-left"
+        :class="{ 'bg-elevated': isActive(`qb-opt-bool-${i}`) }"
         :data-testid="QA_VALUE_EDITOR.OPTION(i)"
         @click="choose(opt[1])"
       >
@@ -70,9 +77,13 @@ function choose(v: unknown) {
     <template v-else-if="kind === 'select'">
       <button
         v-for="(c, i) in draft.field.choices ?? []"
+        :id="`qb-opt-select-${i}`"
         :key="c.value"
         type="button"
+        role="option"
+        :aria-selected="isActive(`qb-opt-select-${i}`)"
         class="flex items-center gap-2.5 h-10 px-3 rounded-lg hover:bg-elevated text-left"
+        :class="{ 'bg-elevated': isActive(`qb-opt-select-${i}`) }"
         :data-testid="QA_VALUE_EDITOR.OPTION(i)"
         @click="choose(c.value)"
       >
@@ -83,9 +94,13 @@ function choose(v: unknown) {
     <template v-else-if="kind === 'entry'">
       <button
         v-for="(e, i) in entries"
+        :id="`qb-opt-entry-${i}`"
         :key="e.id"
         type="button"
+        role="option"
+        :aria-selected="isActive(`qb-opt-entry-${i}`)"
         class="flex items-center gap-2.5 h-12 px-3 rounded-lg hover:bg-elevated text-left"
+        :class="{ 'bg-elevated': isActive(`qb-opt-entry-${i}`) }"
         :data-testid="QA_VALUE_EDITOR.OPTION(i)"
         @click="emit('chooseEntry', e)"
       >
@@ -104,8 +119,12 @@ function choose(v: unknown) {
            (or → / Enter from the value segment) commits the filter. -->
       <button
         v-if="text"
+        id="qb-opt-confirm"
         type="button"
+        role="option"
+        :aria-selected="isActive('qb-opt-confirm')"
         class="flex items-center gap-2.5 h-11 px-3 rounded-lg hover:bg-elevated text-left"
+        :class="{ 'bg-elevated': isActive('qb-opt-confirm') }"
         :data-testid="QA_VALUE_EDITOR.CONFIRM"
         @click="confirmTyped"
       >

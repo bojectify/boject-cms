@@ -4,7 +4,7 @@ import {
   FILTERABLE_FIELD_TYPES,
 } from '~/utils/queryBuilder/operators';
 import type { QueryDropdownProps } from './queryDropdown.types';
-import { QA_QUERY_DROPDOWN } from './queryDropdown.config';
+import { QA_QUERY_DROPDOWN, QUERY_LISTBOX_ID } from './queryDropdown.config';
 
 const props = withDefaults(defineProps<QueryDropdownProps>(), {
   testId: QA_QUERY_DROPDOWN.COMPONENT,
@@ -49,14 +49,27 @@ const operators = computed(() =>
       })
     : []
 );
+
+/** Whether an option id is the keyboard-highlighted one. */
+const isActive = (id: string) => props.activeId === id;
 </script>
 
 <template>
-  <div :data-testid="testId" class="flex flex-col p-2 gap-0.5">
+  <div
+    :id="QUERY_LISTBOX_ID"
+    :data-testid="testId"
+    role="listbox"
+    aria-label="Search options"
+    class="flex flex-col p-2 gap-0.5"
+  >
     <button
       v-if="showFreeTextAction"
+      id="qb-opt-freetext"
       type="button"
-      class="flex items-center gap-2.5 h-11 px-3 rounded-lg bg-elevated text-left"
+      role="option"
+      :aria-selected="isActive('qb-opt-freetext')"
+      class="flex items-center gap-2.5 h-11 px-3 rounded-lg text-left"
+      :class="isActive('qb-opt-freetext') ? 'bg-accented' : 'bg-elevated'"
       :data-testid="QA_QUERY_DROPDOWN.FREE_TEXT_ACTION"
       @click="emit('runFreeText')"
     >
@@ -75,15 +88,20 @@ const operators = computed(() =>
 
     <template v-if="state.step === 'contentType'">
       <div
+        aria-hidden="true"
         class="px-3 py-1 text-[11px] font-semibold tracking-wide text-dimmed uppercase"
       >
         Content types
       </div>
       <button
         v-for="(c, i) in typeMatches"
+        :id="`qb-opt-ct-${i}`"
         :key="c.id"
         type="button"
+        role="option"
+        :aria-selected="isActive(`qb-opt-ct-${i}`)"
         class="flex items-center h-12 px-3 rounded-lg text-left hover:bg-elevated"
+        :class="{ 'bg-elevated': isActive(`qb-opt-ct-${i}`) }"
         :data-testid="QA_QUERY_DROPDOWN.OPTION(i)"
         @click="emit('pickContentType', c.id)"
       >
@@ -95,15 +113,20 @@ const operators = computed(() =>
 
     <template v-else-if="state.step === 'field'">
       <div
+        aria-hidden="true"
         class="px-3 py-1 text-[11px] font-semibold tracking-wide text-dimmed uppercase"
       >
         Filter {{ ct?.name }} by field
       </div>
       <button
         v-for="(f, i) in fields"
+        :id="`qb-opt-field-${i}`"
         :key="f.identifier"
         type="button"
+        role="option"
+        :aria-selected="isActive(`qb-opt-field-${i}`)"
         class="flex items-center justify-between h-11 px-3 rounded-lg text-left hover:bg-elevated"
+        :class="{ 'bg-elevated': isActive(`qb-opt-field-${i}`) }"
         :data-testid="QA_QUERY_DROPDOWN.OPTION(i)"
         @click="emit('pickField', f.identifier)"
       >
@@ -116,9 +139,13 @@ const operators = computed(() =>
     <template v-else-if="state.step === 'operator'">
       <button
         v-for="(o, i) in operators"
+        :id="`qb-opt-op-${i}`"
         :key="o.id"
         type="button"
+        role="option"
+        :aria-selected="isActive(`qb-opt-op-${i}`)"
         class="flex items-center justify-between h-10 px-3 rounded-lg text-left hover:bg-elevated"
+        :class="{ 'bg-elevated': isActive(`qb-opt-op-${i}`) }"
         :data-testid="QA_QUERY_DROPDOWN.OPTION(i)"
         @click="emit('pickOperator', o.id)"
       >
