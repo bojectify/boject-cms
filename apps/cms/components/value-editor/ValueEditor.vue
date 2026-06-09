@@ -17,16 +17,20 @@ const kind = computed(() =>
   valueInputKind(props.draft.field.type, props.draft.op)
 );
 const entries = ref<EntryOption[]>([]);
+// Fire on mount (immediate) AND on every draft/text change, so a relation field
+// shows its entries the moment its value step opens — not only after the user
+// types. Watching `draft` too covers switching directly between relation fields.
 watch(
-  () => props.text,
-  async (q) => {
+  [() => props.draft, () => props.text],
+  async () => {
     if (kind.value === 'entry' && props.searchEntries) {
       entries.value = await props.searchEntries(
         props.draft.field.targetContentTypeIds ?? [],
-        q
+        props.text
       );
     }
-  }
+  },
+  { immediate: true }
 );
 function choose(v: unknown) {
   emit('setValue', v);
