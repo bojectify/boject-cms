@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useQueryBuilder } from '~/composables/useQueryBuilder';
 import type { QueryBuilderProps, EntryOption } from './queryBuilder.types';
+import type { ChipSegment } from '~/components/filter-chip/filterChip.types';
 import { QA_QUERY_BUILDER } from './queryBuilder.config';
 import { QUERY_LISTBOX_ID } from '../query-dropdown/queryDropdown.config';
 import { operatorLabel, valueInputKind } from '~/utils/queryBuilder/operators';
@@ -272,7 +273,7 @@ function onKeydown(e: KeyboardEvent) {
         @remove-content-type="onRemoveContentType"
         @remove-filter="onRemoveFilter"
         @edit-segment="
-          (i: number, seg: 'field' | 'operator' | 'value') =>
+          (i: number, seg: ChipSegment) =>
             handle({ kind: 'editFilter', index: i, segment: seg })
         "
       />
