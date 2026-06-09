@@ -202,6 +202,7 @@ function onKeydown(e: KeyboardEvent) {
           <input
             ref="valueInput"
             :data-testid="QA_QUERY_BUILDER.VALUE_INPUT"
+            autocomplete="off"
             style="field-sizing: content"
             class="min-w-[3rem] max-w-[16rem] bg-transparent outline-none text-xs text-highlighted placeholder:text-dimmed"
             :placeholder="valuePlaceholder"
@@ -218,6 +219,7 @@ function onKeydown(e: KeyboardEvent) {
         :data-testid="QA_QUERY_BUILDER.INPUT"
         role="combobox"
         :aria-expanded="true"
+        autocomplete="off"
         class="flex-1 min-w-[6rem] bg-transparent outline-none text-[15px] text-highlighted placeholder:text-dimmed"
         :placeholder="placeholder"
         :value="state.text"
