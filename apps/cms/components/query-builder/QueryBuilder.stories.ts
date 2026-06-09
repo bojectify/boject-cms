@@ -175,6 +175,43 @@ export const RelationValue: Story = {
   },
 };
 
+// Clicking a committed chip's segment re-opens it for editing in place;
+// committing replaces it (no duplicate, same position).
+export const ReEditCommittedChipValue: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    // build: Summary = "first"
+    await userEvent.type(canvas.getByTestId(QA_QUERY_BUILDER.INPUT), 'art');
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))); // Article
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))); // Summary (TEXT)
+    await userEvent.type(
+      canvas.getByTestId(QA_QUERY_BUILDER.VALUE_INPUT),
+      'first'
+    );
+    await userEvent.keyboard('{ArrowRight}'); // commit
+    const valueSeg = canvas.getByTestId(QA_FILTER_CHIP.VALUE_SEGMENT);
+    await expect(valueSeg).toHaveTextContent('first');
+
+    // click the value segment to re-open the filter; it becomes the editable
+    // draft chip in place, pre-filled with the value
+    await userEvent.click(valueSeg);
+    const valueInput = (await canvas.findByTestId(
+      QA_QUERY_BUILDER.VALUE_INPUT
+    )) as HTMLInputElement;
+    await waitFor(() => expect(valueInput).toHaveValue('first'));
+
+    // edit and re-commit
+    await userEvent.clear(valueInput);
+    await userEvent.type(valueInput, 'second');
+    await userEvent.keyboard('{ArrowRight}');
+
+    // replaced in place — one chip, new value, no duplicate
+    const segs = canvas.getAllByTestId(QA_FILTER_CHIP.VALUE_SEGMENT);
+    expect(segs).toHaveLength(1);
+    await expect(segs[0]!).toHaveTextContent('second');
+  },
+};
+
 export const FullQueryRun: Story = {
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
