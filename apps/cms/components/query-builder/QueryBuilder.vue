@@ -2,6 +2,7 @@
 import { useQueryBuilder } from '~/composables/useQueryBuilder';
 import type { QueryBuilderProps, EntryOption } from './queryBuilder.types';
 import { QA_QUERY_BUILDER } from './queryBuilder.config';
+import { QUERY_LISTBOX_ID } from '../query-dropdown/queryDropdown.config';
 import type { SearchFilter } from '~/utils/queryBuilder/types';
 import { operatorLabel, valueInputKind } from '~/utils/queryBuilder/operators';
 
@@ -52,6 +53,87 @@ function handle(action: Parameters<typeof dispatch>[0]) {
   if (intent?.kind === 'run') emit('run', state.value.query);
   if (intent?.kind === 'broaden') emit('broaden', { q: intent.q });
 }
+
+// --- Roving keyboard navigation over the dropdown's [role=option] list ---
+const activeId = ref<string | null>(null);
+
+// Reset the highlight whenever the option list changes (new step, or typing
+// re-filters it) — so typing never leaves a stale highlight and Space stays a
+// literal space while you type (it only activates an option when one is active).
+watch([() => state.value.step, () => state.value.text], () => {
+  activeId.value = null;
+});
+
+function listboxOptionIds(): string[] {
+  if (typeof document === 'undefined') return [];
+  const root = document.getElementById(QUERY_LISTBOX_ID);
+  return root
+    ? Array.from(root.querySelectorAll<HTMLElement>('[role="option"]')).map(
+        (el) => el.id
+      )
+    : [];
+}
+function moveActive(delta: number) {
+  const ids = listboxOptionIds();
+  if (!ids.length) {
+    activeId.value = null;
+    return;
+  }
+  const cur = activeId.value ? ids.indexOf(activeId.value) : -1;
+  const next = (cur + delta + ids.length) % ids.length;
+  activeId.value = ids[next] ?? null;
+  nextTick(() => {
+    if (activeId.value) {
+      document
+        .getElementById(activeId.value)
+        ?.scrollIntoView({ block: 'nearest' });
+    }
+  });
+}
+function activateActive(): boolean {
+  if (!activeId.value) return false;
+  const el = document.getElementById(activeId.value);
+  if (!el) return false;
+  el.click(); // fires the option's @click (pickField / chooseEntry / runFreeText…)
+  return true;
+}
+/**
+ * Option-list keys shared by both inputs: ↑/↓ move the highlight; Space (only
+ * when an option is highlighted) and Enter activate it. Returns true if handled.
+ */
+function handleNavKeys(e: KeyboardEvent): boolean {
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    moveActive(1);
+    return true;
+  }
+  if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    moveActive(-1);
+    return true;
+  }
+  // Space activates the highlighted option — but ONLY when one is highlighted;
+  // otherwise it's a literal space the user is typing.
+  if (e.key === ' ' && activeId.value) {
+    e.preventDefault();
+    activateActive();
+    return true;
+  }
+  // Enter picks the highlighted option as a convenience; with nothing
+  // highlighted it falls through to the input's run/commit handler.
+  if (e.key === 'Enter' && activeId.value) {
+    e.preventDefault();
+    activateActive();
+    return true;
+  }
+  return false;
+}
+/** "Open" a field/type, "Select" a value — matching the design's Space label. */
+const activeSpaceLabel = computed(() =>
+  state.value.step === 'field' || state.value.step === 'contentType'
+    ? 'Open'
+    : 'Select'
+);
 
 function onChooseEntry(e: EntryOption) {
   relationLabels.value[e.id] = e.entryTitle;
@@ -137,11 +219,21 @@ function onValueInput(e: Event) {
   handle({ kind: 'setFreeText', q: (e.target as HTMLInputElement).value });
 }
 function onValueKeydown(e: KeyboardEvent) {
+  if (handleNavKeys(e)) return;
   if (e.key === 'Enter') {
     e.preventDefault();
     // ↵ runs the search now, locking in a pending typed value first.
     if (isFreeEntry.value && state.value.text !== '') commitTypedValue();
     handle({ kind: 'run' });
+  } else if (
+    e.key === 'Tab' &&
+    !e.shiftKey &&
+    isFreeEntry.value &&
+    state.value.text !== ''
+  ) {
+    // Tab adds this filter and continues with the next (Shift+Tab stays native).
+    e.preventDefault();
+    commitTypedValue();
   } else if (
     e.key === 'ArrowRight' &&
     isFreeEntry.value &&
@@ -164,6 +256,7 @@ function onInput(e: Event) {
   handle({ kind: 'setFreeText', q: (e.target as HTMLInputElement).value });
 }
 function onKeydown(e: KeyboardEvent) {
+  if (handleNavKeys(e)) return;
   if (e.key === 'Enter') {
     e.preventDefault();
     handle({ kind: 'run' });
@@ -226,6 +319,10 @@ function onKeydown(e: KeyboardEvent) {
           <input
             ref="valueInput"
             :data-testid="QA_QUERY_BUILDER.VALUE_INPUT"
+            role="combobox"
+            :aria-expanded="true"
+            :aria-controls="QUERY_LISTBOX_ID"
+            :aria-activedescendant="activeId ?? undefined"
             autocomplete="off"
             style="field-sizing: content"
             class="min-w-[3rem] max-w-[16rem] bg-transparent outline-none text-xs text-highlighted placeholder:text-dimmed"
@@ -243,6 +340,8 @@ function onKeydown(e: KeyboardEvent) {
         :data-testid="QA_QUERY_BUILDER.INPUT"
         role="combobox"
         :aria-expanded="true"
+        :aria-controls="QUERY_LISTBOX_ID"
+        :aria-activedescendant="activeId ?? undefined"
         autocomplete="off"
         class="flex-1 min-w-[6rem] bg-transparent outline-none text-[15px] text-highlighted placeholder:text-dimmed"
         :placeholder="placeholder"
@@ -255,6 +354,7 @@ function onKeydown(e: KeyboardEvent) {
 
     <QueryDropdown
       :state="state"
+      :active-id="activeId"
       :test-id="QA_QUERY_BUILDER.DROPDOWN"
       @run-free-text="handle({ kind: 'run' })"
       @pick-content-type="
@@ -278,6 +378,7 @@ function onKeydown(e: KeyboardEvent) {
           v-if="state.draft"
           :draft="state.draft"
           :text="state.text"
+          :active-id="activeId"
           :search-entries="searchEntries"
           @set-value="(v: unknown) => handle({ kind: 'setValue', value: v })"
           @commit="handle({ kind: 'commitValue' })"
@@ -290,7 +391,9 @@ function onKeydown(e: KeyboardEvent) {
       class="flex items-center gap-4 px-4 py-3 border-t border-default text-xs text-dimmed"
       :data-testid="QA_QUERY_BUILDER.FOOTER"
     >
-      <span><UKbd value="↵" /> Search</span>
+      <span><UKbd value="↑" /><UKbd value="↓" /> Navigate</span>
+      <span v-if="activeId"><UKbd>Space</UKbd> {{ activeSpaceLabel }}</span>
+      <span><UKbd value="↵" /> {{ activeId ? 'Select' : 'Search' }}</span>
       <span><UKbd value="esc" /> Close</span>
     </div>
   </div>

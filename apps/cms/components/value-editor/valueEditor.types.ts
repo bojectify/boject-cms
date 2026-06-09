@@ -7,4 +7,6 @@ export type ValueEditorProps = BasicComponentProps & {
   text: string;
   /** Relation value lookup. Injected so the component never fetches. */
   searchEntries?: (ids: string[], q: string) => Promise<EntryOption[]>;
+  /** Id of the currently keyboard-highlighted option (drives aria-selected + highlight). */
+  activeId?: string | null;
 };

@@ -288,3 +288,31 @@ export const ScopedFieldStepFreeText: Story = {
     );
   },
 };
+
+// Keyboard-only: ↓ highlights options, Space opens a type/field, Enter picks a
+// value — no mouse, no manual re-focus.
+export const KeyboardNavigation: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const input = canvas.getByTestId(QA_QUERY_BUILDER.INPUT);
+    await userEvent.click(input);
+    // ↓ highlights the first content type; Space opens it
+    await userEvent.keyboard('{ArrowDown}'); // Article
+    await userEvent.keyboard(' ');
+    await expect(
+      canvas.getByTestId(QA_QUERY_BUILDER.CONTENT_TYPE_CHIP)
+    ).toHaveTextContent('Article');
+    // field step: ↓↓ to Status, Space opens it
+    await waitFor(() => expect(input).toHaveFocus());
+    await userEvent.keyboard('{ArrowDown}{ArrowDown}'); // Summary, Status
+    await userEvent.keyboard(' ');
+    // value step: ↓↓ to Active, Enter picks the highlighted value
+    const valueInput = await canvas.findByTestId(QA_QUERY_BUILDER.VALUE_INPUT);
+    await waitFor(() => expect(valueInput).toHaveFocus());
+    await userEvent.keyboard('{ArrowDown}{ArrowDown}'); // Draft, Active
+    await userEvent.keyboard('{Enter}');
+    await expect(
+      canvas.getByTestId(QA_FILTER_CHIP.VALUE_SEGMENT)
+    ).toHaveTextContent('Active');
+  },
+};
