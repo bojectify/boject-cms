@@ -80,7 +80,9 @@ export async function ensureEntriesIndex(
   // CONTAINS / STARTS WITH filter operators (used by TEXT/TEXTAREA/SLUG
   // `contains`/`startsWith`) are gated behind this instance-level experimental
   // flag. Wrapped so an engine that disallows the toggle never blocks index
-  // convergence — graceful degradation (those operators 400 until enabled).
+  // convergence — graceful degradation. Until the flag is enabled those
+  // operators are valid input but the engine rejects them, so /api/search
+  // surfaces a 503 (engine failure), not a 400 (the input itself is fine).
   try {
     await client.updateExperimentalFeatures({ containsFilter: true });
   } catch (error) {

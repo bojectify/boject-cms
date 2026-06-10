@@ -270,6 +270,34 @@ describe('GET /api/search', async () => {
     expect(res.hits[0]!.id).toBe('colour-red');
   });
 
+  it('applies a TEXT contains (substring) op through the endpoint', async () => {
+    // CONTAINS is a substring filter gated behind the containsFilter Meili
+    // feature (enabled at index bootstrap). This proves the parseFilters op
+    // path + the live feature flag end-to-end over HTTP, not just at the
+    // runSearch layer. "ims" is mid-word in "crimson" — a substring, not a
+    // prefix — so it can't match via token/prefix search.
+    await addTestDocuments([
+      doc({
+        id: 'colour-crimson',
+        contentType: 'Widget',
+        entryTitle: 'Crimson Widget',
+        fields: { colour: 'crimson' },
+      }),
+      doc({
+        id: 'colour-azure',
+        contentType: 'Widget',
+        entryTitle: 'Azure Widget',
+        fields: { colour: 'azure' },
+      }),
+    ]);
+    const res = await search({
+      q: '',
+      contentType: 'Widget',
+      filter: 'colour:contains:ims',
+    });
+    expect(res.hits.map((h) => h.id)).toEqual(['colour-crimson']);
+  });
+
   it('returns 400 for an operator not valid for the field type', async () => {
     // `gt` is a NUMBER operator; applying it to a TEXT field is rejected by the
     // compiler (SearchInputError → 400), not silently ignored.
