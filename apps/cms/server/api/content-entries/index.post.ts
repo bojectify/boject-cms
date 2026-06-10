@@ -5,6 +5,7 @@ import { enforceMutationRateLimit } from '../../utils/rateLimitEndpoint';
 import { assertApiKeyScope } from '../../utils/assertApiKeyScope';
 import { assertUniqueFieldValues } from '../../utils/assertUniqueFieldValues';
 import { enrichEntryDataWithEmbedIdentifiers } from '../../utils/enrichRichtextEmbeds';
+import { enqueueWebhookDeliveries } from '../../utils/webhooks';
 import {
   flattenEntryWithVersion,
   getPublishedVersion,
@@ -102,23 +103,51 @@ export default defineEventHandler(async (event) => {
 
   let created;
   try {
-    created = await prisma.contentEntry.create({
-      data: {
-        contentTypeId,
-        entryTitle,
-        entryKey,
-        slug,
-        versions: {
-          create: {
-            data: enrichedData as Prisma.InputJsonValue,
-            entryTitle,
-            status,
-            publishedAt:
-              status === CONTENT_STATUSES.PUBLISHED ? new Date() : undefined,
+    created = await prisma.$transaction(async (tx) => {
+      const entry = await tx.contentEntry.create({
+        data: {
+          contentTypeId,
+          entryTitle,
+          entryKey,
+          slug,
+          versions: {
+            create: {
+              data: enrichedData as Prisma.InputJsonValue,
+              entryTitle,
+              status,
+              publishedAt:
+                status === CONTENT_STATUSES.PUBLISHED ? new Date() : undefined,
+            },
           },
         },
-      },
-      include: { versions: true },
+        include: { versions: true },
+      });
+
+      // A brand-new entry published in one step must fire ENTRY_PUBLISHED too,
+      // exactly like the PUT [id] publish path — otherwise the search-index
+      // sync and external subscribers never see it (#330).
+      if (status === CONTENT_STATUSES.PUBLISHED) {
+        const version = entry.versions[0]!;
+        await enqueueWebhookDeliveries(tx, {
+          event: 'ENTRY_PUBLISHED',
+          contentType: {
+            id: contentType.id,
+            identifier: contentType.identifier,
+          },
+          entry: {
+            id: entry.id,
+            entryTitle,
+            slug,
+            status: CONTENT_STATUSES.PUBLISHED,
+            publishedAt: version.publishedAt,
+            createdAt: entry.createdAt,
+            updatedAt: entry.updatedAt,
+            data: version.data,
+          },
+        });
+      }
+
+      return entry;
     });
   } catch (err) {
     // Race: another request inserted the same entryKey between our pre-check

@@ -113,7 +113,8 @@ let testContentType: ContentTypeResponse;
  *   .180-.199 ad-hoc / one-off IPs (currently: .99, .183,
  *             .184-.186 entryKey derivation tests (#205),
  *             .187-.188 entryKey immutability tests (#205),
- *             .189-.190 entryKey in REST responses tests (#205))
+ *             .189-.190 entryKey in REST responses tests (#205),
+ *             .191-.192 publish-on-create webhook enqueue tests (#330))
  *
  * When adding a new rate-limited test:
  *  1. Find the describe block your test will live in
@@ -2457,6 +2458,109 @@ describe('Content Entry endpoints', async () => {
       expect(payload.entry.status).toBe(CONTENT_STATUSES.PUBLISHED);
       expect(payload.entry.data.title).toBe(created.data.title);
       expect(payload.entry.publishedAt).not.toBeNull();
+    });
+
+    it('inserts a WebhookDelivery row when a new entry is published on create (#330)', async () => {
+      const cookie = await getSessionCookie();
+
+      const hook = await prisma.webhook.create({
+        data: {
+          name: `Publish-on-create hook ${Date.now()}`,
+          url: 'https://example.com/hook',
+          secret: 'test-secret',
+          enabled: true,
+          events: ['ENTRY_PUBLISHED'],
+          contentTypeIds: [],
+        },
+      });
+
+      const ct = await ensureBlogContentType();
+      const title = `Create-publish target ${Date.now()}`;
+      // Distinct X-Forwarded-For so this test gets its own rate-limit bucket
+      // (see IP allocation legend) — the in-memory store lives in the
+      // dev-server process and is not cleared by `resetRateLimitStore()`
+      // (which only clears the test-process copy), so the default-IP bucket
+      // accumulates across the file.
+      const createRes = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+          'X-Forwarded-For': '203.0.113.191',
+        },
+        body: JSON.stringify({
+          contentTypeId: ct.id,
+          data: { title },
+          status: CONTENT_STATUSES.PUBLISHED,
+        }),
+      });
+      expect(createRes.status).toBe(201);
+      const created = (await createRes.json()) as {
+        id: string;
+        data: { title: string };
+        status: string;
+      };
+      expect(created.status).toBe(CONTENT_STATUSES.PUBLISHED);
+
+      const deliveries = await prisma.webhookDelivery.findMany({
+        where: { webhookId: hook.id },
+      });
+      const match = deliveries.find(
+        (d) => d.event === 'ENTRY_PUBLISHED' && d.entryId === created.id
+      );
+      expect(match).toBeDefined();
+      expect(match!.status).toBe('PENDING');
+
+      const payload = match!.payload as {
+        event: string;
+        entry: {
+          status: string;
+          data: { title: string };
+          publishedAt: string | null;
+        };
+      };
+      expect(payload.event).toBe('ENTRY_PUBLISHED');
+      expect(payload.entry.status).toBe(CONTENT_STATUSES.PUBLISHED);
+      expect(payload.entry.data.title).toBe(title);
+      expect(payload.entry.publishedAt).not.toBeNull();
+    });
+
+    it('does not enqueue when a new entry is created as a DRAFT (#330)', async () => {
+      const cookie = await getSessionCookie();
+
+      const hook = await prisma.webhook.create({
+        data: {
+          name: `Draft-on-create hook ${Date.now()}`,
+          url: 'https://example.com/hook',
+          secret: 'test-secret',
+          enabled: true,
+          events: ['ENTRY_PUBLISHED'],
+          contentTypeIds: [],
+        },
+      });
+
+      const ct = await ensureBlogContentType();
+      // Distinct X-Forwarded-For for an isolated rate-limit bucket (see legend).
+      const createRes = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+          'X-Forwarded-For': '203.0.113.192',
+        },
+        body: JSON.stringify({
+          contentTypeId: ct.id,
+          data: { title: `Draft-on-create target ${Date.now()}` },
+          status: CONTENT_STATUSES.DRAFT,
+        }),
+      });
+      expect(createRes.status).toBe(201);
+      const created = (await createRes.json()) as { id: string };
+
+      const deliveries = await prisma.webhookDelivery.findMany({
+        where: { webhookId: hook.id, entryId: created.id },
+      });
+      expect(deliveries.length).toBe(0);
     });
 
     it('does not enqueue when the content-type filter excludes this entry type', async () => {
