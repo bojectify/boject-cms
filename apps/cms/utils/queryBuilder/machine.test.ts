@@ -271,4 +271,41 @@ describe('builder machine', () => {
     });
     expect(s.editingIndex).toBeNull();
   });
+
+  it('toggleValue accumulates an array value (add / remove), normalising null', () => {
+    let s = initState({
+      contentTypes: CONTENT_TYPES,
+      lockedContentType: ARTICLE_CT,
+      rich: true,
+      multiValue: true,
+    });
+    const status = ARTICLE_CT.fields.find((f) => f.identifier === 'status')!;
+    s = reduce(s, { kind: 'pickField', field: status });
+    s = reduce(s, { kind: 'pickOperator', op: 'in' });
+    expect(s.step).toBe('value');
+    s = reduce(s, { kind: 'toggleValue', value: 'a' }); // null → ['a']
+    s = reduce(s, { kind: 'toggleValue', value: 'b' }); // ['a','b']
+    s = reduce(s, { kind: 'toggleValue', value: 'a' }); // remove → ['b']
+    expect(s.draft?.value).toEqual(['b']);
+    expect(s.text).toBe(''); // search text untouched by toggling
+    s = reduce(s, { kind: 'commitValue' });
+    expect(s.query.filters).toEqual([
+      { field: 'status', op: 'in', value: ['b'] },
+    ]);
+  });
+
+  it('pickField gate plumbs range: a DATETIME field with range:false lands on the operator step (between gated out)', () => {
+    const s0 = initState({
+      contentTypes: CONTENT_TYPES,
+      lockedContentType: ARTICLE_CT,
+      rich: true,
+      multiValue: true,
+      range: false,
+    });
+    // DATETIME with range:false → is/before/after (3 arity-one ops, `between`
+    // gated out) → operator step. Proves `range` reaches pickField's gate.
+    const dateField = ARTICLE_CT.fields.find((f) => f.type === 'DATETIME')!;
+    const s1 = reduce(s0, { kind: 'pickField', field: dateField });
+    expect(s1.step).toBe('operator');
+  });
 });

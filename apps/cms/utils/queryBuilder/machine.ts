@@ -18,7 +18,8 @@ export interface BuilderState {
   contentTypes: QueryContentType[];
   locked: boolean; // lockedContentType (route scope)
   rich: boolean; // enableRichOperators
-  multiValue: boolean; // enableMultiValueOperators (arity two/many ops; editors land in #333)
+  multiValue: boolean; // enableMultiValueOperators (arity-many list ops: in/containsAny/containsAll)
+  range: boolean; // enableRangeOperators (arity-two range ops: between; date follow-up)
   step: Step;
   query: SearchQuery;
   draft: DraftFilter | null;
@@ -37,6 +38,7 @@ export interface InitOptions {
   lockedContentType?: QueryContentType;
   rich?: boolean;
   multiValue?: boolean;
+  range?: boolean;
   initialQuery?: SearchQuery;
 }
 
@@ -52,6 +54,7 @@ export function initState(opts: InitOptions): BuilderState {
     locked,
     rich: opts.rich ?? false,
     multiValue: opts.multiValue ?? false,
+    range: opts.range ?? false,
     step: query.contentType ? 'field' : 'contentType',
     query,
     draft: null,
@@ -77,6 +80,7 @@ export type Action =
   | { kind: 'pickField'; field: QueryField }
   | { kind: 'pickOperator'; op: string }
   | { kind: 'setValue'; value: unknown }
+  | { kind: 'toggleValue'; value: string }
   | { kind: 'commitValue' }
   | { kind: 'removeFilter'; index: number }
   | {
@@ -135,6 +139,7 @@ export function reduce(prev: BuilderState, action: Action): BuilderState {
       const ops = availableOperators(action.field.type, {
         rich: s.rich,
         multiValue: s.multiValue,
+        range: s.range,
       });
       const op = ops[0] ?? defaultOperator(action.field.type);
       return {
@@ -173,6 +178,19 @@ export function reduce(prev: BuilderState, action: Action): BuilderState {
             text: String(action.value ?? ''),
           }
         : s;
+
+    case 'toggleValue': {
+      if (!s.draft) return s;
+      // Multi-value (list) ops accumulate a string[] without touching `text`
+      // (text is the multi-entry search query, not the value). Null → [].
+      const arr = (
+        Array.isArray(s.draft.value) ? s.draft.value : []
+      ) as string[];
+      const next = arr.includes(action.value)
+        ? arr.filter((v) => v !== action.value)
+        : [...arr, action.value];
+      return { ...s, draft: { ...s.draft, value: next } };
+    }
 
     case 'commitValue': {
       if (!s.draft) return s;
