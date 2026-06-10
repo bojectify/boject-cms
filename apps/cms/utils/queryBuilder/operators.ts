@@ -130,6 +130,44 @@ const REGISTRY: Partial<Record<FieldTypeName, Operator[]>> = {
 
 export const FILTERABLE_FIELD_TYPES = Object.keys(REGISTRY) as FieldTypeName[];
 
+// Value cardinality is a pure function of the operator id (ids don't collide
+// across types with different cardinalities), so arity is type-independent.
+const RANGE_OPS: ReadonlySet<string> = new Set(['between']);
+const LIST_OPS: ReadonlySet<string> = new Set([
+  'in',
+  'containsAny',
+  'containsAll',
+]);
+
+/** Every operator id that appears anywhere in the registry. */
+export const OPERATOR_IDS: ReadonlySet<string> = new Set(
+  Object.values(REGISTRY)
+    .filter((ops): ops is Operator[] => ops !== undefined)
+    .flat()
+    .map((o) => o.id)
+);
+
+/**
+ * True when `id` is a registered operator id (used to disambiguate the URL wire
+ * form, where the middle `field:op:value` segment is untrusted input). Accepts
+ * `unknown` and narrows, mirroring `isFieldTypeName` in fieldTypes.ts.
+ */
+export function isOperatorId(id: unknown): id is string {
+  return typeof id === 'string' && OPERATOR_IDS.has(id);
+}
+
+/** Whether `opId` is a valid operator for `type` (per the registry). */
+export function isOperatorAllowed(type: FieldTypeName, opId: string): boolean {
+  return (REGISTRY[type] ?? []).some((o) => o.id === opId);
+}
+
+/** Value cardinality the operator expects: scalar / range pair / list. */
+export function operatorArity(opId: string): 'one' | 'two' | 'many' {
+  if (RANGE_OPS.has(opId)) return 'two';
+  if (LIST_OPS.has(opId)) return 'many';
+  return 'one';
+}
+
 export function availableOperators(
   type: FieldTypeName,
   opts: { rich: boolean }
