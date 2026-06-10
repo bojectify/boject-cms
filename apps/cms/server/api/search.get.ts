@@ -9,6 +9,11 @@ import { rateLimit } from '../utils/rateLimit';
 import { throwRateLimited } from '../utils/rateLimitEndpoint';
 import { assertApiKeyScope } from '../utils/assertApiKeyScope';
 import type { SearchDocument } from '../utils/searchDocument';
+import {
+  isOperatorId,
+  operatorArity,
+} from '../../utils/queryBuilder/operators';
+import { resolveContentTypeFieldTypes } from '../utils/searchFieldTypes';
 
 const DEFAULT_PER_PAGE = 15;
 const MAX_PER_PAGE = 100;
@@ -16,24 +21,40 @@ const RATE_WINDOW_MS = 60_000;
 const RATE_MAX = Number(process.env.BOJECT_SEARCH_RATE_LIMIT_RPM) || 120;
 
 /**
- * Parse repeated `filter=field:value` query params into SearchFilters.
- * Each value must split on the FIRST colon (the value half may itself contain
- * colons). A missing/empty field half is a 400 — the field-identifier shape is
- * validated downstream in runSearch (SearchInputError → 400).
+ * Parse repeated `filter=` query params into SearchFilters. Accepts both the
+ * 3-part `field:op:value` form and the legacy 2-part `field:value` form (→ eq).
+ * Disambiguation: the middle token is treated as the operator only when it is a
+ * registered operator id; otherwise the whole remainder is an eq value (so
+ * values containing colons, e.g. URLs, are preserved). Multi-value ops
+ * (in / containsAny / containsAll / between) comma-separate their values.
  */
 function parseFilters(raw: unknown): SearchFilter[] {
   const values = Array.isArray(raw) ? raw : raw === undefined ? [] : [raw];
   const filters: SearchFilter[] = [];
   for (const v of values) {
     if (typeof v !== 'string') continue;
-    const idx = v.indexOf(':');
-    if (idx <= 0) {
+    const firstColon = v.indexOf(':');
+    if (firstColon <= 0) {
       throw createError({
         statusCode: 400,
-        statusMessage: `Invalid filter "${v}" — expected "field:value"`,
+        statusMessage: `Invalid filter "${v}" — expected "field:value" or "field:op:value"`,
       });
     }
-    filters.push({ field: v.slice(0, idx), value: v.slice(idx + 1) });
+    const field = v.slice(0, firstColon);
+    const rest = v.slice(firstColon + 1);
+    const secondColon = rest.indexOf(':');
+    if (secondColon > 0) {
+      const maybeOp = rest.slice(0, secondColon);
+      if (isOperatorId(maybeOp)) {
+        const rawValue = rest.slice(secondColon + 1);
+        const vals =
+          operatorArity(maybeOp) === 'one' ? [rawValue] : rawValue.split(',');
+        filters.push({ field, op: maybeOp, values: vals });
+        continue;
+      }
+    }
+    // Legacy 2-part, or a value that contains colons but no registered op prefix.
+    filters.push({ field, op: 'eq', values: [rest] });
   }
   return filters;
 }
@@ -86,12 +107,20 @@ export default defineEventHandler(async (event) => {
           .filter(Boolean)
       : undefined;
 
+  // Only resolve field types when there are structured filters to compile —
+  // a free-text-only search within a content type needs no Postgres hop.
+  const fieldTypes =
+    contentType && filters.length > 0
+      ? await resolveContentTypeFieldTypes(contentType)
+      : {};
+
   const index = meili.index<SearchDocument>(resolveEntriesIndex());
   try {
     const result = await runSearch(index, {
       q,
       contentType,
       filters,
+      fieldTypes,
       attributesToSearchOn,
       offset: (page - 1) * perPage,
       limit: perPage,

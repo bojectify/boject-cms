@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, beforeAll, afterAll } from 'vitest';
 import { setup, $fetch, fetch } from '@nuxt/test-utils/e2e';
 import { createHash } from 'node:crypto';
 import { PrismaPg } from '@prisma/adapter-pg';
@@ -70,6 +70,50 @@ async function getSessionCookie(): Promise<string> {
 describe('GET /api/search', async () => {
   await setup({ dev: true });
 
+  // Typed-operator filters (NUMBER gt, SELECT in, the 400-for-wrong-type case)
+  // require the scoped content type's field types to be resolvable from
+  // Postgres (`resolveContentTypeFieldTypes` reads ContentType.fields by
+  // identifier). The existing equality tests only seed Meili docs (hardcoded
+  // `contentType: 'Article'` with no Postgres row), which is fine for the
+  // unknown-type → eq back-compat path — but typed operators need a real
+  // ContentType + field defs in Postgres AND matching docs in Meili. We create
+  // the `Widget` type once and tear it down after the suite.
+  let widgetTypeId: string | null = null;
+  beforeAll(async () => {
+    const ct = await prisma.contentType.create({
+      data: {
+        name: 'Widget',
+        identifier: 'Widget',
+        fields: {
+          create: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              order: 0,
+            },
+            { identifier: 'price', name: 'Price', type: 'NUMBER', order: 1 },
+            {
+              identifier: 'category',
+              name: 'Category',
+              type: 'SELECT',
+              order: 2,
+              options: { choices: ['a', 'b', 'c'] },
+            },
+            { identifier: 'colour', name: 'Colour', type: 'TEXT', order: 3 },
+          ],
+        },
+      },
+    });
+    widgetTypeId = ct.id;
+  });
+
+  afterAll(async () => {
+    if (widgetTypeId) {
+      await prisma.contentType.delete({ where: { id: widgetTypeId } });
+    }
+  });
+
   beforeEach(async () => {
     await clearTestIndex();
   });
@@ -139,6 +183,124 @@ describe('GET /api/search', async () => {
     });
     expect(res.hits).toHaveLength(1);
     expect(res.hits[0]!.id).toBe('by-author-1');
+  });
+
+  it('applies a NUMBER comparison via field:op:value (gt)', async () => {
+    await addTestDocuments([
+      doc({
+        id: 'widget-cheap',
+        contentType: 'Widget',
+        entryTitle: 'Cheap Widget',
+        fields: { price: 5 },
+      }),
+      doc({
+        id: 'widget-mid',
+        contentType: 'Widget',
+        entryTitle: 'Mid Widget',
+        fields: { price: 15 },
+      }),
+      doc({
+        id: 'widget-pricey',
+        contentType: 'Widget',
+        entryTitle: 'Pricey Widget',
+        fields: { price: 25 },
+      }),
+    ]);
+    const res = await search({
+      q: '',
+      contentType: 'Widget',
+      filter: 'price:gt:10',
+    });
+    expect(res.hits.map((h) => h.id).sort()).toEqual([
+      'widget-mid',
+      'widget-pricey',
+    ]);
+  });
+
+  it('applies a multi-value op (SELECT in) with comma-separated values', async () => {
+    await addTestDocuments([
+      doc({
+        id: 'cat-a',
+        contentType: 'Widget',
+        entryTitle: 'Cat A',
+        fields: { category: 'a' },
+      }),
+      doc({
+        id: 'cat-b',
+        contentType: 'Widget',
+        entryTitle: 'Cat B',
+        fields: { category: 'b' },
+      }),
+      doc({
+        id: 'cat-c',
+        contentType: 'Widget',
+        entryTitle: 'Cat C',
+        fields: { category: 'c' },
+      }),
+    ]);
+    const res = await search({
+      q: '',
+      contentType: 'Widget',
+      filter: 'category:in:a,b',
+    });
+    expect(res.hits.map((h) => h.id).sort()).toEqual(['cat-a', 'cat-b']);
+  });
+
+  it('treats the legacy 2-part field:value form as equality', async () => {
+    await addTestDocuments([
+      doc({
+        id: 'colour-red',
+        contentType: 'Widget',
+        entryTitle: 'Red Widget',
+        fields: { colour: 'red' },
+      }),
+      doc({
+        id: 'colour-blue',
+        contentType: 'Widget',
+        entryTitle: 'Blue Widget',
+        fields: { colour: 'blue' },
+      }),
+    ]);
+    const res = await search({
+      q: '',
+      contentType: 'Widget',
+      filter: 'colour:red',
+    });
+    expect(res.hits).toHaveLength(1);
+    expect(res.hits[0]!.id).toBe('colour-red');
+  });
+
+  it('returns 400 for an operator not valid for the field type', async () => {
+    // `gt` is a NUMBER operator; applying it to a TEXT field is rejected by the
+    // compiler (SearchInputError → 400), not silently ignored.
+    const res = await fetch(
+      '/api/search?q=x&contentType=Widget&filter=colour:gt:5',
+      { headers: { Authorization: `Bearer ${TEST_API_KEY}` } }
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('falls back to eq for a 2-part filter with no contentType scope', async () => {
+    // Without a contentType the field type is unknown, so the compiler allows
+    // only equality-as-quoted-string (the #227 back-compat path). It must not
+    // 500/503 and must return the matching doc.
+    await addTestDocuments([
+      doc({
+        id: 'noscope-1',
+        contentType: 'Article',
+        entryTitle: 'No Scope One',
+        fields: { author: 'author-9' },
+      }),
+      doc({
+        id: 'noscope-2',
+        contentType: 'Page',
+        entryTitle: 'No Scope Two',
+        fields: { author: 'author-8' },
+      }),
+    ]);
+    const res = await search({ q: '', filter: 'author:author-9' });
+    expect(res.hits).toHaveLength(1);
+    expect(res.hits[0]!.id).toBe('noscope-1');
   });
 
   it('narrows the free-text search via attributesToSearchOn', async () => {
