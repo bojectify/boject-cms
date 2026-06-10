@@ -9,6 +9,11 @@ import {
   chipValueDisplay,
   isRelationFieldType,
 } from '~/utils/queryBuilder/chipLabels';
+import {
+  formatDateChip,
+  formatDateRangeChip,
+} from '~/utils/queryBuilder/dateFilter';
+import { FIELD_TYPES } from '~/utils/fieldTypes';
 
 const props = defineProps<QueryChipsProps>();
 const emit = defineEmits<{
@@ -29,6 +34,20 @@ function valueLoadingFor(f: SearchFilter): boolean {
         ? f.value.filter((v): v is string => typeof v === 'string')
         : [];
   return ids.length > 0 && ids.some((id) => !props.relationLabels?.[id]);
+}
+
+/** A filter's value → its chip display string. DATETIME formats as a date / range. */
+function valueDisplayFor(f: SearchFilter): string | null {
+  const type = props.fields.find((x) => x.identifier === f.field)?.type;
+  if (type === FIELD_TYPES.DATETIME) {
+    if (Array.isArray(f.value) && f.value.length === 2) {
+      return formatDateRangeChip(f.value as [string, string]);
+    }
+    return typeof f.value === 'string' && f.value
+      ? formatDateChip(f.value)
+      : null;
+  }
+  return chipValueDisplay(f.value, props.relationLabels);
 }
 
 // ContentTypeChip / FilterChip are auto-registered (Nuxt + Storybook scan components/).
@@ -54,7 +73,7 @@ function valueLoadingFor(f: SearchFilter): boolean {
       v-if="editingIndex !== i"
       :field="chipFieldName(fields, f.field)"
       :operator="chipOperatorLabel(fields, f)"
-      :value="chipValueDisplay(f.value, relationLabels)"
+      :value="valueDisplayFor(f)"
       :value-loading="valueLoadingFor(f)"
       :test-id="QA_QUERY_CHIPS.FILTER_CHIP(i)"
       @remove="emit('removeFilter', i)"
