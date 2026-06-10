@@ -529,6 +529,30 @@ export const MultirelationContainsAnyFlow: Story = {
   },
 };
 
+// Tab at a multi-value step locks in the selection and continues (it does NOT
+// tab out of the palette — a native Tab would move focus off the value input and
+// kill ↑/↓ row navigation). The committed chip appears; the draft is cleared.
+export const SelectIsAnyOfTabCommitsAndContinues: Story = {
+  args: { enableRichOperators: true, enableMultiValueOperators: true },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.type(canvas.getByTestId(QA_QUERY_BUILDER.INPUT), 'art');
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))); // Article
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(1))); // Status (SELECT)
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(2))); // is any of
+    await userEvent.click(canvas.getByTestId(QA_MULTI_SELECT_EDITOR.OPTION(1))); // Active
+    await userEvent.click(canvas.getByTestId(QA_MULTI_SELECT_EDITOR.OPTION(2))); // Ended
+    // refocus the value input (clicking rows moved focus off it), then Tab
+    await userEvent.click(canvas.getByTestId(QA_QUERY_BUILDER.VALUE_INPUT));
+    await userEvent.keyboard('{Tab}');
+    // committed in place (Tab was intercepted, not a native tab-out) + draft gone
+    const seg = canvas.getByTestId(QA_FILTER_CHIP.VALUE_SEGMENT);
+    await expect(seg).toHaveTextContent('Active');
+    await expect(seg).toHaveTextContent('Ended');
+    await expect(canvas.queryByTestId(QA_QUERY_BUILDER.DRAFT_CHIP)).toBeNull();
+  },
+};
+
 // URL-loaded query: a relation filter's chip shows the seeded title (no live pick).
 export const RelationLabelSeed: Story = {
   args: {

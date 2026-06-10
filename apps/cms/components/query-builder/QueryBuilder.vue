@@ -241,18 +241,29 @@ function onValueInput(e: Event) {
 function onValueKeydown(e: KeyboardEvent) {
   const multi =
     draftKind.value === 'multiSelect' || draftKind.value === 'multiEntry';
-  // Multi-value: Enter commits the accumulated array + runs (Space still toggles a
-  // row via handleNavKeys → activateActive → the row's @click). Handle Enter before
-  // handleNavKeys so a highlighted row isn't toggled instead of committing. Only
-  // commit a non-empty selection — Enter with nothing toggled abandons the draft
-  // and just runs (an empty `in`/`containsAny` would serialize to a degenerate
-  // `field:in:` → `IN ['']`), mirroring single-value Enter on an empty input.
-  if (multi && e.key === 'Enter') {
-    e.preventDefault();
+  // Multi-value: Enter commits the accumulated array + runs; Tab commits + continues
+  // to the next filter (mirrors the single-value Tab). Space still toggles a row via
+  // handleNavKeys → activateActive → the row's @click. Handle Enter/Tab BEFORE
+  // handleNavKeys so a highlighted row isn't activated instead of committing, and
+  // preventDefault Tab — a native Tab moves focus out of this input and silently
+  // kills ↑/↓ row navigation (the keydown handler lives here). Only commit a
+  // non-empty selection: an empty `in`/`containsAny` would serialize to a degenerate
+  // `field:op:` → `IN ['']`. Enter with nothing selected abandons the draft and runs
+  // (mirrors single-value Enter on an empty input); empty Tab is swallowed (stay put).
+  if (multi) {
     const val = state.value.draft?.value;
-    if (Array.isArray(val) && val.length > 0) handle({ kind: 'commitValue' });
-    handle({ kind: 'run' });
-    return;
+    const hasSelection = Array.isArray(val) && val.length > 0;
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (hasSelection) handle({ kind: 'commitValue' });
+      handle({ kind: 'run' });
+      return;
+    }
+    if (e.key === 'Tab' && !e.shiftKey) {
+      e.preventDefault();
+      if (hasSelection) handle({ kind: 'commitValue' });
+      return;
+    }
   }
   if (handleNavKeys(e)) return;
   if (e.key === 'Enter') {
