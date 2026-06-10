@@ -114,7 +114,7 @@ const isActive = (id: string) => props.activeId === id;
     </template>
 
     <template v-else>
-      <!-- text / number / datetime: free entry typed into the chip's value
+      <!-- text / number: free entry typed into the chip's value
            segment. A confirm row appears once something is typed; clicking it
            (or → / Enter from the value segment) commits the filter. -->
       <button

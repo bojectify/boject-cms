@@ -208,7 +208,6 @@ const VALUE_KIND: Partial<Record<FieldTypeName, ValueInputKind>> = {
   NUMBER: 'number',
   BOOLEAN: 'boolean',
   SELECT: 'select',
-  DATETIME: 'datetime',
   RELATION: 'entry',
   MULTIRELATION: 'entry',
 };

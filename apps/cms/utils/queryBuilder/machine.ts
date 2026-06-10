@@ -159,9 +159,7 @@ export function reduce(prev: BuilderState, action: Action): BuilderState {
       // re-picked from the dropdown, so their input starts empty.
       const kind = valueInputKind(s.draft.field.type, action.op);
       const prefill =
-        kind === 'text' || kind === 'number' || kind === 'datetime'
-          ? String(s.draft.value ?? '')
-          : '';
+        kind === 'text' || kind === 'number' ? String(s.draft.value ?? '') : '';
       return {
         ...s,
         draft: { ...s.draft, op: action.op },
@@ -246,9 +244,7 @@ export function reduce(prev: BuilderState, action: Action): BuilderState {
       // re-pick is deferred, so the `field` segment falls through here too.
       const kind = valueInputKind(field.type, filter.op);
       const prefill =
-        kind === 'text' || kind === 'number' || kind === 'datetime'
-          ? String(filter.value ?? '')
-          : '';
+        kind === 'text' || kind === 'number' ? String(filter.value ?? '') : '';
       return {
         ...s,
         draft,
