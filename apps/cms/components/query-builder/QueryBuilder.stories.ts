@@ -9,6 +9,7 @@ import { QA_QUERY_DROPDOWN } from '../query-dropdown/queryDropdown.config.js';
 import { QA_FILTER_CHIP } from '../filter-chip/filterChip.config.js';
 import { QA_VALUE_EDITOR } from '../value-editor/valueEditor.config.js';
 import { QA_CONTENT_TYPE_CHIP } from '../content-type-chip/contentTypeChip.config.js';
+import { QA_MULTI_SELECT_EDITOR } from '../multi-select-editor/multiSelectEditor.config.js';
 
 const meta: Meta<typeof QueryBuilder> = {
   title: 'Search/QueryBuilder',
@@ -431,6 +432,55 @@ export const MultiValueOpsGated: Story = {
     const dropdown = canvas.getByTestId(QA_QUERY_BUILDER.DROPDOWN);
     await expect(dropdown).toHaveTextContent('is not');
     await expect(dropdown).not.toHaveTextContent('is any of');
+  },
+};
+
+// Multi-value list ops on: picking SELECT's "is any of" opens the multi-select
+// editor; toggling two choices accumulates a string[], and Enter commits the
+// array + runs the search as a single `in` filter.
+export const SelectIsAnyOfFlow: Story = {
+  args: { enableRichOperators: true, enableMultiValueOperators: true },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await userEvent.type(canvas.getByTestId(QA_QUERY_BUILDER.INPUT), 'art');
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))); // Article
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(1))); // Status (SELECT)
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(2))); // is any of
+    // multi-select editor: toggle two choices (Active, Ended), Enter commits + runs
+    await userEvent.click(canvas.getByTestId(QA_MULTI_SELECT_EDITOR.OPTION(1)));
+    await userEvent.click(canvas.getByTestId(QA_MULTI_SELECT_EDITOR.OPTION(2)));
+    // clicking the rows moved focus off the value input — refocus it so the
+    // {Enter} keydown reaches the combobox's commit+run handler
+    await userEvent.click(canvas.getByTestId(QA_QUERY_BUILDER.VALUE_INPUT));
+    await userEvent.keyboard('{Enter}');
+    const lastRun = (args.onRun as ReturnType<typeof fn>).mock.calls.at(-1)![0];
+    expect(lastRun.contentType).toBe('Article');
+    expect(lastRun.filters[0]).toEqual(
+      expect.objectContaining({ field: 'status', op: 'in' })
+    );
+    expect((lastRun.filters[0].value as string[]).length).toBe(2);
+  },
+};
+
+// Guard: pressing Enter at a multi-value step with NOTHING toggled must not
+// commit a degenerate empty filter (`status:in:` → `IN ['']`). The draft is
+// abandoned and the search just runs with no filter — mirroring single-value
+// Enter on an empty input.
+export const SelectIsAnyOfEmptyEnterCommitsNothing: Story = {
+  args: { enableRichOperators: true, enableMultiValueOperators: true },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await userEvent.type(canvas.getByTestId(QA_QUERY_BUILDER.INPUT), 'art');
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))); // Article
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(1))); // Status (SELECT)
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(2))); // is any of
+    // toggle nothing; hit Enter from the value input
+    await userEvent.click(canvas.getByTestId(QA_QUERY_BUILDER.VALUE_INPUT));
+    await userEvent.keyboard('{Enter}');
+    // ran, but with no filter committed (no degenerate empty `in`)
+    const lastRun = (args.onRun as ReturnType<typeof fn>).mock.calls.at(-1)![0];
+    expect(lastRun.contentType).toBe('Article');
+    expect(lastRun.filters).toEqual([]);
   },
 };
 
