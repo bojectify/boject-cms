@@ -1,5 +1,5 @@
 import type { SearchQuery, SearchFilter } from './types';
-import { isOperatorId } from './operators';
+import { isOperatorId, operatorArity } from './operators';
 
 /** The /api/search param shape — also the URL query shape (minus contentType, which rides the path for per-type routes). */
 export interface SearchParams {
@@ -16,12 +16,13 @@ export interface RouteQuery {
 
 /**
  * Serialize one filter to its `field:op:value` URL token. `value` is stringified
- * one-way (`parseFilter` always returns a string value), so a `serialize`→`parse`
- * round-trip is an identity only for string values — typed coercion by field
- * type (number/boolean/etc.) is the consumer's job (the value editor / machine).
- * NOTE: arity-many values (#333: in / containsAny / containsAll / between) will
+ * one-way, so a `serialize`→`parse` round-trip is an identity only for the value
+ * shape `parseFilter` returns (string for scalar ops, string[] for list ops);
+ * typed coercion by field type (number/boolean/etc.) is the consumer's job (the
+ * value editor / machine). Arity-many values (in / containsAny / containsAll)
  * rely on `Array.prototype.toString` comma-joining here to match the server's
- * comma-split (parseFilters); no multi-value value reaches this yet.
+ * comma-split (parseFilters in search.get.ts) — and to round-trip with
+ * `parseFilter` below.
  */
 export function serializeFilter(f: SearchFilter): string {
   return `${f.field}:${f.op}:${String(f.value ?? '')}`;
@@ -43,7 +44,11 @@ export function parseFilter(s: string): SearchFilter {
   if (secondColon > 0) {
     const maybeOp = rest.slice(0, secondColon);
     if (isOperatorId(maybeOp)) {
-      return { field, op: maybeOp, value: rest.slice(secondColon + 1) };
+      const raw = rest.slice(secondColon + 1);
+      // List ops carry comma-separated values; comma is the delimiter, so a
+      // value cannot itself contain a literal comma (known limit, see #332).
+      const value = operatorArity(maybeOp) === 'one' ? raw : raw.split(',');
+      return { field, op: maybeOp, value };
     }
   }
   return { field, op: 'eq', value: rest };

@@ -67,6 +67,27 @@ describe('compileQuery', () => {
       { field: 'startsAt', op: 'eq', value: '12:30:00' },
     ]);
   });
+
+  it('parseFilter splits multi-value (list) op values into an array; round-trips', () => {
+    const q = routeToSearchQuery(
+      { filter: ['status:in:a,b', 'tags:containsAny:t1,t2,t3'] },
+      'Article'
+    );
+    expect(q.filters).toEqual([
+      { field: 'status', op: 'in', value: ['a', 'b'] },
+      { field: 'tags', op: 'containsAny', value: ['t1', 't2', 't3'] },
+    ]);
+    // serialize → parse identity for a list value
+    expect(compileQuery(q).filter).toEqual([
+      'status:in:a,b',
+      'tags:containsAny:t1,t2,t3',
+    ]);
+  });
+
+  it('a single-value op keeps a scalar value (no split)', () => {
+    const q = routeToSearchQuery({ filter: 'author:neq:a1' }, 'Article');
+    expect(q.filters).toEqual([{ field: 'author', op: 'neq', value: 'a1' }]);
+  });
 });
 
 describe('routeToSearchQuery', () => {
