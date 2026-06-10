@@ -17,8 +17,9 @@ const meta: Meta<typeof QueryBuilder> = {
   title: 'Search/QueryBuilder',
   component: QueryBuilder,
   parameters: { layout: 'centered' },
-  // The palette fills its container; bound it to a realistic width in isolation.
-  decorators: [ContainerDecorator(700)],
+  // The palette fills its container; bound it to the card's max width (1080px) in
+  // isolation. Dropdown + footer contents self-cap at ~700px inside the card.
+  decorators: [ContainerDecorator(1080)],
   args: {
     contentTypes: CONTENT_TYPES,
     searchEntries: fn(async () => [
@@ -618,6 +619,47 @@ export const SelectIsAnyOfTabCommitsAndContinues: Story = {
     await expect(seg).toHaveTextContent('Active');
     await expect(seg).toHaveTextContent('Ended');
     await expect(canvas.queryByTestId(QA_QUERY_BUILDER.DRAFT_CHIP)).toBeNull();
+  },
+};
+
+// Wide palette + wrapping chips: with several committed filters the card grows
+// toward 1080px and the chip row wraps onto multiple lines instead of squashing
+// the input. Keyboard run-to-search still works once the chips have wrapped.
+export const WideWithWrappingChips: Story = {
+  args: {
+    modelValue: {
+      contentType: 'Article',
+      filters: [
+        { field: 'summary', op: 'eq', value: 'alpha' },
+        { field: 'summary', op: 'eq', value: 'bravo' },
+        { field: 'summary', op: 'eq', value: 'charlie' },
+        { field: 'summary', op: 'eq', value: 'delta' },
+        { field: 'summary', op: 'eq', value: 'echo' },
+        { field: 'summary', op: 'eq', value: 'foxtrot' },
+        { field: 'summary', op: 'eq', value: 'golf' },
+        { field: 'summary', op: 'eq', value: 'hotel' },
+      ],
+    },
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    // all eight committed chips render
+    expect(canvas.getAllByTestId(QA_FILTER_CHIP.VALUE_SEGMENT)).toHaveLength(8);
+    // the chip row is set to wrap, and the chips actually flow onto more than one
+    // line (the last chip sits below the first)
+    const row = canvas.getByTestId(QA_QUERY_BUILDER.CHIP_ROW);
+    expect(getComputedStyle(row).flexWrap).toBe('wrap');
+    const firstChip = canvas.getByTestId(
+      QA_QUERY_CHIPS.FILTER_CHIP(0)
+    ) as HTMLElement;
+    const lastChip = canvas.getByTestId(
+      QA_QUERY_CHIPS.FILTER_CHIP(7)
+    ) as HTMLElement;
+    expect(lastChip.offsetTop).toBeGreaterThan(firstChip.offsetTop);
+    // Enter still runs the search with the chips wrapped
+    await userEvent.click(canvas.getByTestId(QA_QUERY_BUILDER.INPUT));
+    await userEvent.keyboard('{Enter}');
+    expect(args.onRun).toHaveBeenCalled();
   },
 };
 
