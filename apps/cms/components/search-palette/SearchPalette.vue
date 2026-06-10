@@ -90,7 +90,7 @@ function onBroaden(payload: { q?: string }) {
     :content="{ onOpenAutoFocus: (e: Event) => e.preventDefault() }"
     :ui="{
       content:
-        'top-[12vh] sm:top-[12vh] translate-y-0 bg-transparent ring-0 shadow-none rounded-none divide-y-0 overflow-visible w-[calc(100vw-2rem)] max-w-2xl',
+        'top-[12vh] sm:top-[12vh] translate-y-0 bg-transparent ring-0 shadow-none rounded-none divide-y-0 overflow-visible w-[calc(100vw-2rem)] max-w-[1080px]',
     }"
     @update:open="
       (v: boolean) => {

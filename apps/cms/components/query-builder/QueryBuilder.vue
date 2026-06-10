@@ -331,7 +331,10 @@ function onKeydown(e: KeyboardEvent) {
     :data-testid="testId"
     class="flex flex-col w-full rounded-2xl border border-default bg-default shadow-xl overflow-clip font-sans"
   >
-    <div class="flex items-center gap-2 px-4 py-4 border-b border-default">
+    <div
+      :data-testid="QA_QUERY_BUILDER.CHIP_ROW"
+      class="flex flex-wrap items-center gap-2 px-4 py-4 border-b border-default"
+    >
       <UIcon name="i-lucide-search" class="size-[18px] text-dimmed shrink-0" />
       <QueryChips
         :content-type-name="ct?.name"
