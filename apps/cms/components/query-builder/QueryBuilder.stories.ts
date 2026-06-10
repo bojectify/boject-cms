@@ -11,6 +11,7 @@ import { QA_VALUE_EDITOR } from '../value-editor/valueEditor.config.js';
 import { QA_CONTENT_TYPE_CHIP } from '../content-type-chip/contentTypeChip.config.js';
 import { QA_MULTI_SELECT_EDITOR } from '../multi-select-editor/multiSelectEditor.config.js';
 import { QA_MULTI_ENTRY_EDITOR } from '../multi-entry-editor/multiEntryEditor.config.js';
+import { QA_DATE_RANGE_EDITOR } from '../date-range-editor/dateRangeEditor.config.js';
 
 const meta: Meta<typeof QueryBuilder> = {
   title: 'Search/QueryBuilder',
@@ -526,6 +527,73 @@ export const MultirelationContainsAnyFlow: Story = {
     const seg = chip.getByTestId(QA_FILTER_CHIP.VALUE_SEGMENT);
     await expect(seg).toHaveTextContent('News');
     await expect(seg).toHaveTextContent('Sport');
+  },
+};
+
+// DATETIME single-date: picking Published → before opens the single-date calendar;
+// selecting a day commits a `before` filter with a UTC start-of-day ISO, and the
+// chip renders the formatted date.
+export const DatetimeBeforeFlow: Story = {
+  args: { enableRichOperators: true, enableRangeOperators: true },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await userEvent.type(canvas.getByTestId(QA_QUERY_BUILDER.INPUT), 'art');
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))); // Article
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(3))); // Published (DATETIME)
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))); // before
+    // single-date calendar (opens on the current month for a fresh draft): pick the
+    // 15th — always an in-view cell, never an adjacent-month overflow day. Its
+    // accessible name ends "… 15, <year>", so `/\b15,/` matches it uniquely.
+    await userEvent.click(await canvas.findByRole('button', { name: /\b15,/ }));
+    const lastModel = (
+      args['onUpdate:modelValue'] as ReturnType<typeof fn>
+    ).mock.calls.at(-1)![0] as {
+      filters: { field: string; op: string; value: unknown }[];
+    };
+    expect(lastModel.filters[0]).toEqual(
+      expect.objectContaining({ field: 'published', op: 'before' })
+    );
+    // start-of-day on the 15th (month/year vary with the test clock)
+    expect(lastModel.filters[0]!.value).toMatch(
+      /^\d{4}-\d{2}-15T00:00:00\.000Z$/
+    );
+    // chip shows a formatted date (e.g. "Jun 15, 2026")
+    await expect(
+      canvas.getByTestId(QA_FILTER_CHIP.VALUE_SEGMENT)
+    ).toHaveTextContent(/\w{3} \d{1,2}, \d{4}/);
+  },
+};
+
+// DATETIME `is between` is now OFFERED (range gate on) and opens the range editor;
+// a preset commits a [start, end] pair.
+export const DatetimeBetweenPresetFlow: Story = {
+  args: { enableRichOperators: true, enableRangeOperators: true },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await userEvent.type(canvas.getByTestId(QA_QUERY_BUILDER.INPUT), 'art');
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))); // Article
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(3))); // Published
+    // operator step includes "is between" (range gate on)
+    const dropdown = canvas.getByTestId(QA_QUERY_BUILDER.DROPDOWN);
+    await expect(dropdown).toHaveTextContent('is between');
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(2))); // is between
+    // range editor: click the "Last 7 days" preset
+    await userEvent.click(
+      canvas.getByTestId(QA_DATE_RANGE_EDITOR.PRESET('last7'))
+    );
+    const lastModel = (
+      args['onUpdate:modelValue'] as ReturnType<typeof fn>
+    ).mock.calls.at(-1)![0] as {
+      filters: { field: string; op: string; value: unknown }[];
+    };
+    expect(lastModel.filters[0]).toEqual(
+      expect.objectContaining({ field: 'published', op: 'between' })
+    );
+    expect(lastModel.filters[0]!.value).toHaveLength(2);
+    // chip shows a formatted range ("start – end")
+    await expect(
+      canvas.getByTestId(QA_FILTER_CHIP.VALUE_SEGMENT)
+    ).toHaveTextContent('–');
   },
 };
 
