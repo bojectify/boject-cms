@@ -16,7 +16,9 @@ const EQ: Operator = {
   rich: false,
 };
 
-// Operators per field type. `eq` is always first (the v1 locked default).
+// Operators per field type. `eq` is first (the locked default) for every type
+// except DATETIME, which is range-only (before/after/between) — equality on a
+// timestamp is rarely what an editor wants, so `eq` is intentionally omitted.
 const REGISTRY: Partial<Record<FieldTypeName, Operator[]>> = {
   TEXT: [
     EQ,
@@ -67,7 +69,6 @@ const REGISTRY: Partial<Record<FieldTypeName, Operator[]>> = {
   ],
   BOOLEAN: [EQ],
   DATETIME: [
-    EQ,
     {
       id: 'before',
       label: 'before',
@@ -207,7 +208,6 @@ const VALUE_KIND: Partial<Record<FieldTypeName, ValueInputKind>> = {
   NUMBER: 'number',
   BOOLEAN: 'boolean',
   SELECT: 'select',
-  DATETIME: 'datetime',
   RELATION: 'entry',
   MULTIRELATION: 'entry',
 };
@@ -222,5 +222,7 @@ export function valueInputKind(
     (op === 'containsAny' || op === 'containsAll')
   )
     return 'multiEntry';
+  if (type === FIELD_TYPES.DATETIME)
+    return op === 'between' ? 'dateRange' : 'date';
   return VALUE_KIND[type] ?? 'text';
 }

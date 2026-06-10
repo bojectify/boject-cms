@@ -9,10 +9,14 @@ import {
   operatorLabel,
   valueInputKind,
 } from '~/utils/queryBuilder/operators';
+import {
+  formatDateChip,
+  formatDateRangeChip,
+} from '~/utils/queryBuilder/dateFilter';
 
 // QueryChips / QueryDropdown / FilterChip / ValueEditor / MultiSelectEditor /
-// MultiEntryEditor are auto-registered (Nuxt + Storybook scan components/), so
-// they need no explicit import.
+// MultiEntryEditor / DateEditor / DateRangeEditor are auto-registered (Nuxt +
+// Storybook scan components/), so they need no explicit import.
 
 const props = withDefaults(defineProps<QueryBuilderProps>(), {
   enableRichOperators: false,
@@ -194,6 +198,20 @@ const draftKind = computed(() =>
     ? valueInputKind(state.value.draft.field.type, state.value.draft.op)
     : null
 );
+const isDateStep = computed(
+  () => draftKind.value === 'date' || draftKind.value === 'dateRange'
+);
+// The draft chip's value segment for date kinds: a read-only formatted label
+// (the calendar in the dropdown owns the actual input + focus).
+const dateValueLabel = computed(() => {
+  const v = state.value.draft?.value;
+  if (draftKind.value === 'dateRange') {
+    return Array.isArray(v) && v.length === 2
+      ? formatDateRangeChip(v as [string, string])
+      : 'Pick a range…';
+  }
+  return typeof v === 'string' && v ? formatDateChip(v) : 'Pick a date…';
+});
 const valuePlaceholder = computed(() => {
   switch (draftKind.value) {
     case 'entry':
@@ -202,8 +220,6 @@ const valuePlaceholder = computed(() => {
       return 'Pick a value…';
     case 'boolean':
       return 'true / false';
-    case 'datetime':
-      return 'YYYY-MM-DD…';
     case 'multiSelect':
       return 'Pick values…';
     case 'multiEntry':
@@ -215,10 +231,7 @@ const valuePlaceholder = computed(() => {
 // Free-entry kinds carry an uncommitted typed value; entry/select/boolean commit
 // via the dropdown (click), so there is no pending text to lock in for them.
 const isFreeEntry = computed(
-  () =>
-    draftKind.value === 'text' ||
-    draftKind.value === 'number' ||
-    draftKind.value === 'datetime'
+  () => draftKind.value === 'text' || draftKind.value === 'number'
 );
 
 function commitTypedValue() {
@@ -351,7 +364,15 @@ function onKeydown(e: KeyboardEvent) {
         :test-id="QA_QUERY_BUILDER.DRAFT_CHIP"
       >
         <template #value>
+          <span
+            v-if="isDateStep"
+            :data-testid="QA_QUERY_BUILDER.VALUE_INPUT"
+            class="text-xs text-highlighted"
+          >
+            {{ dateValueLabel }}
+          </span>
           <input
+            v-else
             ref="valueInput"
             :data-testid="QA_QUERY_BUILDER.VALUE_INPUT"
             role="combobox"
@@ -409,8 +430,20 @@ function onKeydown(e: KeyboardEvent) {
       @pick-operator="(op: string) => handle({ kind: 'pickOperator', op })"
     >
       <template #value>
+        <DateEditor
+          v-if="draftKind === 'date' && state.draft"
+          :draft="state.draft"
+          @set-value="(v: unknown) => handle({ kind: 'setValue', value: v })"
+          @commit="handle({ kind: 'commitValue' })"
+        />
+        <DateRangeEditor
+          v-else-if="draftKind === 'dateRange' && state.draft"
+          :draft="state.draft"
+          @set-value="(v: unknown) => handle({ kind: 'setValue', value: v })"
+          @commit="handle({ kind: 'commitValue' })"
+        />
         <MultiSelectEditor
-          v-if="draftKind === 'multiSelect' && state.draft"
+          v-else-if="draftKind === 'multiSelect' && state.draft"
           :draft="state.draft"
           :active-id="activeId"
           @toggle="(v: string) => handle({ kind: 'toggleValue', value: v })"
@@ -443,7 +476,13 @@ function onKeydown(e: KeyboardEvent) {
       class="flex items-center gap-4 px-4 py-3 border-t border-default text-xs text-dimmed"
       :data-testid="QA_QUERY_BUILDER.FOOTER"
     >
-      <span><UKbd value="↑" /><UKbd value="↓" /> Navigate</span>
+      <span v-if="isDateStep"
+        ><UKbd value="↑" /><UKbd value="↓" /><UKbd value="←" /><UKbd
+          value="→"
+        />
+        Navigate</span
+      >
+      <span v-else><UKbd value="↑" /><UKbd value="↓" /> Navigate</span>
       <span v-if="activeId"><UKbd>Space</UKbd> {{ activeSpaceLabel }}</span>
       <span><UKbd value="↵" /> {{ activeId ? 'Select' : 'Search' }}</span>
       <span><UKbd value="esc" /> Close</span>

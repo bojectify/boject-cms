@@ -108,7 +108,7 @@ function onBroaden(payload: { q?: string }) {
         :model-value="initialQuery"
         :enable-rich-operators="true"
         :enable-multi-value-operators="true"
-        :enable-range-operators="false"
+        :enable-range-operators="true"
         :relation-labels="relationLabels"
         :relation-labels-pending="relationLabelsPending"
         :search-entries="searchEntries"
