@@ -241,4 +241,30 @@ describe('builder machine', () => {
     expect(s2.draft?.value).toBe('x');
     expect(s2.text).toBe('x'); // prefilled so a typed value survives an operator change
   });
+
+  it('committing a re-edited operator replaces the filter in place (contains → is not)', () => {
+    let s = initState({
+      contentTypes: CONTENT_TYPES,
+      lockedContentType: ARTICLE_CT,
+      rich: true,
+      multiValue: false,
+    });
+    const summary = ARTICLE_CT.fields.find((f) => f.identifier === 'summary')!;
+    s = reduce(s, { kind: 'pickField', field: summary });
+    s = reduce(s, { kind: 'pickOperator', op: 'contains' });
+    s = reduce(s, { kind: 'setValue', value: 'x' });
+    s = reduce(s, { kind: 'commitValue' });
+    // Re-edit the operator segment, pick a different operator, re-commit.
+    s = reduce(s, { kind: 'editFilter', index: 0, segment: 'operator' });
+    s = reduce(s, { kind: 'pickOperator', op: 'neq' });
+    s = reduce(s, { kind: 'commitValue' });
+    // In-place replace via editingIndex — not an append; value carried over.
+    expect(s.query.filters).toHaveLength(1);
+    expect(s.query.filters[0]).toMatchObject({
+      field: 'summary',
+      op: 'neq',
+      value: 'x',
+    });
+    expect(s.editingIndex).toBeNull();
+  });
 });
