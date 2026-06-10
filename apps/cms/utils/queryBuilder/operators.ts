@@ -168,12 +168,20 @@ export function operatorArity(opId: string): 'one' | 'two' | 'many' {
   return 'one';
 }
 
+/**
+ * Operators offered for `type`. `rich: false` returns equality-only (v1);
+ * `multiValue: false` additionally hides arity-two/many ops (in / containsAny /
+ * containsAll / between) for single-value-only contexts. Both default to "on".
+ */
 export function availableOperators(
   type: FieldTypeName,
-  opts: { rich: boolean }
+  { rich, multiValue = true }: { rich: boolean; multiValue?: boolean }
 ): Operator[] {
   const all = REGISTRY[type] ?? [EQ];
-  return opts.rich ? all : all.filter((o) => !o.rich);
+  const richFiltered = rich ? all : all.filter((o) => !o.rich);
+  return multiValue
+    ? richFiltered
+    : richFiltered.filter((o) => operatorArity(o.id) === 'one');
 }
 
 export function defaultOperator(type: FieldTypeName): Operator {

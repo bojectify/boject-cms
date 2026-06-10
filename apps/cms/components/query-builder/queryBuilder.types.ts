@@ -11,7 +11,10 @@ export interface QueryBuilderProps extends BasicComponentProps {
   contentTypes: QueryContentType[];
   modelValue?: SearchQuery;
   lockedContentType?: QueryContentType;
+  /** Surface non-equality operators (is not / contains / starts with / >, ≥, <, ≤ / before, after). */
   enableRichOperators?: boolean;
+  /** Surface arity-two/many operators (in / containsAny / containsAll / between). Requires their value editors (#333). */
+  enableMultiValueOperators?: boolean;
   /** Relation value lookup. Injected so the component never fetches (Storybook passes a fixture). */
   searchEntries?: (
     targetContentTypeIds: string[],

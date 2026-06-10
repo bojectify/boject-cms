@@ -1,4 +1,5 @@
 import type { SearchQuery, SearchFilter } from './types';
+import { isOperatorId } from './operators';
 
 /** The /api/search param shape — also the URL query shape (minus contentType, which rides the path for per-type routes). */
 export interface SearchParams {
@@ -13,13 +14,48 @@ export interface RouteQuery {
   filter?: string | string[];
 }
 
-/** SearchQuery → /api/search params. v1 equality only: the operator is dropped (always `eq`). */
+/**
+ * Serialize one filter to its `field:op:value` URL token. `value` is stringified
+ * one-way (`parseFilter` always returns a string value), so a `serialize`→`parse`
+ * round-trip is an identity only for string values — typed coercion by field
+ * type (number/boolean/etc.) is the consumer's job (the value editor / machine).
+ * NOTE: arity-many values (#333: in / containsAny / containsAll / between) will
+ * rely on `Array.prototype.toString` comma-joining here to match the server's
+ * comma-split (parseFilters); no multi-value value reaches this yet.
+ */
+export function serializeFilter(f: SearchFilter): string {
+  return `${f.field}:${f.op}:${String(f.value ?? '')}`;
+}
+
+/**
+ * Parse one URL filter token. Accepts the 3-part `field:op:value` form and the
+ * legacy 2-part `field:value` form (→ eq). The middle token is the operator
+ * only when it is a registered operator id (closed-set disambiguation), so a
+ * colon-bearing value is preserved and a 2-part token defaults to eq. Mirrors
+ * the server-side parseFilters in search.get.ts (kept separate — server layer).
+ */
+export function parseFilter(s: string): SearchFilter {
+  const firstColon = s.indexOf(':');
+  if (firstColon < 0) return { field: s, op: 'eq', value: '' };
+  const field = s.slice(0, firstColon);
+  const rest = s.slice(firstColon + 1);
+  const secondColon = rest.indexOf(':');
+  if (secondColon > 0) {
+    const maybeOp = rest.slice(0, secondColon);
+    if (isOperatorId(maybeOp)) {
+      return { field, op: maybeOp, value: rest.slice(secondColon + 1) };
+    }
+  }
+  return { field, op: 'eq', value: rest };
+}
+
+/** SearchQuery → /api/search params. Filters serialize to the `field:op:value` URL form. */
 export function compileQuery(query: SearchQuery): SearchParams {
   const out: SearchParams = {};
   if (query.q) out.q = query.q;
   if (query.contentType) out.contentType = query.contentType;
   if (query.filters.length) {
-    out.filter = query.filters.map((f) => `${f.field}:${String(f.value)}`);
+    out.filter = query.filters.map(serializeFilter);
   }
   return out;
 }
@@ -34,12 +70,7 @@ export function routeToSearchQuery(
       ? routeQuery.filter
       : [routeQuery.filter]
     : [];
-  const filters: SearchFilter[] = raw.map((s) => {
-    const idx = s.indexOf(':');
-    return idx < 0
-      ? { field: s, op: 'eq', value: '' }
-      : { field: s.slice(0, idx), op: 'eq', value: s.slice(idx + 1) };
-  });
+  const filters: SearchFilter[] = raw.map(parseFilter);
   const out: SearchQuery = { filters };
   if (contentTypeIdentifier) out.contentType = contentTypeIdentifier;
   if (routeQuery.q) out.q = routeQuery.q;

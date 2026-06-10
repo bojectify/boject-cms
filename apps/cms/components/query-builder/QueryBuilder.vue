@@ -4,13 +4,18 @@ import type { QueryBuilderProps, EntryOption } from './queryBuilder.types';
 import type { ChipSegment } from '~/components/filter-chip/filterChip.types';
 import { QA_QUERY_BUILDER } from './queryBuilder.config';
 import { QUERY_LISTBOX_ID } from '../query-dropdown/queryDropdown.config';
-import { operatorLabel, valueInputKind } from '~/utils/queryBuilder/operators';
+import {
+  availableOperators,
+  operatorLabel,
+  valueInputKind,
+} from '~/utils/queryBuilder/operators';
 
 // QueryChips / QueryDropdown / FilterChip / ValueEditor are auto-registered
 // (Nuxt + Storybook scan components/), so they need no explicit import.
 
 const props = withDefaults(defineProps<QueryBuilderProps>(), {
   enableRichOperators: false,
+  enableMultiValueOperators: false,
   testId: QA_QUERY_BUILDER.COMPONENT,
 });
 const emit = defineEmits(['update:modelValue', 'run', 'broaden']);
@@ -19,6 +24,7 @@ const { state, dispatch } = useQueryBuilder({
   contentTypes: props.contentTypes,
   lockedContentType: props.lockedContentType,
   rich: props.enableRichOperators,
+  multiValue: props.enableMultiValueOperators,
   initialQuery: props.modelValue,
 });
 
@@ -75,8 +81,21 @@ const activeId = ref<string | null>(null);
 // Reset the highlight whenever the option list changes (new step, or typing
 // re-filters it) — so typing never leaves a stale highlight and Space stays a
 // literal space while you type (it only activates an option when one is active).
+// Exception: when re-editing a committed filter's operator, pre-highlight the
+// current operator so ↑/↓/Enter start from it and it reads as the selected one.
 watch([() => state.value.step, () => state.value.text], () => {
-  activeId.value = null;
+  const s = state.value;
+  if (s.step === 'operator' && s.editingIndex !== null && s.draft) {
+    const ops = availableOperators(s.draft.field.type, {
+      rich: s.rich,
+      multiValue: s.multiValue,
+    });
+    const idx = ops.findIndex((o) => o.id === s.draft!.op);
+    // Option id mirrors QueryDropdown's `qb-opt-op-<i>` operator-row convention.
+    activeId.value = idx >= 0 ? `qb-opt-op-${idx}` : null;
+  } else {
+    activeId.value = null;
+  }
 });
 
 function listboxOptionIds(): string[] {
@@ -293,7 +312,7 @@ function onKeydown(e: KeyboardEvent) {
         v-if="state.draft"
         :field="state.draft.field.name"
         :operator="operatorLabel(state.draft.field.type, state.draft.op)"
-        :active-segment="'value'"
+        :active-segment="state.step === 'operator' ? 'operator' : 'value'"
         :show-remove="false"
         :test-id="QA_QUERY_BUILDER.DRAFT_CHIP"
       >

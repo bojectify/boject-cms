@@ -213,6 +213,45 @@ export const ReEditCommittedChipValue: Story = {
   },
 };
 
+// Re-editing a committed chip's OPERATOR segment opens the operator step with a
+// CLEAR input — the value is carried on the draft and re-prefilled only once a
+// new operator is picked. Regression guard for the committed value leaking into
+// the input at the operator step (#332).
+export const ReEditCommittedChipOperator: Story = {
+  args: { enableRichOperators: true },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    // build: Summary is "first"
+    await userEvent.type(canvas.getByTestId(QA_QUERY_BUILDER.INPUT), 'art');
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))); // Article
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))); // Summary (TEXT)
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))); // operator: is (eq)
+    await userEvent.type(
+      canvas.getByTestId(QA_QUERY_BUILDER.VALUE_INPUT),
+      'first'
+    );
+    await userEvent.keyboard('{ArrowRight}'); // commit → "Summary is first"
+    await expect(
+      canvas.getByTestId(QA_FILTER_CHIP.OPERATOR_SEGMENT)
+    ).toHaveTextContent('is');
+
+    // click the operator segment → operator step, with a CLEAR value input
+    await userEvent.click(canvas.getByTestId(QA_FILTER_CHIP.OPERATOR_SEGMENT));
+    await expect(
+      canvas.getByTestId(QA_QUERY_BUILDER.DROPDOWN)
+    ).toHaveTextContent('is not'); // operator step is showing
+    await expect(canvas.getByTestId(QA_QUERY_BUILDER.VALUE_INPUT)).toHaveValue(
+      '' // not "first" — the value must not leak into the operator-step input
+    );
+
+    // picking a new operator carries the value back into the value step
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(1))); // is not
+    await expect(canvas.getByTestId(QA_QUERY_BUILDER.VALUE_INPUT)).toHaveValue(
+      'first'
+    );
+  },
+};
+
 export const FullQueryRun: Story = {
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
@@ -337,6 +376,61 @@ export const MouseRemoveKeepsFocus: Story = {
     await waitFor(() => expect(input).toHaveFocus());
     await userEvent.keyboard('{Enter}');
     expect(args.onRun).toHaveBeenCalled();
+  },
+};
+
+// Rich operators on: picking a TEXT field opens the operator step (is / is not /
+// contains / starts with), and picking a single-value op (contains) routes to
+// the value step where a typed value commits the full field·op·value filter.
+export const RichOperatorFlow: Story = {
+  args: { enableRichOperators: true },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await userEvent.type(canvas.getByTestId(QA_QUERY_BUILDER.INPUT), 'art');
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))); // Article
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))); // Summary (TEXT)
+    // Operator step shows TEXT's single-value operators.
+    await expect(
+      canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))
+    ).toHaveTextContent('is');
+    await expect(
+      canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(1))
+    ).toHaveTextContent('is not');
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(2))); // contains
+    // Value step: the typed value lives in the draft chip's value segment, and
+    // → at the end of the text commits it (mirrors TextValueCommitsWithArrow).
+    const valueInput = canvas.getByTestId(QA_QUERY_BUILDER.VALUE_INPUT);
+    await userEvent.type(valueInput, 'brew');
+    await userEvent.keyboard('{ArrowRight}');
+    expect(args['onUpdate:modelValue']).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        filters: [
+          expect.objectContaining({
+            field: 'summary',
+            op: 'contains',
+            value: 'brew',
+          }),
+        ],
+      })
+    );
+  },
+};
+
+// Multi-value operators stay gated even with rich operators on: a SELECT field's
+// operator step offers "is" / "is not" but NOT the arity-many "is any of" (its
+// value editor lands in #333).
+export const MultiValueOpsGated: Story = {
+  args: { enableRichOperators: true },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.type(canvas.getByTestId(QA_QUERY_BUILDER.INPUT), 'art');
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))); // Article
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(1))); // Status (SELECT)
+    // The dropdown is rendered with the QueryBuilder's DROPDOWN test id (the
+    // parent overrides QueryDropdown's own default testId via :test-id).
+    const dropdown = canvas.getByTestId(QA_QUERY_BUILDER.DROPDOWN);
+    await expect(dropdown).toHaveTextContent('is not');
+    await expect(dropdown).not.toHaveTextContent('is any of');
   },
 };
 
