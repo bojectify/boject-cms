@@ -82,39 +82,34 @@ describe('operators registry', () => {
     expect(isOperatorId('https')).toBe(false); // a URL scheme is never an op id
   });
 
-  it('multiValue:false excludes arity-two/many operators (single-value gate)', () => {
-    const select = availableOperators('SELECT', {
-      rich: true,
-      multiValue: false,
-    }).map((o) => o.id);
-    expect(select).toContain('eq');
-    expect(select).toContain('neq');
-    expect(select).not.toContain('in'); // arity 'many' — gated out
+  it('multiValue gates arity-many (list) ops; range gates arity-two (between)', () => {
+    const select = (o: { multiValue?: boolean; range?: boolean }) =>
+      availableOperators('SELECT', { rich: true, ...o }).map((x) => x.id);
+    expect(select({ multiValue: false })).not.toContain('in'); // arity many gated
+    expect(select({ multiValue: true })).toContain('in');
 
-    const multirel = availableOperators('MULTIRELATION', {
-      rich: true,
-      multiValue: false,
-    }).map((o) => o.id);
-    expect(multirel).not.toContain('containsAny');
-    expect(multirel).not.toContain('containsAll');
+    const dt = (o: { multiValue?: boolean; range?: boolean }) =>
+      availableOperators('DATETIME', { rich: true, ...o }).map((x) => x.id);
+    expect(dt({ range: false })).not.toContain('between'); // arity two gated
+    expect(dt({ range: true })).toContain('between');
+    expect(dt({ range: false })).toContain('before'); // arity one unaffected
 
-    const datetime = availableOperators('DATETIME', {
-      rich: true,
-      multiValue: false,
-    }).map((o) => o.id);
-    expect(datetime).toContain('before');
-    expect(datetime).toContain('after');
-    expect(datetime).not.toContain('between'); // arity 'two' — gated out
+    const mr = (o: { multiValue?: boolean }) =>
+      availableOperators('MULTIRELATION', { rich: true, ...o }).map(
+        (x) => x.id
+      );
+    expect(mr({ multiValue: false })).toEqual(['eq']); // only single contains
+    expect(mr({ multiValue: true })).toEqual(
+      expect.arrayContaining(['eq', 'containsAny', 'containsAll'])
+    );
   });
 
-  it('multiValue defaults to true (existing callers keep all rich operators)', () => {
-    const select = availableOperators('SELECT', { rich: true }).map(
-      (o) => o.id
-    );
-    expect(select).toContain('in');
-    const datetime = availableOperators('DATETIME', { rich: true }).map(
-      (o) => o.id
-    );
-    expect(datetime).toContain('between');
+  it('valueInputKind is op-aware for list ops', () => {
+    expect(valueInputKind('SELECT', 'in')).toBe('multiSelect');
+    expect(valueInputKind('SELECT', 'eq')).toBe('select'); // single unchanged
+    expect(valueInputKind('MULTIRELATION', 'containsAny')).toBe('multiEntry');
+    expect(valueInputKind('MULTIRELATION', 'containsAll')).toBe('multiEntry');
+    expect(valueInputKind('MULTIRELATION', 'eq')).toBe('entry'); // single unchanged
+    expect(valueInputKind('TEXT', 'contains')).toBe('text'); // unaffected
   });
 });
