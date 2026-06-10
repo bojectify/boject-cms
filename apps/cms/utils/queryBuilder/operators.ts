@@ -1,4 +1,4 @@
-import type { FieldTypeName } from '../fieldTypes';
+import { FIELD_TYPES, type FieldTypeName } from '../fieldTypes';
 import type { ValueInputKind } from './types';
 
 export interface Operator {
@@ -169,19 +169,26 @@ export function operatorArity(opId: string): 'one' | 'two' | 'many' {
 }
 
 /**
- * Operators offered for `type`. `rich: false` returns equality-only (v1);
- * `multiValue: false` additionally hides arity-two/many ops (in / containsAny /
- * containsAll / between) for single-value-only contexts. Both default to "on".
+ * Operators offered for `type`. `rich: false` returns equality-only (v1).
+ * `multiValue: false` hides arity-many (list) ops (in / containsAny / containsAll).
+ * `range: false` hides arity-two (range) ops (between). Both default to "on".
  */
 export function availableOperators(
   type: FieldTypeName,
-  { rich, multiValue = true }: { rich: boolean; multiValue?: boolean }
+  {
+    rich,
+    multiValue = true,
+    range = true,
+  }: { rich: boolean; multiValue?: boolean; range?: boolean }
 ): Operator[] {
   const all = REGISTRY[type] ?? [EQ];
   const richFiltered = rich ? all : all.filter((o) => !o.rich);
-  return multiValue
-    ? richFiltered
-    : richFiltered.filter((o) => operatorArity(o.id) === 'one');
+  return richFiltered.filter((o) => {
+    const arity = operatorArity(o.id);
+    if (arity === 'many') return multiValue;
+    if (arity === 'two') return range;
+    return true; // 'one'
+  });
 }
 
 export function defaultOperator(type: FieldTypeName): Operator {
@@ -207,7 +214,13 @@ const VALUE_KIND: Partial<Record<FieldTypeName, ValueInputKind>> = {
 
 export function valueInputKind(
   type: FieldTypeName,
-  _op: string
+  op: string
 ): ValueInputKind {
+  if (type === FIELD_TYPES.SELECT && op === 'in') return 'multiSelect';
+  if (
+    type === FIELD_TYPES.MULTIRELATION &&
+    (op === 'containsAny' || op === 'containsAll')
+  )
+    return 'multiEntry';
   return VALUE_KIND[type] ?? 'text';
 }

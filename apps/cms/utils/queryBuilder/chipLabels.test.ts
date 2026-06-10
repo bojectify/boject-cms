@@ -38,6 +38,15 @@ describe('chipLabels', () => {
     );
     expect(chipValueDisplay('id-2', { 'id-1': 'Jamie Rivera' })).toBe('id-2');
   });
+
+  it('chipValueDisplay joins an array value (relation ids → titles, else strings)', () => {
+    expect(chipValueDisplay(['t1', 't2'], { t1: 'News', t2: 'Sport' })).toBe(
+      'News, Sport'
+    );
+    expect(chipValueDisplay(['active', 'ended'])).toBe('active, ended');
+    expect(chipValueDisplay(['t1', 'tX'], { t1: 'News' })).toBe('News, tX'); // unresolved → id
+    expect(chipValueDisplay([])).toBeNull(); // empty array → no value segment
+  });
 });
 
 const relFields: ChipLabelField[] = [
@@ -88,5 +97,16 @@ describe('collectRelationFilterIds', () => {
 
   it('returns [] for an undefined query', () => {
     expect(collectRelationFilterIds(undefined, relFields)).toEqual([]);
+  });
+
+  it('collectRelationFilterIds collects ids from array (containsAny/All) values', () => {
+    const fields: ChipLabelField[] = [
+      { identifier: 'tags', name: 'Tags', type: 'MULTIRELATION' },
+    ];
+    const ids = collectRelationFilterIds(
+      { filters: [{ field: 'tags', op: 'containsAny', value: ['t1', 't2'] }] },
+      fields
+    );
+    expect(ids.sort()).toEqual(['t1', 't2']);
   });
 });

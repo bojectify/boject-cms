@@ -2,6 +2,7 @@
 import {
   availableOperators,
   FILTERABLE_FIELD_TYPES,
+  valueInputKind,
 } from '~/utils/queryBuilder/operators';
 import type { QueryDropdownProps } from './queryDropdown.types';
 import { QA_QUERY_DROPDOWN, QUERY_LISTBOX_ID } from './queryDropdown.config';
@@ -47,9 +48,21 @@ const operators = computed(() =>
     ? availableOperators(props.state.draft.field.type, {
         rich: props.state.rich,
         multiValue: props.state.multiValue,
+        range: props.state.range,
       })
     : []
 );
+
+// At a multi-value value step the listbox holds checkbox-style rows (multiple can
+// be selected), so advertise multi-selectability to assistive tech.
+const isMultiValueStep = computed(() => {
+  if (props.state.step !== 'value' || !props.state.draft) return false;
+  const kind = valueInputKind(
+    props.state.draft.field.type,
+    props.state.draft.op
+  );
+  return kind === 'multiSelect' || kind === 'multiEntry';
+});
 
 /** Whether an option id is the keyboard-highlighted one. */
 const isActive = (id: string) => props.activeId === id;
@@ -61,6 +74,7 @@ const isActive = (id: string) => props.activeId === id;
     :data-testid="testId"
     role="listbox"
     aria-label="Search options"
+    :aria-multiselectable="isMultiValueStep || undefined"
     class="flex flex-col p-2 gap-0.5"
   >
     <button

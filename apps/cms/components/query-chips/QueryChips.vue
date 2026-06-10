@@ -17,14 +17,18 @@ const emit = defineEmits<{
   editSegment: [index: number, segment: ChipSegment];
 }>();
 
-/** A relation chip whose id has no resolved label yet, while resolution is pending. */
+/** A relation chip whose id(s) have no resolved label yet, while resolution is pending. */
 function valueLoadingFor(f: SearchFilter): boolean {
   if (!props.relationLabelsPending) return false;
-  if (typeof f.value !== 'string' || !f.value) return false;
   const type = props.fields.find((x) => x.identifier === f.field)?.type;
-  return (
-    !!type && isRelationFieldType(type) && !props.relationLabels?.[f.value]
-  );
+  if (!type || !isRelationFieldType(type)) return false;
+  const ids =
+    typeof f.value === 'string'
+      ? [f.value]
+      : Array.isArray(f.value)
+        ? f.value.filter((v): v is string => typeof v === 'string')
+        : [];
+  return ids.length > 0 && ids.some((id) => !props.relationLabels?.[id]);
 }
 
 // ContentTypeChip / FilterChip are auto-registered (Nuxt + Storybook scan components/).

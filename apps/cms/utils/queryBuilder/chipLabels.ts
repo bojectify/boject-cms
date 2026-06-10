@@ -29,14 +29,21 @@ export function chipOperatorLabel(
 
 /**
  * A filter value → its display string. Relation ids resolve to a captured title
- * via the optional `relationLabels` map; everything else stringifies. Null/
- * undefined yields null (the chip hides its value segment).
+ * via `relationLabels` (falling back to the id); arrays (list ops) map each
+ * element and join with ", "; null/undefined and empty arrays yield null (the
+ * chip hides its value segment).
  */
 export function chipValueDisplay(
   value: unknown,
   relationLabels?: Record<string, string>
 ): string | null {
   if (value == null) return null;
+  if (Array.isArray(value)) {
+    if (value.length === 0) return null;
+    return value
+      .map((v) => relationLabels?.[String(v)] ?? String(v))
+      .join(', ');
+  }
   const key = String(value);
   return relationLabels?.[key] ?? key;
 }
@@ -47,9 +54,9 @@ export function isRelationFieldType(type: string): boolean {
 }
 
 /**
- * Unique entry ids referenced by a query's RELATION/MULTIRELATION equality
- * filters. v1 equality stores a single id string per filter; array values
- * (rich containsAny/All operators) are #301 and ignored here.
+ * Unique entry ids referenced by a query's RELATION/MULTIRELATION filters.
+ * Equality filters store a single id string per filter; list operators
+ * (containsAny/All) store an array of id strings — both are collected here.
  */
 export function collectRelationFilterIds(
   query: SearchQuery | undefined,
@@ -59,13 +66,13 @@ export function collectRelationFilterIds(
   const seen = new Set<string>();
   for (const f of query.filters) {
     const type = fields.find((x) => x.identifier === f.field)?.type;
-    if (
-      type &&
-      isRelationFieldType(type) &&
-      typeof f.value === 'string' &&
-      f.value
-    ) {
+    if (!type || !isRelationFieldType(type)) continue;
+    if (typeof f.value === 'string' && f.value) {
       seen.add(f.value);
+    } else if (Array.isArray(f.value)) {
+      for (const v of f.value) {
+        if (typeof v === 'string' && v) seen.add(v);
+      }
     }
   }
   return [...seen];

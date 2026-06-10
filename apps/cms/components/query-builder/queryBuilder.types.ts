@@ -15,6 +15,8 @@ export interface QueryBuilderProps extends BasicComponentProps {
   enableRichOperators?: boolean;
   /** Surface arity-two/many operators (in / containsAny / containsAll / between). Requires their value editors (#333). */
   enableMultiValueOperators?: boolean;
+  /** Surface arity-two range operators (between). Requires the date editor (follow-up). */
+  enableRangeOperators?: boolean;
   /** Relation value lookup. Injected so the component never fetches (Storybook passes a fixture). */
   searchEntries?: (
     targetContentTypeIds: string[],

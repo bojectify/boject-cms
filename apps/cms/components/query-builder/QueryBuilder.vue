@@ -10,12 +10,14 @@ import {
   valueInputKind,
 } from '~/utils/queryBuilder/operators';
 
-// QueryChips / QueryDropdown / FilterChip / ValueEditor are auto-registered
-// (Nuxt + Storybook scan components/), so they need no explicit import.
+// QueryChips / QueryDropdown / FilterChip / ValueEditor / MultiSelectEditor /
+// MultiEntryEditor are auto-registered (Nuxt + Storybook scan components/), so
+// they need no explicit import.
 
 const props = withDefaults(defineProps<QueryBuilderProps>(), {
   enableRichOperators: false,
   enableMultiValueOperators: false,
+  enableRangeOperators: false,
   testId: QA_QUERY_BUILDER.COMPONENT,
 });
 const emit = defineEmits(['update:modelValue', 'run', 'broaden']);
@@ -25,6 +27,7 @@ const { state, dispatch } = useQueryBuilder({
   lockedContentType: props.lockedContentType,
   rich: props.enableRichOperators,
   multiValue: props.enableMultiValueOperators,
+  range: props.enableRangeOperators,
   initialQuery: props.modelValue,
 });
 
@@ -89,6 +92,7 @@ watch([() => state.value.step, () => state.value.text], () => {
     const ops = availableOperators(s.draft.field.type, {
       rich: s.rich,
       multiValue: s.multiValue,
+      range: s.range,
     });
     const idx = ops.findIndex((o) => o.id === s.draft!.op);
     // Option id mirrors QueryDropdown's `qb-opt-op-<i>` operator-row convention.
@@ -200,6 +204,10 @@ const valuePlaceholder = computed(() => {
       return 'true / false';
     case 'datetime':
       return 'YYYY-MM-DD…';
+    case 'multiSelect':
+      return 'Pick values…';
+    case 'multiEntry':
+      return 'Search entries…';
     default:
       return 'Enter a value…';
   }
@@ -231,6 +239,32 @@ function onValueInput(e: Event) {
   handle({ kind: 'setFreeText', q: (e.target as HTMLInputElement).value });
 }
 function onValueKeydown(e: KeyboardEvent) {
+  const multi =
+    draftKind.value === 'multiSelect' || draftKind.value === 'multiEntry';
+  // Multi-value: Enter commits the accumulated array + runs; Tab commits + continues
+  // to the next filter (mirrors the single-value Tab). Space still toggles a row via
+  // handleNavKeys → activateActive → the row's @click. Handle Enter/Tab BEFORE
+  // handleNavKeys so a highlighted row isn't activated instead of committing, and
+  // preventDefault Tab — a native Tab moves focus out of this input and silently
+  // kills ↑/↓ row navigation (the keydown handler lives here). Only commit a
+  // non-empty selection: an empty `in`/`containsAny` would serialize to a degenerate
+  // `field:op:` → `IN ['']`. Enter with nothing selected abandons the draft and runs
+  // (mirrors single-value Enter on an empty input); empty Tab is swallowed (stay put).
+  if (multi) {
+    const val = state.value.draft?.value;
+    const hasSelection = Array.isArray(val) && val.length > 0;
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (hasSelection) handle({ kind: 'commitValue' });
+      handle({ kind: 'run' });
+      return;
+    }
+    if (e.key === 'Tab' && !e.shiftKey) {
+      e.preventDefault();
+      if (hasSelection) handle({ kind: 'commitValue' });
+      return;
+    }
+  }
   if (handleNavKeys(e)) return;
   if (e.key === 'Enter') {
     e.preventDefault();
@@ -375,8 +409,25 @@ function onKeydown(e: KeyboardEvent) {
       @pick-operator="(op: string) => handle({ kind: 'pickOperator', op })"
     >
       <template #value>
+        <MultiSelectEditor
+          v-if="draftKind === 'multiSelect' && state.draft"
+          :draft="state.draft"
+          :active-id="activeId"
+          @toggle="(v: string) => handle({ kind: 'toggleValue', value: v })"
+        />
+        <MultiEntryEditor
+          v-else-if="draftKind === 'multiEntry' && state.draft"
+          :draft="state.draft"
+          :text="state.text"
+          :active-id="activeId"
+          :search-entries="searchEntries"
+          @toggle="(v: string) => handle({ kind: 'toggleValue', value: v })"
+          @capture-label="
+            (p: { id: string; title: string }) => (liveLabels[p.id] = p.title)
+          "
+        />
         <ValueEditor
-          v-if="state.draft"
+          v-else-if="state.draft"
           :draft="state.draft"
           :text="state.text"
           :active-id="activeId"

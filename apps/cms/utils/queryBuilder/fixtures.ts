@@ -25,6 +25,12 @@ export const ARTICLE_CT: QueryContentType = {
     { identifier: 'published', name: 'Published', type: 'DATETIME' },
     { identifier: 'featured', name: 'Featured', type: 'BOOLEAN' },
     { identifier: 'readTime', name: 'Read time', type: 'NUMBER' },
+    {
+      identifier: 'tags',
+      name: 'Tags',
+      type: 'MULTIRELATION',
+      targetContentTypeIds: ['tag1'],
+    },
   ],
 };
 
