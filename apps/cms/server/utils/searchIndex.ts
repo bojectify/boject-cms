@@ -54,7 +54,9 @@ export const ENTRIES_INDEX_SETTINGS: Settings = {
 
 /**
  * Create the global `entries` index if absent and converge its settings to
- * ENTRIES_INDEX_SETTINGS. Idempotent — safe to call on every boot.
+ * ENTRIES_INDEX_SETTINGS. Idempotent — safe to call on every boot. Also
+ * converges the instance-level `containsFilter` experimental flag (best-effort
+ * — a toggle failure is warned, not thrown, so it never blocks the index).
  *
  * Existence is checked via getIndexes membership rather than catching a
  * `MeilisearchApiError` with an `index_not_found` code, to avoid coupling to
@@ -74,4 +76,17 @@ export async function ensureEntriesIndex(
   }
 
   await client.index(index).updateSettings(ENTRIES_INDEX_SETTINGS).waitTask();
+
+  // CONTAINS / STARTS WITH filter operators (used by TEXT/TEXTAREA/SLUG
+  // `contains`/`startsWith`) are gated behind this instance-level experimental
+  // flag. Wrapped so an engine that disallows the toggle never blocks index
+  // convergence — graceful degradation (those operators 400 until enabled).
+  try {
+    await client.updateExperimentalFeatures({ containsFilter: true });
+  } catch (error) {
+    console.warn(
+      '[search] could not enable containsFilter experimental feature; CONTAINS/STARTS WITH filters will be unavailable:',
+      error
+    );
+  }
 }
