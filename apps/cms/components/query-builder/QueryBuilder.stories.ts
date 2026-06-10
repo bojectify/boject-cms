@@ -10,6 +10,7 @@ import { QA_FILTER_CHIP } from '../filter-chip/filterChip.config.js';
 import { QA_VALUE_EDITOR } from '../value-editor/valueEditor.config.js';
 import { QA_CONTENT_TYPE_CHIP } from '../content-type-chip/contentTypeChip.config.js';
 import { QA_MULTI_SELECT_EDITOR } from '../multi-select-editor/multiSelectEditor.config.js';
+import { QA_MULTI_ENTRY_EDITOR } from '../multi-entry-editor/multiEntryEditor.config.js';
 
 const meta: Meta<typeof QueryBuilder> = {
   title: 'Search/QueryBuilder',
@@ -481,6 +482,50 @@ export const SelectIsAnyOfEmptyEnterCommitsNothing: Story = {
     const lastRun = (args.onRun as ReturnType<typeof fn>).mock.calls.at(-1)![0];
     expect(lastRun.contentType).toBe('Article');
     expect(lastRun.filters).toEqual([]);
+  },
+};
+
+// Multi-value MULTIRELATION: picking Tags → "contains any" opens the searchable
+// multi-entry editor; toggling two entries accumulates a string[] of ids and
+// captures their titles, and Enter commits the array + runs as one `containsAny`
+// filter. The committed chip shows both captured titles (the array fan-out).
+export const MultirelationContainsAnyFlow: Story = {
+  args: {
+    enableRichOperators: true,
+    enableMultiValueOperators: true,
+    // story-level override: two entries so two can be toggled (meta default returns one)
+    searchEntries: fn(async () => [
+      { id: 't1', entryTitle: 'News', contentTypeName: 'Tag' },
+      { id: 't2', entryTitle: 'Sport', contentTypeName: 'Tag' },
+    ]),
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await userEvent.type(canvas.getByTestId(QA_QUERY_BUILDER.INPUT), 'art');
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))); // Article
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(6))); // Tags (MULTIRELATION) — appended last
+    // operator step: [contains (eq), contains any (containsAny), contains all (containsAll)]
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(1))); // contains any
+    // multi-entry editor: toggle the first two entries
+    await userEvent.click(
+      await canvas.findByTestId(QA_MULTI_ENTRY_EDITOR.OPTION(0))
+    ); // News
+    await userEvent.click(canvas.getByTestId(QA_MULTI_ENTRY_EDITOR.OPTION(1))); // Sport
+    // clicking the rows moved focus off the value input — refocus so {Enter}
+    // reaches the combobox's commit+run handler (mirrors SelectIsAnyOfFlow)
+    await userEvent.click(canvas.getByTestId(QA_QUERY_BUILDER.VALUE_INPUT));
+    await userEvent.keyboard('{Enter}');
+    // committed + ran as one containsAny filter holding the two ids
+    const lastRun = (args.onRun as ReturnType<typeof fn>).mock.calls.at(-1)![0];
+    expect(lastRun.filters[0]).toEqual(
+      expect.objectContaining({ field: 'tags', op: 'containsAny' })
+    );
+    expect(lastRun.filters[0].value).toHaveLength(2);
+    // the committed chip shows BOTH captured titles (array fan-out via liveLabels)
+    const chip = within(canvas.getByTestId(QA_QUERY_CHIPS.FILTER_CHIP(0)));
+    const seg = chip.getByTestId(QA_FILTER_CHIP.VALUE_SEGMENT);
+    await expect(seg).toHaveTextContent('News');
+    await expect(seg).toHaveTextContent('Sport');
   },
 };
 
