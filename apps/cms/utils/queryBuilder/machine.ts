@@ -1,5 +1,9 @@
 import type { QueryContentType, QueryField, SearchQuery } from './types';
-import { defaultOperator, valueInputKind } from './operators';
+import {
+  availableOperators,
+  defaultOperator,
+  valueInputKind,
+} from './operators';
 import { addFilter, removeFilter } from './query';
 
 export type Step = 'contentType' | 'field' | 'operator' | 'value';
@@ -14,6 +18,7 @@ export interface BuilderState {
   contentTypes: QueryContentType[];
   locked: boolean; // lockedContentType (route scope)
   rich: boolean; // enableRichOperators
+  multiValue: boolean; // enableMultiValueOperators (arity two/many ops; editors land in #333)
   step: Step;
   query: SearchQuery;
   draft: DraftFilter | null;
@@ -31,6 +36,7 @@ export interface InitOptions {
   contentTypes: QueryContentType[];
   lockedContentType?: QueryContentType;
   rich?: boolean;
+  multiValue?: boolean;
   initialQuery?: SearchQuery;
 }
 
@@ -45,6 +51,7 @@ export function initState(opts: InitOptions): BuilderState {
     contentTypes: opts.contentTypes,
     locked,
     rich: opts.rich ?? false,
+    multiValue: opts.multiValue ?? false,
     step: query.contentType ? 'field' : 'contentType',
     query,
     draft: null,
@@ -125,19 +132,17 @@ export function reduce(prev: BuilderState, action: Action): BuilderState {
       };
 
     case 'pickField': {
-      const op = defaultOperator(action.field.type);
-      const draft: DraftFilter = {
-        field: action.field,
-        op: op.id,
-        value: null,
-      };
-      // v1: a single operator -> skip straight to the value step.
-      const ops = s.rich ? null : [op];
+      const ops = availableOperators(action.field.type, {
+        rich: s.rich,
+        multiValue: s.multiValue,
+      });
+      const op = ops[0] ?? defaultOperator(action.field.type);
       return {
         ...s,
-        draft,
+        draft: { field: action.field, op: op.id, value: null },
         text: '',
-        step: ops && ops.length === 1 ? 'value' : 'operator',
+        // One operator → skip the operator step; otherwise pick an operator.
+        step: ops.length <= 1 ? 'value' : 'operator',
       };
     }
 
@@ -183,28 +188,30 @@ export function reduce(prev: BuilderState, action: Action): BuilderState {
     }
 
     case 'editFilter': {
-      // Re-open a committed filter for editing. v1: the value is the only
-      // editable aspect (the operator is fixed and field-change is deferred), so
-      // every segment re-opens the value step; the `segment` arg is carried for
-      // #301 (operator step) / a future field re-pick. The original filter stays
-      // in `query.filters` and is replaced in place on commit (or left untouched
-      // on cancel).
+      // Re-open a committed filter for editing. The original filter stays in
+      // `query.filters` and is replaced in place on commit (or left untouched on
+      // cancel). Field re-pick is deferred, so the `field` segment falls through
+      // to the value step alongside `value`.
       const filter = s.query.filters[action.index];
       if (!filter) return s;
       const field = findField(s, filter.field);
       if (!field) return s;
       const kind = valueInputKind(field.type, filter.op);
-      // Pre-fill the input for free-entry values so they can be edited; entry /
+      // Pre-fill free-entry values so a typed value survives the re-edit; entry /
       // select / boolean are re-picked from the dropdown, so start empty.
       const prefill =
         kind === 'text' || kind === 'number' || kind === 'datetime'
           ? String(filter.value ?? '')
           : '';
+      // Operator segment → re-open the operator step (change is → is not, …);
+      // the picked operator then routes to the value step (pickOperator), where
+      // the prefilled text lets a typed value carry over. value / field re-open
+      // the value step directly (field re-pick is deferred).
       return {
         ...s,
         draft: { field, op: filter.op, value: filter.value },
         editingIndex: action.index,
-        step: 'value',
+        step: action.segment === 'operator' ? 'operator' : 'value',
         text: prefill,
       };
     }

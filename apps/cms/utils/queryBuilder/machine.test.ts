@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { initState, reduce } from './machine';
+import { CONTENT_TYPES, ARTICLE_CT } from './fixtures';
 import type { QueryContentType } from './types';
 
 const article: QueryContentType = {
@@ -192,5 +193,52 @@ describe('builder machine', () => {
     expect(s.draft).toBeNull();
     expect(s.text).toBe('');
     expect(s.intent).toBeNull();
+  });
+
+  it('rich + multiValue:false: picking a single-value TEXT field goes to the operator step', () => {
+    const s0 = initState({
+      contentTypes: CONTENT_TYPES,
+      lockedContentType: ARTICLE_CT,
+      rich: true,
+      multiValue: false,
+    });
+    const summary = ARTICLE_CT.fields.find((f) => f.identifier === 'summary')!;
+    const s1 = reduce(s0, { kind: 'pickField', field: summary });
+    expect(s1.step).toBe('operator');
+    expect(s1.draft?.field.identifier).toBe('summary');
+  });
+
+  it('rich: picking a single-operator field (BOOLEAN) skips straight to the value step', () => {
+    const s0 = initState({
+      contentTypes: CONTENT_TYPES,
+      lockedContentType: ARTICLE_CT,
+      rich: true,
+      multiValue: false,
+    });
+    const featured = ARTICLE_CT.fields.find(
+      (f) => f.identifier === 'featured'
+    )!;
+    const s1 = reduce(s0, { kind: 'pickField', field: featured });
+    expect(s1.step).toBe('value'); // BOOLEAN has only `eq` → no operator step
+  });
+
+  it('editFilter on the operator segment re-opens the operator step and preserves the value', () => {
+    let s = initState({
+      contentTypes: CONTENT_TYPES,
+      lockedContentType: ARTICLE_CT,
+      rich: true,
+      multiValue: false,
+    });
+    const summary = ARTICLE_CT.fields.find((f) => f.identifier === 'summary')!;
+    s = reduce(s, { kind: 'pickField', field: summary });
+    s = reduce(s, { kind: 'pickOperator', op: 'contains' });
+    s = reduce(s, { kind: 'setValue', value: 'x' });
+    s = reduce(s, { kind: 'commitValue' });
+    expect(s.query.filters).toHaveLength(1);
+    const s2 = reduce(s, { kind: 'editFilter', index: 0, segment: 'operator' });
+    expect(s2.step).toBe('operator');
+    expect(s2.editingIndex).toBe(0);
+    expect(s2.draft?.value).toBe('x');
+    expect(s2.text).toBe('x'); // prefilled so a typed value survives an operator change
   });
 });
