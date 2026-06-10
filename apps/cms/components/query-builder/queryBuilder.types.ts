@@ -17,6 +17,10 @@ export interface QueryBuilderProps extends BasicComponentProps {
     targetContentTypeIds: string[],
     q: string
   ) => Promise<EntryOption[]>;
+  /** Seed of resolved relation entry-id → title (e.g. from a URL-loaded query). */
+  relationLabels?: Record<string, string>;
+  /** True while the seed relation labels are resolving (drives the chip skeleton). */
+  relationLabelsPending?: boolean;
 }
 
 export interface QueryBuilderEmits {

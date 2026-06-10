@@ -20,8 +20,9 @@ const fields = computed(() => props.fields ?? []);
 <template>
   <!--
     Summary mode: the read-only active query. QueryChips renders the content-type
-    + filter chips (its field / operator / value labels come from the shared
-    chipLabels helpers); relation values still show the id until #322 lands.
+    + filter chips (labels via the shared chipLabels helpers). Relation values
+    show the resolved entry title via relationLabels, a skeleton while pending,
+    and fall back to the id if resolution fails.
   -->
   <div
     v-if="query"
@@ -33,6 +34,8 @@ const fields = computed(() => props.fields ?? []);
       :content-type-name="contentTypeName"
       :filters="query.filters"
       :fields="fields"
+      :relation-labels="relationLabels"
+      :relation-labels-pending="relationLabelsPending"
       @remove-content-type="$emit('clear')"
       @remove-filter="(i: number) => $emit('removeFilter', i)"
     />

@@ -22,12 +22,16 @@ const { state, dispatch } = useQueryBuilder({
   initialQuery: props.modelValue,
 });
 
-/**
- * entryId -> display title, captured when a relation value is chosen, so the
- * chip can show the title while the filter value stays the id (the engine
- * filters relations by entry id).
- */
-const relationLabels = ref<Record<string, string>>({});
+// entryId -> display title, captured when a relation value is picked live in
+// the palette, so the chip shows the title while the filter value stays the id
+// (the engine filters relations by entry id).
+const liveLabels = ref<Record<string, string>>({});
+// Merge the URL-seed (props, resolved by the parent) with live picks; live
+// picks win (same id→title either way).
+const relationLabels = computed(() => ({
+  ...props.relationLabels,
+  ...liveLabels.value,
+}));
 
 const mainInput = ref<HTMLInputElement>();
 const valueInput = ref<HTMLInputElement>();
@@ -147,7 +151,7 @@ const activeSpaceLabel = computed(() =>
 );
 
 function onChooseEntry(e: EntryOption) {
-  relationLabels.value[e.id] = e.entryTitle;
+  liveLabels.value[e.id] = e.entryTitle;
   handle({ kind: 'setValue', value: e.id });
   handle({ kind: 'commitValue' });
 }
@@ -269,6 +273,7 @@ function onKeydown(e: KeyboardEvent) {
         :filters="state.query.filters"
         :fields="ct?.fields ?? []"
         :relation-labels="relationLabels"
+        :relation-labels-pending="relationLabelsPending"
         :editing-index="state.editingIndex"
         @remove-content-type="onRemoveContentType"
         @remove-filter="onRemoveFilter"

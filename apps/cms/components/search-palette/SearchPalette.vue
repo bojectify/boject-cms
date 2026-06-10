@@ -34,6 +34,11 @@ const initialQuery = computed<SearchQuery>(() =>
   )
 );
 
+const { relationLabels, pending: relationLabelsPending } = useFilterChipLabels(
+  () => initialQuery.value,
+  () => lockedContentType.value?.fields ?? []
+);
+
 async function searchEntries(
   targetContentTypeIds: string[],
   q: string
@@ -101,6 +106,8 @@ function onBroaden(payload: { q?: string }) {
         :content-types="contentTypes"
         :locked-content-type="lockedContentType"
         :model-value="initialQuery"
+        :relation-labels="relationLabels"
+        :relation-labels-pending="relationLabelsPending"
         :search-entries="searchEntries"
         @run="onRun"
         @broaden="onBroaden"

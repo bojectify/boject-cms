@@ -94,3 +94,21 @@ export const Editing: Story = {
     ).toHaveTextContent('Summary');
   },
 };
+
+// A relation value still resolving renders a skeleton, not text.
+export const ValueLoading: Story = {
+  args: {
+    field: 'Author',
+    operator: 'is',
+    value: 'some-uuid',
+    valueLoading: true,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByTestId(QA_FILTER_CHIP.VALUE_SKELETON)
+    ).toBeVisible();
+    // the raw value text is not rendered while loading
+    await expect(canvas.queryByTestId(QA_FILTER_CHIP.VALUE_SEGMENT)).toBeNull();
+  },
+};

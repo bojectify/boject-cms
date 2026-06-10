@@ -339,3 +339,37 @@ export const MouseRemoveKeepsFocus: Story = {
     expect(args.onRun).toHaveBeenCalled();
   },
 };
+
+// URL-loaded query: a relation filter's chip shows the seeded title (no live pick).
+export const RelationLabelSeed: Story = {
+  args: {
+    modelValue: {
+      contentType: 'Article',
+      filters: [{ field: 'author', op: 'eq', value: 'e1' }],
+    },
+    relationLabels: { e1: 'Jamie Rivera' },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const chip = within(canvas.getByTestId(QA_QUERY_CHIPS.FILTER_CHIP(0)));
+    await expect(
+      chip.getByTestId(QA_FILTER_CHIP.VALUE_SEGMENT)
+    ).toHaveTextContent('Jamie Rivera');
+  },
+};
+
+// URL-loaded query, labels still resolving → the chip value shows a skeleton.
+export const RelationLabelSeedPending: Story = {
+  args: {
+    modelValue: {
+      contentType: 'Article',
+      filters: [{ field: 'author', op: 'eq', value: 'e1' }],
+    },
+    relationLabelsPending: true,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const chip = within(canvas.getByTestId(QA_QUERY_CHIPS.FILTER_CHIP(0)));
+    await expect(chip.getByTestId(QA_FILTER_CHIP.VALUE_SKELETON)).toBeVisible();
+  },
+};
