@@ -104,15 +104,29 @@ function relationEntryId(value: unknown): string | null {
 }
 
 /**
+ * Convert a stored DATETIME value (ISO-8601 string) to epoch milliseconds for
+ * indexing. Meilisearch comparison operators (`<`, `>`, `TO`) work only on
+ * numbers, so DATETIME is indexed numerically rather than as a sortable-but-
+ * not-comparable string. Shared by the index transformer and (later) the query
+ * compiler so both agree on the unit. Returns null for missing / malformed
+ * values (degrade, never throw).
+ */
+export function datetimeToEpoch(value: unknown): number | null {
+  if (typeof value !== 'string' || value === '') return null;
+  const t = new Date(value).getTime();
+  return Number.isFinite(t) ? t : null;
+}
+
+/**
  * Flatten a CMS entry into a Meilisearch document per the field-type mapping
  * decided in the search epic (#53). Pure — no Prisma, no Nuxt, no I/O.
  *
  * Per field type: TEXT/TEXTAREA/SLUG/SELECT → string; RICHTEXT → flattened
- * plain text; NUMBER → number; BOOLEAN → boolean; DATETIME → ISO string;
- * RELATION → target entryId; MULTIRELATION → target entryId[]; ENTRY_TITLE is
- * folded into the envelope `entryTitle` (not duplicated under `fields`); IMAGE
- * is skipped. Missing / malformed values degrade to null (scalars), '' (rich
- * text), or [] (multirelation) rather than throwing.
+ * plain text; NUMBER → number; BOOLEAN → boolean; DATETIME → epoch
+ * milliseconds; RELATION → target entryId; MULTIRELATION → target entryId[];
+ * ENTRY_TITLE is folded into the envelope `entryTitle` (not duplicated under
+ * `fields`); IMAGE is skipped. Missing / malformed values degrade to null
+ * (scalars), '' (rich text), or [] (multirelation) rather than throwing.
  */
 export function toSearchDocument(
   entry: SearchableEntry,
@@ -134,8 +148,11 @@ export function toSearchDocument(
       case FIELD_TYPES.TEXTAREA:
       case FIELD_TYPES.SLUG:
       case FIELD_TYPES.SELECT:
-      case FIELD_TYPES.DATETIME:
         out[field.identifier] = typeof value === 'string' ? value : null;
+        break;
+
+      case FIELD_TYPES.DATETIME:
+        out[field.identifier] = datetimeToEpoch(value);
         break;
 
       case FIELD_TYPES.NUMBER:
