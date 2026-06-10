@@ -222,7 +222,7 @@ describe('builder machine', () => {
     expect(s1.step).toBe('value'); // BOOLEAN has only `eq` → no operator step
   });
 
-  it('editFilter on the operator segment re-opens the operator step and preserves the value', () => {
+  it('editFilter on the operator segment re-opens the operator step with a clear input; the value carries to the value step on pickOperator', () => {
     let s = initState({
       contentTypes: CONTENT_TYPES,
       lockedContentType: ARTICLE_CT,
@@ -238,8 +238,12 @@ describe('builder machine', () => {
     const s2 = reduce(s, { kind: 'editFilter', index: 0, segment: 'operator' });
     expect(s2.step).toBe('operator');
     expect(s2.editingIndex).toBe(0);
-    expect(s2.draft?.value).toBe('x');
-    expect(s2.text).toBe('x'); // prefilled so a typed value survives an operator change
+    expect(s2.draft?.value).toBe('x'); // value preserved on the draft
+    expect(s2.text).toBe(''); // operator step shows a CLEAR input
+    // Picking a new operator carries the value to the value step (prefilled).
+    const s3 = reduce(s2, { kind: 'pickOperator', op: 'neq' });
+    expect(s3.step).toBe('value');
+    expect(s3.text).toBe('x');
   });
 
   it('committing a re-edited operator replaces the filter in place (contains → is not)', () => {

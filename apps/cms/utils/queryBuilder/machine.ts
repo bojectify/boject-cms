@@ -146,10 +146,24 @@ export function reduce(prev: BuilderState, action: Action): BuilderState {
       };
     }
 
-    case 'pickOperator':
-      return s.draft
-        ? { ...s, draft: { ...s.draft, op: action.op }, step: 'value' }
-        : s;
+    case 'pickOperator': {
+      if (!s.draft) return s;
+      // Carry the draft's value into the value step. A fresh filter has value
+      // null (→ empty input); re-editing an operator prefills the typed value so
+      // e.g. is → is not on "three" keeps "three". Entry / select / boolean are
+      // re-picked from the dropdown, so their input starts empty.
+      const kind = valueInputKind(s.draft.field.type, action.op);
+      const prefill =
+        kind === 'text' || kind === 'number' || kind === 'datetime'
+          ? String(s.draft.value ?? '')
+          : '';
+      return {
+        ...s,
+        draft: { ...s.draft, op: action.op },
+        step: 'value',
+        text: prefill,
+      };
+    }
 
     case 'setValue':
       return s.draft
@@ -196,22 +210,32 @@ export function reduce(prev: BuilderState, action: Action): BuilderState {
       if (!filter) return s;
       const field = findField(s, filter.field);
       if (!field) return s;
+      const draft = { field, op: filter.op, value: filter.value };
+      // Operator segment → re-open the operator step with a CLEAR input. The value
+      // stays on the draft and is re-prefilled at the value step (pickOperator),
+      // so changing e.g. is → is not keeps the value without showing it here.
+      if (action.segment === 'operator') {
+        return {
+          ...s,
+          draft,
+          editingIndex: action.index,
+          step: 'operator',
+          text: '',
+        };
+      }
+      // value / field → value step with a kind-aware prefill so a typed value is
+      // editable; entry / select / boolean are re-picked, so start empty. Field
+      // re-pick is deferred, so the `field` segment falls through here too.
       const kind = valueInputKind(field.type, filter.op);
-      // Pre-fill free-entry values so a typed value survives the re-edit; entry /
-      // select / boolean are re-picked from the dropdown, so start empty.
       const prefill =
         kind === 'text' || kind === 'number' || kind === 'datetime'
           ? String(filter.value ?? '')
           : '';
-      // Operator segment → re-open the operator step (change is → is not, …);
-      // the picked operator then routes to the value step (pickOperator), where
-      // the prefilled text lets a typed value carry over. value / field re-open
-      // the value step directly (field re-pick is deferred).
       return {
         ...s,
-        draft: { field, op: filter.op, value: filter.value },
+        draft,
         editingIndex: action.index,
-        step: action.segment === 'operator' ? 'operator' : 'value',
+        step: 'value',
         text: prefill,
       };
     }

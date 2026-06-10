@@ -213,6 +213,45 @@ export const ReEditCommittedChipValue: Story = {
   },
 };
 
+// Re-editing a committed chip's OPERATOR segment opens the operator step with a
+// CLEAR input — the value is carried on the draft and re-prefilled only once a
+// new operator is picked. Regression guard for the committed value leaking into
+// the input at the operator step (#332).
+export const ReEditCommittedChipOperator: Story = {
+  args: { enableRichOperators: true },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    // build: Summary is "first"
+    await userEvent.type(canvas.getByTestId(QA_QUERY_BUILDER.INPUT), 'art');
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))); // Article
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))); // Summary (TEXT)
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))); // operator: is (eq)
+    await userEvent.type(
+      canvas.getByTestId(QA_QUERY_BUILDER.VALUE_INPUT),
+      'first'
+    );
+    await userEvent.keyboard('{ArrowRight}'); // commit → "Summary is first"
+    await expect(
+      canvas.getByTestId(QA_FILTER_CHIP.OPERATOR_SEGMENT)
+    ).toHaveTextContent('is');
+
+    // click the operator segment → operator step, with a CLEAR value input
+    await userEvent.click(canvas.getByTestId(QA_FILTER_CHIP.OPERATOR_SEGMENT));
+    await expect(
+      canvas.getByTestId(QA_QUERY_BUILDER.DROPDOWN)
+    ).toHaveTextContent('is not'); // operator step is showing
+    await expect(canvas.getByTestId(QA_QUERY_BUILDER.VALUE_INPUT)).toHaveValue(
+      '' // not "first" — the value must not leak into the operator-step input
+    );
+
+    // picking a new operator carries the value back into the value step
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(1))); // is not
+    await expect(canvas.getByTestId(QA_QUERY_BUILDER.VALUE_INPUT)).toHaveValue(
+      'first'
+    );
+  },
+};
+
 export const FullQueryRun: Story = {
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
