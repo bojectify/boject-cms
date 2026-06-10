@@ -81,4 +81,40 @@ describe('operators registry', () => {
     expect(isOperatorId('nope')).toBe(false);
     expect(isOperatorId('https')).toBe(false); // a URL scheme is never an op id
   });
+
+  it('multiValue:false excludes arity-two/many operators (single-value gate)', () => {
+    const select = availableOperators('SELECT', {
+      rich: true,
+      multiValue: false,
+    }).map((o) => o.id);
+    expect(select).toContain('eq');
+    expect(select).toContain('neq');
+    expect(select).not.toContain('in'); // arity 'many' — gated out
+
+    const multirel = availableOperators('MULTIRELATION', {
+      rich: true,
+      multiValue: false,
+    }).map((o) => o.id);
+    expect(multirel).not.toContain('containsAny');
+    expect(multirel).not.toContain('containsAll');
+
+    const datetime = availableOperators('DATETIME', {
+      rich: true,
+      multiValue: false,
+    }).map((o) => o.id);
+    expect(datetime).toContain('before');
+    expect(datetime).toContain('after');
+    expect(datetime).not.toContain('between'); // arity 'two' — gated out
+  });
+
+  it('multiValue defaults to true (existing callers keep all rich operators)', () => {
+    const select = availableOperators('SELECT', { rich: true }).map(
+      (o) => o.id
+    );
+    expect(select).toContain('in');
+    const datetime = availableOperators('DATETIME', { rich: true }).map(
+      (o) => o.id
+    );
+    expect(datetime).toContain('between');
+  });
 });
