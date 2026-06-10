@@ -46,6 +46,7 @@ const operators = computed(() =>
   props.state.draft
     ? availableOperators(props.state.draft.field.type, {
         rich: props.state.rich,
+        multiValue: props.state.multiValue,
       })
     : []
 );

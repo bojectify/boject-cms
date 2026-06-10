@@ -11,6 +11,7 @@ import { operatorLabel, valueInputKind } from '~/utils/queryBuilder/operators';
 
 const props = withDefaults(defineProps<QueryBuilderProps>(), {
   enableRichOperators: false,
+  enableMultiValueOperators: false,
   testId: QA_QUERY_BUILDER.COMPONENT,
 });
 const emit = defineEmits(['update:modelValue', 'run', 'broaden']);
@@ -19,6 +20,7 @@ const { state, dispatch } = useQueryBuilder({
   contentTypes: props.contentTypes,
   lockedContentType: props.lockedContentType,
   rich: props.enableRichOperators,
+  multiValue: props.enableMultiValueOperators,
   initialQuery: props.modelValue,
 });
 

@@ -340,6 +340,61 @@ export const MouseRemoveKeepsFocus: Story = {
   },
 };
 
+// Rich operators on: picking a TEXT field opens the operator step (is / is not /
+// contains / starts with), and picking a single-value op (contains) routes to
+// the value step where a typed value commits the full field·op·value filter.
+export const RichOperatorFlow: Story = {
+  args: { enableRichOperators: true },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await userEvent.type(canvas.getByTestId(QA_QUERY_BUILDER.INPUT), 'art');
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))); // Article
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))); // Summary (TEXT)
+    // Operator step shows TEXT's single-value operators.
+    await expect(
+      canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))
+    ).toHaveTextContent('is');
+    await expect(
+      canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(1))
+    ).toHaveTextContent('is not');
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(2))); // contains
+    // Value step: the typed value lives in the draft chip's value segment, and
+    // → at the end of the text commits it (mirrors TextValueCommitsWithArrow).
+    const valueInput = canvas.getByTestId(QA_QUERY_BUILDER.VALUE_INPUT);
+    await userEvent.type(valueInput, 'brew');
+    await userEvent.keyboard('{ArrowRight}');
+    expect(args['onUpdate:modelValue']).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        filters: [
+          expect.objectContaining({
+            field: 'summary',
+            op: 'contains',
+            value: 'brew',
+          }),
+        ],
+      })
+    );
+  },
+};
+
+// Multi-value operators stay gated even with rich operators on: a SELECT field's
+// operator step offers "is" / "is not" but NOT the arity-many "is any of" (its
+// value editor lands in #333).
+export const MultiValueOpsGated: Story = {
+  args: { enableRichOperators: true },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.type(canvas.getByTestId(QA_QUERY_BUILDER.INPUT), 'art');
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))); // Article
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(1))); // Status (SELECT)
+    // The dropdown is rendered with the QueryBuilder's DROPDOWN test id (the
+    // parent overrides QueryDropdown's own default testId via :test-id).
+    const dropdown = canvas.getByTestId(QA_QUERY_BUILDER.DROPDOWN);
+    await expect(dropdown).toHaveTextContent('is not');
+    await expect(dropdown).not.toHaveTextContent('is any of');
+  },
+};
+
 // URL-loaded query: a relation filter's chip shows the seeded title (no live pick).
 export const RelationLabelSeed: Story = {
   args: {

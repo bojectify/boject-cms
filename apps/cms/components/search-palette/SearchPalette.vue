@@ -106,6 +106,8 @@ function onBroaden(payload: { q?: string }) {
         :content-types="contentTypes"
         :locked-content-type="lockedContentType"
         :model-value="initialQuery"
+        :enable-rich-operators="true"
+        :enable-multi-value-operators="false"
         :relation-labels="relationLabels"
         :relation-labels-pending="relationLabelsPending"
         :search-entries="searchEntries"
