@@ -36,7 +36,10 @@ function onSelect(value: unknown) {
 </script>
 
 <template>
-  <div :data-testid="testId" class="p-2">
+  <!-- w-fit keeps the calendar at its natural width instead of stretching to fill
+       the full-width dropdown (matching the compact range calendar); mx-auto then
+       centres it in the dropdown. -->
+  <div :data-testid="testId" class="p-2 w-fit mx-auto">
     <UCalendar
       :default-value="seed"
       initial-focus

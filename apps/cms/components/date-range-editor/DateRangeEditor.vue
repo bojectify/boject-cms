@@ -57,7 +57,7 @@ function onPreset(id: PresetId) {
 </script>
 
 <template>
-  <div :data-testid="testId" class="flex gap-2 p-2">
+  <div :data-testid="testId" class="flex justify-center gap-2 p-2">
     <div
       role="group"
       aria-label="Quick ranges"
