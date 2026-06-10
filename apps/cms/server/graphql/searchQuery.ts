@@ -1,9 +1,12 @@
 import { resolveOffsetConnection } from '@pothos/plugin-relay';
+import { GraphQLError } from 'graphql';
 import type { Builder } from './builder';
 import { meili } from '../utils/meili';
 import { resolveEntriesIndex } from '../utils/searchIndex';
 import { runSearch, type SearchHit } from '../utils/searchEntries';
 import type { SearchDocument } from '../utils/searchDocument';
+import { SearchInputError } from '../utils/compileSearchFilter';
+import { resolveContentTypeFieldTypes } from '../utils/searchFieldTypes';
 
 /**
  * Register the public `searchEntries` GraphQL field — a Relay connection of
@@ -15,7 +18,9 @@ export function registerSearchQuery(builder: Builder): void {
   const SearchFilterInput = builder.inputType('SearchFilterInput', {
     fields: (t) => ({
       field: t.string({ required: true }),
-      value: t.string({ required: true }),
+      op: t.string(), // operator id; defaults to 'eq' when omitted
+      value: t.string(), // scalar ops
+      values: t.stringList(), // multi-value ops (in / containsAny / containsAll / between)
     }),
   });
 
@@ -45,19 +50,38 @@ export function registerSearchQuery(builder: Builder): void {
       },
       resolve: (_parent, args) =>
         resolveOffsetConnection({ args }, async ({ limit, offset }) => {
-          const res = await runSearch(
-            meili.index<SearchDocument>(resolveEntriesIndex()),
-            {
-              q: args.q,
-              contentType: args.contentType ?? undefined,
-              filters: (args.filters ?? [])
-                .filter((f): f is { field: string; value: string } => f != null)
-                .map((f) => ({ field: f.field, value: f.value })),
-              offset,
-              limit,
+          const fieldTypes = args.contentType
+            ? await resolveContentTypeFieldTypes(args.contentType)
+            : {};
+          const filters = (args.filters ?? [])
+            .filter((f): f is NonNullable<typeof f> => f != null)
+            .map((f) => ({
+              field: f.field,
+              op: f.op ?? undefined,
+              value: f.value ?? undefined,
+              values: f.values ?? undefined,
+            }));
+          try {
+            const res = await runSearch(
+              meili.index<SearchDocument>(resolveEntriesIndex()),
+              {
+                q: args.q,
+                contentType: args.contentType ?? undefined,
+                filters,
+                fieldTypes,
+                offset,
+                limit,
+              }
+            );
+            return res.hits;
+          } catch (err) {
+            if (err instanceof SearchInputError) {
+              throw new GraphQLError(err.message, {
+                extensions: { code: 'BAD_USER_INPUT' },
+              });
             }
-          );
-          return res.hits;
+            throw err;
+          }
         }),
     })
   );

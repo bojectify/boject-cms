@@ -2828,7 +2828,23 @@ describe('GraphQL API', async () => {
       }
     `;
 
+    // Typed-operator filters (NUMBER gt, the BAD_USER_INPUT case) require the
+    // scoped content type's field types to be resolvable from Postgres
+    // (`resolveContentTypeFieldTypes` reads ContentType.fields by identifier),
+    // AND matching docs in the Meili `entries_test` index. We create a
+    // `SearchWidget` type once in Postgres and tear it down after the suite.
+    // The Prisma client is built lazily in beforeAll (the describe callback
+    // is sync, so it can't await the dynamic imports at its top level).
+    let searchPrisma: import('../../../generated/prisma/client').PrismaClient;
+    let widgetTypeId: string | null = null;
+
     beforeAll(async () => {
+      const { PrismaPg } = await import('@prisma/adapter-pg');
+      const { PrismaClient } = await import('../../../generated/prisma/client');
+      searchPrisma = new PrismaClient({
+        adapter: new PrismaPg({ connectionString: getTestDatabaseUrl() }),
+      });
+
       await clearTestIndex();
       const docs: SearchDocument[] = [
         {
@@ -2847,8 +2863,63 @@ describe('GraphQL API', async () => {
           publishedAt: null,
           fields: { body: 'page' },
         },
+        // Typed-operator docs: SearchWidget with a numeric `price` field.
+        {
+          id: 'w-cheap',
+          entryKey: 'w-cheap',
+          contentType: 'SearchWidget',
+          entryTitle: 'Cheap widget',
+          publishedAt: null,
+          fields: { price: 5 },
+        },
+        {
+          id: 'w-mid',
+          entryKey: 'w-mid',
+          contentType: 'SearchWidget',
+          entryTitle: 'Mid widget',
+          publishedAt: null,
+          fields: { price: 15 },
+        },
+        {
+          id: 'w-pricey',
+          entryKey: 'w-pricey',
+          contentType: 'SearchWidget',
+          entryTitle: 'Pricey widget',
+          publishedAt: null,
+          fields: { price: 25 },
+        },
       ];
       await addTestDocuments(docs);
+
+      const ct = await searchPrisma.contentType.create({
+        data: {
+          name: 'Search Widget',
+          identifier: 'SearchWidget',
+          fields: {
+            create: [
+              {
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                order: 0,
+              },
+              { identifier: 'price', name: 'Price', type: 'NUMBER', order: 1 },
+              { identifier: 'colour', name: 'Colour', type: 'TEXT', order: 2 },
+            ],
+          },
+        },
+      });
+      widgetTypeId = ct.id;
+    });
+
+    afterAll(async () => {
+      if (!searchPrisma) return;
+      if (widgetTypeId) {
+        await searchPrisma.contentType
+          .delete({ where: { id: widgetTypeId } })
+          .catch(() => {});
+      }
+      await searchPrisma.$disconnect().catch(() => {});
     });
 
     it('returns matching hits across content types as a Relay connection', async () => {
@@ -2935,6 +3006,36 @@ describe('GraphQL API', async () => {
 
       // Together they cover both seeded docs.
       expect([id1, id2].sort()).toEqual(['g1', 'g2']);
+    });
+
+    it('applies a NUMBER comparison via op + values (gt)', async () => {
+      const { data, errors } = await gqlVars<{
+        searchEntries: Connection<SearchHitNode>;
+      }>(SEARCH_QUERY, {
+        q: '',
+        contentType: 'SearchWidget',
+        filters: [{ field: 'price', op: 'gt', values: ['10'] }],
+      });
+
+      expect(errors).toBeUndefined();
+      const keys = data.searchEntries.edges.map((e) => e.node.entryKey).sort();
+      expect(keys).toEqual(['w-mid', 'w-pricey']);
+    });
+
+    it('rejects an operator invalid for the field type with BAD_USER_INPUT', async () => {
+      // `gt` is a NUMBER operator; applying it to a TEXT field is rejected by
+      // the compiler (SearchInputError → GraphQLError with BAD_USER_INPUT).
+      const res = await gqlVars<{
+        searchEntries: Connection<SearchHitNode>;
+      }>(SEARCH_QUERY, {
+        q: '',
+        contentType: 'SearchWidget',
+        filters: [{ field: 'colour', op: 'gt', values: ['5'] }],
+      });
+
+      expect(res.errors).toBeDefined();
+      expect(res.errors!.length).toBeGreaterThan(0);
+      expect(res.errors![0]!.extensions?.code).toBe('BAD_USER_INPUT');
     });
   });
 });
