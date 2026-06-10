@@ -1,20 +1,22 @@
 import type { Index } from 'meilisearch';
 import type { SearchDocument } from './searchDocument';
+import type { FieldTypeName } from '../../utils/fieldTypes';
+import {
+  compileSearchFilter,
+  SearchInputError,
+  type SearchFilter,
+} from './compileSearchFilter';
 
-// Content-type field identifiers are camelCase (lowercase-first); reject
-// anything else so a malformed field 400s rather than silently matching nothing.
-const FIELD_ID = /^[a-z][a-zA-Z0-9]*$/;
+// SearchInputError + SearchFilter are owned by compileSearchFilter.ts; consumers
+// import them from there directly. We deliberately do NOT re-export them here —
+// a re-export would surface the same names from two server/utils modules and
+// trip Nuxt's duplicate-auto-import warning.
+
 // Allowed `attributesToSearchOn` values: the envelope title, the whole `fields`
 // bucket, or a single nested field path `fields.<camelCase>`. Anything else is
 // a caller mistake (would make Meili 400) — reject it up-front as 400, not 503.
 const SEARCHABLE_ATTR = /^(entryTitle|fields(\.[a-z][a-zA-Z0-9]*)?)$/;
 const CROP_LENGTH = 30;
-
-export interface SearchFilter {
-  /** A content-type field identifier (camelCase). Compiled to `fields.<field>`. */
-  field: string;
-  value: string;
-}
 
 export interface RunSearchParams {
   q: string;
@@ -22,6 +24,8 @@ export interface RunSearchParams {
   contentType?: string;
   /** Per-field equality constraints, AND-ed together. */
   filters?: SearchFilter[];
+  /** field identifier → FieldType, resolved from the scoped content type. */
+  fieldTypes?: Record<string, FieldTypeName>;
   /** Restrict the free-text search to these attributes (e.g. `['entryTitle']`). */
   attributesToSearchOn?: string[];
   offset: number;
@@ -43,26 +47,25 @@ export interface RunSearchResult {
   processingTimeMs: number;
 }
 
-/** Thrown on an invalid field identifier — the REST handler maps it to 400. */
-export class SearchInputError extends Error {}
-
-/** Quote + escape a value for a Meili filter literal. */
-function meiliLiteral(value: string): string {
-  return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
-}
-
 function buildFilter(params: RunSearchParams): string[] {
   const filter: string[] = [];
   if (params.contentType) {
-    filter.push(`contentType = ${meiliLiteral(params.contentType)}`);
+    filter.push(`contentType = ${quoteContentType(params.contentType)}`);
   }
-  for (const { field, value } of params.filters ?? []) {
-    if (!FIELD_ID.test(field)) {
-      throw new SearchInputError(`Invalid filter field "${field}"`);
-    }
-    filter.push(`fields.${field} = ${meiliLiteral(value)}`);
+  const fieldTypes = params.fieldTypes ?? {};
+  for (const f of params.filters ?? []) {
+    filter.push(compileSearchFilter(f, fieldTypes));
   }
   return filter;
+}
+
+// Quote + escape the contentType identifier for its envelope filter literal.
+// Intentionally mirrors the compiler's `meiliLiteral` (Meili string-literal
+// escaping is a fixed property of the filter grammar) — the contentType clause
+// is an envelope filter, deliberately outside compileSearchFilter's per-field
+// remit, so it doesn't route through the compiler.
+function quoteContentType(value: string): string {
+  return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 }
 
 /** Pick a highlighted/cropped excerpt from Meili's `_formatted` payload. */

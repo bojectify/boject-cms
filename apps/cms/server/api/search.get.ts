@@ -1,10 +1,10 @@
 import { meili } from '../utils/meili';
 import { resolveEntriesIndex } from '../utils/searchIndex';
+import { runSearch } from '../utils/searchEntries';
 import {
-  runSearch,
   SearchInputError,
   type SearchFilter,
-} from '../utils/searchEntries';
+} from '../utils/compileSearchFilter';
 import { rateLimit } from '../utils/rateLimit';
 import { throwRateLimited } from '../utils/rateLimitEndpoint';
 import { assertApiKeyScope } from '../utils/assertApiKeyScope';
