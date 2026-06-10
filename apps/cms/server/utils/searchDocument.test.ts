@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   toSearchDocument,
   richtextToPlainText,
+  datetimeToEpoch,
   type SearchableEntry,
   type SearchableFieldDef,
 } from './searchDocument';
@@ -189,7 +190,7 @@ describe('toSearchDocument', () => {
     expect(doc.fields).toEqual({
       views: 42,
       featured: true,
-      publishDate: '2026-01-02T03:04:05.000Z',
+      publishDate: new Date('2026-01-02T03:04:05.000Z').getTime(),
     });
   });
 
@@ -332,5 +333,20 @@ describe('toSearchDocument', () => {
     );
     expect(() => JSON.stringify(doc)).not.toThrow();
     expect(JSON.parse(JSON.stringify(doc))).toEqual(doc);
+  });
+});
+
+describe('datetimeToEpoch', () => {
+  it('converts an ISO string to epoch milliseconds', () => {
+    expect(datetimeToEpoch('2026-01-02T03:04:05.000Z')).toBe(
+      Date.parse('2026-01-02T03:04:05.000Z')
+    );
+  });
+
+  it('returns null for empty / non-string / unparseable input', () => {
+    expect(datetimeToEpoch('')).toBeNull();
+    expect(datetimeToEpoch(null)).toBeNull();
+    expect(datetimeToEpoch(42)).toBeNull();
+    expect(datetimeToEpoch('not a date')).toBeNull();
   });
 });

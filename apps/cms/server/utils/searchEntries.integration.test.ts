@@ -4,6 +4,7 @@ import { ensureEntriesIndex, resolveEntriesIndex } from './searchIndex';
 import { meili } from './meili';
 import { clearTestIndex, addTestDocuments } from '../test/meiliTestUtils';
 import type { SearchDocument } from './searchDocument';
+import { FIELD_TYPES, type FieldTypeName } from '../../utils/fieldTypes';
 
 const index = meili.index<SearchDocument>(resolveEntriesIndex());
 
@@ -168,5 +169,204 @@ describe('runSearch', () => {
       limit: 20,
     });
     expect(res.hits.map((h) => h.id)).toEqual(['evil']);
+  });
+});
+
+describe('runSearch — operators', () => {
+  const fieldTypes: Record<string, FieldTypeName> = {
+    views: FIELD_TYPES.NUMBER,
+    publishedAt: FIELD_TYPES.DATETIME,
+    status: FIELD_TYPES.SELECT,
+    featured: FIELD_TYPES.BOOLEAN,
+    author: FIELD_TYPES.RELATION,
+    tags: FIELD_TYPES.MULTIRELATION,
+    summary: FIELD_TYPES.TEXT,
+    body: FIELD_TYPES.RICHTEXT,
+  };
+
+  const o1 = doc('o1', 'Article', 'One', {
+    views: 10,
+    publishedAt: Date.parse('2026-01-01T00:00:00Z'),
+    status: 'draft',
+    featured: true,
+    author: 'auth-1',
+    tags: ['t1', 't2'],
+    summary: 'the quick brown fox',
+  });
+  const o2 = doc('o2', 'Article', 'Two', {
+    views: 50,
+    publishedAt: Date.parse('2026-06-01T00:00:00Z'),
+    status: 'published',
+    featured: false,
+    author: 'auth-2',
+    tags: ['t2', 't3'],
+    summary: 'a lazy dog sleeps',
+  });
+  const o3 = doc('o3', 'Article', 'Three', {
+    views: 100,
+    publishedAt: Date.parse('2026-12-01T00:00:00Z'),
+    status: 'archived',
+    featured: true,
+    author: 'auth-1',
+    tags: ['t3'],
+    summary: 'brownstone building',
+  });
+
+  const run = (filters: Parameters<typeof runSearch>[1]['filters']) =>
+    runSearch(index, {
+      q: '',
+      contentType: 'Article',
+      filters,
+      fieldTypes,
+      offset: 0,
+      limit: 20,
+    });
+
+  beforeEach(async () => {
+    await ensureEntriesIndex(meili, resolveEntriesIndex());
+    await clearTestIndex();
+    await addTestDocuments([o1, o2, o3]);
+  });
+  afterAll(async () => {
+    await clearTestIndex();
+  });
+
+  it('NUMBER gt / lte', async () => {
+    expect(
+      (await run([{ field: 'views', op: 'gt', values: ['40'] }])).hits
+        .map((h) => h.id)
+        .sort()
+    ).toEqual(['o2', 'o3']);
+    expect(
+      (await run([{ field: 'views', op: 'lte', values: ['50'] }])).hits
+        .map((h) => h.id)
+        .sort()
+    ).toEqual(['o1', 'o2']);
+  });
+
+  it('DATETIME before / after / between', async () => {
+    expect(
+      (
+        await run([
+          {
+            field: 'publishedAt',
+            op: 'before',
+            values: ['2026-05-01T00:00:00Z'],
+          },
+        ])
+      ).hits.map((h) => h.id)
+    ).toEqual(['o1']);
+    expect(
+      (
+        await run([
+          {
+            field: 'publishedAt',
+            op: 'after',
+            values: ['2026-05-01T00:00:00Z'],
+          },
+        ])
+      ).hits
+        .map((h) => h.id)
+        .sort()
+    ).toEqual(['o2', 'o3']);
+    expect(
+      (
+        await run([
+          {
+            field: 'publishedAt',
+            op: 'between',
+            values: ['2026-03-01T00:00:00Z', '2026-09-01T00:00:00Z'],
+          },
+        ])
+      ).hits.map((h) => h.id)
+    ).toEqual(['o2']);
+  });
+
+  it('SELECT is any of (in) / is not (neq)', async () => {
+    expect(
+      (
+        await run([
+          { field: 'status', op: 'in', values: ['draft', 'archived'] },
+        ])
+      ).hits
+        .map((h) => h.id)
+        .sort()
+    ).toEqual(['o1', 'o3']);
+    expect(
+      (await run([{ field: 'status', op: 'neq', values: ['draft'] }])).hits
+        .map((h) => h.id)
+        .sort()
+    ).toEqual(['o2', 'o3']);
+  });
+
+  it('BOOLEAN is', async () => {
+    expect(
+      (await run([{ field: 'featured', op: 'eq', values: ['true'] }])).hits
+        .map((h) => h.id)
+        .sort()
+    ).toEqual(['o1', 'o3']);
+  });
+
+  it('RELATION is not', async () => {
+    expect(
+      (
+        await run([{ field: 'author', op: 'neq', values: ['auth-1'] }])
+      ).hits.map((h) => h.id)
+    ).toEqual(['o2']);
+  });
+
+  it('MULTIRELATION contains any (OR) vs contains all (AND)', async () => {
+    expect(
+      (
+        await run([{ field: 'tags', op: 'containsAny', values: ['t1', 't2'] }])
+      ).hits
+        .map((h) => h.id)
+        .sort()
+    ).toEqual(['o1', 'o2']);
+    expect(
+      (
+        await run([{ field: 'tags', op: 'containsAll', values: ['t2', 't3'] }])
+      ).hits.map((h) => h.id)
+    ).toEqual(['o2']);
+  });
+
+  it('TEXT contains (substring) / starts with', async () => {
+    // CONTAINS is a substring match: "brown" matches both "brown fox" and "brownstone".
+    expect(
+      (
+        await run([{ field: 'summary', op: 'contains', values: ['brown'] }])
+      ).hits
+        .map((h) => h.id)
+        .sort()
+    ).toEqual(['o1', 'o3']);
+    expect(
+      (
+        await run([{ field: 'summary', op: 'startsWith', values: ['the '] }])
+      ).hits.map((h) => h.id)
+    ).toEqual(['o1']);
+  });
+
+  it('rejects an operator not allowed for the field type → SearchInputError', async () => {
+    await expect(
+      run([{ field: 'summary', op: 'gt', values: ['1'] }])
+    ).rejects.toThrow(/not valid/i);
+  });
+
+  it('rejects a filter on a non-filterable RICHTEXT field', async () => {
+    await expect(
+      run([{ field: 'body', op: 'eq', values: ['x'] }])
+    ).rejects.toThrow(/not valid/i);
+  });
+
+  it('rejects between with the wrong number of values', async () => {
+    await expect(
+      run([
+        {
+          field: 'publishedAt',
+          op: 'between',
+          values: ['2026-01-01T00:00:00Z'],
+        },
+      ])
+    ).rejects.toThrow(/2 values/i);
   });
 });

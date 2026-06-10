@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import type { Meilisearch } from 'meilisearch';
 import {
   ensureEntriesIndex,
@@ -26,6 +26,10 @@ function makeFakeClient(existingUids: string[]) {
         return { waitTask: async () => ({}) };
       },
     }),
+    updateExperimentalFeatures: async (features: unknown) => {
+      calls.push({ method: 'updateExperimentalFeatures', args: [features] });
+      return features;
+    },
   };
   // eslint-disable-next-line no-restricted-syntax -- minimal fake has insufficient overlap with the full Meilisearch client type
   return { client: client as unknown as Meilisearch, calls };
@@ -62,6 +66,31 @@ describe('ensureEntriesIndex', () => {
 
     expect(calls.some((c) => c.method === 'createIndex')).toBe(false);
     expect(calls.some((c) => c.method === 'updateSettings')).toBe(true);
+  });
+
+  it('enables the containsFilter experimental feature', async () => {
+    const { client, calls } = makeFakeClient([ENTRIES_INDEX]);
+    await ensureEntriesIndex(client, ENTRIES_INDEX);
+
+    const toggle = calls.find((c) => c.method === 'updateExperimentalFeatures');
+    expect(toggle).toBeDefined();
+    expect(toggle!.args).toEqual([{ containsFilter: true }]);
+  });
+
+  it('does not throw when enabling containsFilter fails (graceful degradation)', async () => {
+    const { client } = makeFakeClient([ENTRIES_INDEX]);
+    vi.spyOn(client, 'updateExperimentalFeatures').mockRejectedValue(
+      new Error('experimental feature toggle rejected')
+    );
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    // Index convergence still succeeds even though the toggle rejected.
+    await expect(
+      ensureEntriesIndex(client, ENTRIES_INDEX)
+    ).resolves.toBeUndefined();
+    expect(warn).toHaveBeenCalled();
+
+    warn.mockRestore();
   });
 
   it('propagates errors when Meilisearch is unreachable', async () => {

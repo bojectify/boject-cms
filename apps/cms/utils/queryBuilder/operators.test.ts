@@ -4,6 +4,9 @@ import {
   defaultOperator,
   valueInputKind,
   FILTERABLE_FIELD_TYPES,
+  isOperatorAllowed,
+  operatorArity,
+  isOperatorId,
 } from './operators';
 
 describe('operators registry', () => {
@@ -41,5 +44,41 @@ describe('operators registry', () => {
     // ENTRY_TITLE lives in the index envelope, not under `fields.<id>`, so it
     // is not filterable — title is searched via free-text `q`.
     expect(FILTERABLE_FIELD_TYPES).not.toContain('ENTRY_TITLE');
+  });
+
+  it('isOperatorAllowed gates operators per field type', () => {
+    expect(isOperatorAllowed('TEXT', 'contains')).toBe(true);
+    expect(isOperatorAllowed('TEXT', 'startsWith')).toBe(true);
+    expect(isOperatorAllowed('TEXTAREA', 'startsWith')).toBe(false); // curated out
+    expect(isOperatorAllowed('SLUG', 'contains')).toBe(false); // curated out
+    expect(isOperatorAllowed('NUMBER', 'gte')).toBe(true);
+    expect(isOperatorAllowed('NUMBER', 'contains')).toBe(false);
+    expect(isOperatorAllowed('BOOLEAN', 'neq')).toBe(false); // BOOLEAN is eq-only
+    expect(isOperatorAllowed('MULTIRELATION', 'containsAll')).toBe(true);
+    // Non-filterable types have no operators at all.
+    expect(isOperatorAllowed('RICHTEXT', 'eq')).toBe(false);
+    expect(isOperatorAllowed('ENTRY_TITLE', 'eq')).toBe(false);
+    expect(isOperatorAllowed('IMAGE', 'eq')).toBe(false);
+    // An unregistered op id on a filterable type is also not allowed.
+    expect(isOperatorAllowed('TEXT', 'nope')).toBe(false);
+  });
+
+  it('operatorArity classifies value cardinality (type-independent)', () => {
+    expect(operatorArity('eq')).toBe('one');
+    expect(operatorArity('gt')).toBe('one');
+    expect(operatorArity('between')).toBe('two');
+    expect(operatorArity('in')).toBe('many');
+    expect(operatorArity('containsAny')).toBe('many');
+    expect(operatorArity('containsAll')).toBe('many');
+    // Unknown / unregistered ids default to the scalar arity (safe fallback).
+    expect(operatorArity('nope')).toBe('one');
+  });
+
+  it('isOperatorId recognises every registered operator id', () => {
+    expect(isOperatorId('eq')).toBe(true);
+    expect(isOperatorId('between')).toBe(true);
+    expect(isOperatorId('containsAll')).toBe(true);
+    expect(isOperatorId('nope')).toBe(false);
+    expect(isOperatorId('https')).toBe(false); // a URL scheme is never an op id
   });
 });
