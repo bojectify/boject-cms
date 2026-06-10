@@ -19,7 +19,7 @@ describe('compileQuery', () => {
     expect(compileQuery(q)).toEqual({
       q: 'playoff',
       contentType: 'Article',
-      filter: ['status:Active', 'featured:true'],
+      filter: ['status:eq:Active', 'featured:eq:true'],
     });
   });
 
@@ -30,8 +30,42 @@ describe('compileQuery', () => {
         filters: [{ field: 'readTime', op: 'eq', value: 5 }],
       })
     ).toEqual({
-      filter: ['readTime:5'],
+      filter: ['readTime:eq:5'],
     });
+  });
+
+  it('compileQuery emits the 3-part field:op:value form', () => {
+    const params = compileQuery({
+      contentType: 'Article',
+      filters: [
+        { field: 'author', op: 'neq', value: 'a1' },
+        { field: 'readTime', op: 'gt', value: '5' },
+        { field: 'title', op: 'eq', value: 'Hello' },
+      ],
+    });
+    expect(params.filter).toEqual([
+      'author:neq:a1',
+      'readTime:gt:5',
+      'title:eq:Hello',
+    ]);
+  });
+
+  it('routeToSearchQuery parses the operator (defaults eq for the 2-part legacy form)', () => {
+    const q = routeToSearchQuery(
+      { filter: ['author:neq:a1', 'status:published'] },
+      'Article'
+    );
+    expect(q.filters).toEqual([
+      { field: 'author', op: 'neq', value: 'a1' },
+      { field: 'status', op: 'eq', value: 'published' }, // legacy 2-part → eq
+    ]);
+  });
+
+  it('preserves colon-bearing values (op token disambiguated against the registry)', () => {
+    const q = routeToSearchQuery({ filter: 'startsAt:eq:12:30:00' }, 'Event');
+    expect(q.filters).toEqual([
+      { field: 'startsAt', op: 'eq', value: '12:30:00' },
+    ]);
   });
 });
 

@@ -32,7 +32,7 @@ describe('planNavigation', () => {
     );
     expect(plan).toEqual({
       path: '/content-types/a1/entries',
-      query: { q: 'playoff', filter: ['status:Active'] },
+      query: { q: 'playoff', filter: ['status:eq:Active'] },
     });
   });
 
