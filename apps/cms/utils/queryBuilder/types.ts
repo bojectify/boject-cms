@@ -44,4 +44,6 @@ export type ValueInputKind =
   | 'datetime'
   | 'entry'
   | 'multiSelect'
-  | 'multiEntry';
+  | 'multiEntry'
+  | 'date'
+  | 'dateRange';

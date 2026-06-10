@@ -10,10 +10,12 @@ import {
 } from './operators';
 
 describe('operators registry', () => {
-  it('exposes the equality op as the v1 default for each filterable type', () => {
+  it('exposes the equality op as the default for filterable types (DATETIME excepted)', () => {
     for (const t of FILTERABLE_FIELD_TYPES) {
+      if (t === 'DATETIME') continue; // DATETIME dropped `eq`; its default is `before`
       expect(defaultOperator(t).id).toBe('eq');
     }
+    expect(defaultOperator('DATETIME').id).toBe('before');
   });
 
   it('returns only the equality op when rich operators are off (v1)', () => {
@@ -32,7 +34,9 @@ describe('operators registry', () => {
     expect(valueInputKind('BOOLEAN', 'eq')).toBe('boolean');
     expect(valueInputKind('SELECT', 'eq')).toBe('select');
     expect(valueInputKind('NUMBER', 'eq')).toBe('number');
-    expect(valueInputKind('DATETIME', 'eq')).toBe('datetime');
+    expect(valueInputKind('DATETIME', 'before')).toBe('date');
+    expect(valueInputKind('DATETIME', 'after')).toBe('date');
+    expect(valueInputKind('DATETIME', 'between')).toBe('dateRange');
     expect(valueInputKind('RELATION', 'eq')).toBe('entry');
     expect(valueInputKind('MULTIRELATION', 'eq')).toBe('entry');
     expect(valueInputKind('TEXT', 'eq')).toBe('text');
@@ -111,5 +115,13 @@ describe('operators registry', () => {
     expect(valueInputKind('MULTIRELATION', 'containsAll')).toBe('multiEntry');
     expect(valueInputKind('MULTIRELATION', 'eq')).toBe('entry'); // single unchanged
     expect(valueInputKind('TEXT', 'contains')).toBe('text'); // unaffected
+  });
+
+  it('DATETIME offers before/after/between (no eq) and gates between behind range', () => {
+    expect(isOperatorAllowed('DATETIME', 'eq')).toBe(false);
+    const ops = availableOperators('DATETIME', { rich: true, range: true }).map(
+      (o) => o.id
+    );
+    expect(ops).toEqual(['before', 'after', 'between']);
   });
 });
