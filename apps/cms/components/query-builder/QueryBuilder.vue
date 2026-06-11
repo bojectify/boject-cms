@@ -409,7 +409,12 @@ function onKeydown(e: KeyboardEvent) {
         @input="onInput"
         @keydown="onKeydown"
       />
-      <UKbd value="esc" class="shrink-0" />
+      <!--
+        ml-auto keeps the hint on the right edge even at the value step, where
+        the flex-1 main input is v-show-hidden (the draft chip's inline value
+        input doesn't grow to fill the row).
+      -->
+      <UKbd value="esc" class="shrink-0 ml-auto" />
     </div>
 
     <QueryDropdown
