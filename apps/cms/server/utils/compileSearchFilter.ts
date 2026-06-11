@@ -3,6 +3,10 @@ import {
   isOperatorAllowed,
   operatorArity,
 } from '../../utils/queryBuilder/operators';
+import {
+  getSystemField,
+  isSystemFieldId,
+} from '../../utils/queryBuilder/systemFields';
 import { datetimeToEpoch } from './searchDocument';
 
 // Content-type field identifiers are camelCase; reject anything else so a
@@ -159,24 +163,46 @@ function multirelationClause(
 }
 
 /**
- * Compile one filter to a Meilisearch filter clause over `fields.<id>`.
+ * Compile one filter to a Meilisearch filter clause. Content-type fields
+ * compile over `fields.<id>` — except ENTRY_TITLE, which targets the envelope
+ * attribute `entryTitle`. System fields (`$`-prefixed, e.g. `$entryKey`)
+ * resolve via the closed systemFields registry to an envelope attribute and a
+ * "donor" field type, then flow through the same operator/arity/clause
+ * machinery as a typed field.
  * `fieldTypes` maps a field identifier to its FieldType (resolved from the
  * scoped content type). An absent entry = unknown type (no content-type scope):
  * only `eq` is allowed there and renders as a quoted string — the #227
- * back-compat behaviour. Throws SearchInputError on any bad combination.
+ * back-compat behaviour. System fields need NO scope (envelope attributes
+ * exist on every document), so they compile with empty `fieldTypes`.
+ * Throws SearchInputError on any bad combination.
  */
 export function compileSearchFilter(
   filter: SearchFilter,
   fieldTypes: Record<string, FieldTypeName>
 ): string {
   const { field } = filter;
-  if (!FIELD_ID.test(field)) {
-    throw new SearchInputError(`Invalid filter field "${field}"`);
+
+  // Resolve the compile target (type + engine path). System branch: registry
+  // lookup — a miss ($bogus, bare '$') is a 400, a hit borrows the donor type.
+  // Typed branch: validate the identifier shape, then look up the scoped type.
+  let type: FieldTypeName | undefined;
+  let path: string;
+  if (isSystemFieldId(field)) {
+    const sys = getSystemField(field);
+    if (!sys) {
+      throw new SearchInputError(`Unknown system field "${field}"`);
+    }
+    type = sys.type;
+    path = sys.enginePath;
+  } else {
+    if (!FIELD_ID.test(field)) {
+      throw new SearchInputError(`Invalid filter field "${field}"`);
+    }
+    type = fieldTypes[field];
+    path = type === FIELD_TYPES.ENTRY_TITLE ? 'entryTitle' : `fields.${field}`;
   }
 
   const op = filter.op ?? 'eq';
-  const path = `fields.${field}`;
-  const type = fieldTypes[field];
   const values = valueList(filter);
 
   // Unknown field type (no content-type scope): equality-as-quoted-string only.
@@ -218,6 +244,7 @@ export function compileSearchFilter(
     case FIELD_TYPES.TEXT:
     case FIELD_TYPES.TEXTAREA:
     case FIELD_TYPES.SLUG:
+    case FIELD_TYPES.ENTRY_TITLE: // string-shaped; path is `entryTitle`
       return textClause(path, op, values[0]!, field);
 
     case FIELD_TYPES.NUMBER:
@@ -241,8 +268,8 @@ export function compileSearchFilter(
       return `${path} = ${booleanLiteral(values[0]!, field)}`;
 
     default:
-      // RICHTEXT / IMAGE / ENTRY_TITLE are not in the registry, so
-      // isOperatorAllowed already threw; this is a defensive backstop.
+      // RICHTEXT / IMAGE are not in the registry, so isOperatorAllowed
+      // already threw; this is a defensive backstop.
       throw new SearchInputError(`Field "${field}" is not filterable`);
   }
 }

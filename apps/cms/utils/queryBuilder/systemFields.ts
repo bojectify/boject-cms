@@ -11,6 +11,11 @@
 // Each system field declares a "donor" `type`: an existing FieldTypeName whose
 // operator set (operators.ts) and value-input kind it reuses. Piggybacking the
 // donor type means there is no parallel operator registry to keep in sync.
+// NOTE the donor also dictates the compiled literal ENCODING (compileSearchFilter
+// routes through the donor's clause builder), so the envelope attribute must be
+// indexed in the donor type's representation. e.g. a future $publishedAt cannot
+// borrow DATETIME while the envelope publishedAt is an ISO string — DATETIME
+// clauses compile epoch-ms literals (see searchDocument.ts::datetimeToEpoch).
 //
 // The registry is deliberately an ordered array rather than the keyed
 // object-const used by fieldTypes.ts: it doubles as the palette's display list,
