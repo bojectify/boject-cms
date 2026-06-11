@@ -7,6 +7,7 @@ import {
   isOperatorAllowed,
   operatorArity,
   isOperatorId,
+  operatorLabel,
 } from './operators';
 
 describe('operators registry', () => {
@@ -42,12 +43,26 @@ describe('operators registry', () => {
     expect(valueInputKind('TEXT', 'eq')).toBe('text');
   });
 
-  it('excludes RICHTEXT, IMAGE, and ENTRY_TITLE from filterable types', () => {
+  it('excludes RICHTEXT and IMAGE from filterable types; includes ENTRY_TITLE', () => {
     expect(FILTERABLE_FIELD_TYPES).not.toContain('RICHTEXT');
     expect(FILTERABLE_FIELD_TYPES).not.toContain('IMAGE');
-    // ENTRY_TITLE lives in the index envelope, not under `fields.<id>`, so it
-    // is not filterable — title is searched via free-text `q`.
-    expect(FILTERABLE_FIELD_TYPES).not.toContain('ENTRY_TITLE');
+    // ENTRY_TITLE is filterable — its filters compile to the index envelope
+    // path `entryTitle` (see compileSearchFilter), not `fields.<id>`.
+    expect(FILTERABLE_FIELD_TYPES).toContain('ENTRY_TITLE');
+  });
+
+  it('ENTRY_TITLE mirrors TEXT: eq/neq/contains/startsWith, eq-only without rich', () => {
+    const rich = availableOperators('ENTRY_TITLE', { rich: true });
+    expect(rich.map((o) => o.id)).toEqual([
+      'eq',
+      'neq',
+      'contains',
+      'startsWith',
+    ]);
+    const v1 = availableOperators('ENTRY_TITLE', { rich: false });
+    expect(v1.map((o) => o.id)).toEqual(['eq']);
+    expect(valueInputKind('ENTRY_TITLE', 'eq')).toBe('text');
+    expect(operatorLabel('ENTRY_TITLE', 'eq')).toBe('is');
   });
 
   it('isOperatorAllowed gates operators per field type', () => {
@@ -59,9 +74,9 @@ describe('operators registry', () => {
     expect(isOperatorAllowed('NUMBER', 'contains')).toBe(false);
     expect(isOperatorAllowed('BOOLEAN', 'neq')).toBe(false); // BOOLEAN is eq-only
     expect(isOperatorAllowed('MULTIRELATION', 'containsAll')).toBe(true);
+    expect(isOperatorAllowed('ENTRY_TITLE', 'eq')).toBe(true);
     // Non-filterable types have no operators at all.
     expect(isOperatorAllowed('RICHTEXT', 'eq')).toBe(false);
-    expect(isOperatorAllowed('ENTRY_TITLE', 'eq')).toBe(false);
     expect(isOperatorAllowed('IMAGE', 'eq')).toBe(false);
     // An unregistered op id on a filterable type is also not allowed.
     expect(isOperatorAllowed('TEXT', 'nope')).toBe(false);
