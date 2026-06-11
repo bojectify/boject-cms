@@ -50,7 +50,12 @@ function onRemoveFilter(index: number) {
     filters: searchQuery.value.filters.filter((_, i) => i !== index),
   };
   const params = compileQuery(next);
-  router.push({ path: '/', query: { ...(params.q ? { q: params.q } : {}) } });
+  // Keep the remaining filters (mirrors the per-type page) — unscoped URLs can
+  // legitimately carry filters, e.g. system fields like $entryKey (#315).
+  const query: Record<string, string | string[]> = {};
+  if (params.q) query.q = params.q;
+  if (params.filter) query.filter = params.filter;
+  router.push({ path: '/', query });
 }
 
 // --- Browse mode (existing behaviour) ---

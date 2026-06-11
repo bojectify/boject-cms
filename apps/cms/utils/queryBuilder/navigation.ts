@@ -1,5 +1,6 @@
 import type { SearchQuery, QueryContentType } from './types';
-import { compileQuery } from './compile';
+import { compileQuery, serializeFilter } from './compile';
+import { getSystemField } from './systemFields';
 
 export interface NavigationPlan {
   path: string;
@@ -27,6 +28,12 @@ export function planNavigation(
     if (params.filter) routeQuery.filter = params.filter;
     return { path: `/content-types/${scoped.id}/entries`, query: routeQuery };
   }
-  // Unscoped (or unknown type): All Content carries q only — field filters can't survive without a type.
+  // Unscoped (or unknown type): content-type FIELD filters can't survive
+  // without a type, but system-field filters target envelope attributes that
+  // exist on every document — those carry over to All Content (#315).
+  const systemFilters = query.filters.filter((f) => getSystemField(f.field));
+  if (systemFilters.length) {
+    routeQuery.filter = systemFilters.map(serializeFilter);
+  }
   return { path: '/', query: routeQuery };
 }
