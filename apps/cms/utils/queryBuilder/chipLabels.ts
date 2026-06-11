@@ -2,6 +2,7 @@ import type { FieldTypeName } from '../fieldTypes';
 import { FIELD_TYPES } from '../fieldTypes';
 import type { SearchFilter, SearchQuery } from './types';
 import { operatorLabel } from './operators';
+import { getSystemField } from './systemFields';
 
 /** Minimal field shape needed to render a filter chip's labels. */
 export interface ChipLabelField {
@@ -10,20 +11,33 @@ export interface ChipLabelField {
   type: string;
 }
 
-/** A field identifier → its display name (falls back to the identifier). */
+/**
+ * A field identifier → its display name (falls back to the identifier).
+ * System fields (`$entryKey`) resolve via their registry first — the order is
+ * just clarity, since a user field identifier can never start with `$`.
+ */
 export function chipFieldName(
   fields: ChipLabelField[],
   identifier: string
 ): string {
-  return fields.find((f) => f.identifier === identifier)?.name ?? identifier;
+  return (
+    getSystemField(identifier)?.name ??
+    fields.find((f) => f.identifier === identifier)?.name ??
+    identifier
+  );
 }
 
-/** A filter's operator id → its display label for the field's type (e.g. eq → "is"). */
+/**
+ * A filter's operator id → its display label for the field's type (e.g. eq →
+ * "is"). System fields label via their donor type (e.g. $entryKey → SLUG).
+ */
 export function chipOperatorLabel(
   fields: ChipLabelField[],
   filter: SearchFilter
 ): string {
-  const type = fields.find((f) => f.identifier === filter.field)?.type;
+  const type =
+    getSystemField(filter.field)?.type ??
+    fields.find((f) => f.identifier === filter.field)?.type;
   return type ? operatorLabel(type as FieldTypeName, filter.op) : filter.op;
 }
 

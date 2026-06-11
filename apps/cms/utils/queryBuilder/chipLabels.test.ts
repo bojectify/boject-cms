@@ -47,6 +47,33 @@ describe('chipLabels', () => {
     expect(chipValueDisplay(['t1', 'tX'], { t1: 'News' })).toBe('News, tX'); // unresolved → id
     expect(chipValueDisplay([])).toBeNull(); // empty array → no value segment
   });
+
+  it('chipFieldName resolves $entryKey via the system registry', () => {
+    expect(chipFieldName(fields, '$entryKey')).toBe('Entry key');
+  });
+
+  it('chipFieldName falls back to the identifier for an unknown $-token', () => {
+    expect(chipFieldName(fields, '$bogus')).toBe('$bogus');
+  });
+
+  it('chipOperatorLabel uses the donor type for $entryKey operators', () => {
+    expect(
+      chipOperatorLabel(fields, { field: '$entryKey', op: 'eq', value: 'x' })
+    ).toBe('is');
+    expect(
+      chipOperatorLabel(fields, {
+        field: '$entryKey',
+        op: 'startsWith',
+        value: 'x',
+      })
+    ).toBe('starts with');
+  });
+
+  it('chipOperatorLabel falls back to the raw op id for an unknown $-token', () => {
+    expect(
+      chipOperatorLabel(fields, { field: '$bogus', op: 'eq', value: 'x' })
+    ).toBe('eq');
+  });
 });
 
 const relFields: ChipLabelField[] = [
@@ -108,5 +135,18 @@ describe('collectRelationFilterIds', () => {
       fields
     );
     expect(ids.sort()).toEqual(['t1', 't2']);
+  });
+
+  it('a $entryKey filter contributes no relation ids (system field, no relation type)', () => {
+    const ids = collectRelationFilterIds(
+      {
+        filters: [
+          { field: '$entryKey', op: 'eq', value: 'about-us' },
+          { field: 'author', op: 'eq', value: 'a1' },
+        ],
+      },
+      relFields
+    );
+    expect(ids).toEqual(['a1']);
   });
 });

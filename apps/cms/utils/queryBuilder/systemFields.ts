@@ -21,7 +21,7 @@
 // object-const used by fieldTypes.ts: it doubles as the palette's display list,
 // stays tiny, and identifier uniqueness/prefixing is pinned by tests.
 import { FIELD_TYPES, type FieldTypeName } from '../fieldTypes';
-import type { QueryField } from './types';
+import type { QueryContentType, QueryField } from './types';
 
 export const SYSTEM_FIELD_PREFIX = '$';
 
@@ -69,4 +69,21 @@ export function getSystemField(id: string): SystemField | undefined {
  */
 export function toQueryField(sys: SystemField): QueryField {
   return { identifier: sys.identifier, name: sys.name, type: sys.type };
+}
+
+/**
+ * THE field lookup for the palette: a content-type field by identifier, falling
+ * back to the system registry (as a QueryField). Shared by the machine
+ * (editFilter on a committed/URL-prefilled chip) and the host's pick-field
+ * handler so the two resolutions can never drift. The order is just clarity —
+ * a user field identifier can never start with `$` (see assertFieldIdentifier).
+ */
+export function resolveQueryField(
+  ct: QueryContentType | undefined,
+  identifier: string
+): QueryField | undefined {
+  const own = ct?.fields.find((f) => f.identifier === identifier);
+  if (own) return own;
+  const sys = getSystemField(identifier);
+  return sys ? toQueryField(sys) : undefined;
 }

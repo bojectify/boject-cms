@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { compileQuery, routeToSearchQuery, isSearchMode } from './compile';
+import {
+  compileQuery,
+  routeToSearchQuery,
+  isSearchMode,
+  serializeFilter,
+  parseFilter,
+} from './compile';
 import type { SearchQuery } from './types';
 
 describe('compileQuery', () => {
@@ -87,6 +93,25 @@ describe('compileQuery', () => {
   it('a single-value op keeps a scalar value (no split)', () => {
     const q = routeToSearchQuery({ filter: 'author:neq:a1' }, 'Article');
     expect(q.filters).toEqual([{ field: 'author', op: 'neq', value: 'a1' }]);
+  });
+
+  it('$entryKey system-field filters round-trip through the URL form unchanged', () => {
+    // No special-casing in compile.ts — the `$`-prefixed identifier is just a
+    // field token. These pins guard that property.
+    expect(
+      serializeFilter({ field: '$entryKey', op: 'startsWith', value: 'foo' })
+    ).toBe('$entryKey:startsWith:foo');
+    expect(parseFilter('$entryKey:startsWith:foo')).toEqual({
+      field: '$entryKey',
+      op: 'startsWith',
+      value: 'foo',
+    });
+    // Legacy 2-part form defaults to eq, same as user fields.
+    expect(parseFilter('$entryKey:foo')).toEqual({
+      field: '$entryKey',
+      op: 'eq',
+      value: 'foo',
+    });
   });
 });
 

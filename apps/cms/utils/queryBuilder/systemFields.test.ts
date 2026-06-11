@@ -5,7 +5,9 @@ import {
   isSystemFieldId,
   getSystemField,
   toQueryField,
+  resolveQueryField,
 } from './systemFields';
+import type { QueryContentType } from './types';
 // Test-only import: src-level systemFields.ts must not import operators.ts
 // (cycle avoidance), but a test can cross-check the registries.
 import { FILTERABLE_FIELD_TYPES } from './operators';
@@ -37,6 +39,17 @@ describe('systemFields registry', () => {
     // the server.
     for (const f of SYSTEM_FIELDS) {
       expect(FILTERABLE_FIELD_TYPES).toContain(f.type);
+    }
+  });
+
+  it('no donor type needs special chip value rendering', () => {
+    // QueryChips' value-display lookups (relation skeleton, DATETIME chip
+    // formatting) consult only ct.fields, which is correct for system fields
+    // ONLY while no donor is DATETIME or RELATION/MULTIRELATION. DATETIME
+    // donors are additionally forbidden for encoding reasons (see the header
+    // comment in systemFields.ts).
+    for (const f of SYSTEM_FIELDS) {
+      expect(['DATETIME', 'RELATION', 'MULTIRELATION']).not.toContain(f.type);
     }
   });
 });
@@ -83,5 +96,39 @@ describe('toQueryField', () => {
       name: 'Entry key',
       type: 'SLUG',
     });
+  });
+});
+
+describe('resolveQueryField', () => {
+  const ct: QueryContentType = {
+    id: 'ct1',
+    identifier: 'Article',
+    name: 'Article',
+    fields: [{ identifier: 'summary', name: 'Summary', type: 'TEXT' }],
+  };
+
+  it('returns the content-type field for a normal identifier', () => {
+    // The exact field object, not a copy — the ct lookup wins.
+    expect(resolveQueryField(ct, 'summary')).toBe(ct.fields[0]);
+  });
+
+  it('falls back to the system registry for $entryKey', () => {
+    expect(resolveQueryField(ct, '$entryKey')).toStrictEqual({
+      identifier: '$entryKey',
+      name: 'Entry key',
+      type: 'SLUG',
+    });
+  });
+
+  it('resolves system fields without a content type (undefined ct)', () => {
+    expect(resolveQueryField(undefined, '$entryKey')?.name).toBe('Entry key');
+  });
+
+  it('returns undefined for an unknown identifier', () => {
+    expect(resolveQueryField(ct, 'nope')).toBeUndefined();
+  });
+
+  it('returns undefined for an unknown $-token', () => {
+    expect(resolveQueryField(ct, '$bogus')).toBeUndefined();
   });
 });
