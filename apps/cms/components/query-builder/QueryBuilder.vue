@@ -13,6 +13,7 @@ import {
   formatDateChip,
   formatDateRangeChip,
 } from '~/utils/queryBuilder/dateFilter';
+import { resolveQueryField } from '~/utils/queryBuilder/systemFields';
 
 // QueryChips / QueryDropdown / FilterChip / ValueEditor / MultiSelectEditor /
 // MultiEntryEditor / DateEditor / DateRangeEditor are auto-registered (Nuxt +
@@ -408,7 +409,12 @@ function onKeydown(e: KeyboardEvent) {
         @input="onInput"
         @keydown="onKeydown"
       />
-      <UKbd value="esc" class="shrink-0" />
+      <!--
+        ml-auto keeps the hint on the right edge even at the value step, where
+        the flex-1 main input is v-show-hidden (the draft chip's inline value
+        input doesn't grow to fill the row).
+      -->
+      <UKbd value="esc" class="shrink-0 ml-auto" />
     </div>
 
     <QueryDropdown
@@ -427,7 +433,7 @@ function onKeydown(e: KeyboardEvent) {
         (id: string) =>
           handle({
             kind: 'pickField',
-            field: ct!.fields.find((f) => f.identifier === id)!,
+            field: resolveQueryField(ct, id)!,
           })
       "
       @pick-operator="(op: string) => handle({ kind: 'pickOperator', op })"

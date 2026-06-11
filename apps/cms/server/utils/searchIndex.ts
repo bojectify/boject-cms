@@ -25,8 +25,9 @@ export function resolveEntriesIndex(): string {
  * - searchableAttributes: entryTitle (highest-priority text field) + the nested
  *   `fields` parent (covers every per-field value).
  * - filterableAttributes: contentType (cross-type query scoping) + entryKey
- *   (exact-match lookups) + the nested `fields` parent (covers every per-field
- *   value).
+ *   (exact-match lookups) + entryTitle (exact/partial title filters via the
+ *   ENTRY_TITLE envelope compile path, #315) + the nested `fields` parent
+ *   (covers every per-field value).
  * - sortableAttributes: publishedAt.
  * - rankingRules: Meilisearch's documented defaults, set explicitly so the
  *   baseline is self-describing for downstream tuning.
@@ -37,10 +38,12 @@ export const ENTRIES_INDEX_SETTINGS: Settings = {
   // Meili's nested-attribute matching — covers any content type's fields with
   // no per-field config. Consumers narrow with `attributesToSearchOn`.
   searchableAttributes: ['entryTitle', 'fields'],
-  // `contentType`/`entryKey` for envelope filters; `fields` makes every nested
+  // `contentType`/`entryKey` for envelope filters; `entryTitle` because
+  // ENTRY_TITLE field filters compile to the envelope path (exact/partial
+  // title matches — eq/neq/contains/startsWith, #315); `fields` makes every nested
   // field value filterable (RELATION/MULTIRELATION/SELECT/etc.) so `/api/search`
   // can filter `fields.author = "x"`, `fields.tags = "y"` (array membership).
-  filterableAttributes: ['contentType', 'entryKey', 'fields'],
+  filterableAttributes: ['contentType', 'entryKey', 'entryTitle', 'fields'],
   sortableAttributes: ['publishedAt'],
   rankingRules: [
     'words',

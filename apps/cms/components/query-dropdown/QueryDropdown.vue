@@ -4,6 +4,7 @@ import {
   FILTERABLE_FIELD_TYPES,
   valueInputKind,
 } from '~/utils/queryBuilder/operators';
+import { SYSTEM_FIELDS } from '~/utils/queryBuilder/systemFields';
 import type { QueryDropdownProps } from './queryDropdown.types';
 import { QA_QUERY_DROPDOWN, QUERY_LISTBOX_ID } from './queryDropdown.config';
 
@@ -33,6 +34,14 @@ const fields = computed(() =>
     .filter((f) =>
       f.name.toLowerCase().includes(props.state.text.toLowerCase())
     )
+);
+// System (envelope) fields — offered after the type's own fields, filtered by
+// the same name match. Their option ids continue the `qb-opt-field-<i>`
+// sequence so the roving keyboard nav walks one flat list.
+const systemFields = computed(() =>
+  SYSTEM_FIELDS.filter((f) =>
+    f.name.toLowerCase().includes(props.state.text.toLowerCase())
+  )
 );
 // The free-text "Search …" run action shows whenever the user is typing at a
 // step where free text is a valid query: unscoped (contentType step) or scoped
@@ -149,6 +158,32 @@ const isActive = (id: string) => props.activeId === id;
           f.name
         }}</span>
       </button>
+      <template v-if="systemFields.length">
+        <div
+          aria-hidden="true"
+          class="px-3 py-1 text-[11px] font-semibold tracking-wide text-dimmed uppercase"
+        >
+          System
+        </div>
+        <button
+          v-for="(f, i) in systemFields"
+          :id="`qb-opt-field-${fields.length + i}`"
+          :key="f.identifier"
+          type="button"
+          role="option"
+          :aria-selected="isActive(`qb-opt-field-${fields.length + i}`)"
+          class="flex items-center justify-between h-11 px-3 rounded-lg text-left hover:bg-elevated"
+          :class="{
+            'bg-elevated': isActive(`qb-opt-field-${fields.length + i}`),
+          }"
+          :data-testid="QA_QUERY_DROPDOWN.OPTION(fields.length + i)"
+          @click="emit('pickField', f.identifier)"
+        >
+          <span class="text-highlighted text-[13px] font-medium">{{
+            f.name
+          }}</span>
+        </button>
+      </template>
     </template>
 
     <template v-else-if="state.step === 'operator'">

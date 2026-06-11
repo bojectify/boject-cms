@@ -248,3 +248,118 @@ describe('compileSearchFilter — validation', () => {
     );
   });
 });
+
+describe('compileSearchFilter — system fields ($-prefixed envelope attributes)', () => {
+  it('$entryKey compiles to the envelope path with EMPTY fieldTypes (no scope needed)', () => {
+    expect(
+      compileSearchFilter(
+        { field: '$entryKey', op: 'eq', values: ['my-key'] },
+        {}
+      )
+    ).toBe('entryKey = "my-key"');
+    expect(
+      compileSearchFilter(
+        { field: '$entryKey', op: 'startsWith', values: ['my-'] },
+        {}
+      )
+    ).toBe('entryKey STARTS WITH "my-"');
+  });
+
+  it('rejects operators outside the SLUG donor set (contains, gt)', () => {
+    expect(() =>
+      compileSearchFilter(
+        { field: '$entryKey', op: 'contains', values: ['x'] },
+        {}
+      )
+    ).toThrow('Operator "contains" is not valid for field "$entryKey"');
+    expect(() =>
+      compileSearchFilter({ field: '$entryKey', op: 'gt', values: ['1'] }, {})
+    ).toThrow(SearchInputError);
+  });
+
+  it('rejects unknown system fields ($bogus) and the bare prefix ($)', () => {
+    // The class matters as much as the message: SearchInputError maps to 400
+    // in search.get.ts; anything else surfaces as a 503 engine failure.
+    expect(() =>
+      compileSearchFilter({ field: '$bogus', op: 'eq', values: ['x'] }, {})
+    ).toThrow(SearchInputError);
+    expect(() =>
+      compileSearchFilter({ field: '$bogus', op: 'eq', values: ['x'] }, {})
+    ).toThrow('Unknown system field "$bogus"');
+    expect(() =>
+      compileSearchFilter({ field: '$', op: 'eq', values: ['x'] }, {})
+    ).toThrow('Unknown system field "$"');
+  });
+
+  it('defaults op to eq and reads a single `value` (legacy 2-part wire form)', () => {
+    expect(compileSearchFilter({ field: '$entryKey', value: 'x' }, {})).toBe(
+      'entryKey = "x"'
+    );
+  });
+
+  it('escapes values through the shared meiliLiteral path', () => {
+    expect(
+      compileSearchFilter(
+        { field: '$entryKey', op: 'eq', values: ['a"b\\c'] },
+        {}
+      )
+    ).toBe('entryKey = "a\\"b\\\\c"');
+  });
+
+  it('reuses the shared arity checks (eq with 2 values rejects)', () => {
+    expect(() =>
+      compileSearchFilter(
+        { field: '$entryKey', op: 'eq', values: ['a', 'b'] },
+        {}
+      )
+    ).toThrow(SearchInputError);
+  });
+});
+
+describe('compileSearchFilter — ENTRY_TITLE envelope path', () => {
+  const titleTypes: Record<string, FieldTypeName> = {
+    title: FIELD_TYPES.ENTRY_TITLE,
+  };
+
+  it('compiles eq/neq/contains/startsWith to entryTitle, never fields.title', () => {
+    expect(
+      compileSearchFilter(
+        { field: 'title', op: 'eq', values: ['Hi'] },
+        titleTypes
+      )
+    ).toBe('entryTitle = "Hi"');
+    expect(
+      compileSearchFilter(
+        { field: 'title', op: 'neq', values: ['Hi'] },
+        titleTypes
+      )
+    ).toBe('entryTitle != "Hi"');
+    expect(
+      compileSearchFilter(
+        { field: 'title', op: 'contains', values: ['Hi'] },
+        titleTypes
+      )
+    ).toBe('entryTitle CONTAINS "Hi"');
+    expect(
+      compileSearchFilter(
+        { field: 'title', op: 'startsWith', values: ['Hi'] },
+        titleTypes
+      )
+    ).toBe('entryTitle STARTS WITH "Hi"');
+  });
+
+  it('reuses the shared arity checks (eq with zero values rejects)', () => {
+    expect(() =>
+      compileSearchFilter({ field: 'title', op: 'eq', values: [] }, titleTypes)
+    ).toThrow('needs exactly 1 value');
+  });
+
+  it('back-compat: an UNSCOPED `title` (empty fieldTypes) is not special — still fields.title eq-only', () => {
+    expect(
+      compileSearchFilter({ field: 'title', op: 'eq', values: ['Hi'] }, {})
+    ).toBe('fields.title = "Hi"');
+    expect(() =>
+      compileSearchFilter({ field: 'title', op: 'contains', values: ['x'] }, {})
+    ).toThrow(SearchInputError);
+  });
+});

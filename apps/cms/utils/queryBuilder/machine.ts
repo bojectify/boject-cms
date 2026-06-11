@@ -5,6 +5,7 @@ import {
   valueInputKind,
 } from './operators';
 import { addFilter, removeFilter } from './query';
+import { resolveQueryField } from './systemFields';
 
 export type Step = 'contentType' | 'field' | 'operator' | 'value';
 
@@ -64,13 +65,17 @@ export function initState(opts: InitOptions): BuilderState {
   };
 }
 
-/** Look up a committed filter's field definition in the scoped content type. */
+/**
+ * Look up a committed filter's field definition: the scoped content type's
+ * fields first, falling back to the system-field registry (so `editFilter`
+ * works for committed/URL-prefilled `$entryKey` chips).
+ */
 function findField(
   s: BuilderState,
   identifier: string
 ): QueryField | undefined {
   const ct = s.contentTypes.find((c) => c.identifier === s.query.contentType);
-  return ct?.fields.find((f) => f.identifier === identifier);
+  return resolveQueryField(ct, identifier);
 }
 
 export type Action =

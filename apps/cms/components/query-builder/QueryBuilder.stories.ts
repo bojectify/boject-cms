@@ -1,7 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import QueryBuilder from './QueryBuilder.vue';
-import { CONTENT_TYPES, ARTICLE_CT } from '~/utils/queryBuilder/fixtures';
+import {
+  CONTENT_TYPES,
+  ARTICLE_CT,
+  REPORT_CT,
+} from '~/utils/queryBuilder/fixtures';
 import { ContainerDecorator } from '../../.storybook/decorators';
 import { QA_QUERY_BUILDER } from './queryBuilder.config.js';
 import { QA_QUERY_CHIPS } from '../query-chips/queryChips.config.js';
@@ -694,5 +698,161 @@ export const RelationLabelSeedPending: Story = {
     const canvas = within(canvasElement);
     const chip = within(canvas.getByTestId(QA_QUERY_CHIPS.FILTER_CHIP(0)));
     await expect(chip.getByTestId(QA_FILTER_CHIP.VALUE_SKELETON)).toBeVisible();
+  },
+};
+// System (envelope) fields: scoped to a type, the field step offers a "System"
+// group after the type's own fields with the "Entry key" row. With rich
+// operators on, picking it opens the operator step with exactly SLUG's donor
+// set (is / starts with); committing a value lands a chip rendering the
+// DISPLAY name ("Entry key") and a model filter carrying the `$entryKey` wire
+// token (#315).
+export const SystemEntryKeyFlow: Story = {
+  args: { lockedContentType: ARTICLE_CT, enableRichOperators: true },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    // field step: Article's 7 filterable fields occupy OPTION(0..6); the System
+    // group header + Entry key row follow
+    await expect(
+      canvas.getByTestId(QA_QUERY_BUILDER.DROPDOWN)
+    ).toHaveTextContent('System');
+    const entryKeyRow = canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(7));
+    await expect(entryKeyRow).toHaveTextContent('Entry key');
+    await userEvent.click(entryKeyRow);
+    // operator step: exactly the SLUG donor operators — is / starts with
+    await expect(
+      canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))
+    ).toHaveTextContent('is');
+    await expect(
+      canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(1))
+    ).toHaveTextContent('starts with');
+    await expect(canvas.queryByTestId(QA_QUERY_DROPDOWN.OPTION(2))).toBeNull();
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))); // is (eq)
+    // value step: type + → commits (mirrors TextValueCommitsWithArrow)
+    await userEvent.type(
+      canvas.getByTestId(QA_QUERY_BUILDER.VALUE_INPUT),
+      'my-key'
+    );
+    await userEvent.keyboard('{ArrowRight}');
+    // chip shows display labels…
+    const chip = within(canvas.getByTestId(QA_QUERY_CHIPS.FILTER_CHIP(0)));
+    await expect(
+      chip.getByTestId(QA_FILTER_CHIP.FIELD_SEGMENT)
+    ).toHaveTextContent('Entry key');
+    await expect(
+      chip.getByTestId(QA_FILTER_CHIP.OPERATOR_SEGMENT)
+    ).toHaveTextContent('is');
+    await expect(
+      chip.getByTestId(QA_FILTER_CHIP.VALUE_SEGMENT)
+    ).toHaveTextContent('my-key');
+    // …while the model carries the `$entryKey` wire token
+    expect(args['onUpdate:modelValue']).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        filters: [{ field: '$entryKey', op: 'eq', value: 'my-key' }],
+      })
+    );
+  },
+};
+
+// URL-prefilled system-field filter: the committed chip renders the display
+// labels ("Entry key starts with fix"), never the raw `$entryKey` wire token;
+// its ✕ removes it (#315).
+export const SystemFieldChipFromUrl: Story = {
+  args: {
+    modelValue: {
+      contentType: 'Article',
+      filters: [{ field: '$entryKey', op: 'startsWith', value: 'fix' }],
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const chipEl = canvas.getByTestId(QA_QUERY_CHIPS.FILTER_CHIP(0));
+    const chip = within(chipEl);
+    await expect(
+      chip.getByTestId(QA_FILTER_CHIP.FIELD_SEGMENT)
+    ).toHaveTextContent('Entry key');
+    await expect(
+      chip.getByTestId(QA_FILTER_CHIP.OPERATOR_SEGMENT)
+    ).toHaveTextContent('starts with');
+    await expect(
+      chip.getByTestId(QA_FILTER_CHIP.VALUE_SEGMENT)
+    ).toHaveTextContent('fix');
+    await expect(chipEl).not.toHaveTextContent('$entryKey');
+    await userEvent.click(chip.getByTestId(QA_FILTER_CHIP.REMOVE_BUTTON));
+    await expect(
+      canvas.queryByTestId(QA_QUERY_CHIPS.FILTER_CHIP(0))
+    ).toBeNull();
+  },
+};
+
+// ENTRY_TITLE is filterable (#315): a type's title field is offered at the
+// field step like any other field, and an eq commit reads "Title is …" on the
+// chip while compiling to the `title` field identifier on the model.
+export const EntryTitleFieldFilter: Story = {
+  args: { lockedContentType: REPORT_CT },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const titleRow = canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0));
+    await expect(titleRow).toHaveTextContent('Title');
+    await userEvent.click(titleRow);
+    // rich operators off → eq auto-locks → value step
+    await userEvent.type(
+      canvas.getByTestId(QA_QUERY_BUILDER.VALUE_INPUT),
+      'quarterly'
+    );
+    await userEvent.keyboard('{ArrowRight}');
+    const chip = within(canvas.getByTestId(QA_QUERY_CHIPS.FILTER_CHIP(0)));
+    await expect(
+      chip.getByTestId(QA_FILTER_CHIP.FIELD_SEGMENT)
+    ).toHaveTextContent('Title');
+    await expect(
+      chip.getByTestId(QA_FILTER_CHIP.OPERATOR_SEGMENT)
+    ).toHaveTextContent('is');
+    await expect(
+      chip.getByTestId(QA_FILTER_CHIP.VALUE_SEGMENT)
+    ).toHaveTextContent('quarterly');
+    expect(args['onUpdate:modelValue']).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        filters: [{ field: 'title', op: 'eq', value: 'quarterly' }],
+      })
+    );
+  },
+};
+
+// Narrowing the field step keeps the System rows reachable: typing "key"
+// filters Report's fields down to "Key contact" (from 3), so the Entry key row
+// continues the option id sequence at the NARROWED offset — OPTION(1), not
+// OPTION(3) — and clicking it still commits the system filter. Pins the
+// `fields.length + i` DOM id arithmetic under narrowing (#315).
+export const NarrowedFieldStepKeepsSystemRow: Story = {
+  args: { lockedContentType: REPORT_CT },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await userEvent.type(canvas.getByTestId(QA_QUERY_BUILDER.INPUT), 'key');
+    await expect(
+      canvas.getByTestId(QA_QUERY_BUILDER.DROPDOWN)
+    ).toHaveTextContent('System');
+    await expect(
+      canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))
+    ).toHaveTextContent('Key contact');
+    const entryKeyRow = canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(1));
+    await expect(entryKeyRow).toHaveTextContent('Entry key');
+    await expect(canvas.queryByTestId(QA_QUERY_DROPDOWN.OPTION(2))).toBeNull();
+    await userEvent.click(entryKeyRow);
+    // eq auto-locked (rich off) → value step; commit a value
+    await userEvent.type(
+      canvas.getByTestId(QA_QUERY_BUILDER.VALUE_INPUT),
+      'fix'
+    );
+    await userEvent.keyboard('{ArrowRight}');
+    const chip = within(canvas.getByTestId(QA_QUERY_CHIPS.FILTER_CHIP(0)));
+    await expect(
+      chip.getByTestId(QA_FILTER_CHIP.FIELD_SEGMENT)
+    ).toHaveTextContent('Entry key');
+    // the click landed on the system row, not the narrowed ct field
+    expect(args['onUpdate:modelValue']).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        filters: [{ field: '$entryKey', op: 'eq', value: 'fix' }],
+      })
+    );
   },
 };

@@ -44,4 +44,25 @@ describe('planNavigation', () => {
       query: { q: 'x' },
     });
   });
+
+  it('keeps system-field filters on an unscoped run, dropping ct-field filters', () => {
+    // System fields target envelope attributes present on every document, so
+    // they survive broadening to All Content (#315); content-type field
+    // filters still don't.
+    expect(
+      planNavigation(
+        {
+          q: 'goal',
+          filters: [
+            { field: '$entryKey', op: 'eq', value: 'fixture-1' },
+            { field: 'author', op: 'eq', value: 'a9' },
+          ],
+        },
+        CTS
+      )
+    ).toEqual({
+      path: '/',
+      query: { q: 'goal', filter: ['$entryKey:eq:fixture-1'] },
+    });
+  });
 });

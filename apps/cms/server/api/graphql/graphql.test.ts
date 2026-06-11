@@ -3037,5 +3037,52 @@ describe('GraphQL API', async () => {
       expect(res.errors!.length).toBeGreaterThan(0);
       expect(res.errors![0]!.extensions?.code).toBe('BAD_USER_INPUT');
     });
+
+    it('filters on the $entryKey system field without a contentType scope', async () => {
+      // $entryKey resolves via the system-field registry to the envelope
+      // `entryKey` attribute — no content-type scope needed (#315).
+      const { data, errors } = await gqlVars<{
+        searchEntries: Connection<SearchHitNode>;
+      }>(SEARCH_QUERY, {
+        q: '',
+        filters: [{ field: '$entryKey', value: 'w-mid' }],
+      });
+
+      expect(errors).toBeUndefined();
+      const ids = data.searchEntries.edges.map((e) => e.node.id);
+      expect(ids).toEqual(['w-mid']);
+    });
+
+    it('filters an ENTRY_TITLE field against the envelope entryTitle (contains)', async () => {
+      // The seeded SearchWidget docs carry NO `fields.title` key (mirroring
+      // toSearchDocument, which folds ENTRY_TITLE into the envelope), so a hit
+      // proves the filter compiled to the envelope `entryTitle` path (#315).
+      const { data, errors } = await gqlVars<{
+        searchEntries: Connection<SearchHitNode>;
+      }>(SEARCH_QUERY, {
+        q: '',
+        contentType: 'SearchWidget',
+        filters: [{ field: 'title', op: 'contains', value: 'Pricey' }],
+      });
+
+      expect(errors).toBeUndefined();
+      const ids = data.searchEntries.edges.map((e) => e.node.id);
+      expect(ids).toEqual(['w-pricey']);
+    });
+
+    it('rejects an unknown system field with BAD_USER_INPUT', async () => {
+      // An unrecognised `$…` token misses the system-field registry →
+      // SearchInputError → BAD_USER_INPUT, not an engine failure.
+      const res = await gqlVars<{
+        searchEntries: Connection<SearchHitNode>;
+      }>(SEARCH_QUERY, {
+        q: '',
+        filters: [{ field: '$bogus', value: 'x' }],
+      });
+
+      expect(res.errors).toBeDefined();
+      expect(res.errors!.length).toBeGreaterThan(0);
+      expect(res.errors![0]!.extensions?.code).toBe('BAD_USER_INPUT');
+    });
   });
 });

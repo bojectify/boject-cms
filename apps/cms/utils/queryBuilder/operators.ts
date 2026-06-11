@@ -16,26 +16,30 @@ const EQ: Operator = {
   rich: false,
 };
 
+// The full string-field operator set, shared verbatim by TEXT and ENTRY_TITLE
+// (a single const so the two can never silently de-mirror).
+const TEXT_OPERATORS: Operator[] = [
+  EQ,
+  { id: 'neq', label: 'is not', description: 'Excludes matches', rich: true },
+  {
+    id: 'contains',
+    label: 'contains',
+    description: 'Matches part of the value',
+    rich: true,
+  },
+  {
+    id: 'startsWith',
+    label: 'starts with',
+    description: 'Matches the beginning',
+    rich: true,
+  },
+];
+
 // Operators per field type. `eq` is first (the locked default) for every type
 // except DATETIME, which is range-only (before/after/between) — equality on a
 // timestamp is rarely what an editor wants, so `eq` is intentionally omitted.
 const REGISTRY: Partial<Record<FieldTypeName, Operator[]>> = {
-  TEXT: [
-    EQ,
-    { id: 'neq', label: 'is not', description: 'Excludes matches', rich: true },
-    {
-      id: 'contains',
-      label: 'contains',
-      description: 'Matches part of the value',
-      rich: true,
-    },
-    {
-      id: 'startsWith',
-      label: 'starts with',
-      description: 'Matches the beginning',
-      rich: true,
-    },
-  ],
+  TEXT: TEXT_OPERATORS,
   TEXTAREA: [
     EQ,
     {
@@ -54,11 +58,9 @@ const REGISTRY: Partial<Record<FieldTypeName, Operator[]>> = {
       rich: true,
     },
   ],
-  // ENTRY_TITLE is intentionally absent: its value is folded into the search
-  // index envelope (`entryTitle`), never under `fields.<id>`, so a structured
-  // `fields.title = …` filter matches nothing. Title is searched via free-text
-  // `q` (the index ranks `entryTitle` highest). Filtering by envelope/system
-  // fields (id, entryKey, entryTitle) is a deferred follow-up.
+  // ENTRY_TITLE mirrors TEXT, but its filters compile to the index envelope
+  // path `entryTitle` (not `fields.<id>`) — see compileSearchFilter.
+  ENTRY_TITLE: TEXT_OPERATORS,
   NUMBER: [
     { id: 'eq', label: '=', description: 'Equals', rich: false },
     { id: 'neq', label: '≠', description: 'Not equal', rich: true },
@@ -202,6 +204,7 @@ export function operatorLabel(type: FieldTypeName, id: string): string {
 }
 
 const VALUE_KIND: Partial<Record<FieldTypeName, ValueInputKind>> = {
+  ENTRY_TITLE: 'text',
   TEXT: 'text',
   TEXTAREA: 'text',
   SLUG: 'text',

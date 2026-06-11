@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { initState, reduce } from './machine';
 import { CONTENT_TYPES, ARTICLE_CT } from './fixtures';
-import type { QueryContentType } from './types';
+import type { QueryContentType, QueryField } from './types';
 
 const article: QueryContentType = {
   id: 'a1',
@@ -292,6 +292,62 @@ describe('builder machine', () => {
     expect(s.query.filters).toEqual([
       { field: 'status', op: 'in', value: ['b'] },
     ]);
+  });
+
+  it('rich: picking the $entryKey system field lands on the operator step (SLUG has 2 ops)', () => {
+    const entryKey: QueryField = {
+      identifier: '$entryKey',
+      name: 'Entry key',
+      type: 'SLUG',
+    };
+    let s = initState({
+      contentTypes: [article],
+      lockedContentType: article,
+      rich: true,
+    });
+    s = reduce(s, { kind: 'pickField', field: entryKey });
+    expect(s.step).toBe('operator');
+    s = reduce(s, { kind: 'pickOperator', op: 'startsWith' });
+    expect(s.step).toBe('value');
+    s = reduce(s, { kind: 'setValue', value: 'about' });
+    s = reduce(s, { kind: 'commitValue' });
+    expect(s.query.filters).toEqual([
+      { field: '$entryKey', op: 'startsWith', value: 'about' },
+    ]);
+  });
+
+  it('rich off: picking the $entryKey system field auto-locks eq and lands on the value step', () => {
+    const entryKey: QueryField = {
+      identifier: '$entryKey',
+      name: 'Entry key',
+      type: 'SLUG',
+    };
+    let s = initState({ contentTypes: [article], lockedContentType: article });
+    s = reduce(s, { kind: 'pickField', field: entryKey });
+    expect(s.step).toBe('value');
+    expect(s.draft?.op).toBe('eq');
+  });
+
+  it('editFilter resolves a committed $entryKey filter via the system registry (URL-prefilled chip)', () => {
+    // The scoped content type has no `$entryKey` field — the system registry
+    // must back the lookup, or the chip would be uneditable.
+    let s = initState({
+      contentTypes: [article],
+      lockedContentType: article,
+      initialQuery: {
+        contentType: 'Article',
+        filters: [{ field: '$entryKey', op: 'eq', value: 'x' }],
+      },
+    });
+    s = reduce(s, { kind: 'editFilter', index: 0, segment: 'value' });
+    expect(s.step).toBe('value');
+    expect(s.editingIndex).toBe(0);
+    expect(s.draft).toEqual({
+      field: { identifier: '$entryKey', name: 'Entry key', type: 'SLUG' },
+      op: 'eq',
+      value: 'x',
+    });
+    expect(s.text).toBe('x'); // free-entry value pre-filled for editing
   });
 
   it('pickField gate plumbs range: a DATETIME field with range:false lands on the operator step (between gated out)', () => {
