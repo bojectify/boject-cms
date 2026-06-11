@@ -270,6 +270,144 @@ describe('GET /api/search', async () => {
     expect(res.hits[0]!.id).toBe('colour-red');
   });
 
+  it('filters ENTRY_TITLE via the envelope entryTitle (legacy 2-part eq)', async () => {
+    // The seeded docs deliberately carry NO `fields.title` key — mirroring
+    // toSearchDocument, which folds ENTRY_TITLE into the envelope `entryTitle`
+    // and never writes it under `fields`. A hit therefore proves the filter
+    // compiled to the envelope attribute (#315), not `fields.title`.
+    await addTestDocuments([
+      doc({
+        id: 'title-some',
+        contentType: 'Widget',
+        entryTitle: 'Some Article',
+      }),
+      doc({
+        id: 'title-other',
+        contentType: 'Widget',
+        entryTitle: 'Other Piece',
+      }),
+    ]);
+    const hit = await search({
+      q: '',
+      contentType: 'Widget',
+      filter: 'title:Some Article',
+    });
+    expect(hit.hits.map((h) => h.id)).toEqual(['title-some']);
+
+    const miss = await search({
+      q: '',
+      contentType: 'Widget',
+      filter: 'title:Another Title',
+    });
+    expect(miss.hits).toEqual([]);
+    expect(miss.total).toBe(0);
+  });
+
+  it('applies contains/startsWith on an ENTRY_TITLE field against the envelope', async () => {
+    // As above: no `fields.title` key on the docs, so matches prove the
+    // envelope `entryTitle` compile path.
+    await addTestDocuments([
+      doc({
+        id: 'title-some',
+        contentType: 'Widget',
+        entryTitle: 'Some Article',
+      }),
+      doc({
+        id: 'title-other',
+        contentType: 'Widget',
+        entryTitle: 'Other Piece',
+      }),
+    ]);
+    const contains = await search({
+      q: '',
+      contentType: 'Widget',
+      filter: 'title:contains:Article',
+    });
+    expect(contains.hits.map((h) => h.id)).toEqual(['title-some']);
+
+    const starts = await search({
+      q: '',
+      contentType: 'Widget',
+      filter: 'title:startsWith:Some',
+    });
+    expect(starts.hits.map((h) => h.id)).toEqual(['title-some']);
+  });
+
+  it('filters on $entryKey with and without a contentType scope', async () => {
+    // The doc() helper defaults entryKey to the id.
+    await addTestDocuments([
+      doc({
+        id: 'ek-alpha-post',
+        contentType: 'Widget',
+        entryTitle: 'EK Alpha',
+      }),
+      doc({ id: 'zz-beta-post', contentType: 'Widget', entryTitle: 'EK Beta' }),
+    ]);
+
+    // 3-part eq, scoped.
+    const scoped = await search({
+      q: '',
+      contentType: 'Widget',
+      filter: '$entryKey:eq:ek-alpha-post',
+    });
+    expect(scoped.hits.map((h) => h.id)).toEqual(['ek-alpha-post']);
+
+    // 3-part eq, unscoped — envelope attributes need no content-type scope.
+    const unscoped = await search({
+      q: '',
+      filter: '$entryKey:eq:ek-alpha-post',
+    });
+    expect(unscoped.hits.map((h) => h.id)).toEqual(['ek-alpha-post']);
+
+    // Legacy 2-part form, scoped + unscoped.
+    const legacyScoped = await search({
+      q: '',
+      contentType: 'Widget',
+      filter: '$entryKey:ek-alpha-post',
+    });
+    expect(legacyScoped.hits.map((h) => h.id)).toEqual(['ek-alpha-post']);
+    const legacyUnscoped = await search({
+      q: '',
+      filter: '$entryKey:ek-alpha-post',
+    });
+    expect(legacyUnscoped.hits.map((h) => h.id)).toEqual(['ek-alpha-post']);
+  });
+
+  it('applies $entryKey startsWith (prefix match on the envelope key)', async () => {
+    await addTestDocuments([
+      doc({
+        id: 'ek-gamma-post',
+        contentType: 'Widget',
+        entryTitle: 'EK Gamma',
+      }),
+      doc({
+        id: 'zz-delta-post',
+        contentType: 'Widget',
+        entryTitle: 'EK Delta',
+      }),
+    ]);
+    const res = await search({ q: '', filter: '$entryKey:startsWith:ek-' });
+    expect(res.hits.map((h) => h.id)).toEqual(['ek-gamma-post']);
+  });
+
+  it('returns 400 (not 503) for an unknown $-prefixed system field', async () => {
+    // An unrecognised system token misses the registry → SearchInputError →
+    // 400 bad input, never a 503 engine failure.
+    const res = await fetch('/api/search?q=x&filter=$bogus:eq:x', {
+      headers: { Authorization: `Bearer ${TEST_API_KEY}` },
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 400 (not 503) for an operator outside the $entryKey donor set', async () => {
+    // $entryKey borrows SLUG's operators (eq + startsWith); contains is not
+    // in the donor set, so the compiler rejects it as bad input.
+    const res = await fetch('/api/search?q=x&filter=$entryKey:contains:x', {
+      headers: { Authorization: `Bearer ${TEST_API_KEY}` },
+    });
+    expect(res.status).toBe(400);
+  });
+
   it('applies a TEXT contains (substring) op through the endpoint', async () => {
     // CONTAINS is a substring filter gated behind the containsFilter Meili
     // feature (enabled at index bootstrap). This proves the parseFilters op
