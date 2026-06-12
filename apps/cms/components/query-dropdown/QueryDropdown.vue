@@ -5,6 +5,7 @@ import {
   valueInputKind,
 } from '~/utils/queryBuilder/operators';
 import { SYSTEM_FIELDS } from '~/utils/queryBuilder/systemFields';
+import { STEPS } from '~/utils/queryBuilder/machine';
 import type { QueryDropdownProps } from './queryDropdown.types';
 import { QA_QUERY_DROPDOWN, QUERY_LISTBOX_ID } from './queryDropdown.config';
 
@@ -57,7 +58,8 @@ const unscopedSystemFields = computed(() =>
 const showFreeTextAction = computed(
   () =>
     !!props.state.text &&
-    (props.state.step === 'contentType' || props.state.step === 'field')
+    (props.state.step === STEPS.CONTENT_TYPE ||
+      props.state.step === STEPS.FIELD)
 );
 const operators = computed(() =>
   props.state.draft
@@ -72,7 +74,7 @@ const operators = computed(() =>
 // At a multi-value value step the listbox holds checkbox-style rows (multiple can
 // be selected), so advertise multi-selectability to assistive tech.
 const isMultiValueStep = computed(() => {
-  if (props.state.step !== 'value' || !props.state.draft) return false;
+  if (props.state.step !== STEPS.VALUE || !props.state.draft) return false;
   const kind = valueInputKind(
     props.state.draft.field.type,
     props.state.draft.op
@@ -117,7 +119,7 @@ const isActive = (id: string) => props.activeId === id;
       >
     </button>
 
-    <template v-if="state.step === 'contentType'">
+    <template v-if="state.step === STEPS.CONTENT_TYPE">
       <template v-if="unscopedSystemFields.length">
         <div
           aria-hidden="true"
@@ -166,7 +168,7 @@ const isActive = (id: string) => props.activeId === id;
       </button>
     </template>
 
-    <template v-else-if="state.step === 'field'">
+    <template v-else-if="state.step === STEPS.FIELD">
       <div
         aria-hidden="true"
         class="px-3 py-1 text-[11px] font-semibold tracking-wide text-dimmed uppercase"
@@ -217,7 +219,7 @@ const isActive = (id: string) => props.activeId === id;
       </template>
     </template>
 
-    <template v-else-if="state.step === 'operator'">
+    <template v-else-if="state.step === STEPS.OPERATOR">
       <button
         v-for="(o, i) in operators"
         :id="`qb-opt-op-${i}`"
@@ -235,6 +237,6 @@ const isActive = (id: string) => props.activeId === id;
       </button>
     </template>
 
-    <slot v-else-if="state.step === 'value'" name="value" />
+    <slot v-else-if="state.step === STEPS.VALUE" name="value" />
   </div>
 </template>

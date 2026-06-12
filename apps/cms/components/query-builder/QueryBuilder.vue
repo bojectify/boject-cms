@@ -14,6 +14,7 @@ import {
   formatDateRangeChip,
 } from '~/utils/queryBuilder/dateFilter';
 import { resolveQueryField } from '~/utils/queryBuilder/systemFields';
+import { STEPS } from '~/utils/queryBuilder/machine';
 
 // QueryChips / QueryDropdown / FilterChip / ValueEditor / MultiSelectEditor /
 // MultiEntryEditor / DateEditor / DateRangeEditor are auto-registered (Nuxt +
@@ -56,7 +57,7 @@ const valueInput = ref<HTMLInputElement>();
 // the ✕ keeps the input focused and Enter still runs the search.
 function focusActiveInput() {
   nextTick(() => {
-    if (state.value.step === 'value') valueInput.value?.focus();
+    if (state.value.step === STEPS.VALUE) valueInput.value?.focus();
     else mainInput.value?.focus();
   });
 }
@@ -93,7 +94,7 @@ const activeId = ref<string | null>(null);
 // current operator so ↑/↓/Enter start from it and it reads as the selected one.
 watch([() => state.value.step, () => state.value.text], () => {
   const s = state.value;
-  if (s.step === 'operator' && s.editingIndex !== null && s.draft) {
+  if (s.step === STEPS.OPERATOR && s.editingIndex !== null && s.draft) {
     const ops = availableOperators(s.draft.field.type, {
       rich: s.rich,
       multiValue: s.multiValue,
@@ -173,7 +174,7 @@ function handleNavKeys(e: KeyboardEvent): boolean {
 }
 /** "Open" a field/type, "Select" a value — matching the design's Space label. */
 const activeSpaceLabel = computed(() =>
-  state.value.step === 'field' || state.value.step === 'contentType'
+  state.value.step === STEPS.FIELD || state.value.step === STEPS.CONTENT_TYPE
     ? 'Open'
     : 'Select'
 );
@@ -363,7 +364,7 @@ function onKeydown(e: KeyboardEvent) {
         v-if="state.draft"
         :field="state.draft.field.name"
         :operator="operatorLabel(state.draft.field.type, state.draft.op)"
-        :active-segment="state.step === 'operator' ? 'operator' : 'value'"
+        :active-segment="state.step === STEPS.OPERATOR ? 'operator' : 'value'"
         :show-remove="false"
         :test-id="QA_QUERY_BUILDER.DRAFT_CHIP"
       >
@@ -394,7 +395,7 @@ function onKeydown(e: KeyboardEvent) {
         </template>
       </FilterChip>
       <input
-        v-show="state.step !== 'value'"
+        v-show="state.step !== STEPS.VALUE"
         :id="QA_QUERY_BUILDER.INPUT"
         ref="mainInput"
         :data-testid="QA_QUERY_BUILDER.INPUT"
