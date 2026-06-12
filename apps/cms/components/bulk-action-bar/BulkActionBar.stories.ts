@@ -52,6 +52,9 @@ export const Busy: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(
+      canvas.getByTestId(QA_BULK_ACTION_BAR.PUBLISH_BUTTON)
+    ).toBeDisabled();
+    await expect(
       canvas.getByTestId(QA_BULK_ACTION_BAR.CLEAR_BUTTON)
     ).toBeDisabled();
   },

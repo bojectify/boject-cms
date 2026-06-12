@@ -2,7 +2,7 @@
 import type { BulkActionBarProps } from './bulkActionBar.types';
 import { QA_BULK_ACTION_BAR } from './bulkActionBar.config';
 
-const props = withDefaults(defineProps<BulkActionBarProps>(), {
+withDefaults(defineProps<BulkActionBarProps>(), {
   busy: false,
   testId: QA_BULK_ACTION_BAR.COMPONENT,
 });
@@ -12,7 +12,7 @@ const emit = defineEmits<{ publish: []; clear: [] }>();
 <template>
   <Transition name="bulk-bar">
     <div
-      v-if="props.count > 0"
+      v-if="count > 0"
       :data-testid="testId"
       class="fixed inset-x-0 bottom-6 z-50 mx-auto flex w-fit items-center gap-3 rounded-full border border-default bg-default px-4 py-2.5 shadow-xl"
       role="region"
@@ -22,14 +22,15 @@ const emit = defineEmits<{ publish: []; clear: [] }>();
         :data-testid="QA_BULK_ACTION_BAR.COUNT"
         class="text-sm font-medium text-highlighted"
       >
-        {{ props.count }} selected
+        {{ count }} selected
       </span>
       <UButton
         :data-testid="QA_BULK_ACTION_BAR.PUBLISH_BUTTON"
         color="primary"
         size="sm"
         icon="i-lucide-upload"
-        :loading="props.busy"
+        :loading="busy"
+        :disabled="busy"
         @click="emit('publish')"
       >
         Publish
@@ -39,7 +40,7 @@ const emit = defineEmits<{ publish: []; clear: [] }>();
         color="neutral"
         variant="ghost"
         size="sm"
-        :disabled="props.busy"
+        :disabled="busy"
         @click="emit('clear')"
       >
         Clear selection
