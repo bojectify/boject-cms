@@ -3,6 +3,7 @@ import type { TableColumn } from '@nuxt/ui';
 import { routeToSearchQuery, compileQuery } from '~/utils/queryBuilder/compile';
 import type { RouteQuery } from '~/utils/queryBuilder/compile';
 import type { SearchQuery } from '~/utils/queryBuilder/types';
+import type { RowLike } from '~/composables/useRowSelection';
 
 type ArchiveFilter = 'active' | 'archived' | 'all';
 
@@ -61,12 +62,6 @@ const searchColumns: TableColumn<Record<string, unknown>>[] = [
   { accessorKey: 'status', header: 'Status' },
 ];
 
-const {
-  selection,
-  busy: bulkBusy,
-  publish: onBulkPublish,
-} = useBulkPublish(searchRows, refreshSearch);
-
 function onClear() {
   router.push({ path: `/content-types/${contentTypeId}/entries`, query: {} });
 }
@@ -89,7 +84,11 @@ watch(archiveFilter, () => {
   page.value = 1;
 });
 
-const { data, status } = await useAuthedFetch<{
+const {
+  data,
+  status,
+  refresh: refreshBrowse,
+} = await useAuthedFetch<{
   items: Array<{
     id: string;
     data: Record<string, unknown>;
@@ -115,6 +114,20 @@ const tableData = computed(() =>
   }))
 );
 
+// One selection model over whichever table is showing (search hits or browse
+// rows), plus the matching refresh, so checkboxes + the bulk bar behave the same
+// in both modes — the results table makes no browse/search distinction.
+const activeRows = computed<RowLike[]>(() =>
+  searchMode.value ? searchRows.value : tableData.value
+);
+const {
+  selection,
+  busy: bulkBusy,
+  publish: onBulkPublish,
+} = useBulkPublish(activeRows, () =>
+  searchMode.value ? refreshSearch() : refreshBrowse()
+);
+
 const filterOptions: Array<{ label: string; value: ArchiveFilter }> = [
   { label: 'Active', value: 'active' },
   { label: 'Archived', value: 'archived' },
@@ -123,7 +136,7 @@ const filterOptions: Array<{ label: string; value: ArchiveFilter }> = [
 </script>
 
 <template>
-  <div :class="{ 'pb-28': searchMode && selection.count.value > 0 }">
+  <div>
     <template v-if="searchMode">
       <ContentTable
         v-model:page="searchPage"
@@ -174,13 +187,15 @@ const filterOptions: Array<{ label: string; value: ArchiveFilter }> = [
             </p>
           </div>
         </template>
+        <template #bulk-bar>
+          <BulkActionBar
+            :count="selection.count.value"
+            :busy="bulkBusy"
+            @publish="onBulkPublish"
+            @clear="selection.clear"
+          />
+        </template>
       </ContentTable>
-      <BulkActionBar
-        :count="selection.count.value"
-        :busy="bulkBusy"
-        @publish="onBulkPublish"
-        @clear="selection.clear"
-      />
     </template>
     <ContentTable
       v-else
@@ -190,6 +205,12 @@ const filterOptions: Array<{ label: string; value: ArchiveFilter }> = [
       :loading="status === 'pending'"
       :total="data?.total ?? 0"
       :row-link="(row) => `/entries/${row.id}`"
+      selectable
+      :is-selected="selection.isSelected"
+      :all-selected="selection.allSelected.value"
+      :indeterminate="selection.indeterminate.value"
+      @row-select="(e, id, index) => selection.toggle(id, index, e.shiftKey)"
+      @select-all="selection.toggleAll"
     >
       <template #toolbar>
         <SearchBar
@@ -215,6 +236,14 @@ const filterOptions: Array<{ label: string; value: ArchiveFilter }> = [
             New Entry
           </UButton>
         </div>
+      </template>
+      <template #bulk-bar>
+        <BulkActionBar
+          :count="selection.count.value"
+          :busy="bulkBusy"
+          @publish="onBulkPublish"
+          @clear="selection.clear"
+        />
       </template>
     </ContentTable>
   </div>

@@ -19,7 +19,12 @@ const emit = defineEmits<{
 const slots = defineSlots();
 
 const tableSlots = computed(() => {
-  const { actions: _actions, toolbar: _toolbar, ...rest } = slots;
+  const {
+    actions: _actions,
+    toolbar: _toolbar,
+    'bulk-bar': _bulkBar,
+    ...rest
+  } = slots;
   return rest;
 });
 
@@ -30,8 +35,17 @@ const { formatDate, statusColor } = useContentTable();
 // either set can use — unused ones simply don't render.
 const allColumns = computed<TableColumn<Record<string, unknown>>[]>(() => {
   const base = props.columns ?? DEFAULT_CONTENT_COLUMNS;
+  // `w-px` shrinks the selection column to hug its checkbox — a table cell can't
+  // collapse below its content's min-width, so the other columns absorb the rest.
   return props.selectable
-    ? [{ id: 'select', enableSorting: false }, ...base]
+    ? [
+        {
+          id: 'select',
+          enableSorting: false,
+          meta: { class: { th: 'w-px', td: 'w-px' } },
+        },
+        ...base,
+      ]
     : base;
 });
 </script>
@@ -49,9 +63,15 @@ const allColumns = computed<TableColumn<Record<string, unknown>>[]>(() => {
     </div>
     <UTable :data="data" :columns="allColumns" :loading="loading">
       <template v-if="selectable" #select-header>
+        <!--
+          Nuxt UI's UCheckbox has no boolean `indeterminate` prop — the partial
+          (dash) state is driven by the string `'indeterminate'` in model-value
+          (Reka's tri-state). `false`/`true` cover none/all.
+        -->
         <UCheckbox
-          :model-value="allSelected ?? false"
-          :indeterminate="indeterminate ?? false"
+          :model-value="
+            indeterminate ? 'indeterminate' : (allSelected ?? false)
+          "
           aria-label="Select all rows"
           @click="emit('selectAll')"
         />
@@ -128,6 +148,20 @@ const allColumns = computed<TableColumn<Record<string, unknown>>[]>(() => {
         :disabled="(itemsPerPage ?? 15) >= (total ?? 0)"
         @update:page="emit('update:page', $event)"
       />
+    </div>
+    <!--
+      Sticky bulk-action region. `position: sticky` anchors the bar to the
+      bottom of the dashboard panel's scrollport: it floats over the results
+      while there's more to scroll and settles below the pagination at the end —
+      "sticky based on the table + pagination". Empty (zero-height,
+      non-interactive) until the host's BulkActionBar has a selection, so it adds
+      no layout otherwise; the bar itself re-enables pointer events.
+    -->
+    <div
+      v-if="$slots['bulk-bar']"
+      class="sticky bottom-4 z-20 mt-3 flex justify-center pointer-events-none"
+    >
+      <slot name="bulk-bar" />
     </div>
   </div>
 </template>
