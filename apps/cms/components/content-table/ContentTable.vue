@@ -136,7 +136,7 @@ const allColumns = computed<TableColumn<Record<string, unknown>>[]>(() => {
     </UTable>
     <div
       v-if="total !== undefined"
-      class="flex justify-center border-t border-default pt-4"
+      class="flex justify-center border-t border-default pt-8"
     >
       <UPagination
         :page="page"
@@ -159,7 +159,7 @@ const allColumns = computed<TableColumn<Record<string, unknown>>[]>(() => {
     -->
     <div
       v-if="$slots['bulk-bar']"
-      class="sticky bottom-4 z-20 mt-3 flex justify-center pointer-events-none"
+      class="sticky bottom-4 z-20 mt-8 flex justify-center pointer-events-none"
     >
       <slot name="bulk-bar" />
     </div>
