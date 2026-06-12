@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   toSearchDocument,
+  searchDocId,
   richtextToPlainText,
   datetimeToEpoch,
   type SearchableEntry,
@@ -15,6 +16,8 @@ function entry(overrides: Partial<SearchableEntry> = {}): SearchableEntry {
     contentType: 'Article',
     entryTitle: 'My Article',
     publishedAt: '2026-05-01T00:00:00.000Z',
+    status: 'PUBLISHED',
+    isWorkingVersion: true,
     data: {},
     ...overrides,
   };
@@ -130,7 +133,10 @@ describe('richtextToPlainText', () => {
 describe('toSearchDocument', () => {
   it('includes the envelope fields with the entry id as document id', () => {
     expect(toSearchDocument(entry(), [])).toEqual({
-      id: 'entry-1',
+      id: 'entry-1__PUBLISHED',
+      entryId: 'entry-1',
+      status: 'PUBLISHED',
+      isWorkingVersion: true,
       entryKey: 'my-article',
       contentType: 'Article',
       entryTitle: 'My Article',
@@ -348,5 +354,33 @@ describe('datetimeToEpoch', () => {
     expect(datetimeToEpoch(null)).toBeNull();
     expect(datetimeToEpoch(42)).toBeNull();
     expect(datetimeToEpoch('not a date')).toBeNull();
+  });
+});
+
+describe('searchDocId', () => {
+  it('joins entryId + status with a double underscore (Meili-safe id)', () => {
+    expect(searchDocId('abc-123', 'CHANGED')).toBe('abc-123__CHANGED');
+  });
+});
+
+describe('toSearchDocument — envelope (per-version)', () => {
+  it('emits the composite id, entryId, status and isWorkingVersion', () => {
+    const doc = toSearchDocument(
+      entry({ id: 'e9', status: 'DRAFT', isWorkingVersion: true }),
+      []
+    );
+    expect(doc.id).toBe('e9__DRAFT');
+    expect(doc.entryId).toBe('e9');
+    expect(doc.status).toBe('DRAFT');
+    expect(doc.isWorkingVersion).toBe(true);
+  });
+
+  it('marks a shadowed PUBLISHED version isWorkingVersion=false', () => {
+    const doc = toSearchDocument(
+      entry({ id: 'e9', status: 'PUBLISHED', isWorkingVersion: false }),
+      []
+    );
+    expect(doc.id).toBe('e9__PUBLISHED');
+    expect(doc.isWorkingVersion).toBe(false);
   });
 });

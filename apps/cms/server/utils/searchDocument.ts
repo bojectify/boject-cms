@@ -1,4 +1,5 @@
 import { FIELD_TYPES, type FieldTypeName } from '../../utils/fieldTypes';
+import type { ContentStatusName } from '../../utils/contentStatus';
 
 /** A value that can appear under a SearchDocument's `fields` map. */
 export type SearchFieldValue = string | number | boolean | string[] | null;
@@ -18,6 +19,10 @@ export interface SearchableEntry {
   entryTitle: string;
   /** ISO-8601 string, or null if never published. */
   publishedAt: string | null;
+  /** The version's status (DRAFT/CHANGED/PUBLISHED) — drives the doc key + filter. */
+  status: ContentStatusName;
+  /** True for the version the editor would see (draft-priority); false for the PUBLISHED doc shadowed by a CHANGED draft. */
+  isWorkingVersion: boolean;
   /** The entry version's JSONB `data` blob (guarded internally). */
   data: unknown;
 }
@@ -31,7 +36,11 @@ export interface SearchableEntry {
  * settings (#225 sync / #227 query expose `fields.<id>` paths).
  */
 export interface SearchDocument {
+  /** Primary key: `${entryId}__${status}`. */
   id: string;
+  entryId: string;
+  status: ContentStatusName;
+  isWorkingVersion: boolean;
   entryKey: string;
   contentType: string;
   entryTitle: string;
@@ -118,6 +127,15 @@ export function datetimeToEpoch(value: unknown): number | null {
 }
 
 /**
+ * The Meilisearch primary-key value for one entry version. Meili doc ids only
+ * allow [A-Za-z0-9_-], so the delimiter is `__` (a `:` is rejected). Status is a
+ * fixed enum with no underscore, so the split is unambiguous.
+ */
+export function searchDocId(entryId: string, status: string): string {
+  return `${entryId}__${status}`;
+}
+
+/**
  * Flatten a CMS entry into a Meilisearch document per the field-type mapping
  * decided in the search epic (#53). Pure — no Prisma, no Nuxt, no I/O.
  *
@@ -185,7 +203,10 @@ export function toSearchDocument(
   }
 
   return {
-    id: entry.id,
+    id: searchDocId(entry.id, entry.status),
+    entryId: entry.id,
+    status: entry.status,
+    isWorkingVersion: entry.isWorkingVersion,
     entryKey: entry.entryKey,
     contentType: entry.contentType,
     entryTitle: entry.entryTitle,

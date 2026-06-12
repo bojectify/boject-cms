@@ -9,6 +9,7 @@ import {
   applyTransitionMutations,
   planTransition,
 } from '../../../utils/entryTransitions';
+import { enqueueEntryDraftSync } from '../../../utils/webhooks';
 
 export default defineEventHandler(async (event) => {
   assertApiKeyScope(event, 'content:write');
@@ -37,6 +38,10 @@ export default defineEventHandler(async (event) => {
 
   await prisma.$transaction(async (tx) => {
     await applyTransitionMutations(tx, plan.mutations);
+    await enqueueEntryDraftSync(tx, {
+      contentType: { id: entry.contentType.id },
+      entryId: entry.id,
+    });
   });
 
   const refreshed = await prisma.contentEntry.findUniqueOrThrow({

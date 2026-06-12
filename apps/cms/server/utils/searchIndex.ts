@@ -27,7 +27,9 @@ export function resolveEntriesIndex(): string {
  * - filterableAttributes: contentType (cross-type query scoping) + entryKey
  *   (exact-match lookups) + entryTitle (exact/partial title filters via the
  *   ENTRY_TITLE envelope compile path, #315) + the nested `fields` parent
- *   (covers every per-field value).
+ *   (covers every per-field value) + status (the editorial DRAFT/CHANGED
+ *   filter) + entryId (the `$id` lookup + the per-version document key) +
+ *   isWorkingVersion (the CMS working-version-per-entry default).
  * - sortableAttributes: publishedAt.
  * - rankingRules: Meilisearch's documented defaults, set explicitly so the
  *   baseline is self-describing for downstream tuning.
@@ -43,7 +45,15 @@ export const ENTRIES_INDEX_SETTINGS: Settings = {
   // title matches — eq/neq/contains/startsWith, #315); `fields` makes every nested
   // field value filterable (RELATION/MULTIRELATION/SELECT/etc.) so `/api/search`
   // can filter `fields.author = "x"`, `fields.tags = "y"` (array membership).
-  filterableAttributes: ['contentType', 'entryKey', 'entryTitle', 'fields'],
+  filterableAttributes: [
+    'contentType',
+    'entryKey',
+    'entryTitle',
+    'fields',
+    'status',
+    'entryId',
+    'isWorkingVersion',
+  ],
   sortableAttributes: ['publishedAt'],
   rankingRules: [
     'words',

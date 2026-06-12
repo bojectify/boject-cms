@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { initState, reduce } from './machine';
 import { CONTENT_TYPES, ARTICLE_CT } from './fixtures';
+import { getSystemField, toQueryField } from './systemFields';
 import type { QueryContentType, QueryField } from './types';
 
 const article: QueryContentType = {
@@ -363,5 +364,45 @@ describe('builder machine', () => {
     const dateField = ARTICLE_CT.fields.find((f) => f.type === 'DATETIME')!;
     const s1 = reduce(s0, { kind: 'pickField', field: dateField });
     expect(s1.step).toBe('operator');
+  });
+});
+
+describe('builder machine — pre-scope system fields', () => {
+  const articleCt = {
+    id: 'a1',
+    identifier: 'Article',
+    name: 'Article',
+    fields: [{ identifier: 'summary', name: 'Summary', type: 'TEXT' as const }],
+  };
+
+  it('picks a system field while unscoped and advances past the field step', () => {
+    let s = initState({
+      contentTypes: [articleCt],
+      rich: true,
+      multiValue: true,
+    });
+    expect(s.step).toBe('contentType');
+    const status = toQueryField(getSystemField('$status')!);
+    s = reduce(s, { kind: 'pickField', field: status });
+    // SELECT has >1 operator (is / is not / is any of) → operator step.
+    expect(s.step).toBe('operator');
+    expect(s.draft?.field.identifier).toBe('$status');
+  });
+
+  it('committing an unscoped system filter returns to the contentType step', () => {
+    let s = initState({
+      contentTypes: [articleCt],
+      rich: true,
+      multiValue: true,
+    });
+    const status = toQueryField(getSystemField('$status')!);
+    s = reduce(s, { kind: 'pickField', field: status });
+    s = reduce(s, { kind: 'pickOperator', op: 'eq' });
+    s = reduce(s, { kind: 'setValue', value: 'DRAFT' });
+    s = reduce(s, { kind: 'commitValue' });
+    expect(s.query.filters).toEqual([
+      { field: '$status', op: 'eq', value: 'DRAFT' },
+    ]);
+    expect(s.step).toBe('contentType'); // unscoped → back to contentType, not field
   });
 });

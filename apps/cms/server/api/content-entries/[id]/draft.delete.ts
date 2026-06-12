@@ -6,6 +6,7 @@ import {
   getPublishedVersion,
   flattenEntryWithVersion,
 } from '../../../utils/resolveVersion';
+import { enqueueEntryDraftSync } from '../../../utils/webhooks';
 
 export default defineEventHandler(async (event) => {
   assertApiKeyScope(event, 'content:write');
@@ -40,7 +41,13 @@ export default defineEventHandler(async (event) => {
     });
   }
 
-  await prisma.contentEntryVersion.delete({ where: { id: draft.id } });
+  await prisma.$transaction(async (tx) => {
+    await tx.contentEntryVersion.delete({ where: { id: draft.id } });
+    await enqueueEntryDraftSync(tx, {
+      contentType: { id: entry.contentTypeId },
+      entryId: entry.id,
+    });
+  });
 
   return flattenEntryWithVersion(entry, published);
 });

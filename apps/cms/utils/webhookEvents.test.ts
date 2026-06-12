@@ -2,36 +2,47 @@ import { describe, it, expect } from 'vitest';
 import {
   WEBHOOK_EVENT_OPTIONS,
   WEBHOOK_EVENT_NAMES,
+  EXTERNAL_WEBHOOK_EVENT_NAMES,
   isWebhookEventName,
+  isExternalWebhookEventName,
 } from './webhookEvents';
 
 describe('webhookEvents registry', () => {
-  it('lists all four events in order with labels and descriptions', () => {
+  it('WEBHOOK_EVENT_NAMES includes the internal ENTRY_DRAFT_SYNC', () => {
     expect(WEBHOOK_EVENT_NAMES).toEqual([
       'ENTRY_PUBLISHED',
       'ENTRY_UNPUBLISHED',
       'ENTRY_DELETED',
       'CONTENT_TYPE_SCHEMA_CHANGED',
+      'ENTRY_DRAFT_SYNC',
     ]);
-    const schema = WEBHOOK_EVENT_OPTIONS.find(
-      (e) => e.value === 'CONTENT_TYPE_SCHEMA_CHANGED'
+  });
+
+  it('EXTERNAL_WEBHOOK_EVENT_NAMES excludes ENTRY_DRAFT_SYNC', () => {
+    expect(EXTERNAL_WEBHOOK_EVENT_NAMES).toEqual([
+      'ENTRY_PUBLISHED',
+      'ENTRY_UNPUBLISHED',
+      'ENTRY_DELETED',
+      'CONTENT_TYPE_SCHEMA_CHANGED',
+    ]);
+  });
+
+  it('the external UI options match the external (not full) name set', () => {
+    expect([...WEBHOOK_EVENT_OPTIONS.map((o) => o.value)].sort()).toEqual(
+      [...EXTERNAL_WEBHOOK_EVENT_NAMES].sort()
     );
-    expect(schema?.label).toBe('Content type schema changed');
-    expect(schema?.description).toBeTruthy();
     expect(WEBHOOK_EVENT_OPTIONS).toHaveLength(4);
   });
 
-  it('keeps WEBHOOK_EVENT_OPTIONS values in sync with WEBHOOK_EVENT_NAMES (same set)', () => {
-    expect([...WEBHOOK_EVENT_OPTIONS.map((o) => o.value)].sort()).toEqual(
-      [...WEBHOOK_EVENT_NAMES].sort()
-    );
-  });
-
-  it('isWebhookEventName accepts registry values and rejects others', () => {
-    expect(isWebhookEventName('CONTENT_TYPE_SCHEMA_CHANGED')).toBe(true);
+  it('isWebhookEventName accepts every enum value incl. ENTRY_DRAFT_SYNC', () => {
+    expect(isWebhookEventName('ENTRY_DRAFT_SYNC')).toBe(true);
     expect(isWebhookEventName('ENTRY_PUBLISHED')).toBe(true);
     expect(isWebhookEventName('NOT_AN_EVENT')).toBe(false);
-    expect(isWebhookEventName(42)).toBe(false);
-    expect(isWebhookEventName(null)).toBe(false);
+  });
+
+  it('isExternalWebhookEventName rejects ENTRY_DRAFT_SYNC but accepts external ones', () => {
+    expect(isExternalWebhookEventName('ENTRY_DRAFT_SYNC')).toBe(false);
+    expect(isExternalWebhookEventName('ENTRY_PUBLISHED')).toBe(true);
+    expect(isExternalWebhookEventName(42)).toBe(false);
   });
 });

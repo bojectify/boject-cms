@@ -316,6 +316,41 @@ describe('compileSearchFilter — system fields ($-prefixed envelope attributes)
   });
 });
 
+describe('compileSearchFilter — $status / $id', () => {
+  it('$status compiles to the status envelope path (eq / neq / in)', () => {
+    expect(
+      compileSearchFilter({ field: '$status', op: 'eq', values: ['DRAFT'] }, {})
+    ).toBe('status = "DRAFT"');
+    expect(
+      compileSearchFilter(
+        { field: '$status', op: 'neq', values: ['PUBLISHED'] },
+        {}
+      )
+    ).toBe('status != "PUBLISHED"');
+    expect(
+      compileSearchFilter(
+        { field: '$status', op: 'in', values: ['DRAFT', 'CHANGED'] },
+        {}
+      )
+    ).toBe('status IN ["DRAFT", "CHANGED"]');
+  });
+
+  it('$id compiles to the entryId envelope path (eq)', () => {
+    expect(
+      compileSearchFilter({ field: '$id', op: 'eq', values: ['abc-123'] }, {})
+    ).toBe('entryId = "abc-123"');
+  });
+
+  it('rejects an operator outside the $status (SELECT) donor set', () => {
+    expect(() =>
+      compileSearchFilter(
+        { field: '$status', op: 'contains', values: ['x'] },
+        {}
+      )
+    ).toThrow(SearchInputError);
+  });
+});
+
 describe('compileSearchFilter — ENTRY_TITLE envelope path', () => {
   const titleTypes: Record<string, FieldTypeName> = {
     title: FIELD_TYPES.ENTRY_TITLE,

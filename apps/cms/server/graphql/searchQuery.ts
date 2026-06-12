@@ -30,6 +30,7 @@ export function registerSearchQuery(builder: Builder): void {
       entryKey: t.exposeString('entryKey'),
       contentType: t.exposeString('contentType'),
       entryTitle: t.exposeString('entryTitle'),
+      status: t.exposeString('status'),
       // Highlighted/cropped excerpt; null when Meili returns no formatted match.
       snippet: t.exposeString('snippet', { nullable: true }),
       publishedAt: t.field({
@@ -55,6 +56,7 @@ export function registerSearchQuery(builder: Builder): void {
             : {};
           const filters = (args.filters ?? [])
             .filter((f): f is NonNullable<typeof f> => f != null)
+            .filter((f) => f.field !== '$status')
             .map((f) => ({
               field: f.field,
               op: f.op ?? undefined,
@@ -69,6 +71,7 @@ export function registerSearchQuery(builder: Builder): void {
                 contentType: args.contentType ?? undefined,
                 filters,
                 fieldTypes,
+                envelopeFilters: ['status = "PUBLISHED"'],
                 offset,
                 limit,
               }

@@ -4,7 +4,7 @@ import { isCmsRequest } from '../../utils/resolveVersion';
 import { enforceMutationRateLimit } from '../../utils/rateLimitEndpoint';
 import { assertWebhookUrl } from '../../utils/webhookUrl';
 import { withPrismaErrors } from '../../utils/prismaErrors';
-import { isWebhookEventName } from '../../../utils/webhookEvents';
+import { isExternalWebhookEventName } from '../../../utils/webhookEvents';
 
 export default defineEventHandler(async (event) => {
   if (!isCmsRequest(event)) {
@@ -58,7 +58,7 @@ export default defineEventHandler(async (event) => {
       });
     }
     data.events = body.events.map((e, i) => {
-      if (!isWebhookEventName(e)) {
+      if (!isExternalWebhookEventName(e)) {
         throw createError({
           statusCode: 400,
           statusMessage: `events[${i}] is not a valid WebhookEvent`,

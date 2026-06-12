@@ -7,6 +7,7 @@ import {
   toQueryField,
   resolveQueryField,
 } from './systemFields';
+import { FIELD_TYPES } from '../fieldTypes';
 import type { QueryContentType } from './types';
 // Test-only import: src-level systemFields.ts must not import operators.ts
 // (cycle avoidance), but a test can cross-check the registries.
@@ -17,14 +18,42 @@ describe('systemFields registry', () => {
     expect(SYSTEM_FIELD_PREFIX).toBe('$');
   });
 
-  it('registers exactly one system field: $entryKey (SLUG donor, entryKey envelope path)', () => {
-    expect(SYSTEM_FIELDS).toHaveLength(1);
-    expect(SYSTEM_FIELDS[0]).toEqual({
-      identifier: '$entryKey',
-      name: 'Entry key',
-      enginePath: 'entryKey',
-      type: 'SLUG',
+  it('registers $status, $id and $entryKey', () => {
+    expect(SYSTEM_FIELDS.map((f) => f.identifier)).toEqual([
+      '$status',
+      '$id',
+      '$entryKey',
+    ]);
+  });
+
+  it('$status is a SELECT donor with the three content statuses as choices and is unscoped', () => {
+    const status = getSystemField('$status')!;
+    expect(status).toEqual({
+      identifier: '$status',
+      name: 'Status',
+      enginePath: 'status',
+      type: FIELD_TYPES.SELECT,
+      unscoped: true,
+      choices: [
+        { label: 'Draft', value: 'DRAFT' },
+        { label: 'Changed', value: 'CHANGED' },
+        { label: 'Published', value: 'PUBLISHED' },
+      ],
     });
+  });
+
+  it('$id is a TEXT donor targeting entryId and is unscoped', () => {
+    expect(getSystemField('$id')).toEqual({
+      identifier: '$id',
+      name: 'Entry ID',
+      enginePath: 'entryId',
+      type: FIELD_TYPES.TEXT,
+      unscoped: true,
+    });
+  });
+
+  it('$entryKey stays scoped-only (not unscoped)', () => {
+    expect(getSystemField('$entryKey')?.unscoped).toBeFalsy();
   });
 
   it('every identifier carries the wire prefix', () => {
@@ -79,7 +108,7 @@ describe('getSystemField', () => {
       identifier: '$entryKey',
       name: 'Entry key',
       enginePath: 'entryKey',
-      type: 'SLUG',
+      type: FIELD_TYPES.SLUG,
     });
   });
 
@@ -89,12 +118,24 @@ describe('getSystemField', () => {
 });
 
 describe('toQueryField', () => {
-  it('maps identifier/name/type and nothing else (no enginePath leak)', () => {
-    const sys = getSystemField('$entryKey')!;
-    expect(toQueryField(sys)).toStrictEqual({
+  it('maps identifier/name/type and choices, dropping enginePath/unscoped', () => {
+    expect(toQueryField(getSystemField('$status')!)).toStrictEqual({
+      identifier: '$status',
+      name: 'Status',
+      type: FIELD_TYPES.SELECT,
+      choices: [
+        { label: 'Draft', value: 'DRAFT' },
+        { label: 'Changed', value: 'CHANGED' },
+        { label: 'Published', value: 'PUBLISHED' },
+      ],
+    });
+  });
+
+  it('omits choices for a donor without them ($entryKey)', () => {
+    expect(toQueryField(getSystemField('$entryKey')!)).toStrictEqual({
       identifier: '$entryKey',
       name: 'Entry key',
-      type: 'SLUG',
+      type: FIELD_TYPES.SLUG,
     });
   });
 });
@@ -104,7 +145,9 @@ describe('resolveQueryField', () => {
     id: 'ct1',
     identifier: 'Article',
     name: 'Article',
-    fields: [{ identifier: 'summary', name: 'Summary', type: 'TEXT' }],
+    fields: [
+      { identifier: 'summary', name: 'Summary', type: FIELD_TYPES.TEXT },
+    ],
   };
 
   it('returns the content-type field for a normal identifier', () => {
@@ -116,7 +159,7 @@ describe('resolveQueryField', () => {
     expect(resolveQueryField(ct, '$entryKey')).toStrictEqual({
       identifier: '$entryKey',
       name: 'Entry key',
-      type: 'SLUG',
+      type: FIELD_TYPES.SLUG,
     });
   });
 

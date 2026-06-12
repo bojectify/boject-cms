@@ -8,6 +8,10 @@ export const WEBHOOK_EVENTS = {
   ENTRY_UNPUBLISHED: 'ENTRY_UNPUBLISHED',
   ENTRY_DELETED: 'ENTRY_DELETED',
   CONTENT_TYPE_SCHEMA_CHANGED: 'CONTENT_TYPE_SCHEMA_CHANGED',
+  // Internal-only (search index sync). NOT externally subscribable — kept out of
+  // WEBHOOK_EVENT_OPTIONS + isExternalWebhookEventName so external webhooks can't
+  // receive draft-activity signals.
+  ENTRY_DRAFT_SYNC: 'ENTRY_DRAFT_SYNC',
 } as const;
 
 export type WebhookEventName =
@@ -23,6 +27,31 @@ export function isWebhookEventName(value: unknown): value is WebhookEventName {
   return (
     typeof value === 'string' &&
     WEBHOOK_EVENT_NAMES_SET.has(value as WebhookEventName)
+  );
+}
+
+/**
+ * The externally-subscribable subset. ENTRY_DRAFT_SYNC is internal-only (search
+ * sync), so it is excluded here even though it is a valid WebhookEvent.
+ */
+export const EXTERNAL_WEBHOOK_EVENT_NAMES: WebhookEventName[] = [
+  WEBHOOK_EVENTS.ENTRY_PUBLISHED,
+  WEBHOOK_EVENTS.ENTRY_UNPUBLISHED,
+  WEBHOOK_EVENTS.ENTRY_DELETED,
+  WEBHOOK_EVENTS.CONTENT_TYPE_SCHEMA_CHANGED,
+];
+
+const EXTERNAL_WEBHOOK_EVENT_NAMES_SET: ReadonlySet<WebhookEventName> = new Set(
+  EXTERNAL_WEBHOOK_EVENT_NAMES
+);
+
+/** True for events an external webhook may subscribe to (excludes ENTRY_DRAFT_SYNC). */
+export function isExternalWebhookEventName(
+  value: unknown
+): value is WebhookEventName {
+  return (
+    typeof value === 'string' &&
+    EXTERNAL_WEBHOOK_EVENT_NAMES_SET.has(value as WebhookEventName)
   );
 }
 

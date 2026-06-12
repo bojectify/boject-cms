@@ -7,6 +7,7 @@ interface SearchHit {
   entryKey: string;
   contentType: string;
   entryTitle: string;
+  status: string;
   snippet: string | null;
   publishedAt: string | null;
 }

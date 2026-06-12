@@ -1,5 +1,6 @@
 import type { WebhookEvent } from '#prisma';
 import type { CONTENT_STATUSES } from '../../utils/contentStatus';
+import { WEBHOOK_EVENTS } from '../../utils/webhookEvents';
 
 export interface WebhookEntrySnapshot {
   id: string;
@@ -72,10 +73,33 @@ export function buildSchemaChangedPayload(input: {
   contentType: { id: string; identifier: string };
 }): SchemaChangedPayload {
   return {
-    event: 'CONTENT_TYPE_SCHEMA_CHANGED',
+    event: WEBHOOK_EVENTS.CONTENT_TYPE_SCHEMA_CHANGED,
     deliveryId: input.deliveryId,
     contentTypeId: input.contentType.id,
     contentTypeIdentifier: input.contentType.identifier,
+    occurredAt: input.occurredAt.toISOString(),
+  };
+}
+
+export interface DraftSyncPayload {
+  event: 'ENTRY_DRAFT_SYNC';
+  deliveryId: string;
+  contentTypeId: string;
+  entry: { id: string };
+  occurredAt: string;
+}
+
+export function buildDraftSyncPayload(input: {
+  deliveryId: string;
+  occurredAt: Date;
+  contentTypeId: string;
+  entryId: string;
+}): DraftSyncPayload {
+  return {
+    event: WEBHOOK_EVENTS.ENTRY_DRAFT_SYNC,
+    deliveryId: input.deliveryId,
+    contentTypeId: input.contentTypeId,
+    entry: { id: input.entryId },
     occurredAt: input.occurredAt.toISOString(),
   };
 }

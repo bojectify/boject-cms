@@ -343,9 +343,14 @@ export const KeyboardNavigation: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const input = canvas.getByTestId(QA_QUERY_BUILDER.INPUT);
-    await userEvent.click(input);
-    // ↓ highlights the first content type; Space opens it
-    await userEvent.keyboard('{ArrowDown}'); // Article
+    // Type "art" to filter the content-type list to Article. This also hides the
+    // pre-scope "System" group (no system field name contains "art"), so the
+    // option list is just [free-text action, Article, …] (#302) — keeping the
+    // assertion robust to the system-field registry growing.
+    await userEvent.type(input, 'art');
+    // ↓↓ skips the free-text action (shown while typing) to highlight the first
+    // content type; Space opens it.
+    await userEvent.keyboard('{ArrowDown}{ArrowDown}'); // free-text action, Article
     await userEvent.keyboard(' ');
     await expect(
       canvas.getByTestId(QA_QUERY_CHIPS.CONTENT_TYPE_CHIP)
@@ -710,13 +715,14 @@ export const SystemEntryKeyFlow: Story = {
   args: { lockedContentType: ARTICLE_CT, enableRichOperators: true },
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
-    // field step: Article's 7 filterable fields occupy OPTION(0..6); the System
-    // group header + Entry key row follow
+    // field step: Article's own filterable fields are followed by the "System"
+    // group, which lists every SYSTEM_FIELDS row (e.g. Entry key). Locate the
+    // Entry key option by its display name rather than a hardcoded index, so the
+    // test stays correct as the system-field registry grows (#302).
     await expect(
       canvas.getByTestId(QA_QUERY_BUILDER.DROPDOWN)
     ).toHaveTextContent('System');
-    const entryKeyRow = canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(7));
-    await expect(entryKeyRow).toHaveTextContent('Entry key');
+    const entryKeyRow = canvas.getByRole('option', { name: 'Entry key' });
     await userEvent.click(entryKeyRow);
     // operator step: exactly the SLUG donor operators — is / starts with
     await expect(
@@ -750,6 +756,59 @@ export const SystemEntryKeyFlow: Story = {
         filters: [{ field: '$entryKey', op: 'eq', value: 'my-key' }],
       })
     );
+  },
+};
+
+// Pre-scope system fields (#302): UNSCOPED (no content type picked), the
+// contentType step offers a "System" group ABOVE "Content types" with the
+// `unscoped` envelope fields (Status, Entry ID) — so "all DRAFTs across types"
+// is a one-step query. Picking Status → "is any of" → Draft + Changed commits a
+// single `$status` filter and the search stays cross-type (no content type).
+export const PreScopeSystemFields: Story = {
+  args: { enableRichOperators: true, enableMultiValueOperators: true },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    // DOM order: the "System" group heading precedes the "Content types"
+    // heading, and the Status option sits above the first content-type option.
+    const dropdown = canvas.getByTestId(QA_QUERY_BUILDER.DROPDOWN);
+    await expect(dropdown).toHaveTextContent('System');
+    const systemHeading = within(dropdown).getByText('System');
+    const contentTypesHeading = within(dropdown).getByText('Content types');
+    expect(
+      systemHeading.compareDocumentPosition(contentTypesHeading) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy(); // System heading comes before Content types heading
+    const statusOption = canvas.getByRole('option', { name: 'Status' });
+    await expect(
+      canvas.getByRole('option', { name: 'Entry ID' })
+    ).toBeVisible();
+    const firstType = canvas.getByRole('option', { name: 'Article' });
+    expect(
+      statusOption.compareDocumentPosition(firstType) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy(); // Status option precedes the first content-type option
+
+    // Pick Status by its visible text (registry-growth robust, not an index).
+    await userEvent.click(statusOption);
+    // SELECT operator step: is / is not / is any of — pick "is any of".
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(2)));
+    // multi-select editor: toggle Draft (0) + Changed (1)
+    await userEvent.click(canvas.getByTestId(QA_MULTI_SELECT_EDITOR.OPTION(0))); // Draft
+    await userEvent.click(canvas.getByTestId(QA_MULTI_SELECT_EDITOR.OPTION(1))); // Changed
+    // clicking rows moved focus off the value input — refocus so {Enter} reaches
+    // the commit+run handler (mirrors SelectIsAnyOfFlow)
+    await userEvent.click(canvas.getByTestId(QA_QUERY_BUILDER.VALUE_INPUT));
+    await userEvent.keyboard('{Enter}');
+    // committed `$status` chip; no content type was scoped (cross-type query)
+    await expect(
+      canvas.getByTestId(QA_QUERY_CHIPS.FILTER_CHIP(0))
+    ).toBeVisible();
+    const lastRun = (args.onRun as ReturnType<typeof fn>).mock.calls.at(-1)![0];
+    expect(lastRun.contentType).toBeUndefined();
+    expect(lastRun.filters[0]).toEqual(
+      expect.objectContaining({ field: '$status', op: 'in' })
+    );
+    expect(lastRun.filters[0].value).toEqual(['DRAFT', 'CHANGED']);
   },
 };
 

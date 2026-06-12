@@ -2,7 +2,7 @@ import type { TableColumn } from '@nuxt/ui';
 
 /**
  * The default browse columns. Pages pass their own `columns` to ContentTable to
- * replace this set (e.g. search results render Entry Title / Type / Published).
+ * replace this set (e.g. search results render Entry Title / Type / Status).
  */
 export const DEFAULT_CONTENT_COLUMNS: TableColumn<Record<string, unknown>>[] = [
   { accessorKey: 'entryTitle', header: 'Entry Title' },

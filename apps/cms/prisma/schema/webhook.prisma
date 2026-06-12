@@ -3,6 +3,7 @@ enum WebhookEvent {
   ENTRY_UNPUBLISHED
   ENTRY_DELETED
   CONTENT_TYPE_SCHEMA_CHANGED
+  ENTRY_DRAFT_SYNC
 }
 
 enum DeliveryStatus {

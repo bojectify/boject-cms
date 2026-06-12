@@ -79,6 +79,23 @@ describe('Webhooks REST', async () => {
       expect(res.status).toBe(400);
     });
 
+    it('rejects subscribing to the internal-only ENTRY_DRAFT_SYNC event', async () => {
+      const cookie = await getSessionCookie();
+      const res = await fetch('/api/webhooks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify({
+          name: 'draft-sync',
+          url: 'https://example.com/draft-sync',
+          events: ['ENTRY_DRAFT_SYNC'],
+          contentTypeIds: [],
+        }),
+      });
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { statusMessage?: string };
+      expect(body.statusMessage).toBe('events[0] is not a valid WebhookEvent');
+    });
+
     it('rejects API-key callers', async () => {
       const res = await fetch('/api/webhooks', {
         method: 'POST',

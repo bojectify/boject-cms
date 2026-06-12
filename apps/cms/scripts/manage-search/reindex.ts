@@ -2,28 +2,40 @@
 //
 // Backfill / reindex command (`pnpm search:reindex`). Rebuilds the Meilisearch
 // entries index from current Postgres state — first-time adoption + disaster
-// recovery. Walks every ContentEntry that has a PUBLISHED version, runs
-// toSearchDocument() per entry, and upserts to Meili in batches.
+// recovery. Walks every ContentEntry that has at least one indexable
+// (DRAFT/CHANGED/PUBLISHED, never ARCHIVED) version, runs
+// buildEntrySearchDocuments() per entry to emit one doc per version, and upserts
+// to Meili in batches.
 //
-// Upsert-only (no clear-first): documents only ever move toward current state,
-// never blanked, so the command is safe to run while the app is live (search
-// stays up) and concurrent edits are reconciled by the sync worker. Trade-off:
-// a document for an entry that lost its PUBLISHED version *before* this runs is
-// not pruned here — the sync worker handles deletions going forward. A future
-// --prune flag could diff index ids vs. current PUBLISHED ids if needed.
+// Default is upsert-only (no clear-first): documents only ever move toward
+// current state, never blanked, so the command is safe to run while the app is
+// live (search stays up) and concurrent edits are reconciled by the sync worker.
+// Trade-off: a document for a version that vanished *before* this runs is not
+// pruned here — the sync worker handles deletions going forward.
+//
+// --rebuild flips to clear-then-upsert: it empties the index before the upsert
+// pass, the one-time path for the per-version re-key migration (old bare-entry-id
+// docs are replaced wholesale by `${entryId}__${status}` docs). Not live-safe —
+// search is briefly empty until the upsert lands — so reserve it for the
+// migration / disaster recovery, not routine backfills.
 //
 // Scale note: the matching entries are loaded into memory in one findMany
 // before batching (batchSize chunks only the Meili write, not the DB read), so
-// peak memory scales with the corpus. Fine for first-adoption/recovery; a
-// keyset-paginated DB read is the follow-up if this is run on a very large set.
+// peak memory scales with the corpus — and now holds one document per indexable
+// version (up to ~2x the entry count for a corpus mid-edit). Fine for
+// first-adoption/recovery; a keyset-paginated DB read is the follow-up if this
+// is run on a very large set.
 
 import 'dotenv/config';
 import { parseArgs } from 'node:util';
 import type { Index } from 'meilisearch';
 import type { PrismaClient } from '../../generated/prisma/client';
 import type { SearchDocument } from '../../server/utils/searchDocument';
-import { buildEntrySearchDocument } from '../../server/utils/buildEntrySearchDocument';
-import { CONTENT_STATUSES } from '../../utils/contentStatus';
+import {
+  buildEntrySearchDocuments,
+  INDEXABLE_STATUSES,
+  type EntryForSearch,
+} from '../../server/utils/buildEntrySearchDocument';
 
 const DEFAULT_BATCH_SIZE = 1000;
 
@@ -36,6 +48,7 @@ Flags:
   --content-type <Identifier>   Reindex only this content type (PascalCase identifier).
   --dry-run                     Count what would be indexed; write nothing.
   --batch-size <n>              Documents per Meilisearch batch (default ${DEFAULT_BATCH_SIZE}).
+  --rebuild                     Clear the index before upserting (one-time, for the per-version re-key).
   --help, -h                    Show this help.
 
 Notes:
@@ -61,13 +74,15 @@ export interface ReindexOptions {
   dryRun?: boolean;
   /** Documents per Meilisearch batch (default 1000). */
   batchSize?: number;
+  /** Clear the index before upserting — one-time use for the per-version re-key. */
+  rebuild?: boolean;
 }
 
 export interface ReindexSummary {
   dryRun: boolean;
-  /** Entries that were (or, in dry-run, would be) indexed. */
+  /** Documents (one per indexable version) that were (or, in dry-run, would be) indexed. */
   total: number;
-  /** Per-content-type identifier counts. */
+  /** Per-content-type identifier document counts. */
   byContentType: Record<string, number>;
 }
 
@@ -85,33 +100,35 @@ export async function runReindex(
     contentType,
     dryRun = false,
     batchSize = DEFAULT_BATCH_SIZE,
+    rebuild = false,
   } = options;
 
   const entries = await prisma.contentEntry.findMany({
     where: {
-      versions: { some: { status: CONTENT_STATUSES.PUBLISHED } },
+      versions: { some: { status: { in: INDEXABLE_STATUSES } } },
       ...(contentType ? { contentType: { identifier: contentType } } : {}),
     },
     include: {
       contentType: { include: { fields: true } },
-      versions: { where: { status: CONTENT_STATUSES.PUBLISHED }, take: 1 },
+      versions: { where: { status: { in: INDEXABLE_STATUSES } } },
     },
     orderBy: { createdAt: 'asc' },
   });
 
   const scope = contentType ?? 'all types';
-  const total = entries.length;
   const byContentType: Record<string, number> = {};
 
-  const documents: SearchDocument[] = entries.map((entry) => {
+  const documents: SearchDocument[] = entries.flatMap((entry) => {
     const identifier = entry.contentType.identifier;
-    byContentType[identifier] = (byContentType[identifier] ?? 0) + 1;
-    return buildEntrySearchDocument(entry);
+    const docs = buildEntrySearchDocuments(entry as EntryForSearch);
+    byContentType[identifier] = (byContentType[identifier] ?? 0) + docs.length;
+    return docs;
   });
+  const total = documents.length;
 
   if (dryRun) {
     logger.info(
-      `[search:reindex] DRY RUN — ${total} entries would be indexed (${scope})`
+      `[search:reindex] DRY RUN — ${total} documents would be indexed (${scope})`
     );
     for (const [type, count] of Object.entries(byContentType)) {
       logger.info(`[search:reindex]   ${type}: ${count}`);
@@ -120,8 +137,13 @@ export async function runReindex(
   }
 
   if (total === 0) {
-    logger.info(`[search:reindex] no published entries to index (${scope})`);
+    logger.info(`[search:reindex] no indexable entries to index (${scope})`);
     return { dryRun: false, total: 0, byContentType };
+  }
+
+  if (rebuild) {
+    logger.info('[search:reindex] --rebuild: clearing the index before upsert');
+    await index.deleteAllDocuments().waitTask();
   }
 
   let indexed = 0;
@@ -131,7 +153,7 @@ export async function runReindex(
     indexed += batch.length;
     const pct = Math.round((indexed / total) * 100);
     logger.info(
-      `[search:reindex] ${indexed} / ${total} entries indexed (${scope}, ${pct}% complete)`
+      `[search:reindex] ${indexed} / ${total} documents indexed (${scope}, ${pct}% complete)`
     );
   }
 
@@ -146,6 +168,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       'content-type': { type: 'string' },
       'dry-run': { type: 'boolean' },
       'batch-size': { type: 'string' },
+      rebuild: { type: 'boolean' },
       help: { type: 'boolean', short: 'h' },
     },
   });
@@ -191,10 +214,15 @@ if (import.meta.url === `file://${process.argv[1]}`) {
         index: meili.index<SearchDocument>(indexName),
         logger: { info: (msg) => console.log(msg) },
       },
-      { contentType: values['content-type'], dryRun, batchSize }
+      {
+        contentType: values['content-type'],
+        dryRun,
+        batchSize,
+        rebuild: values.rebuild,
+      }
     );
     console.log(
-      `[search:reindex] done — ${summary.total} entries ${summary.dryRun ? 'would be indexed' : 'indexed'} into "${indexName}"`
+      `[search:reindex] done — ${summary.total} documents ${summary.dryRun ? 'would be indexed' : 'indexed'} into "${indexName}"`
     );
   } catch (err) {
     console.error(err);

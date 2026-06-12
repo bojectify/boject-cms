@@ -22,7 +22,7 @@ describe('ensureSearchSyncWebhook', () => {
     await prisma.$disconnect();
   });
 
-  it('creates one INTERNAL search-sync webhook with the 4 events and null url/secret', async () => {
+  it('creates one INTERNAL search-sync webhook with the 5 events and null url/secret', async () => {
     await ensureSearchSyncWebhook(prisma);
     const rows = await prisma.webhook.findMany();
     expect(rows).toHaveLength(1);

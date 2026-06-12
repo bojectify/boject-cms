@@ -3,8 +3,10 @@ import type { Prisma, WebhookEvent } from '#prisma';
 import {
   buildWebhookPayload,
   buildSchemaChangedPayload,
+  buildDraftSyncPayload,
 } from './webhookPayload';
 import type { WebhookEntrySnapshot } from './webhookPayload';
+import { WEBHOOK_EVENTS } from '../../utils/webhookEvents';
 
 export function generateWebhookSecret(): string {
   return randomBytes(32).toString('base64');
@@ -115,7 +117,7 @@ export async function enqueueContentTypeSchemaChanged(
   args: EnqueueSchemaChangedArgs
 ): Promise<number> {
   return insertDeliveries(tx, {
-    event: 'CONTENT_TYPE_SCHEMA_CHANGED',
+    event: WEBHOOK_EVENTS.CONTENT_TYPE_SCHEMA_CHANGED,
     contentTypeId: args.contentType.id,
     entryId: null,
     buildPayload: (deliveryId, now) =>
@@ -123,6 +125,29 @@ export async function enqueueContentTypeSchemaChanged(
         deliveryId,
         occurredAt: now,
         contentType: args.contentType,
+      }),
+  });
+}
+
+/**
+ * Enqueue an internal search-sync trigger for a draft-side mutation (create
+ * draft / save draft / discard / unarchive / draft-only delete). Only the
+ * INTERNAL search-sync webhook subscribes to ENTRY_DRAFT_SYNC.
+ */
+export async function enqueueEntryDraftSync(
+  tx: Prisma.TransactionClient,
+  args: { contentType: { id: string }; entryId: string }
+): Promise<number> {
+  return insertDeliveries(tx, {
+    event: WEBHOOK_EVENTS.ENTRY_DRAFT_SYNC,
+    contentTypeId: args.contentType.id,
+    entryId: args.entryId,
+    buildPayload: (deliveryId, now) =>
+      buildDraftSyncPayload({
+        deliveryId,
+        occurredAt: now,
+        contentTypeId: args.contentType.id,
+        entryId: args.entryId,
       }),
   });
 }
