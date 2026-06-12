@@ -1,4 +1,4 @@
-import type { Prisma, ContentEntryVersion, FieldType } from '#prisma';
+import type { Prisma } from '#prisma';
 import { assertUuid } from '../../utils/validation';
 import { withPrismaErrors } from '../../utils/prismaErrors';
 import { enforceMutationRateLimit } from '../../utils/rateLimitEndpoint';
@@ -6,7 +6,7 @@ import { assertApiKeyScope } from '../../utils/assertApiKeyScope';
 import { assertUniqueFieldValues } from '../../utils/assertUniqueFieldValues';
 import { enrichEntryDataWithEmbedIdentifiers } from '../../utils/enrichRichtextEmbeds';
 import { enqueueEntryDraftSync } from '../../utils/webhooks';
-import { publishEntry } from '../../utils/publishEntry';
+import { publishEntry, type PublishableEntry } from '../../utils/publishEntry';
 import {
   isCmsRequest,
   getDraftVersion,
@@ -103,25 +103,6 @@ export default defineEventHandler(async (event) => {
   });
 });
 
-type EntryWithVersionsAndType = NonNullable<
-  Awaited<ReturnType<typeof prisma.contentEntry.findUnique>>
-> & {
-  versions: ContentEntryVersion[];
-  contentType: {
-    id: string;
-    identifier: string;
-    fields: Array<{
-      id: string;
-      identifier: string;
-      name: string;
-      type: FieldType;
-      required: boolean;
-      options: unknown;
-      order: number;
-    }>;
-  };
-};
-
 /**
  * Save Draft Flow
  *
@@ -130,7 +111,7 @@ type EntryWithVersionsAndType = NonNullable<
  * Update envelope slug/entryTitle if data changed.
  */
 async function saveDraftFlow(
-  entry: EntryWithVersionsAndType,
+  entry: PublishableEntry,
   validatedData: Record<string, unknown> | null
 ): Promise<void> {
   const publishedVersion = getPublishedVersion(entry.versions);
@@ -198,7 +179,7 @@ async function saveDraftFlow(
 
 /** Publish via the shared util (the PUT path supplies the request's validated data). */
 async function publishFlow(
-  entry: EntryWithVersionsAndType,
+  entry: PublishableEntry,
   validatedData: Record<string, unknown> | null
 ): Promise<void> {
   await publishEntry(entry, validatedData);
