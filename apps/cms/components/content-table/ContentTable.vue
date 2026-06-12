@@ -57,6 +57,15 @@ const allColumns = computed<TableColumn<Record<string, unknown>>[]>(() => {
         />
       </template>
       <template v-if="selectable" #select-cell="{ row }">
+        <!--
+          Controlled (one-way :model-value); `@click` is the ONLY state path —
+          it captures `shiftKey` for range-select and emits to the page's
+          useRowSelection. Keep it `@click`, NOT `@update:model-value`/`@change`:
+          Reka's checkbox is a role=checkbox button, so keyboard Space/Enter
+          dispatches a synthetic click here too (with shiftKey:false → a plain
+          toggle), preserving keyboard a11y. Switching to @change would lose the
+          MouseEvent and silently drop shift-range selection.
+        -->
         <UCheckbox
           :model-value="
             isSelected ? isSelected(row.original.id as string) : false
