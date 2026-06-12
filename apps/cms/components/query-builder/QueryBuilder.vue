@@ -250,6 +250,23 @@ function commitTypedValue() {
   handle({ kind: 'commitValue' });
 }
 
+// Commit any pending value for the current step, then run. The single source of
+// truth for "execute the search now" — shared by the Enter handlers and the
+// Submit button. At the value step it locks in a multi-value selection or a typed
+// free-entry value first; elsewhere (field / content-type step) it just runs.
+function submit() {
+  if (state.value.step === STEPS.VALUE) {
+    const dk = draftKind.value;
+    if (dk === 'multiSelect' || dk === 'multiEntry') {
+      const v = state.value.draft?.value;
+      if (Array.isArray(v) && v.length > 0) handle({ kind: 'commitValue' });
+    } else if (isFreeEntry.value && state.value.text !== '') {
+      commitTypedValue();
+    }
+  }
+  handle({ kind: 'run' });
+}
+
 /** True when the caret sits at the very end of the input with no selection. */
 function caretAtEnd(e: KeyboardEvent): boolean {
   const el = e.target as HTMLInputElement;
@@ -279,8 +296,7 @@ function onValueKeydown(e: KeyboardEvent) {
     const hasSelection = Array.isArray(val) && val.length > 0;
     if (e.key === 'Enter') {
       e.preventDefault();
-      if (hasSelection) handle({ kind: 'commitValue' });
-      handle({ kind: 'run' });
+      submit();
       return;
     }
     if (e.key === 'Tab' && !e.shiftKey) {
@@ -292,9 +308,8 @@ function onValueKeydown(e: KeyboardEvent) {
   if (handleNavKeys(e)) return;
   if (e.key === 'Enter') {
     e.preventDefault();
-    // ↵ runs the search now, locking in a pending typed value first.
-    if (isFreeEntry.value && state.value.text !== '') commitTypedValue();
-    handle({ kind: 'run' });
+    // ↵ runs the search now, committing any pending typed value first.
+    submit();
   } else if (
     e.key === 'Tab' &&
     !e.shiftKey &&
@@ -329,7 +344,7 @@ function onKeydown(e: KeyboardEvent) {
   if (handleNavKeys(e)) return;
   if (e.key === 'Enter') {
     e.preventDefault();
-    handle({ kind: 'run' });
+    submit();
   } else if (e.key === 'Backspace' && state.value.text === '') {
     handle({ kind: 'backspace' });
   }
