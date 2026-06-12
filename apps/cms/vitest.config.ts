@@ -82,6 +82,7 @@ export default defineConfig({
         test: {
           name: 'unit',
           include: [
+            'composables/**/*.test.ts',
             'scripts/**/*.test.ts',
             'server/utils/**/*.test.ts',
             'test/**/*.test.ts',

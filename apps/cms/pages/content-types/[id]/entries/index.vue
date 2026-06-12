@@ -3,6 +3,7 @@ import type { TableColumn } from '@nuxt/ui';
 import { routeToSearchQuery, compileQuery } from '~/utils/queryBuilder/compile';
 import type { RouteQuery } from '~/utils/queryBuilder/compile';
 import type { SearchQuery } from '~/utils/queryBuilder/types';
+import type { RowLike } from '~/composables/useRowSelection';
 
 type ArchiveFilter = 'active' | 'archived' | 'all';
 
@@ -34,6 +35,7 @@ const {
   loading: searchLoading,
   unavailable,
   page: searchPage,
+  refresh: refreshSearch,
 } = useEntrySearch(() => contentType.value?.identifier);
 
 const searchQuery = computed<SearchQuery>(() =>
@@ -82,7 +84,11 @@ watch(archiveFilter, () => {
   page.value = 1;
 });
 
-const { data, status } = await useAuthedFetch<{
+const {
+  data,
+  status,
+  refresh: refreshBrowse,
+} = await useAuthedFetch<{
   items: Array<{
     id: string;
     data: Record<string, unknown>;
@@ -108,6 +114,20 @@ const tableData = computed(() =>
   }))
 );
 
+// One selection model over whichever table is showing (search hits or browse
+// rows), plus the matching refresh, so checkboxes + the bulk bar behave the same
+// in both modes — the results table makes no browse/search distinction.
+const activeRows = computed<RowLike[]>(() =>
+  searchMode.value ? searchRows.value : tableData.value
+);
+const {
+  selection,
+  busy: bulkBusy,
+  publish: onBulkPublish,
+} = useBulkPublish(activeRows, () =>
+  searchMode.value ? refreshSearch() : refreshBrowse()
+);
+
 const filterOptions: Array<{ label: string; value: ArchiveFilter }> = [
   { label: 'Active', value: 'active' },
   { label: 'Archived', value: 'archived' },
@@ -116,84 +136,115 @@ const filterOptions: Array<{ label: string; value: ArchiveFilter }> = [
 </script>
 
 <template>
-  <ContentTable
-    v-if="searchMode"
-    v-model:page="searchPage"
-    :title="contentType?.name ?? 'Entries'"
-    :data="searchRows"
-    :loading="searchLoading"
-    :columns="searchColumns"
-    :total="searchTotal"
-    :row-link="(row) => `/entries/${row.id}`"
-  >
-    <template #toolbar>
-      <SearchBar
-        :query="searchQuery"
-        :content-type-name="contentType?.name"
-        :fields="contentType?.fields ?? []"
-        :relation-labels="chipRelationLabels"
-        :relation-labels-pending="chipLabelsPending"
-        @edit="open()"
-        @clear="onClear"
-        @remove-filter="onRemoveFilter"
-      />
+  <div>
+    <template v-if="searchMode">
+      <ContentTable
+        v-model:page="searchPage"
+        :title="contentType?.name ?? 'Entries'"
+        :data="searchRows"
+        :loading="searchLoading"
+        :columns="searchColumns"
+        :total="searchTotal"
+        :row-link="(row) => `/entries/${row.id}`"
+        selectable
+        :is-selected="selection.isSelected"
+        :all-selected="selection.allSelected.value"
+        :indeterminate="selection.indeterminate.value"
+        @row-select="(e, id, index) => selection.toggle(id, index, e.shiftKey)"
+        @select-all="selection.toggleAll"
+      >
+        <template #toolbar>
+          <SearchBar
+            :query="searchQuery"
+            :content-type-name="contentType?.name"
+            :fields="contentType?.fields ?? []"
+            :relation-labels="chipRelationLabels"
+            :relation-labels-pending="chipLabelsPending"
+            @edit="open()"
+            @clear="onClear"
+            @remove-filter="onRemoveFilter"
+          />
+        </template>
+        <template #empty>
+          <div class="flex flex-col items-center gap-2 py-10 text-center">
+            <UIcon
+              :name="unavailable ? 'i-lucide-search-x' : 'i-lucide-search'"
+              class="size-8 text-dimmed"
+            />
+            <p class="text-highlighted font-medium">
+              {{
+                unavailable
+                  ? 'Search is temporarily unavailable'
+                  : 'No matching entries'
+              }}
+            </p>
+            <p class="text-sm text-muted">
+              {{
+                unavailable
+                  ? 'The search service is down. Clear search to keep browsing.'
+                  : 'Try removing a filter or broadening your search.'
+              }}
+            </p>
+          </div>
+        </template>
+        <template #bulk-bar>
+          <BulkActionBar
+            :count="selection.count.value"
+            :busy="bulkBusy"
+            @publish="onBulkPublish"
+            @clear="selection.clear"
+          />
+        </template>
+      </ContentTable>
     </template>
-    <template #empty>
-      <div class="flex flex-col items-center gap-2 py-10 text-center">
-        <UIcon
-          :name="unavailable ? 'i-lucide-search-x' : 'i-lucide-search'"
-          class="size-8 text-dimmed"
+    <ContentTable
+      v-else
+      v-model:page="page"
+      :title="contentType?.name ?? 'Entries'"
+      :data="tableData"
+      :loading="status === 'pending'"
+      :total="data?.total ?? 0"
+      :row-link="(row) => `/entries/${row.id}`"
+      selectable
+      :is-selected="selection.isSelected"
+      :all-selected="selection.allSelected.value"
+      :indeterminate="selection.indeterminate.value"
+      @row-select="(e, id, index) => selection.toggle(id, index, e.shiftKey)"
+      @select-all="selection.toggleAll"
+    >
+      <template #toolbar>
+        <SearchBar
+          :placeholder="`Search ${contentType?.name ?? 'entries'}…`"
+          @open="open"
         />
-        <p class="text-highlighted font-medium">
-          {{
-            unavailable
-              ? 'Search is temporarily unavailable'
-              : 'No matching entries'
-          }}
-        </p>
-        <p class="text-sm text-muted">
-          {{
-            unavailable
-              ? 'The search service is down. Clear search to keep browsing.'
-              : 'Try removing a filter or broadening your search.'
-          }}
-        </p>
-      </div>
-    </template>
-  </ContentTable>
-  <ContentTable
-    v-else
-    v-model:page="page"
-    :title="contentType?.name ?? 'Entries'"
-    :data="tableData"
-    :loading="status === 'pending'"
-    :total="data?.total ?? 0"
-    :row-link="(row) => `/entries/${row.id}`"
-  >
-    <template #toolbar>
-      <SearchBar
-        :placeholder="`Search ${contentType?.name ?? 'entries'}…`"
-        @open="open"
-      />
-    </template>
-    <template #actions>
-      <div class="flex items-center gap-2">
-        <UFieldGroup>
-          <UButton
-            v-for="opt in filterOptions"
-            :key="opt.value"
-            :color="archiveFilter === opt.value ? 'primary' : 'neutral'"
-            :variant="archiveFilter === opt.value ? 'solid' : 'outline'"
-            size="sm"
-            @click="archiveFilter = opt.value"
-          >
-            {{ opt.label }}
+      </template>
+      <template #actions>
+        <div class="flex items-center gap-2">
+          <UFieldGroup>
+            <UButton
+              v-for="opt in filterOptions"
+              :key="opt.value"
+              :color="archiveFilter === opt.value ? 'primary' : 'neutral'"
+              :variant="archiveFilter === opt.value ? 'solid' : 'outline'"
+              size="sm"
+              @click="archiveFilter = opt.value"
+            >
+              {{ opt.label }}
+            </UButton>
+          </UFieldGroup>
+          <UButton :to="`/entries/new:${contentTypeId}`" icon="i-lucide-plus">
+            New Entry
           </UButton>
-        </UFieldGroup>
-        <UButton :to="`/entries/new:${contentTypeId}`" icon="i-lucide-plus">
-          New Entry
-        </UButton>
-      </div>
-    </template>
-  </ContentTable>
+        </div>
+      </template>
+      <template #bulk-bar>
+        <BulkActionBar
+          :count="selection.count.value"
+          :busy="bulkBusy"
+          @publish="onBulkPublish"
+          @clear="selection.clear"
+        />
+      </template>
+    </ContentTable>
+  </div>
 </template>

@@ -87,5 +87,6 @@ export function useEntrySearch(
     loading: computed(() => status.value === 'pending'),
     unavailable,
     page,
+    refresh: () => execute(),
   };
 }
