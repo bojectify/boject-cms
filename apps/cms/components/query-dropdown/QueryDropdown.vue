@@ -43,6 +43,13 @@ const systemFields = computed(() =>
     f.name.toLowerCase().includes(props.state.text.toLowerCase())
   )
 );
+// System fields offered BEFORE a content type is chosen (cross-type envelope
+// filters). Filtered by the same name match as the type list.
+const unscopedSystemFields = computed(() =>
+  SYSTEM_FIELDS.filter((f) => f.unscoped).filter((f) =>
+    f.name.toLowerCase().includes(props.state.text.toLowerCase())
+  )
+);
 // The free-text "Search …" run action shows whenever the user is typing at a
 // step where free text is a valid query: unscoped (contentType step) or scoped
 // (field step). It is how you full-text search a content type — including by
@@ -111,6 +118,30 @@ const isActive = (id: string) => props.activeId === id;
     </button>
 
     <template v-if="state.step === 'contentType'">
+      <template v-if="unscopedSystemFields.length">
+        <div
+          aria-hidden="true"
+          class="px-3 py-1 text-[11px] font-semibold tracking-wide text-dimmed uppercase"
+        >
+          System
+        </div>
+        <button
+          v-for="(f, i) in unscopedSystemFields"
+          :id="`qb-opt-sys-${i}`"
+          :key="f.identifier"
+          type="button"
+          role="option"
+          :aria-selected="isActive(`qb-opt-sys-${i}`)"
+          class="flex items-center h-11 px-3 rounded-lg text-left hover:bg-elevated"
+          :class="{ 'bg-elevated': isActive(`qb-opt-sys-${i}`) }"
+          :data-testid="QA_QUERY_DROPDOWN.OPTION(i)"
+          @click="emit('pickField', f.identifier)"
+        >
+          <span class="text-highlighted text-[13px] font-medium">{{
+            f.name
+          }}</span>
+        </button>
+      </template>
       <div
         aria-hidden="true"
         class="px-3 py-1 text-[11px] font-semibold tracking-wide text-dimmed uppercase"
@@ -126,7 +157,7 @@ const isActive = (id: string) => props.activeId === id;
         :aria-selected="isActive(`qb-opt-ct-${i}`)"
         class="flex items-center h-12 px-3 rounded-lg text-left hover:bg-elevated"
         :class="{ 'bg-elevated': isActive(`qb-opt-ct-${i}`) }"
-        :data-testid="QA_QUERY_DROPDOWN.OPTION(i)"
+        :data-testid="QA_QUERY_DROPDOWN.OPTION(unscopedSystemFields.length + i)"
         @click="emit('pickContentType', c.id)"
       >
         <span class="text-highlighted text-[13px] font-medium">{{

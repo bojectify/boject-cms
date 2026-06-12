@@ -218,7 +218,9 @@ export function reduce(prev: BuilderState, action: Action): BuilderState {
         draft: null,
         editingIndex: null,
         text: '',
-        step: 'field',
+        // Unscoped → back to contentType (offers system fields + content types);
+        // scoped → back to field. Mirrors the backspace empty-draft logic.
+        step: s.query.contentType ? 'field' : 'contentType',
       };
     }
 
