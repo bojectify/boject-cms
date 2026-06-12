@@ -9,8 +9,11 @@ export interface RowLike {
  * Page-scoped row selection for a results table. `click` toggles a row and sets
  * the anchor; `shift+click` turns ON the inclusive range from the anchor to the
  * target (the anchor stays put, so further shift-clicks re-range from it — the
- * macOS/GitHub model) and never deselects. Selection is the current page's set;
- * the page clears it on navigation, so no cross-page pruning is needed.
+ * macOS/GitHub model) and never deselects. Selection is the current page's set:
+ * the composable does NOT prune ids that leave the page, because results
+ * pagination is a soft `router.replace` that keeps this instance mounted. The
+ * CONSUMER must call `clear()` when the rows change (e.g. `watch(page, clear)`)
+ * so a bulk action never operates on now-invisible ids from a prior page.
  */
 export function useRowSelection(rows: MaybeRefOrGetter<RowLike[]>) {
   const selected = ref<Set<string>>(new Set());
