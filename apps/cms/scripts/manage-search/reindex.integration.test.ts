@@ -116,21 +116,24 @@ describe('runReindex', () => {
     expect(summary.total).toBe(2);
     expect(summary.byContentType).toEqual({ Article: 2 });
 
-    const doc = await assertDocumentExists(a1.id);
+    const doc = await assertDocumentExists(`${a1.id}__PUBLISHED`);
     expect(doc.entryTitle).toBe('First post');
     expect(doc.fields.body).toBe('hello world');
-    await assertAttributeValues(a1.id, {
+    await assertAttributeValues(`${a1.id}__PUBLISHED`, {
       contentType: 'Article',
       entryKey: 'first-post',
     });
 
     const ids = (await getAllDocuments()).map((d) => d.id).sort();
-    expect(ids).toEqual([a1.id, a2.id].sort());
+    expect(ids).toEqual([`${a1.id}__PUBLISHED`, `${a2.id}__PUBLISHED`].sort());
   });
 
   it("reindexes only the named content type, leaving other types' documents", async () => {
     const pageDoc: SearchDocument = {
-      id: 'page-0000-0000-0000-000000000000',
+      id: 'page-0000-0000-0000-000000000000__PUBLISHED',
+      entryId: 'page-0000-0000-0000-000000000000',
+      status: CONTENT_STATUSES.PUBLISHED,
+      isWorkingVersion: true,
       entryKey: 'about',
       contentType: 'Page',
       entryTitle: 'About',
@@ -157,7 +160,7 @@ describe('runReindex', () => {
     expect(summary.byContentType).toEqual({ Article: 1 });
 
     const ids = (await getAllDocuments()).map((d) => d.id).sort();
-    expect(ids).toEqual([a1.id, pageDoc.id].sort());
+    expect(ids).toEqual([`${a1.id}__PUBLISHED`, pageDoc.id].sort());
   });
 
   it('--dry-run reports counts and writes nothing', async () => {
@@ -177,7 +180,7 @@ describe('runReindex', () => {
     });
     expect(await getAllDocuments()).toEqual([]);
     expect(
-      lines.some((l) => l.includes('DRY RUN') && l.includes('1 entries'))
+      lines.some((l) => l.includes('DRY RUN') && l.includes('1 documents'))
     ).toBe(true);
   });
 
@@ -191,7 +194,7 @@ describe('runReindex', () => {
 
     const all = await getAllDocuments();
     expect(all).toHaveLength(1);
-    expect(all[0]!.id).toBe(a1.id);
+    expect(all[0]!.id).toBe(`${a1.id}__PUBLISHED`);
   });
 
   it('reports progress per batch', async () => {
@@ -203,10 +206,86 @@ describe('runReindex', () => {
     const { logger, lines } = makeLogger();
     await runReindex({ prisma, index, logger }, { batchSize: 1 });
 
-    const progress = lines.filter((l) => l.includes('entries indexed'));
+    const progress = lines.filter((l) => l.includes('documents indexed'));
     expect(progress).toHaveLength(3);
     expect(progress[2]).toContain(
-      '3 / 3 entries indexed (all types, 100% complete)'
+      '3 / 3 documents indexed (all types, 100% complete)'
     );
+  });
+
+  it('indexes per-version docs (published + draft) for all indexable entries', async () => {
+    const ctId = await createType('Article', 'Article');
+    const pub = await prisma.contentEntry.create({
+      data: {
+        contentTypeId: ctId,
+        entryTitle: 'Pub',
+        entryKey: 'pub',
+        slug: 'pub',
+        versions: {
+          create: {
+            data: { title: 'Pub', body: 'p' },
+            entryTitle: 'Pub',
+            status: CONTENT_STATUSES.PUBLISHED,
+            publishedAt: new Date('2026-01-01T00:00:00.000Z'),
+          },
+        },
+      },
+    });
+    const draft = await prisma.contentEntry.create({
+      data: {
+        contentTypeId: ctId,
+        entryTitle: 'Draft',
+        entryKey: 'draft',
+        slug: 'draft',
+        versions: {
+          create: {
+            data: { title: 'Draft', body: 'd' },
+            entryTitle: 'Draft',
+            status: CONTENT_STATUSES.DRAFT,
+          },
+        },
+      },
+    });
+    const { logger } = makeLogger();
+    await runReindex({ prisma, index, logger }, {});
+    const ids = (await getAllDocuments()).map((d) => d.id).sort();
+    expect(ids).toEqual([`${pub.id}__PUBLISHED`, `${draft.id}__DRAFT`].sort());
+  });
+
+  it('rebuild clears stale docs before upserting', async () => {
+    const ctId = await createType('Article', 'Article');
+    const e = await prisma.contentEntry.create({
+      data: {
+        contentTypeId: ctId,
+        entryTitle: 'Keep',
+        entryKey: 'keep',
+        slug: 'keep',
+        versions: {
+          create: {
+            data: { title: 'Keep', body: 'k' },
+            entryTitle: 'Keep',
+            status: CONTENT_STATUSES.PUBLISHED,
+            publishedAt: new Date('2026-01-01T00:00:00.000Z'),
+          },
+        },
+      },
+    });
+    await addTestDocuments([
+      {
+        id: 'orphan',
+        entryId: 'orphan',
+        status: CONTENT_STATUSES.PUBLISHED,
+        isWorkingVersion: true,
+        entryKey: 'orphan',
+        contentType: 'Article',
+        entryTitle: 'Orphan',
+        publishedAt: null,
+        fields: {},
+      } as SearchDocument,
+    ]);
+    const { logger } = makeLogger();
+    await runReindex({ prisma, index, logger }, { rebuild: true });
+    const ids = (await getAllDocuments()).map((d) => d.id).sort();
+    expect(ids).toEqual([`${e.id}__PUBLISHED`]); // orphan gone
   });
 });
