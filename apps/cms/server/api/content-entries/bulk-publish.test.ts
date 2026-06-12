@@ -132,7 +132,7 @@ describe('POST /api/content-entries/bulk-publish', async () => {
     // The internal search-sync webhook (the ENTRY_PUBLISHED subscriber) is not
     // seeded in test mode, so create an explicit subscriber scoped to this type
     // — mirrors the single-entry publish suite's webhook wiring tests.
-    await prisma.webhook.create({
+    const hook = await prisma.webhook.create({
       data: {
         name: `Bulk publish hook ${Date.now()}`,
         url: 'https://example.com/hook',
@@ -149,8 +149,12 @@ describe('POST /api/content-entries/bulk-publish', async () => {
       CONTENT_STATUSES.DRAFT
     );
     await bulkPublish([a.id]);
+    // Scope the count to THIS test's webhook. Other integration files leave
+    // all-types ENTRY_PUBLISHED subscribers in the shared boject_test DB; an
+    // (event, entryId)-only count would sweep those in and flake order-
+    // dependently. Mirrors the single-entry publish suite's webhookId scoping.
     const count = await prisma.webhookDelivery.count({
-      where: { event: 'ENTRY_PUBLISHED', entryId: a.id },
+      where: { webhookId: hook.id, event: 'ENTRY_PUBLISHED', entryId: a.id },
     });
     expect(count).toBe(1);
   });
