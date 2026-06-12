@@ -111,12 +111,15 @@ describe('ENTRIES_INDEX_SETTINGS', () => {
       'fields',
     ]);
   });
-  it('makes contentType, entryKey, entryTitle, and nested fields filterable', () => {
+  it('makes contentType, entryKey, entryTitle, nested fields, and the per-version envelope filterable', () => {
     expect(ENTRIES_INDEX_SETTINGS.filterableAttributes).toEqual([
       'contentType',
       'entryKey',
       'entryTitle',
       'fields',
+      'status',
+      'entryId',
+      'isWorkingVersion',
     ]);
   });
 });

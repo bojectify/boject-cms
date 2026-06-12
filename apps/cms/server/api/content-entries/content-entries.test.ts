@@ -4172,7 +4172,10 @@ describe('Content Entry endpoints', async () => {
       const draft = await $fetch<EntryResponse>('/api/content-entries', {
         method: 'POST',
         headers: auth('203.0.113.195'),
-        body: { contentTypeId: ct.id, data: { title: `DelDraft ${Date.now()}` } },
+        body: {
+          contentTypeId: ct.id,
+          data: { title: `DelDraft ${Date.now()}` },
+        },
       });
       const beforeDelete = await draftSyncCount(draft.id); // 1 from the create
       await $fetch(`/api/content-entries/${draft.id}`, {
