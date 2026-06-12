@@ -7,8 +7,6 @@ import { meili } from './meili';
 import { resolveEntriesIndex } from './searchIndex';
 import {
   addTestDocuments,
-  assertAttributeValues,
-  assertDocumentExists,
   clearTestIndex,
   getAllDocuments,
 } from '../test/meiliTestUtils';
@@ -34,19 +32,8 @@ async function createType(identifier: string): Promise<string> {
       name: identifier,
       fields: {
         create: [
-          {
-            identifier: 'title',
-            name: 'Title',
-            type: FIELD_TYPES.ENTRY_TITLE,
-            required: true,
-            order: 0,
-          },
-          {
-            identifier: 'body',
-            name: 'Body',
-            type: FIELD_TYPES.TEXT,
-            order: 1,
-          },
+          { identifier: 'title', name: 'Title', type: FIELD_TYPES.ENTRY_TITLE, required: true, order: 0 },
+          { identifier: 'body', name: 'Body', type: FIELD_TYPES.TEXT, order: 1 },
         ],
       },
     },
@@ -54,25 +41,25 @@ async function createType(identifier: string): Promise<string> {
   return ct.id;
 }
 
-async function createPublishedEntry(
+/** Create an entry with the given version statuses (data per status). */
+async function createEntry(
   contentTypeId: string,
-  title: string,
   key: string,
-  body: string
+  versions: { status: string; title: string; body: string; publishedAt?: Date }[]
 ) {
   return prisma.contentEntry.create({
     data: {
       contentTypeId,
-      entryTitle: title,
+      entryTitle: versions[0]!.title,
       entryKey: key,
       slug: key,
       versions: {
-        create: {
-          data: { title, body },
-          entryTitle: title,
-          status: CONTENT_STATUSES.PUBLISHED,
-          publishedAt: new Date('2026-01-01T00:00:00.000Z'),
-        },
+        create: versions.map((v) => ({
+          data: { title: v.title, body: v.body },
+          entryTitle: v.title,
+          status: v.status as never,
+          publishedAt: v.publishedAt ?? null,
+        })),
       },
     },
   });
@@ -83,16 +70,12 @@ function entryPayload(
   contentType: { id: string; identifier: string },
   entryId: string
 ) {
-  return {
-    event,
-    deliveryId: 'd1',
-    timestamp: '2026-01-01T00:00:00.000Z',
-    contentType,
-    entry: { id: entryId },
-  };
+  return { event, deliveryId: 'd1', timestamp: '2026-01-01T00:00:00.000Z', contentType, entry: { id: entryId } };
 }
 
-describe('syncToSearchIndex', () => {
+const ids = async () => (await getAllDocuments()).map((d) => d.id).sort();
+
+describe('syncToSearchIndex — reconcile', () => {
   beforeEach(async () => {
     await resetDb();
     await clearTestIndex();
@@ -104,172 +87,83 @@ describe('syncToSearchIndex', () => {
     await prisma.$disconnect();
   });
 
-  it('ENTRY_PUBLISHED upserts the document', async () => {
+  it('ENTRY_PUBLISHED upserts the PUBLISHED doc', async () => {
     const ctId = await createType('Article');
-    const e = await createPublishedEntry(ctId, 'Hello', 'hello', 'world');
-    await syncToSearchIndex(
-      deps,
-      entryPayload('ENTRY_PUBLISHED', { id: ctId, identifier: 'Article' }, e.id)
-    );
+    const e = await createEntry(ctId, 'hello', [
+      { status: CONTENT_STATUSES.PUBLISHED, title: 'Hello', body: 'world', publishedAt: new Date('2026-01-01T00:00:00.000Z') },
+    ]);
+    await syncToSearchIndex(deps, entryPayload('ENTRY_PUBLISHED', { id: ctId, identifier: 'Article' }, e.id));
+    expect(await ids()).toEqual([`${e.id}__PUBLISHED`]);
+  });
 
-    const doc = await assertDocumentExists(e.id);
-    expect(doc.entryTitle).toBe('Hello');
-    await assertAttributeValues(e.id, {
-      contentType: 'Article',
-      entryKey: 'hello',
+  it('a two-slot entry indexes a PUBLISHED and a CHANGED doc', async () => {
+    const ctId = await createType('Article');
+    const e = await createEntry(ctId, 'two', [
+      { status: CONTENT_STATUSES.PUBLISHED, title: 'Live', body: 'live', publishedAt: new Date('2026-01-01T00:00:00.000Z') },
+      { status: CONTENT_STATUSES.CHANGED, title: 'Edited', body: 'edited' },
+    ]);
+    await syncToSearchIndex(deps, entryPayload('ENTRY_DRAFT_SYNC', { id: ctId, identifier: 'Article' }, e.id));
+    expect(await ids()).toEqual([`${e.id}__CHANGED`, `${e.id}__PUBLISHED`].sort());
+  });
+
+  it('publishing a CHANGED draft prunes the CHANGED doc, leaving only PUBLISHED', async () => {
+    const ctId = await createType('Article');
+    const e = await createEntry(ctId, 'two', [
+      { status: CONTENT_STATUSES.PUBLISHED, title: 'Live', body: 'live', publishedAt: new Date('2026-01-01T00:00:00.000Z') },
+      { status: CONTENT_STATUSES.CHANGED, title: 'Edited', body: 'edited' },
+    ]);
+    await syncToSearchIndex(deps, entryPayload('ENTRY_DRAFT_SYNC', { id: ctId, identifier: 'Article' }, e.id));
+    await prisma.contentEntryVersion.deleteMany({ where: { entryId: e.id } });
+    await prisma.contentEntryVersion.create({
+      data: { entryId: e.id, data: { title: 'Edited', body: 'edited' }, entryTitle: 'Edited', status: CONTENT_STATUSES.PUBLISHED, publishedAt: new Date('2026-01-01T00:00:00.000Z') },
     });
-    expect(doc.fields.body).toBe('world');
+    await syncToSearchIndex(deps, entryPayload('ENTRY_PUBLISHED', { id: ctId, identifier: 'Article' }, e.id));
+    expect(await ids()).toEqual([`${e.id}__PUBLISHED`]);
   });
 
-  it('ENTRY_UNPUBLISHED deletes the document', async () => {
-    const seeded: SearchDocument = {
-      id: 'u1',
-      entryKey: 'u1',
-      contentType: 'Article',
-      entryTitle: 'U',
-      publishedAt: null,
-      fields: {},
-    };
-    await addTestDocuments([seeded]);
-    await syncToSearchIndex(
-      deps,
-      entryPayload(
-        'ENTRY_UNPUBLISHED',
-        { id: 'x', identifier: 'Article' },
-        'u1'
-      )
-    );
-    expect(await getAllDocuments()).toEqual([]);
-  });
-
-  it('ENTRY_DELETED deletes the document', async () => {
-    const seeded: SearchDocument = {
-      id: 'd9',
-      entryKey: 'd9',
-      contentType: 'Article',
-      entryTitle: 'D',
-      publishedAt: null,
-      fields: {},
-    };
-    await addTestDocuments([seeded]);
-    await syncToSearchIndex(
-      deps,
-      entryPayload('ENTRY_DELETED', { id: 'x', identifier: 'Article' }, 'd9')
-    );
-    expect(await getAllDocuments()).toEqual([]);
-  });
-
-  it('CONTENT_TYPE_SCHEMA_CHANGED reindexes every published entry of the type', async () => {
+  it('ENTRY_DELETED removes every status doc for the entry', async () => {
     const ctId = await createType('Article');
-    const a = await createPublishedEntry(ctId, 'A', 'a', 'aa');
-    const b = await createPublishedEntry(ctId, 'B', 'b', 'bb');
+    const fakeId = '11111111-1111-1111-1111-111111111111';
+    await addTestDocuments([
+      { id: `${fakeId}__PUBLISHED`, entryId: fakeId, status: CONTENT_STATUSES.PUBLISHED, isWorkingVersion: true, entryKey: 'g', contentType: 'Article', entryTitle: 'G', publishedAt: null, fields: {} },
+      { id: `${fakeId}__CHANGED`, entryId: fakeId, status: CONTENT_STATUSES.CHANGED, isWorkingVersion: true, entryKey: 'g', contentType: 'Article', entryTitle: 'G', publishedAt: null, fields: {} },
+    ]);
+    await syncToSearchIndex(deps, entryPayload('ENTRY_DELETED', { id: ctId, identifier: 'Article' }, fakeId));
+    expect(await getAllDocuments()).toEqual([]);
+  });
+
+  it('unpublish (CHANGED→DRAFT) leaves only the DRAFT doc', async () => {
+    const ctId = await createType('Article');
+    const e = await createEntry(ctId, 'd', [
+      { status: CONTENT_STATUSES.DRAFT, title: 'Back to draft', body: 'b' },
+    ]);
+    await addTestDocuments([
+      { id: `${e.id}__PUBLISHED`, entryId: e.id, status: CONTENT_STATUSES.PUBLISHED, isWorkingVersion: false, entryKey: 'd', contentType: 'Article', entryTitle: 'Old', publishedAt: null, fields: {} },
+    ]);
+    await syncToSearchIndex(deps, entryPayload('ENTRY_UNPUBLISHED', { id: ctId, identifier: 'Article' }, e.id));
+    expect(await ids()).toEqual([`${e.id}__DRAFT`]);
+  });
+
+  it('CONTENT_TYPE_SCHEMA_CHANGED reindexes per-version docs for every indexable entry of the type', async () => {
+    const ctId = await createType('Article');
+    const a = await createEntry(ctId, 'a', [
+      { status: CONTENT_STATUSES.PUBLISHED, title: 'A', body: 'aa', publishedAt: new Date('2026-01-01T00:00:00.000Z') },
+      { status: CONTENT_STATUSES.CHANGED, title: 'A2', body: 'aaa' },
+    ]);
+    const b = await createEntry(ctId, 'b', [
+      { status: CONTENT_STATUSES.DRAFT, title: 'B', body: 'bb' },
+    ]);
     await syncToSearchIndex(deps, {
-      event: 'CONTENT_TYPE_SCHEMA_CHANGED',
-      deliveryId: 'd2',
-      contentTypeId: ctId,
-      contentTypeIdentifier: 'Article',
-      occurredAt: '2026-01-01T00:00:00.000Z',
+      event: 'CONTENT_TYPE_SCHEMA_CHANGED', deliveryId: 'd2', contentTypeId: ctId, contentTypeIdentifier: 'Article', occurredAt: '2026-01-01T00:00:00.000Z',
     });
-    const ids = (await getAllDocuments()).map((d) => d.id).sort();
-    expect(ids).toEqual([a.id, b.id].sort());
+    expect(await ids()).toEqual([`${a.id}__CHANGED`, `${a.id}__PUBLISHED`, `${b.id}__DRAFT`].sort());
   });
 
-  it('ENTRY_PUBLISHED for an entry with no published version deletes any stale doc', async () => {
-    const seeded: SearchDocument = {
-      id: 'race1',
-      entryKey: 'race1',
-      contentType: 'Article',
-      entryTitle: 'R',
-      publishedAt: null,
-      fields: {},
-    };
-    await addTestDocuments([seeded]);
-    await syncToSearchIndex(
-      deps,
-      entryPayload(
-        'ENTRY_PUBLISHED',
-        { id: 'x', identifier: 'Article' },
-        'race1'
-      )
-    );
-    expect(await getAllDocuments()).toEqual([]);
-  });
-
-  it('ENTRY_PUBLISHED deletes a stale doc when the entry has only a DRAFT version', async () => {
-    // Entry envelope exists but has NO published version (only DRAFT) — the
-    // `entry.versions.length === 0` arm (distinct from the missing-entry arm).
-    const ctId = await createType('Article');
-    const e = await prisma.contentEntry.create({
-      data: {
-        contentTypeId: ctId,
-        entryTitle: 'Drafty',
-        entryKey: 'drafty',
-        slug: 'drafty',
-        versions: {
-          create: {
-            data: { title: 'Drafty', body: 'x' },
-            entryTitle: 'Drafty',
-            status: CONTENT_STATUSES.DRAFT,
-            publishedAt: null,
-          },
-        },
-      },
-    });
-    const stale: SearchDocument = {
-      id: e.id,
-      entryKey: 'drafty',
-      contentType: 'Article',
-      entryTitle: 'Drafty',
-      publishedAt: null,
-      fields: {},
-    };
-    await addTestDocuments([stale]);
-    await syncToSearchIndex(
-      deps,
-      entryPayload('ENTRY_PUBLISHED', { id: ctId, identifier: 'Article' }, e.id)
-    );
-    expect(await getAllDocuments()).toEqual([]);
-  });
-
-  it('CONTENT_TYPE_SCHEMA_CHANGED with no published entries is a no-op', async () => {
-    const ctId = await createType('Article');
-    const keep: SearchDocument = {
-      id: 'keep1',
-      entryKey: 'keep1',
-      contentType: 'Other',
-      entryTitle: 'K',
-      publishedAt: null,
-      fields: {},
-    };
-    await addTestDocuments([keep]);
-    await syncToSearchIndex(deps, {
-      event: 'CONTENT_TYPE_SCHEMA_CHANGED',
-      deliveryId: 'd3',
-      contentTypeId: ctId,
-      contentTypeIdentifier: 'Article',
-      occurredAt: '2026-01-01T00:00:00.000Z',
-    });
-    expect((await getAllDocuments()).map((d) => d.id)).toEqual(['keep1']);
-  });
-
-  it('ignores an unknown event (no-op, leaves the index untouched)', async () => {
-    const keep: SearchDocument = {
-      id: 'keep2',
-      entryKey: 'keep2',
-      contentType: 'Other',
-      entryTitle: 'K2',
-      publishedAt: null,
-      fields: {},
-    };
-    await addTestDocuments([keep]);
-    await syncToSearchIndex(
-      deps,
-      entryPayload(
-        'SOMETHING_ELSE',
-        { id: 'x', identifier: 'Article' },
-        'keep2'
-      )
-    );
-    expect((await getAllDocuments()).map((d) => d.id)).toEqual(['keep2']);
+  it('ignores an unknown event (no-op)', async () => {
+    await addTestDocuments([
+      { id: 'keep__PUBLISHED', entryId: 'keep', status: CONTENT_STATUSES.PUBLISHED, isWorkingVersion: true, entryKey: 'keep', contentType: 'Other', entryTitle: 'K', publishedAt: null, fields: {} },
+    ]);
+    await syncToSearchIndex(deps, entryPayload('SOMETHING_ELSE', { id: 'x', identifier: 'Article' }, 'keep'));
+    expect((await getAllDocuments()).map((d) => d.id)).toEqual(['keep__PUBLISHED']);
   });
 });
