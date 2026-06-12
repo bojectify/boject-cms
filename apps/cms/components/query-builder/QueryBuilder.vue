@@ -185,6 +185,15 @@ function onChooseEntry(e: EntryOption) {
   handle({ kind: 'commitValue' });
 }
 
+// A pointer click on a multi-value option toggles it but leaves focus on the
+// option <button> (the toggle doesn't change the step, so the focus watcher
+// doesn't fire). Re-home focus to the value input — mirroring the chip-removal
+// pattern — so Enter (commit + run) and ↑/↓ row nav keep working after pointer use.
+function onToggle(value: string) {
+  handle({ kind: 'toggleValue', value });
+  focusActiveInput();
+}
+
 const ct = computed(() =>
   props.contentTypes.find((c) => c.identifier === state.value.query.contentType)
 );
@@ -456,7 +465,7 @@ function onKeydown(e: KeyboardEvent) {
           v-else-if="draftKind === 'multiSelect' && state.draft"
           :draft="state.draft"
           :active-id="activeId"
-          @toggle="(v: string) => handle({ kind: 'toggleValue', value: v })"
+          @toggle="onToggle"
         />
         <MultiEntryEditor
           v-else-if="draftKind === 'multiEntry' && state.draft"
@@ -464,7 +473,7 @@ function onKeydown(e: KeyboardEvent) {
           :text="state.text"
           :active-id="activeId"
           :search-entries="searchEntries"
-          @toggle="(v: string) => handle({ kind: 'toggleValue', value: v })"
+          @toggle="onToggle"
           @capture-label="
             (p: { id: string; title: string }) => (liveLabels[p.id] = p.title)
           "
