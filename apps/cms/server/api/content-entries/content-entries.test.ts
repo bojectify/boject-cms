@@ -4141,5 +4141,45 @@ describe('Content Entry endpoints', async () => {
       });
       expect(await draftSyncCount(created.id)).toBe(before + 1);
     });
+
+    it('unarchive and draft-only delete each enqueue ENTRY_DRAFT_SYNC', async () => {
+      const ct = await makeType(`DraftSyncC_${Date.now()}`);
+
+      // Unarchive: publish → archive (fires ENTRY_UNPUBLISHED, not draft-sync) →
+      // unarchive (ARCHIVED→DRAFT) fires the draft trigger.
+      const pub = await $fetch<EntryResponse>('/api/content-entries', {
+        method: 'POST',
+        headers: auth('203.0.113.195'),
+        body: {
+          contentTypeId: ct.id,
+          status: 'PUBLISHED',
+          data: { title: `Arch ${Date.now()}` },
+        },
+      });
+      await $fetch(`/api/content-entries/${pub.id}/archive`, {
+        method: 'POST',
+        headers: auth('203.0.113.195'),
+      });
+      const beforeUnarchive = await draftSyncCount(pub.id);
+      await $fetch(`/api/content-entries/${pub.id}/unarchive`, {
+        method: 'POST',
+        headers: auth('203.0.113.195'),
+      });
+      expect(await draftSyncCount(pub.id)).toBe(beforeUnarchive + 1);
+
+      // Draft-only delete: a never-published entry's delete fires the draft
+      // trigger (ENTRY_DELETED only fires when a published version existed).
+      const draft = await $fetch<EntryResponse>('/api/content-entries', {
+        method: 'POST',
+        headers: auth('203.0.113.195'),
+        body: { contentTypeId: ct.id, data: { title: `DelDraft ${Date.now()}` } },
+      });
+      const beforeDelete = await draftSyncCount(draft.id); // 1 from the create
+      await $fetch(`/api/content-entries/${draft.id}`, {
+        method: 'DELETE',
+        headers: auth('203.0.113.195'),
+      });
+      expect(await draftSyncCount(draft.id)).toBe(beforeDelete + 1);
+    });
   });
 });
