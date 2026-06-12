@@ -3,12 +3,13 @@ import { WEBHOOK_EVENTS } from '../../utils/webhookEvents';
 
 export const SEARCH_SYNC_WEBHOOK_NAME = 'Search index sync';
 
-/** The four events the bundled search sync subscribes to. */
+/** The five events the bundled search sync subscribes to. */
 export const SEARCH_SYNC_EVENTS: WebhookEvent[] = [
   WEBHOOK_EVENTS.ENTRY_PUBLISHED,
   WEBHOOK_EVENTS.ENTRY_UNPUBLISHED,
   WEBHOOK_EVENTS.ENTRY_DELETED,
   WEBHOOK_EVENTS.CONTENT_TYPE_SCHEMA_CHANGED,
+  WEBHOOK_EVENTS.ENTRY_DRAFT_SYNC,
 ];
 
 /**

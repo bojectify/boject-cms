@@ -79,3 +79,26 @@ export function buildSchemaChangedPayload(input: {
     occurredAt: input.occurredAt.toISOString(),
   };
 }
+
+export interface DraftSyncPayload {
+  event: 'ENTRY_DRAFT_SYNC';
+  deliveryId: string;
+  contentTypeId: string;
+  entry: { id: string };
+  occurredAt: string;
+}
+
+export function buildDraftSyncPayload(input: {
+  deliveryId: string;
+  occurredAt: Date;
+  contentTypeId: string;
+  entryId: string;
+}): DraftSyncPayload {
+  return {
+    event: 'ENTRY_DRAFT_SYNC',
+    deliveryId: input.deliveryId,
+    contentTypeId: input.contentTypeId,
+    entry: { id: input.entryId },
+    occurredAt: input.occurredAt.toISOString(),
+  };
+}
