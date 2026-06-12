@@ -185,6 +185,15 @@ function onChooseEntry(e: EntryOption) {
   handle({ kind: 'commitValue' });
 }
 
+// A pointer click on a multi-value option toggles it but leaves focus on the
+// option <button> (the toggle doesn't change the step, so the focus watcher
+// doesn't fire). Re-home focus to the value input — mirroring the chip-removal
+// pattern — so Enter (commit + run) and ↑/↓ row nav keep working after pointer use.
+function onToggle(value: string) {
+  handle({ kind: 'toggleValue', value });
+  focusActiveInput();
+}
+
 const ct = computed(() =>
   props.contentTypes.find((c) => c.identifier === state.value.query.contentType)
 );
@@ -241,6 +250,23 @@ function commitTypedValue() {
   handle({ kind: 'commitValue' });
 }
 
+// Commit any pending value for the current step, then run. The single source of
+// truth for "execute the search now" — shared by the Enter handlers and the
+// Submit button. At the value step it locks in a multi-value selection or a typed
+// free-entry value first; elsewhere (field / content-type step) it just runs.
+function submit() {
+  if (state.value.step === STEPS.VALUE) {
+    const dk = draftKind.value;
+    if (dk === 'multiSelect' || dk === 'multiEntry') {
+      const v = state.value.draft?.value;
+      if (Array.isArray(v) && v.length > 0) handle({ kind: 'commitValue' });
+    } else if (isFreeEntry.value && state.value.text !== '') {
+      commitTypedValue();
+    }
+  }
+  handle({ kind: 'run' });
+}
+
 /** True when the caret sits at the very end of the input with no selection. */
 function caretAtEnd(e: KeyboardEvent): boolean {
   const el = e.target as HTMLInputElement;
@@ -270,8 +296,7 @@ function onValueKeydown(e: KeyboardEvent) {
     const hasSelection = Array.isArray(val) && val.length > 0;
     if (e.key === 'Enter') {
       e.preventDefault();
-      if (hasSelection) handle({ kind: 'commitValue' });
-      handle({ kind: 'run' });
+      submit();
       return;
     }
     if (e.key === 'Tab' && !e.shiftKey) {
@@ -283,9 +308,8 @@ function onValueKeydown(e: KeyboardEvent) {
   if (handleNavKeys(e)) return;
   if (e.key === 'Enter') {
     e.preventDefault();
-    // ↵ runs the search now, locking in a pending typed value first.
-    if (isFreeEntry.value && state.value.text !== '') commitTypedValue();
-    handle({ kind: 'run' });
+    // ↵ runs the search now, committing any pending typed value first.
+    submit();
   } else if (
     e.key === 'Tab' &&
     !e.shiftKey &&
@@ -320,7 +344,7 @@ function onKeydown(e: KeyboardEvent) {
   if (handleNavKeys(e)) return;
   if (e.key === 'Enter') {
     e.preventDefault();
-    handle({ kind: 'run' });
+    submit();
   } else if (e.key === 'Backspace' && state.value.text === '') {
     handle({ kind: 'backspace' });
   }
@@ -411,11 +435,22 @@ function onKeydown(e: KeyboardEvent) {
         @keydown="onKeydown"
       />
       <!--
-        ml-auto keeps the hint on the right edge even at the value step, where
-        the flex-1 main input is v-show-hidden (the draft chip's inline value
-        input doesn't grow to fill the row).
+        Right-edge submit: the pointer/touch execute affordance. Commits any
+        pending value and runs (mirrors Enter-with-nothing-highlighted via the
+        shared submit()). ml-auto pins the button + esc to the right edge even at
+        the value step, where the flex-1 main input is v-show-hidden.
       -->
-      <UKbd value="esc" class="shrink-0 ml-auto" />
+      <UButton
+        :data-testid="QA_QUERY_BUILDER.SUBMIT"
+        size="xs"
+        color="primary"
+        icon="i-lucide-corner-down-left"
+        class="shrink-0 ml-auto"
+        @click="submit"
+      >
+        Search
+      </UButton>
+      <UKbd value="esc" class="shrink-0" />
     </div>
 
     <QueryDropdown
@@ -456,7 +491,7 @@ function onKeydown(e: KeyboardEvent) {
           v-else-if="draftKind === 'multiSelect' && state.draft"
           :draft="state.draft"
           :active-id="activeId"
-          @toggle="(v: string) => handle({ kind: 'toggleValue', value: v })"
+          @toggle="onToggle"
         />
         <MultiEntryEditor
           v-else-if="draftKind === 'multiEntry' && state.draft"
@@ -464,7 +499,7 @@ function onKeydown(e: KeyboardEvent) {
           :text="state.text"
           :active-id="activeId"
           :search-entries="searchEntries"
-          @toggle="(v: string) => handle({ kind: 'toggleValue', value: v })"
+          @toggle="onToggle"
           @capture-label="
             (p: { id: string; title: string }) => (liveLabels[p.id] = p.title)
           "
