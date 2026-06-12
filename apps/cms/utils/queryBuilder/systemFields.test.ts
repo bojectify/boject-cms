@@ -7,6 +7,7 @@ import {
   toQueryField,
   resolveQueryField,
 } from './systemFields';
+import { FIELD_TYPES } from '../fieldTypes';
 import type { QueryContentType } from './types';
 // Test-only import: src-level systemFields.ts must not import operators.ts
 // (cycle avoidance), but a test can cross-check the registries.
@@ -31,7 +32,7 @@ describe('systemFields registry', () => {
       identifier: '$status',
       name: 'Status',
       enginePath: 'status',
-      type: 'SELECT',
+      type: FIELD_TYPES.SELECT,
       unscoped: true,
       choices: [
         { label: 'Draft', value: 'DRAFT' },
@@ -46,7 +47,7 @@ describe('systemFields registry', () => {
       identifier: '$id',
       name: 'Entry ID',
       enginePath: 'entryId',
-      type: 'TEXT',
+      type: FIELD_TYPES.TEXT,
       unscoped: true,
     });
   });
@@ -107,7 +108,7 @@ describe('getSystemField', () => {
       identifier: '$entryKey',
       name: 'Entry key',
       enginePath: 'entryKey',
-      type: 'SLUG',
+      type: FIELD_TYPES.SLUG,
     });
   });
 
@@ -121,7 +122,7 @@ describe('toQueryField', () => {
     expect(toQueryField(getSystemField('$status')!)).toStrictEqual({
       identifier: '$status',
       name: 'Status',
-      type: 'SELECT',
+      type: FIELD_TYPES.SELECT,
       choices: [
         { label: 'Draft', value: 'DRAFT' },
         { label: 'Changed', value: 'CHANGED' },
@@ -134,7 +135,7 @@ describe('toQueryField', () => {
     expect(toQueryField(getSystemField('$entryKey')!)).toStrictEqual({
       identifier: '$entryKey',
       name: 'Entry key',
-      type: 'SLUG',
+      type: FIELD_TYPES.SLUG,
     });
   });
 });
@@ -144,7 +145,9 @@ describe('resolveQueryField', () => {
     id: 'ct1',
     identifier: 'Article',
     name: 'Article',
-    fields: [{ identifier: 'summary', name: 'Summary', type: 'TEXT' }],
+    fields: [
+      { identifier: 'summary', name: 'Summary', type: FIELD_TYPES.TEXT },
+    ],
   };
 
   it('returns the content-type field for a normal identifier', () => {
@@ -156,7 +159,7 @@ describe('resolveQueryField', () => {
     expect(resolveQueryField(ct, '$entryKey')).toStrictEqual({
       identifier: '$entryKey',
       name: 'Entry key',
-      type: 'SLUG',
+      type: FIELD_TYPES.SLUG,
     });
   });
 

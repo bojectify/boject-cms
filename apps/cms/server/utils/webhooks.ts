@@ -6,6 +6,7 @@ import {
   buildDraftSyncPayload,
 } from './webhookPayload';
 import type { WebhookEntrySnapshot } from './webhookPayload';
+import { WEBHOOK_EVENTS } from '../../utils/webhookEvents';
 
 export function generateWebhookSecret(): string {
   return randomBytes(32).toString('base64');
@@ -116,7 +117,7 @@ export async function enqueueContentTypeSchemaChanged(
   args: EnqueueSchemaChangedArgs
 ): Promise<number> {
   return insertDeliveries(tx, {
-    event: 'CONTENT_TYPE_SCHEMA_CHANGED',
+    event: WEBHOOK_EVENTS.CONTENT_TYPE_SCHEMA_CHANGED,
     contentTypeId: args.contentType.id,
     entryId: null,
     buildPayload: (deliveryId, now) =>
@@ -138,7 +139,7 @@ export async function enqueueEntryDraftSync(
   args: { contentType: { id: string }; entryId: string }
 ): Promise<number> {
   return insertDeliveries(tx, {
-    event: 'ENTRY_DRAFT_SYNC',
+    event: WEBHOOK_EVENTS.ENTRY_DRAFT_SYNC,
     contentTypeId: args.contentType.id,
     entryId: args.entryId,
     buildPayload: (deliveryId, now) =>
