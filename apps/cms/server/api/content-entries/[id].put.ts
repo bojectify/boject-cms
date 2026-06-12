@@ -5,10 +5,8 @@ import { enforceMutationRateLimit } from '../../utils/rateLimitEndpoint';
 import { assertApiKeyScope } from '../../utils/assertApiKeyScope';
 import { assertUniqueFieldValues } from '../../utils/assertUniqueFieldValues';
 import { enrichEntryDataWithEmbedIdentifiers } from '../../utils/enrichRichtextEmbeds';
-import {
-  enqueueWebhookDeliveries,
-  enqueueEntryDraftSync,
-} from '../../utils/webhooks';
+import { enqueueEntryDraftSync } from '../../utils/webhooks';
+import { publishEntry } from '../../utils/publishEntry';
 import {
   isCmsRequest,
   getDraftVersion,
@@ -198,105 +196,10 @@ async function saveDraftFlow(
   );
 }
 
-/**
- * Publish Flow
- *
- * In a transaction:
- * 1. Delete old PUBLISHED version (to respect partial unique index)
- * 2. Promote existing draft to PUBLISHED, or create a new PUBLISHED version
- * Update envelope slug/entryTitle.
- */
+/** Publish via the shared util (the PUT path supplies the request's validated data). */
 async function publishFlow(
   entry: EntryWithVersionsAndType,
   validatedData: Record<string, unknown> | null
 ): Promise<void> {
-  const publishedVersion = getPublishedVersion(entry.versions);
-  const draftVersion = getDraftVersion(entry.versions);
-
-  // Determine the data to publish
-  const dataToPublish =
-    validatedData ??
-    (draftVersion?.data as Record<string, unknown> | null) ??
-    (publishedVersion?.data as Record<string, unknown> | null);
-  if (!dataToPublish) {
-    throw createError({
-      statusCode: 400,
-      statusMessage: 'No data provided and no existing version to publish',
-    });
-  }
-
-  const entryTitle = extractEntryTitle(dataToPublish, entry.contentType.fields);
-  const slug = extractSlug(dataToPublish, entry.contentType.fields);
-  const now = new Date();
-  // Preserve original publishedAt from the existing PUBLISHED version, or set now
-  const publishedAt = publishedVersion?.publishedAt ?? now;
-
-  await withPrismaErrors(
-    () =>
-      prisma.$transaction(async (tx) => {
-        // Step 1: Delete old PUBLISHED version first (partial unique index)
-        if (publishedVersion) {
-          await tx.contentEntryVersion.delete({
-            where: { id: publishedVersion.id },
-          });
-        }
-
-        // Step 2: Promote draft or create new PUBLISHED version
-        if (draftVersion) {
-          await tx.contentEntryVersion.update({
-            where: { id: draftVersion.id },
-            data: {
-              data: (validatedData ??
-                draftVersion.data) as Prisma.InputJsonValue,
-              entryTitle,
-              status: CONTENT_STATUSES.PUBLISHED,
-              publishedAt,
-            },
-          });
-        } else {
-          await tx.contentEntryVersion.create({
-            data: {
-              entryId: entry.id,
-              data: dataToPublish as Prisma.InputJsonValue,
-              entryTitle,
-              status: CONTENT_STATUSES.PUBLISHED,
-              publishedAt,
-            },
-          });
-        }
-
-        // Step 3: Update envelope slug and entryTitle
-        await tx.contentEntry.update({
-          where: { id: entry.id },
-          data: { slug, entryTitle },
-        });
-
-        // Re-read the canonical published version inside this transaction so
-        // the snapshot matches what consumers would see via GraphQL/REST.
-        const published = await tx.contentEntryVersion.findFirstOrThrow({
-          where: { entryId: entry.id, status: CONTENT_STATUSES.PUBLISHED },
-        });
-        await enqueueWebhookDeliveries(tx, {
-          event: 'ENTRY_PUBLISHED',
-          contentType: {
-            id: entry.contentType.id,
-            identifier: entry.contentType.identifier,
-          },
-          entry: {
-            id: entry.id,
-            entryTitle,
-            slug,
-            status: CONTENT_STATUSES.PUBLISHED,
-            publishedAt: published.publishedAt,
-            createdAt: entry.createdAt,
-            updatedAt: new Date(),
-            data: published.data,
-          },
-        });
-      }),
-    {
-      uniqueMessage:
-        'An entry with this slug or title already exists for this content type',
-    }
-  );
+  await publishEntry(entry, validatedData);
 }
