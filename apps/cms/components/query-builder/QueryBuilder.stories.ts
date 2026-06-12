@@ -710,13 +710,14 @@ export const SystemEntryKeyFlow: Story = {
   args: { lockedContentType: ARTICLE_CT, enableRichOperators: true },
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
-    // field step: Article's 7 filterable fields occupy OPTION(0..6); the System
-    // group header + Entry key row follow
+    // field step: Article's own filterable fields are followed by the "System"
+    // group, which lists every SYSTEM_FIELDS row (e.g. Entry key). Locate the
+    // Entry key option by its display name rather than a hardcoded index, so the
+    // test stays correct as the system-field registry grows (#302).
     await expect(
       canvas.getByTestId(QA_QUERY_BUILDER.DROPDOWN)
     ).toHaveTextContent('System');
-    const entryKeyRow = canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(7));
-    await expect(entryKeyRow).toHaveTextContent('Entry key');
+    const entryKeyRow = canvas.getByRole('option', { name: 'Entry key' });
     await userEvent.click(entryKeyRow);
     // operator step: exactly the SLUG donor operators — is / starts with
     await expect(
