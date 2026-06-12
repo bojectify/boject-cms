@@ -5,7 +5,10 @@ import { enforceMutationRateLimit } from '../../utils/rateLimitEndpoint';
 import { assertApiKeyScope } from '../../utils/assertApiKeyScope';
 import { assertUniqueFieldValues } from '../../utils/assertUniqueFieldValues';
 import { enrichEntryDataWithEmbedIdentifiers } from '../../utils/enrichRichtextEmbeds';
-import { enqueueWebhookDeliveries } from '../../utils/webhooks';
+import {
+  enqueueWebhookDeliveries,
+  enqueueEntryDraftSync,
+} from '../../utils/webhooks';
 import {
   flattenEntryWithVersion,
   getPublishedVersion,
@@ -144,6 +147,12 @@ export default defineEventHandler(async (event) => {
             updatedAt: entry.updatedAt,
             data: version.data,
           },
+        });
+      } else {
+        // DRAFT entry: the search index hears this only via the internal trigger.
+        await enqueueEntryDraftSync(tx, {
+          contentType: { id: contentType.id },
+          entryId: entry.id,
         });
       }
 

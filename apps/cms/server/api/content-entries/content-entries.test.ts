@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { setup, $fetch, fetch } from '@nuxt/test-utils/e2e';
 import { createHash } from 'node:crypto';
 import { PrismaPg } from '@prisma/adapter-pg';
@@ -114,7 +114,8 @@ let testContentType: ContentTypeResponse;
  *             .184-.186 entryKey derivation tests (#205),
  *             .187-.188 entryKey immutability tests (#205),
  *             .189-.190 entryKey in REST responses tests (#205),
- *             .191-.192 publish-on-create webhook enqueue tests (#330))
+ *             .191-.192 publish-on-create webhook enqueue tests (#330),
+ *             .193-.195 ENTRY_DRAFT_SYNC enqueue tests (#302))
  *
  * When adding a new rate-limited test:
  *  1. Find the describe block your test will live in
@@ -4026,6 +4027,119 @@ describe('Content Entry endpoints', async () => {
       expect(archivedItem).toBeDefined();
       expect(archivedItem!.status).toBe(CONTENT_STATUSES.ARCHIVED);
       expect(archivedTitles).toContain(archivedItem!.data.title);
+    });
+  });
+
+  describe('ENTRY_DRAFT_SYNC enqueue (#302)', () => {
+    // Rate-limit IPs: 203.0.113.193-.195 (see the legend at the top of the file).
+    const auth = (ip: string) => ({
+      Authorization: `Bearer ${TEST_API_KEY}`,
+      'x-forwarded-for': ip,
+    });
+    let draftSyncWebhookId: string;
+
+    beforeAll(async () => {
+      // External webhooks can't subscribe to the internal-only ENTRY_DRAFT_SYNC,
+      // so create the subscriber directly. Scope delivery counts to its id so the
+      // assertions are deterministic even if a plugin seeded another internal row.
+      const wh = await prisma.webhook.create({
+        data: {
+          name: `test-draft-sync-${Date.now()}`,
+          kind: 'INTERNAL',
+          url: null,
+          secret: null,
+          enabled: true,
+          contentTypeIds: [],
+          events: ['ENTRY_DRAFT_SYNC'],
+        },
+      });
+      draftSyncWebhookId = wh.id;
+    });
+
+    afterAll(async () => {
+      // Cascades its deliveries.
+      await prisma.webhook.delete({ where: { id: draftSyncWebhookId } });
+    });
+
+    async function makeType(identifier: string) {
+      return prisma.contentType.create({
+        data: {
+          identifier,
+          name: identifier,
+          fields: {
+            create: [
+              {
+                identifier: 'title',
+                name: 'Title',
+                type: FIELD_TYPES.ENTRY_TITLE,
+                order: 0,
+                required: true,
+              },
+            ],
+          },
+        },
+      });
+    }
+    const draftSyncCount = (entryId: string) =>
+      prisma.webhookDelivery.count({
+        where: {
+          event: 'ENTRY_DRAFT_SYNC',
+          entryId,
+          webhookId: draftSyncWebhookId,
+        },
+      });
+
+    it('a new DRAFT entry enqueues ENTRY_DRAFT_SYNC; publish-on-create does not', async () => {
+      const ct = await makeType(`DraftSyncA_${Date.now()}`);
+      const draft = await $fetch<EntryResponse>('/api/content-entries', {
+        method: 'POST',
+        headers: auth('203.0.113.193'),
+        body: { contentTypeId: ct.id, data: { title: `Draft ${Date.now()}` } },
+      });
+      expect(await draftSyncCount(draft.id)).toBe(1);
+
+      const pub = await $fetch<EntryResponse>('/api/content-entries', {
+        method: 'POST',
+        headers: auth('203.0.113.193'),
+        body: {
+          contentTypeId: ct.id,
+          status: 'PUBLISHED',
+          data: { title: `Pub ${Date.now()}` },
+        },
+      });
+      expect(await draftSyncCount(pub.id)).toBe(0);
+      expect(
+        await prisma.webhookDelivery.count({
+          where: { event: 'ENTRY_PUBLISHED', entryId: pub.id },
+        })
+      ).toBeGreaterThanOrEqual(1);
+    });
+
+    it('discarding a CHANGED draft enqueues ENTRY_DRAFT_SYNC', async () => {
+      const ct = await makeType(`DraftSyncB_${Date.now()}`);
+      const created = await $fetch<EntryResponse>('/api/content-entries', {
+        method: 'POST',
+        headers: auth('203.0.113.194'),
+        body: {
+          contentTypeId: ct.id,
+          status: 'PUBLISHED',
+          data: { title: `HasDraft ${Date.now()}` },
+        },
+      });
+      // Save a CHANGED draft (this PUT also enqueues one ENTRY_DRAFT_SYNC).
+      await $fetch(`/api/content-entries/${created.id}`, {
+        method: 'PUT',
+        headers: auth('203.0.113.194'),
+        body: { data: { title: `HasDraft edited ${Date.now()}` } },
+      });
+      const before = await draftSyncCount(created.id);
+      expect(before).toBe(1);
+      // Discard it → one more ENTRY_DRAFT_SYNC.
+      await $fetch(`/api/content-entries/${created.id}/draft`, {
+        method: 'DELETE',
+        headers: auth('203.0.113.194'),
+      });
+      expect(await draftSyncCount(created.id)).toBe(before + 1);
     });
   });
 });

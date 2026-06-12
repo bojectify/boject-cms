@@ -5,7 +5,10 @@ import { enforceMutationRateLimit } from '../../utils/rateLimitEndpoint';
 import { assertApiKeyScope } from '../../utils/assertApiKeyScope';
 import { assertUniqueFieldValues } from '../../utils/assertUniqueFieldValues';
 import { enrichEntryDataWithEmbedIdentifiers } from '../../utils/enrichRichtextEmbeds';
-import { enqueueWebhookDeliveries } from '../../utils/webhooks';
+import {
+  enqueueWebhookDeliveries,
+  enqueueEntryDraftSync,
+} from '../../utils/webhooks';
 import {
   isCmsRequest,
   getDraftVersion,
@@ -152,35 +155,42 @@ async function saveDraftFlow(
   const slug = extractSlug(dataToSave, entry.contentType.fields);
 
   await withPrismaErrors(
-    async () => {
-      if (draftVersion) {
-        // Update existing draft/changed version
-        await prisma.contentEntryVersion.update({
-          where: { id: draftVersion.id },
-          data: {
-            data: dataToSave as Prisma.InputJsonValue,
-            entryTitle,
-            status: targetStatus,
-          },
-        });
-      } else {
-        // Create a new draft/changed version
-        await prisma.contentEntryVersion.create({
-          data: {
-            entryId: entry.id,
-            data: dataToSave as Prisma.InputJsonValue,
-            entryTitle,
-            status: targetStatus,
-          },
-        });
-      }
+    () =>
+      prisma.$transaction(async (tx) => {
+        if (draftVersion) {
+          // Update existing draft/changed version
+          await tx.contentEntryVersion.update({
+            where: { id: draftVersion.id },
+            data: {
+              data: dataToSave as Prisma.InputJsonValue,
+              entryTitle,
+              status: targetStatus,
+            },
+          });
+        } else {
+          // Create a new draft/changed version
+          await tx.contentEntryVersion.create({
+            data: {
+              entryId: entry.id,
+              data: dataToSave as Prisma.InputJsonValue,
+              entryTitle,
+              status: targetStatus,
+            },
+          });
+        }
 
-      // Update envelope slug and entryTitle for uniqueness constraint enforcement
-      await prisma.contentEntry.update({
-        where: { id: entry.id },
-        data: { slug, entryTitle },
-      });
-    },
+        // Update envelope slug and entryTitle for uniqueness constraint enforcement
+        await tx.contentEntry.update({
+          where: { id: entry.id },
+          data: { slug, entryTitle },
+        });
+
+        // DRAFT-side save: the search index hears this only via the internal trigger.
+        await enqueueEntryDraftSync(tx, {
+          contentType: { id: entry.contentType.id },
+          entryId: entry.id,
+        });
+      }),
     {
       uniqueMessage:
         'An entry with this slug or title already exists for this content type',

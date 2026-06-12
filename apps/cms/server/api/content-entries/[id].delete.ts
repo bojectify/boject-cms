@@ -2,7 +2,10 @@ import type { ContentEntryVersion } from '#prisma';
 import { assertUuid } from '../../utils/validation';
 import { withPrismaErrors } from '../../utils/prismaErrors';
 import { enforceMutationRateLimit } from '../../utils/rateLimitEndpoint';
-import { enqueueWebhookDeliveries } from '../../utils/webhooks';
+import {
+  enqueueWebhookDeliveries,
+  enqueueEntryDraftSync,
+} from '../../utils/webhooks';
 import { getPublishedVersion } from '../../utils/resolveVersion';
 import { assertApiKeyScope } from '../../utils/assertApiKeyScope';
 import { CONTENT_STATUSES } from '../../../utils/contentStatus';
@@ -47,6 +50,13 @@ export default defineEventHandler(async (event) => {
               updatedAt: existing.updatedAt,
               data: publishedVersion.data,
             },
+          });
+        } else {
+          // Draft-only delete: ENTRY_DELETED never fires here, so use the
+          // internal trigger to prune the entry's draft doc from the index.
+          await enqueueEntryDraftSync(tx, {
+            contentType: { id: existing.contentType.id },
+            entryId: existing.id,
           });
         }
         await tx.contentEntry.delete({ where: { id } });
