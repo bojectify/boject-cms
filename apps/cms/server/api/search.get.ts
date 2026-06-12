@@ -14,6 +14,7 @@ import {
   operatorArity,
 } from '../../utils/queryBuilder/operators';
 import { resolveContentTypeFieldTypes } from '../utils/searchFieldTypes';
+import { isCmsRequest } from '../utils/resolveVersion';
 
 const DEFAULT_PER_PAGE = 15;
 const MAX_PER_PAGE = 100;
@@ -88,9 +89,25 @@ export default defineEventHandler(async (event) => {
 
   // A bare request with nothing to search and no scoping is a 400 — Meili would
   // otherwise return the entire index. A filter or contentType is enough to
-  // make an empty q meaningful (e.g. "all Articles by author X").
+  // make an empty q meaningful (e.g. "all Articles by author X"). This guard
+  // deliberately reads the ORIGINAL parsed `filters` (pre-gate) so an API-key
+  // request carrying only `$status` still passes before the gate strips it.
   if (q.length === 0 && !contentType && filters.length === 0) {
     throw createError({ statusCode: 400, statusMessage: 'q is required' });
+  }
+
+  // Auth-context status gate. API keys (and any non-session caller) are forced
+  // to PUBLISHED — drafts never leak. A CMS session may filter by $status; with
+  // no $status it defaults to the working version per entry (isWorkingVersion).
+  const isCms = isCmsRequest(event);
+  let effectiveFilters = filters;
+  let envelopeFilters: string[];
+  if (!isCms) {
+    effectiveFilters = filters.filter((f) => f.field !== '$status');
+    envelopeFilters = ['status = "PUBLISHED"'];
+  } else {
+    const hasStatus = filters.some((f) => f.field === '$status');
+    envelopeFilters = hasStatus ? [] : ['isWorkingVersion = true'];
   }
 
   const page = Math.max(1, Number(query.page) || 1);
@@ -110,7 +127,7 @@ export default defineEventHandler(async (event) => {
   // Only resolve field types when there are structured filters to compile —
   // a free-text-only search within a content type needs no Postgres hop.
   const fieldTypes =
-    contentType && filters.length > 0
+    contentType && effectiveFilters.length > 0
       ? await resolveContentTypeFieldTypes(contentType)
       : {};
 
@@ -119,9 +136,10 @@ export default defineEventHandler(async (event) => {
     const result = await runSearch(index, {
       q,
       contentType,
-      filters,
+      filters: effectiveFilters,
       fieldTypes,
       attributesToSearchOn,
+      envelopeFilters,
       offset: (page - 1) * perPage,
       limit: perPage,
     });

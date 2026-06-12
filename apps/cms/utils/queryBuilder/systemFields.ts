@@ -26,19 +26,47 @@ import type { QueryContentType, QueryField } from './types';
 export const SYSTEM_FIELD_PREFIX = '$';
 
 export interface SystemField {
-  /** Wire token INCLUDING the prefix, e.g. '$entryKey'. */
+  /** Wire token INCLUDING the prefix, e.g. '$status'. */
   identifier: string;
-  /** Display name, e.g. 'Entry key'. */
+  /** Display name, e.g. 'Status'. */
   name: string;
-  /** The Meilisearch envelope attribute the filter compiles to, e.g. 'entryKey'. */
+  /** The Meilisearch envelope attribute the filter compiles to, e.g. 'status'. */
   enginePath: string;
   /** Donor field type whose operators + value-input kind this field reuses. */
   type: FieldTypeName;
+  /** SELECT-donor choices (the fixed value set), when applicable. */
+  choices?: { label: string; value: string }[];
+  /** True when offered before a content type is chosen (cross-type envelope filter). */
+  unscoped?: boolean;
 }
 
 export const SYSTEM_FIELDS: ReadonlyArray<SystemField> = [
+  // Status across types is the headline pre-scope query (bulk-publish workflow).
+  // SELECT donor → is / is not / is any of, over the fixed content-status set.
+  {
+    identifier: '$status',
+    name: 'Status',
+    enginePath: 'status',
+    type: FIELD_TYPES.SELECT,
+    unscoped: true,
+    choices: [
+      { label: 'Draft', value: 'DRAFT' },
+      { label: 'Changed', value: 'CHANGED' },
+      { label: 'Published', value: 'PUBLISHED' },
+    ],
+  },
+  // Find an entry by its UUID. TEXT donor (`is` is the meaningful op; contains/
+  // startsWith are harmless on a UUID). enginePath is the entryId envelope attr.
+  {
+    identifier: '$id',
+    name: 'Entry ID',
+    enginePath: 'entryId',
+    type: FIELD_TYPES.TEXT,
+    unscoped: true,
+  },
   // entryKey is slug-shaped (derived via slugify), so SLUG's operators —
-  // `is` / `starts with` — match its semantics.
+  // `is` / `starts with` — match its semantics. Scoped-only: an unscoped
+  // entryKey would match ambiguously across types (per-content-type unique).
   {
     identifier: '$entryKey',
     name: 'Entry key',
@@ -68,7 +96,13 @@ export function getSystemField(id: string): SystemField | undefined {
  * `enginePath` is intentionally dropped — it is a compiler concern.
  */
 export function toQueryField(sys: SystemField): QueryField {
-  return { identifier: sys.identifier, name: sys.name, type: sys.type };
+  const field: QueryField = {
+    identifier: sys.identifier,
+    name: sys.name,
+    type: sys.type,
+  };
+  if (sys.choices) field.choices = sys.choices;
+  return field;
 }
 
 /**

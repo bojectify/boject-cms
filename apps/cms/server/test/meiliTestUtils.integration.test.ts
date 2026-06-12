@@ -11,6 +11,9 @@ import type { SearchDocument } from '../utils/searchDocument';
 
 const docA: SearchDocument = {
   id: '11111111-1111-1111-1111-111111111111',
+  entryId: '11111111-1111-1111-1111-111111111111',
+  status: 'PUBLISHED',
+  isWorkingVersion: true,
   entryKey: 'harness-smoke-a',
   contentType: 'Article',
   entryTitle: 'Harness smoke A',
@@ -20,6 +23,9 @@ const docA: SearchDocument = {
 
 const docB: SearchDocument = {
   id: '22222222-2222-2222-2222-222222222222',
+  entryId: '22222222-2222-2222-2222-222222222222',
+  status: 'PUBLISHED',
+  isWorkingVersion: true,
   entryKey: 'harness-smoke-b',
   contentType: 'Page',
   entryTitle: 'Harness smoke B',

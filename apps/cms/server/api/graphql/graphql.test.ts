@@ -2849,6 +2849,9 @@ describe('GraphQL API', async () => {
       const docs: SearchDocument[] = [
         {
           id: 'g1',
+          entryId: 'g1',
+          status: 'PUBLISHED',
+          isWorkingVersion: true,
           entryKey: 'g1',
           contentType: 'Article',
           entryTitle: 'Coffee guide',
@@ -2857,6 +2860,9 @@ describe('GraphQL API', async () => {
         },
         {
           id: 'g2',
+          entryId: 'g2',
+          status: 'PUBLISHED',
+          isWorkingVersion: true,
           entryKey: 'g2',
           contentType: 'Page',
           entryTitle: 'About whatever',
@@ -2866,6 +2872,9 @@ describe('GraphQL API', async () => {
         // Typed-operator docs: SearchWidget with a numeric `price` field.
         {
           id: 'w-cheap',
+          entryId: 'w-cheap',
+          status: 'PUBLISHED',
+          isWorkingVersion: true,
           entryKey: 'w-cheap',
           contentType: 'SearchWidget',
           entryTitle: 'Cheap widget',
@@ -2874,6 +2883,9 @@ describe('GraphQL API', async () => {
         },
         {
           id: 'w-mid',
+          entryId: 'w-mid',
+          status: 'PUBLISHED',
+          isWorkingVersion: true,
           entryKey: 'w-mid',
           contentType: 'SearchWidget',
           entryTitle: 'Mid widget',
@@ -2882,6 +2894,9 @@ describe('GraphQL API', async () => {
         },
         {
           id: 'w-pricey',
+          entryId: 'w-pricey',
+          status: 'PUBLISHED',
+          isWorkingVersion: true,
           entryKey: 'w-pricey',
           contentType: 'SearchWidget',
           entryTitle: 'Pricey widget',

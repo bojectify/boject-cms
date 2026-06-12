@@ -20,6 +20,7 @@ type SearchHit = {
   entryKey: string;
   contentType: string;
   entryTitle: string;
+  status: string;
   snippet: string | null;
   publishedAt: string | null;
 };
@@ -35,6 +36,9 @@ type SearchResponse = {
 /** A minimal SearchDocument for seeding the test index. */
 function doc(over: Partial<SearchDocument> & { id: string }): SearchDocument {
   return {
+    entryId: over.id, // hit.id projects from entryId; default it to the seed id
+    status: 'PUBLISHED',
+    isWorkingVersion: true,
     entryKey: over.id,
     contentType: 'Article',
     entryTitle: 'Untitled',
@@ -553,5 +557,98 @@ describe('GET /api/search', async () => {
       'Slow your search request rate, or cache results client-side.'
     );
     expect(limited!.headers.get('retry-after')).toBeDefined();
+  });
+
+  describe('status gate', () => {
+    beforeEach(async () => {
+      await clearTestIndex();
+    });
+
+    async function sessionSearch(params: Record<string, string>) {
+      const cookie = await getSessionCookie();
+      const qs = new URLSearchParams(params).toString();
+      return $fetch<SearchResponse>(`/api/search?${qs}`, {
+        headers: { cookie },
+      });
+    }
+
+    it('API-key search never returns a non-PUBLISHED document', async () => {
+      await addTestDocuments([
+        doc({
+          id: 'pub',
+          entryId: 'pub',
+          status: 'PUBLISHED',
+          isWorkingVersion: false,
+          entryTitle: 'Pub Doc',
+        }),
+        doc({
+          id: 'draft',
+          entryId: 'draftEntry',
+          status: 'DRAFT',
+          isWorkingVersion: true,
+          entryTitle: 'Draft Doc',
+        }),
+        doc({
+          id: 'changed',
+          entryId: 'pub',
+          status: 'CHANGED',
+          isWorkingVersion: true,
+          entryTitle: 'Changed Doc',
+        }),
+      ]);
+      // Even if a client passes $status=DRAFT, the gate strips it and forces PUBLISHED.
+      const res = await search({ q: '', filter: '$status:eq:DRAFT' });
+      expect(res.hits.every((h) => h.status === 'PUBLISHED')).toBe(true);
+      expect(res.hits.map((h) => h.id)).toEqual(['pub']);
+    });
+
+    it('CMS session can filter by $status (DRAFT)', async () => {
+      await addTestDocuments([
+        doc({
+          id: 'pubg',
+          entryId: 'pubg',
+          status: 'PUBLISHED',
+          isWorkingVersion: true,
+          entryTitle: 'Gate Pub',
+        }),
+        doc({
+          id: 'draftg',
+          entryId: 'draftg',
+          status: 'DRAFT',
+          isWorkingVersion: true,
+          entryTitle: 'Gate Draft',
+        }),
+      ]);
+      const res = await sessionSearch({ q: '', filter: '$status:eq:DRAFT' });
+      expect(res.hits.map((h) => h.id)).toEqual(['draftg']);
+      expect(res.hits[0]!.status).toBe('DRAFT');
+    });
+
+    it('CMS session default (no $status) returns the working version per entry', async () => {
+      // Two-slot entry "wv": a CHANGED working doc + a shadowed PUBLISHED doc,
+      // sharing entryKey 'wv' and both matching the query "WV".
+      await addTestDocuments([
+        doc({
+          id: 'wv__PUBLISHED',
+          entryId: 'wv',
+          entryKey: 'wv',
+          status: 'PUBLISHED',
+          isWorkingVersion: false,
+          entryTitle: 'WV Live',
+        }),
+        doc({
+          id: 'wv__CHANGED',
+          entryId: 'wv',
+          entryKey: 'wv',
+          status: 'CHANGED',
+          isWorkingVersion: true,
+          entryTitle: 'WV Edited',
+        }),
+      ]);
+      const res = await sessionSearch({ q: 'WV' });
+      expect(res.hits).toHaveLength(1);
+      expect(res.hits[0]!.status).toBe('CHANGED');
+      expect(res.hits[0]!.id).toBe('wv');
+    });
   });
 });

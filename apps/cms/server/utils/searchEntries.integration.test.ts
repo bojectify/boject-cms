@@ -16,6 +16,9 @@ function doc(
 ): SearchDocument {
   return {
     id,
+    entryId: id, // hit.id projects from entryId; keep it equal to id
+    status: 'PUBLISHED',
+    isWorkingVersion: true,
     entryKey: id,
     contentType,
     entryTitle,

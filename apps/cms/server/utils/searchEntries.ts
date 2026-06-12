@@ -28,6 +28,8 @@ export interface RunSearchParams {
   fieldTypes?: Record<string, FieldTypeName>;
   /** Restrict the free-text search to these attributes (e.g. `['entryTitle']`). */
   attributesToSearchOn?: string[];
+  /** Pre-compiled raw envelope filter clauses (the auth status gate) appended verbatim. */
+  envelopeFilters?: string[];
   offset: number;
   limit: number;
 }
@@ -37,6 +39,7 @@ export interface SearchHit {
   entryKey: string;
   contentType: string;
   entryTitle: string;
+  status: string;
   snippet: string | null;
   publishedAt: string | null;
 }
@@ -55,6 +58,9 @@ function buildFilter(params: RunSearchParams): string[] {
   const fieldTypes = params.fieldTypes ?? {};
   for (const f of params.filters ?? []) {
     filter.push(compileSearchFilter(f, fieldTypes));
+  }
+  for (const ef of params.envelopeFilters ?? []) {
+    filter.push(ef);
   }
   return filter;
 }
@@ -127,10 +133,11 @@ export async function runSearch(
   // arbitrary field value — so omit the snippet entirely unless `q` is present.
   const hasQuery = params.q.trim().length > 0;
   const hits: SearchHit[] = res.hits.map((h) => ({
-    id: h.id,
+    id: h.entryId,
     entryKey: h.entryKey,
     contentType: h.contentType,
     entryTitle: h.entryTitle,
+    status: h.status,
     publishedAt: h.publishedAt,
     snippet: hasQuery ? buildSnippet(h._formatted) : null,
   }));
