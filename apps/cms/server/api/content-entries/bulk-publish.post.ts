@@ -62,7 +62,15 @@ export default defineEventHandler(async (event) => {
       await publishEntry(entry);
       results.push({ id, ok: true });
     } catch (err) {
-      results.push({ id, ok: false, error: classifyError(err) });
+      const error = classifyError(err);
+      if (error === 'UNKNOWN') {
+        console.error(
+          '[bulk-publish] unexpected error publishing entry',
+          id,
+          err
+        );
+      }
+      results.push({ id, ok: false, error });
     }
   }
 

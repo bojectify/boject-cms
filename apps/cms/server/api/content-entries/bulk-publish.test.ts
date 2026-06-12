@@ -80,8 +80,18 @@ describe('POST /api/content-entries/bulk-publish', async () => {
 
   it('publishes every draft id and reports the count', async () => {
     const ct = await makeType(`BulkPubA_${Date.now()}`);
-    const a = await makeEntry(ct, 'A1', `a1-${Date.now()}`, CONTENT_STATUSES.DRAFT);
-    const b = await makeEntry(ct, 'B1', `b1-${Date.now()}`, CONTENT_STATUSES.DRAFT);
+    const a = await makeEntry(
+      ct,
+      'A1',
+      `a1-${Date.now()}`,
+      CONTENT_STATUSES.DRAFT
+    );
+    const b = await makeEntry(
+      ct,
+      'B1',
+      `b1-${Date.now()}`,
+      CONTENT_STATUSES.DRAFT
+    );
     const res = await bulkPublish([a.id, b.id]);
     expect(res.status).toBe(200);
     const body = (await res.json()) as BulkResult;
@@ -98,7 +108,12 @@ describe('POST /api/content-entries/bulk-publish', async () => {
 
   it('reports partial failure: a missing id is NOT_FOUND, real drafts still publish', async () => {
     const ct = await makeType(`BulkPubB_${Date.now()}`);
-    const a = await makeEntry(ct, 'A2', `a2-${Date.now()}`, CONTENT_STATUSES.DRAFT);
+    const a = await makeEntry(
+      ct,
+      'A2',
+      `a2-${Date.now()}`,
+      CONTENT_STATUSES.DRAFT
+    );
     // RFC-4122 v4 shape (version nibble 4, variant nibble 8) so the repo's
     // strict `isUuid` accepts it and it reaches the NOT_FOUND branch rather
     // than being filtered out before the loop.
@@ -127,7 +142,12 @@ describe('POST /api/content-entries/bulk-publish', async () => {
         contentTypeIds: [ct],
       },
     });
-    const a = await makeEntry(ct, 'A3', `a3-${Date.now()}`, CONTENT_STATUSES.DRAFT);
+    const a = await makeEntry(
+      ct,
+      'A3',
+      `a3-${Date.now()}`,
+      CONTENT_STATUSES.DRAFT
+    );
     await bulkPublish([a.id]);
     const count = await prisma.webhookDelivery.count({
       where: { event: 'ENTRY_PUBLISHED', entryId: a.id },
@@ -145,6 +165,22 @@ describe('POST /api/content-entries/bulk-publish', async () => {
       (_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`
     );
     expect((await bulkPublish(tooMany)).status).toBe(400);
+  });
+
+  it('reports NOTHING_TO_PUBLISH for an entry with only an ARCHIVED version', async () => {
+    const ct = await makeType(`BulkPubD_${Date.now()}`);
+    const archived = await makeEntry(
+      ct,
+      'Arch',
+      `arch-${Date.now()}`,
+      CONTENT_STATUSES.ARCHIVED
+    );
+    const body = (await (
+      await bulkPublish([archived.id], undefined, '203.0.113.211')
+    ).json()) as BulkResult;
+    expect(body.published).toBe(0);
+    expect(body.failed).toBe(1);
+    expect(body.results[0]?.error).toBe('NOTHING_TO_PUBLISH');
   });
 
   it('403s without content:write scope', async () => {
