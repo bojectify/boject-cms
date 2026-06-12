@@ -19,6 +19,7 @@ const {
   loading: searchLoading,
   unavailable,
   page: searchPage,
+  refresh: refreshSearch,
 } = useEntrySearch(() => undefined);
 
 const searchQuery = computed<SearchQuery>(() =>
@@ -40,6 +41,39 @@ const searchColumns: TableColumn<Record<string, unknown>>[] = [
   { accessorKey: 'contentType', header: 'Type' },
   { accessorKey: 'status', header: 'Status' },
 ];
+
+const selection = useRowSelection(searchRows);
+watch(searchPage, () => selection.clear());
+
+const toast = useToast();
+const bulkBusy = ref(false);
+
+async function onBulkPublish() {
+  const ids = [...selection.selected.value];
+  if (!ids.length) return;
+  bulkBusy.value = true;
+  try {
+    const res = await $fetch<{ published: number; failed: number }>(
+      '/api/content-entries/bulk-publish',
+      { method: 'POST', body: { ids } }
+    );
+    toast.add(
+      res.failed === 0
+        ? { title: `${res.published} published`, color: 'success' }
+        : {
+            title: `${res.published} of ${ids.length} published`,
+            description: `${res.failed} failed`,
+            color: 'warning',
+          }
+    );
+    selection.clear();
+    await refreshSearch();
+  } catch {
+    toast.add({ title: 'Bulk publish failed', color: 'error' });
+  } finally {
+    bulkBusy.value = false;
+  }
+}
 
 function onClear() {
   router.push({ path: '/', query: {} });
@@ -84,73 +118,88 @@ const filterOptions: Array<{ label: string; value: ArchiveFilter }> = [
 </script>
 
 <template>
-  <ContentTable
-    v-if="searchMode"
-    v-model:page="searchPage"
-    title="All Content"
-    :data="searchRows"
-    :loading="searchLoading"
-    :columns="searchColumns"
-    :total="searchTotal"
-    :row-link="(row) => `/entries/${row.id}`"
-  >
-    <template #toolbar>
-      <SearchBar
-        :query="searchQuery"
-        @edit="open()"
-        @clear="onClear"
-        @remove-filter="onRemoveFilter"
+  <div>
+    <template v-if="searchMode">
+      <ContentTable
+        v-model:page="searchPage"
+        title="All Content"
+        :data="searchRows"
+        :loading="searchLoading"
+        :columns="searchColumns"
+        :total="searchTotal"
+        :row-link="(row) => `/entries/${row.id}`"
+        selectable
+        :is-selected="selection.isSelected"
+        :all-selected="selection.allSelected.value"
+        :indeterminate="selection.indeterminate.value"
+        @row-select="(e, id, index) => selection.toggle(id, index, e.shiftKey)"
+        @select-all="selection.toggleAll"
+      >
+        <template #toolbar>
+          <SearchBar
+            :query="searchQuery"
+            @edit="open()"
+            @clear="onClear"
+            @remove-filter="onRemoveFilter"
+          />
+        </template>
+        <template #empty>
+          <div class="flex flex-col items-center gap-2 py-10 text-center">
+            <UIcon
+              :name="unavailable ? 'i-lucide-search-x' : 'i-lucide-search'"
+              class="size-8 text-dimmed"
+            />
+            <p class="text-highlighted font-medium">
+              {{
+                unavailable
+                  ? 'Search is temporarily unavailable'
+                  : 'No matching entries'
+              }}
+            </p>
+            <p class="text-sm text-muted">
+              {{
+                unavailable
+                  ? 'The search service is down. Clear search to keep browsing.'
+                  : 'Try removing a filter or broadening your search.'
+              }}
+            </p>
+          </div>
+        </template>
+      </ContentTable>
+      <BulkActionBar
+        :count="selection.count.value"
+        :busy="bulkBusy"
+        @publish="onBulkPublish"
+        @clear="selection.clear"
       />
     </template>
-    <template #empty>
-      <div class="flex flex-col items-center gap-2 py-10 text-center">
-        <UIcon
-          :name="unavailable ? 'i-lucide-search-x' : 'i-lucide-search'"
-          class="size-8 text-dimmed"
-        />
-        <p class="text-highlighted font-medium">
-          {{
-            unavailable
-              ? 'Search is temporarily unavailable'
-              : 'No matching entries'
-          }}
-        </p>
-        <p class="text-sm text-muted">
-          {{
-            unavailable
-              ? 'The search service is down. Clear search to keep browsing.'
-              : 'Try removing a filter or broadening your search.'
-          }}
-        </p>
-      </div>
-    </template>
-  </ContentTable>
-  <ContentTable
-    v-else
-    v-model:page="page"
-    title="All Content"
-    :data="data?.items ?? []"
-    :loading="status === 'pending'"
-    :columns="browseColumns"
-    :total="data?.total ?? 0"
-    :row-link="(row) => `/entries/${row.id}`"
-  >
-    <template #toolbar>
-      <SearchBar placeholder="Search all content…" @open="open" />
-    </template>
-    <template #actions>
-      <UFieldGroup>
-        <UButton
-          v-for="opt in filterOptions"
-          :key="opt.value"
-          :color="archiveFilter === opt.value ? 'primary' : 'neutral'"
-          :variant="archiveFilter === opt.value ? 'solid' : 'outline'"
-          size="sm"
-          @click="archiveFilter = opt.value"
-        >
-          {{ opt.label }}
-        </UButton>
-      </UFieldGroup>
-    </template>
-  </ContentTable>
+    <ContentTable
+      v-else
+      v-model:page="page"
+      title="All Content"
+      :data="data?.items ?? []"
+      :loading="status === 'pending'"
+      :columns="browseColumns"
+      :total="data?.total ?? 0"
+      :row-link="(row) => `/entries/${row.id}`"
+    >
+      <template #toolbar>
+        <SearchBar placeholder="Search all content…" @open="open" />
+      </template>
+      <template #actions>
+        <UFieldGroup>
+          <UButton
+            v-for="opt in filterOptions"
+            :key="opt.value"
+            :color="archiveFilter === opt.value ? 'primary' : 'neutral'"
+            :variant="archiveFilter === opt.value ? 'solid' : 'outline'"
+            size="sm"
+            @click="archiveFilter = opt.value"
+          >
+            {{ opt.label }}
+          </UButton>
+        </UFieldGroup>
+      </template>
+    </ContentTable>
+  </div>
 </template>
