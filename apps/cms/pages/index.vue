@@ -31,14 +31,14 @@ const searchRows = computed(() =>
     id: h.id,
     entryTitle: h.entryTitle,
     snippet: h.snippet,
-    publishedAt: h.publishedAt,
+    status: h.status,
     contentType: h.contentType,
   }))
 );
 const searchColumns: TableColumn<Record<string, unknown>>[] = [
   { accessorKey: 'entryTitle', header: 'Entry Title' },
   { accessorKey: 'contentType', header: 'Type' },
-  { accessorKey: 'publishedAt', header: 'Published' },
+  { accessorKey: 'status', header: 'Status' },
 ];
 
 function onClear() {

@@ -76,13 +76,6 @@ const allColumns = computed<TableColumn<Record<string, unknown>>[]>(
           {{ row.original.status }}
         </UBadge>
       </template>
-      <template #publishedAt-cell="{ row }">
-        {{
-          row.original.publishedAt
-            ? formatDate(row.original.publishedAt as string)
-            : '—'
-        }}
-      </template>
       <template v-for="(_, name) in tableSlots" :key="name" #[name]="slotProps">
         <slot :name="name" v-bind="slotProps" />
       </template>
