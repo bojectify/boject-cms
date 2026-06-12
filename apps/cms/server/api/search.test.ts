@@ -650,5 +650,43 @@ describe('GET /api/search', async () => {
       expect(res.hits[0]!.status).toBe('CHANGED');
       expect(res.hits[0]!.id).toBe('wv');
     });
+
+    it('CMS session $status filters the editorial (working) version — a CHANGED entry is excluded from PUBLISHED', async () => {
+      // Two-slot entry "twoslot": a CHANGED working doc + a shadowed PUBLISHED
+      // doc. The entry's editorial status is CHANGED, so it must NOT surface
+      // under $status=PUBLISHED via its shadowed PUBLISHED version, and it must
+      // appear (labelled CHANGED) under $status=CHANGED.
+      await addTestDocuments([
+        doc({
+          id: 'twoslot__PUBLISHED',
+          entryId: 'twoslot',
+          entryKey: 'twoslot',
+          status: 'PUBLISHED',
+          isWorkingVersion: false,
+          entryTitle: 'Two Slot Live',
+        }),
+        doc({
+          id: 'twoslot__CHANGED',
+          entryId: 'twoslot',
+          entryKey: 'twoslot',
+          status: 'CHANGED',
+          isWorkingVersion: true,
+          entryTitle: 'Two Slot Edited',
+        }),
+      ]);
+
+      const published = await sessionSearch({
+        q: '',
+        filter: '$status:eq:PUBLISHED',
+      });
+      expect(published.hits).toHaveLength(0);
+
+      const changed = await sessionSearch({
+        q: '',
+        filter: '$status:eq:CHANGED',
+      });
+      expect(changed.hits.map((h) => h.id)).toEqual(['twoslot']);
+      expect(changed.hits[0]!.status).toBe('CHANGED');
+    });
   });
 });

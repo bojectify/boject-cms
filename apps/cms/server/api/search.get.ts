@@ -97,8 +97,11 @@ export default defineEventHandler(async (event) => {
   }
 
   // Auth-context status gate. API keys (and any non-session caller) are forced
-  // to PUBLISHED — drafts never leak. A CMS session may filter by $status; with
-  // no $status it defaults to the working version per entry (isWorkingVersion).
+  // to PUBLISHED — drafts never leak. A CMS session always sees the working
+  // (editor-visible) version per entry, so a $status filter matches the entry's
+  // EDITORIAL status (DRAFT/CHANGED/PUBLISHED), not a shadowed version: a
+  // CHANGED entry (CHANGED working doc + a shadowed PUBLISHED doc) must NOT
+  // surface under $status=PUBLISHED via its shadowed PUBLISHED doc.
   const isCms = isCmsRequest(event);
   let effectiveFilters = filters;
   let envelopeFilters: string[];
@@ -106,8 +109,7 @@ export default defineEventHandler(async (event) => {
     effectiveFilters = filters.filter((f) => f.field !== '$status');
     envelopeFilters = ['status = "PUBLISHED"'];
   } else {
-    const hasStatus = filters.some((f) => f.field === '$status');
-    envelopeFilters = hasStatus ? [] : ['isWorkingVersion = true'];
+    envelopeFilters = ['isWorkingVersion = true'];
   }
 
   const page = Math.max(1, Number(query.page) || 1);
