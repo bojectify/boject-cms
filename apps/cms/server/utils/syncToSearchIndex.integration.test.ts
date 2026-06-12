@@ -144,6 +144,19 @@ describe('syncToSearchIndex — reconcile', () => {
     expect(await ids()).toEqual([`${e.id}__DRAFT`]);
   });
 
+  it('archiving (entry present, only an ARCHIVED version) prunes all of its docs', async () => {
+    const ctId = await createType('Article');
+    const e = await createEntry(ctId, 'arch', [
+      { status: CONTENT_STATUSES.ARCHIVED, title: 'Archived', body: 'a', publishedAt: new Date('2026-01-01T00:00:00.000Z') },
+    ]);
+    // A stale PUBLISHED doc from before the archive — reconcile must remove it.
+    await addTestDocuments([
+      { id: `${e.id}__PUBLISHED`, entryId: e.id, status: CONTENT_STATUSES.PUBLISHED, isWorkingVersion: true, entryKey: 'arch', contentType: 'Article', entryTitle: 'Archived', publishedAt: null, fields: {} },
+    ]);
+    await syncToSearchIndex(deps, entryPayload('ENTRY_UNPUBLISHED', { id: ctId, identifier: 'Article' }, e.id));
+    expect(await getAllDocuments()).toEqual([]);
+  });
+
   it('CONTENT_TYPE_SCHEMA_CHANGED reindexes per-version docs for every indexable entry of the type', async () => {
     const ctId = await createType('Article');
     const a = await createEntry(ctId, 'a', [
