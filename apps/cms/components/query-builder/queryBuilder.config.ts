@@ -5,6 +5,8 @@ export const QA_QUERY_BUILDER = {
     INPUT: 'input',
     DROPDOWN: 'dropdown',
     FOOTER: 'footer',
+    // The right-edge "Search" submit button (commit pending value + run).
+    SUBMIT: 'submit',
     // The top search/chip row (content-type + filter chips + input). Wraps onto
     // multiple lines as chips accumulate.
     CHIP_ROW: 'chip-row',

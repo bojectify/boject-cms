@@ -501,6 +501,29 @@ export const PointerToggleKeepsFocusForEnter: Story = {
   },
 };
 
+// Submit button (pointer execute): after toggling options with a pointer, clicking
+// the Submit button commits the accumulated selection + runs — no Enter, no focus
+// juggling. The discoverable execute affordance for mouse / touch / pen.
+export const SubmitButtonRunsMultiValue: Story = {
+  args: { enableRichOperators: true, enableMultiValueOperators: true },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await userEvent.type(canvas.getByTestId(QA_QUERY_BUILDER.INPUT), 'art');
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))); // Article
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(1))); // Status (SELECT)
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(2))); // is any of
+    await userEvent.click(canvas.getByTestId(QA_MULTI_SELECT_EDITOR.OPTION(1))); // Active
+    await userEvent.click(canvas.getByTestId(QA_MULTI_SELECT_EDITOR.OPTION(2))); // Ended
+    await userEvent.click(canvas.getByTestId(QA_QUERY_BUILDER.SUBMIT)); // pointer execute
+    const lastRun = (args.onRun as ReturnType<typeof fn>).mock.calls.at(-1)![0];
+    expect(lastRun.contentType).toBe('Article');
+    expect(lastRun.filters[0]).toEqual(
+      expect.objectContaining({ field: 'status', op: 'in' })
+    );
+    expect((lastRun.filters[0].value as string[]).length).toBe(2);
+  },
+};
+
 // Guard: pressing Enter at a multi-value step with NOTHING toggled must not
 // commit a degenerate empty filter (`status:in:` → `IN ['']`). The draft is
 // abandoned and the search just runs with no filter — mirroring single-value

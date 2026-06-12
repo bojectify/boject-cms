@@ -435,11 +435,22 @@ function onKeydown(e: KeyboardEvent) {
         @keydown="onKeydown"
       />
       <!--
-        ml-auto keeps the hint on the right edge even at the value step, where
-        the flex-1 main input is v-show-hidden (the draft chip's inline value
-        input doesn't grow to fill the row).
+        Right-edge submit: the pointer/touch execute affordance. Commits any
+        pending value and runs (mirrors Enter-with-nothing-highlighted via the
+        shared submit()). ml-auto pins the button + esc to the right edge even at
+        the value step, where the flex-1 main input is v-show-hidden.
       -->
-      <UKbd value="esc" class="shrink-0 ml-auto" />
+      <UButton
+        :data-testid="QA_QUERY_BUILDER.SUBMIT"
+        size="xs"
+        color="primary"
+        icon="i-lucide-corner-down-left"
+        class="shrink-0 ml-auto"
+        @click="submit"
+      >
+        Search
+      </UButton>
+      <UKbd value="esc" class="shrink-0" />
     </div>
 
     <QueryDropdown
