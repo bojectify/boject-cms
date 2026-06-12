@@ -10,4 +10,11 @@ export type ContentTableProps = BasicComponentProps & {
   total?: number;
   itemsPerPage?: number;
   rowLink?: (_row: Record<string, unknown>) => string;
+  /** Render a leading selection-checkbox column (search/editorial mode). */
+  selectable?: boolean;
+  /** Whether a row id is selected (from useRowSelection). */
+  isSelected?: (_id: string) => boolean;
+  /** Header checkbox state. */
+  allSelected?: boolean;
+  indeterminate?: boolean;
 };

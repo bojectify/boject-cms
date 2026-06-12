@@ -12,6 +12,8 @@ const props = withDefaults(defineProps<ContentTableProps>(), {
 
 const emit = defineEmits<{
   'update:page': [value: number];
+  rowSelect: [event: MouseEvent, id: string, index: number];
+  selectAll: [];
 }>();
 
 const slots = defineSlots();
@@ -26,9 +28,12 @@ const { formatDate, statusColor } = useContentTable();
 // `columns`, when provided, is the full column set (the page owns it); otherwise
 // the default browse columns. The cell templates below cover every accessorKey
 // either set can use — unused ones simply don't render.
-const allColumns = computed<TableColumn<Record<string, unknown>>[]>(
-  () => props.columns ?? DEFAULT_CONTENT_COLUMNS
-);
+const allColumns = computed<TableColumn<Record<string, unknown>>[]>(() => {
+  const base = props.columns ?? DEFAULT_CONTENT_COLUMNS;
+  return props.selectable
+    ? [{ id: 'select', enableSorting: false }, ...base]
+    : base;
+});
 </script>
 
 <template>
@@ -43,6 +48,26 @@ const allColumns = computed<TableColumn<Record<string, unknown>>[]>(
       <slot name="toolbar" />
     </div>
     <UTable :data="data" :columns="allColumns" :loading="loading">
+      <template v-if="selectable" #select-header>
+        <UCheckbox
+          :model-value="allSelected ?? false"
+          :indeterminate="indeterminate ?? false"
+          aria-label="Select all rows"
+          @click="emit('selectAll')"
+        />
+      </template>
+      <template v-if="selectable" #select-cell="{ row }">
+        <UCheckbox
+          :model-value="
+            isSelected ? isSelected(row.original.id as string) : false
+          "
+          aria-label="Select row"
+          @click="
+            (e: MouseEvent) =>
+              emit('rowSelect', e, row.original.id as string, row.index)
+          "
+        />
+      </template>
       <template #entryTitle-cell="{ row }">
         <NuxtLink
           v-if="rowLink"
