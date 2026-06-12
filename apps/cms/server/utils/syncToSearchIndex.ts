@@ -64,7 +64,7 @@ async function reconcileEntry(
     await index.deleteDocuments(allKeys).waitTask();
     return;
   }
-  const docs = buildEntrySearchDocuments(entry as unknown as EntryForSearch);
+  const docs = buildEntrySearchDocuments(entry as EntryForSearch);
   const presentIds = new Set(docs.map((d) => d.id));
   const staleKeys = allKeys.filter((k) => !presentIds.has(k));
   if (docs.length) await index.addDocuments(docs).waitTask();
@@ -107,7 +107,7 @@ export async function syncToSearchIndex(
         orderBy: { createdAt: 'asc' },
       });
       const documents = entries.flatMap((e) =>
-        buildEntrySearchDocuments(e as unknown as EntryForSearch)
+        buildEntrySearchDocuments(e as EntryForSearch)
       );
       for (let i = 0; i < documents.length; i += SCHEMA_REINDEX_BATCH) {
         await index
