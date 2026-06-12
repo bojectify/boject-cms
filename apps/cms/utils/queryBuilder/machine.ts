@@ -7,7 +7,17 @@ import {
 import { addFilter, removeFilter } from './query';
 import { resolveQueryField } from './systemFields';
 
-export type Step = 'contentType' | 'field' | 'operator' | 'value';
+// Object-const source of truth for the builder step; `Step` is derived from it
+// (mirrors the FIELD_TYPES / WEBHOOK_EVENTS / CONTENT_STATUSES convention). Note
+// the editFilter action's `segment` ('field' | 'operator' | 'value') is a
+// SEPARATE concept (a ChipSegment), not a Step, despite overlapping values.
+export const STEPS = {
+  CONTENT_TYPE: 'contentType',
+  FIELD: 'field',
+  OPERATOR: 'operator',
+  VALUE: 'value',
+} as const;
+export type Step = (typeof STEPS)[keyof typeof STEPS];
 
 export interface DraftFilter {
   field: QueryField;
@@ -56,7 +66,7 @@ export function initState(opts: InitOptions): BuilderState {
     rich: opts.rich ?? false,
     multiValue: opts.multiValue ?? false,
     range: opts.range ?? false,
-    step: query.contentType ? 'field' : 'contentType',
+    step: query.contentType ? STEPS.FIELD : STEPS.CONTENT_TYPE,
     query,
     draft: null,
     editingIndex: null,
@@ -106,7 +116,7 @@ export function reduce(prev: BuilderState, action: Action): BuilderState {
         ...s,
         text: action.q,
         query:
-          s.step === 'value'
+          s.step === STEPS.VALUE
             ? s.query
             : { ...s.query, q: action.q || undefined },
       };
@@ -118,7 +128,7 @@ export function reduce(prev: BuilderState, action: Action): BuilderState {
       // query stay in sync. (Free-text at the field step is unaffected.)
       return {
         ...s,
-        step: 'field',
+        step: STEPS.FIELD,
         text: '',
         draft: null,
         editingIndex: null,
@@ -133,7 +143,7 @@ export function reduce(prev: BuilderState, action: Action): BuilderState {
       if (s.locked) return { ...s, intent: { kind: 'broaden', q: s.query.q } };
       return {
         ...s,
-        step: 'contentType',
+        step: STEPS.CONTENT_TYPE,
         draft: null,
         editingIndex: null,
         text: '',
@@ -152,7 +162,7 @@ export function reduce(prev: BuilderState, action: Action): BuilderState {
         draft: { field: action.field, op: op.id, value: null },
         text: '',
         // One operator → skip the operator step; otherwise pick an operator.
-        step: ops.length <= 1 ? 'value' : 'operator',
+        step: ops.length <= 1 ? STEPS.VALUE : STEPS.OPERATOR,
       };
     }
 
@@ -168,7 +178,7 @@ export function reduce(prev: BuilderState, action: Action): BuilderState {
       return {
         ...s,
         draft: { ...s.draft, op: action.op },
-        step: 'value',
+        step: STEPS.VALUE,
         text: prefill,
       };
     }
@@ -220,7 +230,7 @@ export function reduce(prev: BuilderState, action: Action): BuilderState {
         text: '',
         // Unscoped → back to contentType (offers system fields + content types);
         // scoped → back to field. Mirrors the backspace empty-draft logic.
-        step: s.query.contentType ? 'field' : 'contentType',
+        step: s.query.contentType ? STEPS.FIELD : STEPS.CONTENT_TYPE,
       };
     }
 
@@ -242,7 +252,7 @@ export function reduce(prev: BuilderState, action: Action): BuilderState {
           ...s,
           draft,
           editingIndex: action.index,
-          step: 'operator',
+          step: STEPS.OPERATOR,
           text: '',
         };
       }
@@ -256,7 +266,7 @@ export function reduce(prev: BuilderState, action: Action): BuilderState {
         ...s,
         draft,
         editingIndex: action.index,
-        step: 'value',
+        step: STEPS.VALUE,
         text: prefill,
       };
     }
@@ -281,7 +291,7 @@ export function reduce(prev: BuilderState, action: Action): BuilderState {
           ...s,
           draft: null,
           editingIndex: null,
-          step: s.query.contentType ? 'field' : 'contentType',
+          step: s.query.contentType ? STEPS.FIELD : STEPS.CONTENT_TYPE,
         };
       }
       if (s.text === '' && !s.draft && s.query.filters.length) {

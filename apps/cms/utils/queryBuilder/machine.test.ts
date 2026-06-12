@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { initState, reduce } from './machine';
+import { initState, reduce, STEPS } from './machine';
 import { CONTENT_TYPES, ARTICLE_CT } from './fixtures';
 import { getSystemField, toQueryField } from './systemFields';
 import type { QueryContentType, QueryField } from './types';
@@ -22,7 +22,7 @@ const article: QueryContentType = {
 describe('builder machine', () => {
   it('starts in the content-type step when unscoped', () => {
     const s = initState({ contentTypes: [article] });
-    expect(s.step).toBe('contentType');
+    expect(s.step).toBe(STEPS.CONTENT_TYPE);
     expect(s.query.contentType).toBeUndefined();
   });
 
@@ -30,7 +30,7 @@ describe('builder machine', () => {
     let s = initState({ contentTypes: [article] });
     s = reduce(s, { kind: 'pickContentType', contentType: article });
     expect(s.query.contentType).toBe('Article');
-    expect(s.step).toBe('field');
+    expect(s.step).toBe(STEPS.FIELD);
   });
 
   it('pre-scopes via lockedContentType and starts in the field step', () => {
@@ -39,21 +39,21 @@ describe('builder machine', () => {
       lockedContentType: article,
     });
     expect(s.query.contentType).toBe('Article');
-    expect(s.step).toBe('field');
+    expect(s.step).toBe(STEPS.FIELD);
     expect(s.locked).toBe(true);
   });
 
   it('builds a filter: field -> operator -> value -> commit', () => {
     let s = initState({ contentTypes: [article], lockedContentType: article });
     s = reduce(s, { kind: 'pickField', field: article.fields[0]! }); // summary
-    expect(s.step).toBe('value'); // v1: operator auto-locked to eq, skip to value
+    expect(s.step).toBe(STEPS.VALUE); // v1: operator auto-locked to eq, skip to value
     expect(s.draft?.op).toBe('eq');
     s = reduce(s, { kind: 'setValue', value: 'final' });
     s = reduce(s, { kind: 'commitValue' });
     expect(s.query.filters).toEqual([
       { field: 'summary', op: 'eq', value: 'final' },
     ]);
-    expect(s.step).toBe('field'); // back to field step, ready for the next filter
+    expect(s.step).toBe(STEPS.FIELD); // back to field step, ready for the next filter
   });
 
   it('editFilter re-opens a committed filter at the value step (free-entry value pre-filled)', () => {
@@ -63,7 +63,7 @@ describe('builder machine', () => {
     s = reduce(s, { kind: 'commitValue' });
     expect(s.query.filters).toHaveLength(1);
     s = reduce(s, { kind: 'editFilter', index: 0, segment: 'value' });
-    expect(s.step).toBe('value');
+    expect(s.step).toBe(STEPS.VALUE);
     expect(s.editingIndex).toBe(0);
     expect(s.draft).toEqual({
       field: article.fields[0],
@@ -94,7 +94,7 @@ describe('builder machine', () => {
       { field: 'status', op: 'eq', value: 'Active' },
     ]);
     expect(s.editingIndex).toBeNull();
-    expect(s.step).toBe('field');
+    expect(s.step).toBe(STEPS.FIELD);
   });
 
   it('cancelling a re-edit (backspace on empty) leaves the original filter untouched', () => {
@@ -130,7 +130,7 @@ describe('builder machine', () => {
   it('setFreeText at the value step updates text but not query.q (no free-text pollution)', () => {
     let s = initState({ contentTypes: [article], lockedContentType: article });
     s = reduce(s, { kind: 'pickField', field: article.fields[0]! }); // TEXT -> value step (eq auto-locked)
-    expect(s.step).toBe('value');
+    expect(s.step).toBe(STEPS.VALUE);
     s = reduce(s, { kind: 'setFreeText', q: 'playoff' });
     expect(s.text).toBe('playoff');
     expect(s.query.q).toBeUndefined();
@@ -139,11 +139,11 @@ describe('builder machine', () => {
   it('backspace on an empty value input cancels the draft, back to field step', () => {
     let s = initState({ contentTypes: [article], lockedContentType: article });
     s = reduce(s, { kind: 'pickField', field: article.fields[0]! }); // -> value step, draft set
-    expect(s.step).toBe('value');
+    expect(s.step).toBe(STEPS.VALUE);
     expect(s.draft).not.toBeNull();
     s = reduce(s, { kind: 'backspace' }); // empty input, draft present -> cancel
     expect(s.draft).toBeNull();
-    expect(s.step).toBe('field');
+    expect(s.step).toBe(STEPS.FIELD);
     expect(s.query.filters).toHaveLength(0); // no committed chip touched
   });
 
@@ -189,7 +189,7 @@ describe('builder machine', () => {
     s = reduce(s, { kind: 'pickContentType', contentType: article });
     s = reduce(s, { kind: 'pickField', field: article.fields[0]! });
     s = reduce(s, { kind: 'removeContentType' });
-    expect(s.step).toBe('contentType');
+    expect(s.step).toBe(STEPS.CONTENT_TYPE);
     expect(s.query.contentType).toBeUndefined();
     expect(s.draft).toBeNull();
     expect(s.text).toBe('');
@@ -205,7 +205,7 @@ describe('builder machine', () => {
     });
     const summary = ARTICLE_CT.fields.find((f) => f.identifier === 'summary')!;
     const s1 = reduce(s0, { kind: 'pickField', field: summary });
-    expect(s1.step).toBe('operator');
+    expect(s1.step).toBe(STEPS.OPERATOR);
     expect(s1.draft?.field.identifier).toBe('summary');
   });
 
@@ -220,7 +220,7 @@ describe('builder machine', () => {
       (f) => f.identifier === 'featured'
     )!;
     const s1 = reduce(s0, { kind: 'pickField', field: featured });
-    expect(s1.step).toBe('value'); // BOOLEAN has only `eq` → no operator step
+    expect(s1.step).toBe(STEPS.VALUE); // BOOLEAN has only `eq` → no operator step
   });
 
   it('editFilter on the operator segment re-opens the operator step with a clear input; the value carries to the value step on pickOperator', () => {
@@ -237,13 +237,13 @@ describe('builder machine', () => {
     s = reduce(s, { kind: 'commitValue' });
     expect(s.query.filters).toHaveLength(1);
     const s2 = reduce(s, { kind: 'editFilter', index: 0, segment: 'operator' });
-    expect(s2.step).toBe('operator');
+    expect(s2.step).toBe(STEPS.OPERATOR);
     expect(s2.editingIndex).toBe(0);
     expect(s2.draft?.value).toBe('x'); // value preserved on the draft
     expect(s2.text).toBe(''); // operator step shows a CLEAR input
     // Picking a new operator carries the value to the value step (prefilled).
     const s3 = reduce(s2, { kind: 'pickOperator', op: 'neq' });
-    expect(s3.step).toBe('value');
+    expect(s3.step).toBe(STEPS.VALUE);
     expect(s3.text).toBe('x');
   });
 
@@ -283,7 +283,7 @@ describe('builder machine', () => {
     const status = ARTICLE_CT.fields.find((f) => f.identifier === 'status')!;
     s = reduce(s, { kind: 'pickField', field: status });
     s = reduce(s, { kind: 'pickOperator', op: 'in' });
-    expect(s.step).toBe('value');
+    expect(s.step).toBe(STEPS.VALUE);
     s = reduce(s, { kind: 'toggleValue', value: 'a' }); // null → ['a']
     s = reduce(s, { kind: 'toggleValue', value: 'b' }); // ['a','b']
     s = reduce(s, { kind: 'toggleValue', value: 'a' }); // remove → ['b']
@@ -307,9 +307,9 @@ describe('builder machine', () => {
       rich: true,
     });
     s = reduce(s, { kind: 'pickField', field: entryKey });
-    expect(s.step).toBe('operator');
+    expect(s.step).toBe(STEPS.OPERATOR);
     s = reduce(s, { kind: 'pickOperator', op: 'startsWith' });
-    expect(s.step).toBe('value');
+    expect(s.step).toBe(STEPS.VALUE);
     s = reduce(s, { kind: 'setValue', value: 'about' });
     s = reduce(s, { kind: 'commitValue' });
     expect(s.query.filters).toEqual([
@@ -325,7 +325,7 @@ describe('builder machine', () => {
     };
     let s = initState({ contentTypes: [article], lockedContentType: article });
     s = reduce(s, { kind: 'pickField', field: entryKey });
-    expect(s.step).toBe('value');
+    expect(s.step).toBe(STEPS.VALUE);
     expect(s.draft?.op).toBe('eq');
   });
 
@@ -341,7 +341,7 @@ describe('builder machine', () => {
       },
     });
     s = reduce(s, { kind: 'editFilter', index: 0, segment: 'value' });
-    expect(s.step).toBe('value');
+    expect(s.step).toBe(STEPS.VALUE);
     expect(s.editingIndex).toBe(0);
     expect(s.draft).toEqual({
       field: { identifier: '$entryKey', name: 'Entry key', type: 'SLUG' },
@@ -363,7 +363,7 @@ describe('builder machine', () => {
     // gated out) → operator step. Proves `range` reaches pickField's gate.
     const dateField = ARTICLE_CT.fields.find((f) => f.type === 'DATETIME')!;
     const s1 = reduce(s0, { kind: 'pickField', field: dateField });
-    expect(s1.step).toBe('operator');
+    expect(s1.step).toBe(STEPS.OPERATOR);
   });
 });
 
@@ -381,11 +381,11 @@ describe('builder machine — pre-scope system fields', () => {
       rich: true,
       multiValue: true,
     });
-    expect(s.step).toBe('contentType');
+    expect(s.step).toBe(STEPS.CONTENT_TYPE);
     const status = toQueryField(getSystemField('$status')!);
     s = reduce(s, { kind: 'pickField', field: status });
     // SELECT has >1 operator (is / is not / is any of) → operator step.
-    expect(s.step).toBe('operator');
+    expect(s.step).toBe(STEPS.OPERATOR);
     expect(s.draft?.field.identifier).toBe('$status');
   });
 
@@ -403,6 +403,6 @@ describe('builder machine — pre-scope system fields', () => {
     expect(s.query.filters).toEqual([
       { field: '$status', op: 'eq', value: 'DRAFT' },
     ]);
-    expect(s.step).toBe('contentType'); // unscoped → back to contentType, not field
+    expect(s.step).toBe(STEPS.CONTENT_TYPE); // unscoped → back to contentType, not field
   });
 });
