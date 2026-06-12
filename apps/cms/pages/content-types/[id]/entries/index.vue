@@ -61,38 +61,11 @@ const searchColumns: TableColumn<Record<string, unknown>>[] = [
   { accessorKey: 'status', header: 'Status' },
 ];
 
-const selection = useRowSelection(searchRows);
-watch(searchPage, () => selection.clear());
-
-const toast = useToast();
-const bulkBusy = ref(false);
-
-async function onBulkPublish() {
-  const ids = [...selection.selected.value];
-  if (!ids.length) return;
-  bulkBusy.value = true;
-  try {
-    const res = await $fetch<{ published: number; failed: number }>(
-      '/api/content-entries/bulk-publish',
-      { method: 'POST', body: { ids } }
-    );
-    toast.add(
-      res.failed === 0
-        ? { title: `${res.published} published`, color: 'success' }
-        : {
-            title: `${res.published} of ${ids.length} published`,
-            description: `${res.failed} failed`,
-            color: 'warning',
-          }
-    );
-    selection.clear();
-    await refreshSearch();
-  } catch {
-    toast.add({ title: 'Bulk publish failed', color: 'error' });
-  } finally {
-    bulkBusy.value = false;
-  }
-}
+const {
+  selection,
+  busy: bulkBusy,
+  publish: onBulkPublish,
+} = useBulkPublish(searchRows, refreshSearch);
 
 function onClear() {
   router.push({ path: `/content-types/${contentTypeId}/entries`, query: {} });
