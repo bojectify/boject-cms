@@ -150,7 +150,7 @@ const filterOptions: Array<{ label: string; value: ArchiveFilter }> = [
 </script>
 
 <template>
-  <div>
+  <div :class="{ 'pb-28': selection.count.value > 0 }">
     <template v-if="searchMode">
       <ContentTable
         v-model:page="searchPage"
