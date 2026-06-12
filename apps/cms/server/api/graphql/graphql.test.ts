@@ -2810,6 +2810,7 @@ describe('GraphQL API', async () => {
       entryKey: string;
       contentType: string;
       entryTitle: string;
+      status: string;
       snippet: string | null;
       publishedAt: string | null;
     };
@@ -2822,7 +2823,7 @@ describe('GraphQL API', async () => {
           contentType: $contentType
           filters: $filters
         ) {
-          edges { node { id entryKey contentType entryTitle snippet publishedAt } cursor }
+          edges { node { id entryKey contentType entryTitle status snippet publishedAt } cursor }
           pageInfo { hasNextPage endCursor }
         }
       }
@@ -3098,6 +3099,46 @@ describe('GraphQL API', async () => {
       expect(res.errors).toBeDefined();
       expect(res.errors!.length).toBeGreaterThan(0);
       expect(res.errors![0]!.extensions?.code).toBe('BAD_USER_INPUT');
+    });
+
+    it('returns only PUBLISHED hits, excluding DRAFT docs (envelope status gate)', async () => {
+      // Two docs match the same term — one PUBLISHED, one DRAFT (distinct
+      // ids/entryIds). The GraphQL field hardcodes a `status = "PUBLISHED"`
+      // envelope filter, so the DRAFT doc must never surface.
+      const docs: SearchDocument[] = [
+        {
+          id: 'draftparity-pub',
+          entryId: 'draftparity-pub',
+          status: 'PUBLISHED',
+          isWorkingVersion: false,
+          entryKey: 'draftparity-pub',
+          contentType: 'Article',
+          entryTitle: 'Draftparity published',
+          publishedAt: null,
+          fields: { body: 'draftparity body' },
+        },
+        {
+          id: 'draftparity-draft',
+          entryId: 'draftparity-draft',
+          status: 'DRAFT',
+          isWorkingVersion: true,
+          entryKey: 'draftparity-draft',
+          contentType: 'Article',
+          entryTitle: 'Draftparity draft',
+          publishedAt: null,
+          fields: { body: 'draftparity body' },
+        },
+      ];
+      await addTestDocuments(docs);
+
+      const { data, errors } = await gqlVars<{
+        searchEntries: Connection<SearchHitNode>;
+      }>(SEARCH_QUERY, { q: 'draftparity' });
+
+      expect(errors).toBeUndefined();
+      const ids = data.searchEntries.edges.map((e) => e.node.id);
+      expect(ids).toEqual(['draftparity-pub']);
+      expect(data.searchEntries.edges[0]!.node.status).toBe('PUBLISHED');
     });
   });
 });
