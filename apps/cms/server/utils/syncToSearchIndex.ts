@@ -1,19 +1,14 @@
 import type { Index } from 'meilisearch';
 import type { PrismaClient } from '#prisma';
-import { CONTENT_STATUSES } from '../../utils/contentStatus';
 import { WEBHOOK_EVENTS } from '../../utils/webhookEvents';
 import {
   buildEntrySearchDocuments,
+  INDEXABLE_STATUSES,
   type EntryForSearch,
 } from './buildEntrySearchDocument';
 import { searchDocId, type SearchDocument } from './searchDocument';
 
 const SCHEMA_REINDEX_BATCH = 1000;
-const INDEXABLE_STATUSES = [
-  CONTENT_STATUSES.DRAFT,
-  CONTENT_STATUSES.CHANGED,
-  CONTENT_STATUSES.PUBLISHED,
-];
 
 export interface SyncToSearchIndexDeps {
   prisma: PrismaClient;

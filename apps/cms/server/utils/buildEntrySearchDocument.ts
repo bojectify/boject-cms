@@ -10,7 +10,7 @@ import {
 } from './searchDocument';
 
 /** Versions a doc is built for. ARCHIVED is never indexed. */
-const INDEXABLE_STATUSES: ContentStatusName[] = [
+export const INDEXABLE_STATUSES: ContentStatusName[] = [
   CONTENT_STATUSES.DRAFT,
   CONTENT_STATUSES.CHANGED,
   CONTENT_STATUSES.PUBLISHED,

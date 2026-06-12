@@ -21,8 +21,10 @@
 //
 // Scale note: the matching entries are loaded into memory in one findMany
 // before batching (batchSize chunks only the Meili write, not the DB read), so
-// peak memory scales with the corpus. Fine for first-adoption/recovery; a
-// keyset-paginated DB read is the follow-up if this is run on a very large set.
+// peak memory scales with the corpus — and now holds one document per indexable
+// version (up to ~2x the entry count for a corpus mid-edit). Fine for
+// first-adoption/recovery; a keyset-paginated DB read is the follow-up if this
+// is run on a very large set.
 
 import 'dotenv/config';
 import { parseArgs } from 'node:util';
@@ -31,9 +33,9 @@ import type { PrismaClient } from '../../generated/prisma/client';
 import type { SearchDocument } from '../../server/utils/searchDocument';
 import {
   buildEntrySearchDocuments,
+  INDEXABLE_STATUSES,
   type EntryForSearch,
 } from '../../server/utils/buildEntrySearchDocument';
-import { CONTENT_STATUSES } from '../../utils/contentStatus';
 
 const DEFAULT_BATCH_SIZE = 1000;
 
@@ -103,32 +105,12 @@ export async function runReindex(
 
   const entries = await prisma.contentEntry.findMany({
     where: {
-      versions: {
-        some: {
-          status: {
-            in: [
-              CONTENT_STATUSES.DRAFT,
-              CONTENT_STATUSES.CHANGED,
-              CONTENT_STATUSES.PUBLISHED,
-            ],
-          },
-        },
-      },
+      versions: { some: { status: { in: INDEXABLE_STATUSES } } },
       ...(contentType ? { contentType: { identifier: contentType } } : {}),
     },
     include: {
       contentType: { include: { fields: true } },
-      versions: {
-        where: {
-          status: {
-            in: [
-              CONTENT_STATUSES.DRAFT,
-              CONTENT_STATUSES.CHANGED,
-              CONTENT_STATUSES.PUBLISHED,
-            ],
-          },
-        },
-      },
+      versions: { where: { status: { in: INDEXABLE_STATUSES } } },
     },
     orderBy: { createdAt: 'asc' },
   });
