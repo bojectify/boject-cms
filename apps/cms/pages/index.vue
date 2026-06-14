@@ -187,7 +187,6 @@ const filterOptions: Array<{ label: string; value: ArchiveFilter }> = [
             :key="opt.value"
             :color="archiveFilter === opt.value ? 'primary' : 'neutral'"
             :variant="archiveFilter === opt.value ? 'solid' : 'outline'"
-            size="sm"
             @click="archiveFilter = opt.value"
           >
             {{ opt.label }}
