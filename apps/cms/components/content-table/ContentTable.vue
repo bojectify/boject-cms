@@ -53,7 +53,10 @@ const allColumns = computed<TableColumn<Record<string, unknown>>[]>(() => {
 <template>
   <div class="p-6" :data-testid="testId">
     <div class="flex items-center justify-between mb-4">
-      <h1 class="text-2xl font-bold">{{ title }}</h1>
+      <div>
+        <h1 class="text-2xl font-bold">{{ title }}</h1>
+        <p v-if="subtitle" class="text-sm text-muted mt-0.5">{{ subtitle }}</p>
+      </div>
       <slot name="actions" />
     </div>
     <!-- Toolbar row (e.g. the search launcher bar) sits below the header,
