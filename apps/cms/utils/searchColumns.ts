@@ -66,7 +66,8 @@ function relationTitle(v: unknown): string | null {
   return null;
 }
 
-const EMPTY = '—';
+/** The display string for an empty / missing column value (em-dash, U+2014). */
+export const EMPTY_CELL = '—';
 
 /**
  * Render a hit's `fields.<id>` value for display. `formatDate` is injected (the
@@ -81,20 +82,20 @@ export function formatColumnValue(
 ): string {
   switch (type) {
     case FIELD_TYPES.DATETIME:
-      return typeof value === 'number' ? formatDate(value) : EMPTY;
+      return typeof value === 'number' ? formatDate(value) : EMPTY_CELL;
     case FIELD_TYPES.NUMBER:
-      return typeof value === 'number' ? String(value) : EMPTY;
+      return typeof value === 'number' ? String(value) : EMPTY_CELL;
     case FIELD_TYPES.BOOLEAN:
-      return value === true ? 'Yes' : value === false ? 'No' : EMPTY;
+      return value === true ? 'Yes' : value === false ? 'No' : EMPTY_CELL;
     case FIELD_TYPES.RELATION:
-      return relationTitle(value) ?? EMPTY;
+      return relationTitle(value) ?? EMPTY_CELL;
     case FIELD_TYPES.MULTIRELATION: {
-      if (!Array.isArray(value)) return EMPTY;
+      if (!Array.isArray(value)) return EMPTY_CELL;
       const titles = value.map(relationTitle).filter((t): t is string => !!t);
-      return titles.length ? titles.join(', ') : EMPTY;
+      return titles.length ? titles.join(', ') : EMPTY_CELL;
     }
     default:
       // TEXT / SLUG / SELECT — string-shaped.
-      return typeof value === 'string' && value !== '' ? value : EMPTY;
+      return typeof value === 'string' && value !== '' ? value : EMPTY_CELL;
   }
 }

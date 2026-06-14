@@ -4,7 +4,7 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 dayjs.extend(relativeTime);
 
 export function useContentTable() {
-  function formatDate(date: string) {
+  function formatDate(date: string | number) {
     const d = dayjs(date);
     if (dayjs().diff(d, 'day') < 7) {
       return `${d.fromNow()} at ${d.format('HH:mm')}`;
