@@ -104,6 +104,9 @@ export type Action =
       segment: 'field' | 'operator' | 'value';
     }
   | { kind: 'editDraft'; segment: 'operator' }
+  | { kind: 'commitFreeText' }
+  | { kind: 'editFreeText' }
+  | { kind: 'removeFreeText' }
   | { kind: 'backspace' }
   | { kind: 'run' };
 
@@ -111,22 +114,17 @@ export function reduce(prev: BuilderState, action: Action): BuilderState {
   const s = { ...prev, intent: null };
   switch (action.kind) {
     case 'setFreeText':
-      // At the value step, `text` is the filter value being typed — don't let it
-      // leak into the global free-text `query.q`.
-      return {
-        ...s,
-        text: action.q,
-        query:
-          s.step === STEPS.VALUE
-            ? s.query
-            : { ...s.query, q: action.q || undefined },
-      };
+      // `text` is the transient list-finder / free-text *candidate* — it never
+      // live-mutates the committed free-text `query.q` (the FreeTextChip). The
+      // candidate is promoted to `query.q` explicitly via `commitFreeText` (the
+      // "Search for …" path / Enter), mirroring how the value step commits.
+      return { ...s, text: action.q };
 
     case 'pickContentType':
-      // The text typed at the contentType step was used to find this type in
-      // the list, not as a free-text query for the now-scoped search. Clear it
-      // from both the input and query.q so the visible input and the emitted
-      // query stay in sync. (Free-text at the field step is unaffected.)
+      // The text typed at the contentType step was a type-finder, not a
+      // free-text query for the now-scoped search — drop it from the input. A
+      // *committed* `query.q` (the chip) survives scoping: the per-type route
+      // carries it (planNavigation/compileQuery), so it is preserved here.
       return {
         ...s,
         step: STEPS.FIELD,
@@ -136,7 +134,6 @@ export function reduce(prev: BuilderState, action: Action): BuilderState {
         query: {
           ...s.query,
           contentType: action.contentType.identifier,
-          q: undefined,
         },
       };
 
@@ -281,6 +278,28 @@ export function reduce(prev: BuilderState, action: Action): BuilderState {
       return { ...s, step: STEPS.OPERATOR, text: '' };
     }
 
+    case 'commitFreeText':
+      // Promote the transient `text` candidate to the committed free-text
+      // `query.q` (rendered as the FreeTextChip) and clear the input. Empty
+      // text clears the chip. The host follows this with a `run`.
+      return { ...s, text: '', query: { ...s.query, q: s.text || undefined } };
+
+    case 'editFreeText':
+      // Move the committed `query.q` back into the input for editing (chip →
+      // input) and clear the chip; re-commit via the "Search for …" path. Land
+      // on the field step (scoped) / content-type step (unscoped) so the
+      // type/field list stays offered while editing.
+      return {
+        ...s,
+        text: s.query.q ?? '',
+        query: { ...s.query, q: undefined },
+        step: s.query.contentType ? STEPS.FIELD : STEPS.CONTENT_TYPE,
+      };
+
+    case 'removeFreeText':
+      // The chip's ✕ — drop the committed free-text query.
+      return { ...s, query: { ...s.query, q: undefined } };
+
     case 'removeFilter': {
       const query = removeFilter(s.query, action.index);
       // Keep editingIndex pointing at the same filter if an earlier one is removed.
@@ -292,10 +311,11 @@ export function reduce(prev: BuilderState, action: Action): BuilderState {
     }
 
     case 'backspace':
-      // An empty input backs out the current draft first (cancel the in-progress
-      // filter — whether a new add or an in-place edit — and return to field
-      // selection; a re-edit leaves the original committed filter untouched),
-      // then deletes the last committed chip.
+      // An empty input backs out the rightmost thing first, matching the chip
+      // row's visual order: the in-progress draft (cancel it — whether a new add
+      // or an in-place edit — and return to field selection; a re-edit leaves the
+      // original committed filter untouched), then the free-text `q` chip (which
+      // renders LAST, after the filter chips), then the last committed filter.
       if (s.text === '' && s.draft) {
         return {
           ...s,
@@ -303,6 +323,9 @@ export function reduce(prev: BuilderState, action: Action): BuilderState {
           editingIndex: null,
           step: s.query.contentType ? STEPS.FIELD : STEPS.CONTENT_TYPE,
         };
+      }
+      if (s.text === '' && !s.draft && s.query.q) {
+        return { ...s, query: { ...s.query, q: undefined } };
       }
       if (s.text === '' && !s.draft && s.query.filters.length) {
         return {
