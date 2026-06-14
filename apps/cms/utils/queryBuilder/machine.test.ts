@@ -127,6 +127,54 @@ describe('builder machine', () => {
     expect(s.query.filters).toHaveLength(1);
   });
 
+  it('editDraft(operator) re-opens the operator step keeping the draft; value survives a re-pick', () => {
+    // Rich TEXT has multiple operators, so the operator step is reachable.
+    let s = initState({
+      contentTypes: [article],
+      lockedContentType: article,
+      rich: true,
+    });
+    s = reduce(s, { kind: 'pickField', field: article.fields[0]! }); // summary (TEXT)
+    expect(s.step).toBe(STEPS.OPERATOR); // 4 rich TEXT ops → operator step
+    s = reduce(s, { kind: 'pickOperator', op: 'contains' });
+    s = reduce(s, { kind: 'setValue', value: 'playoff' });
+    expect(s.step).toBe(STEPS.VALUE);
+
+    // Re-edit the draft's operator: back to the operator step, draft preserved,
+    // input cleared. No editingIndex — this is the draft, not a committed filter.
+    s = reduce(s, { kind: 'editDraft', segment: 'operator' });
+    expect(s.step).toBe(STEPS.OPERATOR);
+    expect(s.draft).toEqual({
+      field: article.fields[0],
+      op: 'contains',
+      value: 'playoff',
+    });
+    expect(s.text).toBe('');
+    expect(s.editingIndex).toBeNull();
+
+    // Pick a different operator → value step, value preserved + re-prefilled.
+    s = reduce(s, { kind: 'pickOperator', op: 'eq' });
+    expect(s.step).toBe(STEPS.VALUE);
+    expect(s.draft).toEqual({
+      field: article.fields[0],
+      op: 'eq',
+      value: 'playoff',
+    });
+    expect(s.text).toBe('playoff');
+  });
+
+  it('editDraft is a no-op when there is no draft', () => {
+    const s = initState({
+      contentTypes: [article],
+      lockedContentType: article,
+      rich: true,
+    });
+    expect(s.draft).toBeNull();
+    const after = reduce(s, { kind: 'editDraft', segment: 'operator' });
+    expect(after.draft).toBeNull();
+    expect(after.step).toBe(s.step);
+  });
+
   it('setFreeText at the value step updates text but not query.q (no free-text pollution)', () => {
     let s = initState({ contentTypes: [article], lockedContentType: article });
     s = reduce(s, { kind: 'pickField', field: article.fields[0]! }); // TEXT -> value step (eq auto-locked)

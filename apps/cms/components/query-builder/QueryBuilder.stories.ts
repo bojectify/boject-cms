@@ -164,6 +164,55 @@ export const ArrowRightMidTextDoesNotCommit: Story = {
   },
 };
 
+// #360: clicking the in-progress draft's operator segment re-opens the operator
+// step. Verified via the v-show step change — the main input is hidden at the
+// value step and visible again once the operator step re-opens (proves the
+// editDraft wiring fired; the machine + value-preservation are unit-tested).
+export const ReEditDraftOperator: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.type(canvas.getByTestId(QA_QUERY_BUILDER.INPUT), 'art');
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))); // Article
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))); // Summary (TEXT) → value step
+    const chip = await canvas.findByTestId(QA_QUERY_BUILDER.DRAFT_CHIP);
+    // At the value step the main input is hidden (v-show); the value input shows.
+    await expect(canvas.getByTestId(QA_QUERY_BUILDER.INPUT)).not.toBeVisible();
+    await expect(
+      canvas.getByTestId(QA_QUERY_BUILDER.VALUE_INPUT)
+    ).toBeVisible();
+    // Click the draft chip's operator segment → re-open the operator step.
+    await userEvent.click(
+      within(chip).getByTestId(QA_FILTER_CHIP.OPERATOR_SEGMENT)
+    );
+    // Operator step re-opened: the main input is visible again.
+    await waitFor(() =>
+      expect(canvas.getByTestId(QA_QUERY_BUILDER.INPUT)).toBeVisible()
+    );
+  },
+};
+
+// #360 keyboard path: Shift+Tab from the value input lands on the operator
+// segment (a native button), Enter activates it → re-open the operator step.
+export const ReEditDraftOperatorViaKeyboard: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.type(canvas.getByTestId(QA_QUERY_BUILDER.INPUT), 'art');
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))); // Article
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))); // Summary (TEXT) → value step
+    const chip = await canvas.findByTestId(QA_QUERY_BUILDER.DRAFT_CHIP);
+    await waitFor(() =>
+      expect(canvas.getByTestId(QA_QUERY_BUILDER.VALUE_INPUT)).toHaveFocus()
+    );
+    await userEvent.tab({ shift: true });
+    const operator = within(chip).getByTestId(QA_FILTER_CHIP.OPERATOR_SEGMENT);
+    await expect(operator).toHaveFocus();
+    await userEvent.keyboard('{Enter}');
+    await waitFor(() =>
+      expect(canvas.getByTestId(QA_QUERY_BUILDER.INPUT)).toBeVisible()
+    );
+  },
+};
+
 export const RelationValue: Story = {
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);

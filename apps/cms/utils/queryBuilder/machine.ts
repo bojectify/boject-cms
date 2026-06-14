@@ -103,6 +103,7 @@ export type Action =
       index: number;
       segment: 'field' | 'operator' | 'value';
     }
+  | { kind: 'editDraft'; segment: 'operator' }
   | { kind: 'backspace' }
   | { kind: 'run' };
 
@@ -269,6 +270,15 @@ export function reduce(prev: BuilderState, action: Action): BuilderState {
         step: STEPS.VALUE,
         text: prefill,
       };
+    }
+
+    case 'editDraft': {
+      // Re-open the IN-PROGRESS draft's operator step (vs editFilter, which
+      // re-opens a committed filter by index). The field + value stay on the
+      // draft; the value is re-prefilled at the value step by pickOperator, so
+      // e.g. is → is not keeps a typed value. No editingIndex — it's the draft.
+      if (!s.draft) return s;
+      return { ...s, step: STEPS.OPERATOR, text: '' };
     }
 
     case 'removeFilter': {
