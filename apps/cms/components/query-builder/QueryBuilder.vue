@@ -391,6 +391,11 @@ function onKeydown(e: KeyboardEvent) {
         :active-segment="state.step === STEPS.OPERATOR ? 'operator' : 'value'"
         :show-remove="false"
         :test-id="QA_QUERY_BUILDER.DRAFT_CHIP"
+        @edit-segment="
+          (seg: ChipSegment) =>
+            seg === 'operator' &&
+            handle({ kind: 'editDraft', segment: 'operator' })
+        "
       >
         <template #value>
           <span
