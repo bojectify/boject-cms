@@ -1,19 +1,21 @@
 import { prisma } from './prisma';
 import { FIELD_TYPES, type FieldTypeName } from '../../utils/fieldTypes';
-import type { SearchHit } from './searchEntries';
 
 /** A title fetcher: entry ids → Map(id → entryTitle). */
 export type TitleFetcher = (ids: string[]) => Promise<Map<string, string>>;
 
-/** Collect deduped target entry ids across all hits for the RELATION/MULTIRELATION columns. */
+/** The minimal item shape the column hydrator operates on (a search hit or a browse item). */
+export type ColumnItem = { fields?: Record<string, unknown> };
+
+/** Collect deduped target entry ids across all items for the RELATION/MULTIRELATION columns. */
 export function collectRelationColumnIds(
-  hits: SearchHit[],
+  items: ColumnItem[],
   columns: string[],
   fieldTypes: Record<string, FieldTypeName>
 ): string[] {
   const ids = new Set<string>();
-  for (const hit of hits) {
-    const fields = hit.fields;
+  for (const item of items) {
+    const fields = item.fields;
     if (!fields) continue;
     for (const col of columns) {
       const type = fieldTypes[col];
@@ -47,16 +49,16 @@ export const fetchEntryTitles: TitleFetcher = async (ids) => {
  * columns are untouched. `fetch` is injected for testing; defaults to Prisma.
  */
 export async function hydrateRelationColumns(
-  hits: SearchHit[],
+  items: ColumnItem[],
   columns: string[],
   fieldTypes: Record<string, FieldTypeName>,
   fetch: TitleFetcher = fetchEntryTitles
 ): Promise<void> {
-  const ids = collectRelationColumnIds(hits, columns, fieldTypes);
+  const ids = collectRelationColumnIds(items, columns, fieldTypes);
   if (ids.length === 0) return;
   const titles = await fetch(ids);
-  for (const hit of hits) {
-    const fields = hit.fields;
+  for (const item of items) {
+    const fields = item.fields;
     if (!fields) continue;
     for (const col of columns) {
       const type = fieldTypes[col];

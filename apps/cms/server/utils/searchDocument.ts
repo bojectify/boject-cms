@@ -105,7 +105,7 @@ function asObject(value: unknown): Record<string, unknown> {
  * type — matching how the GraphQL relation filters compare on entryId
  * (jsonbFilters.ts). contentTypeId is intentionally dropped.
  */
-function relationEntryId(value: unknown): string | null {
+export function relationEntryId(value: unknown): string | null {
   const rel = asObject(value);
   return typeof rel.entryId === 'string' && rel.entryId !== ''
     ? rel.entryId

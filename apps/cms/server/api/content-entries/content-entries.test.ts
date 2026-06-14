@@ -4185,4 +4185,122 @@ describe('Content Entry endpoints', async () => {
       expect(await draftSyncCount(draft.id)).toBe(beforeDelete + 1);
     });
   });
+
+  describe('field columns (#303 browse-mode parity)', () => {
+    it('projects ?columns= to a `fields` map identical to /api/search (DATETIME→epoch, RELATION→{entryId,entryTitle})', async () => {
+      const cookie = await getSessionCookie();
+      const suffix = Date.now();
+
+      // A content type that relates to itself, so the same type carries both the
+      // RELATION column and the target entry. Built via direct prisma (the #264 /
+      // #302 blocks' convention) for a deterministic, isolated row set.
+      const ct = await prisma.contentType.create({
+        data: {
+          identifier: `FieldColumns303_${suffix}`,
+          name: `Field Columns 303 ${suffix}`,
+          fields: {
+            create: [
+              {
+                identifier: 'title',
+                name: 'Title',
+                type: FIELD_TYPES.ENTRY_TITLE,
+                order: 0,
+                required: true,
+                unique: true,
+              },
+              {
+                identifier: 'name',
+                name: 'Name',
+                type: FIELD_TYPES.TEXT,
+                order: 1,
+              },
+              {
+                identifier: 'publishedAt',
+                name: 'Published At',
+                type: FIELD_TYPES.DATETIME,
+                order: 2,
+              },
+              {
+                identifier: 'author',
+                name: 'Author',
+                type: FIELD_TYPES.RELATION,
+                order: 3,
+              },
+            ],
+          },
+        },
+      });
+
+      const target = await prisma.contentEntry.create({
+        data: {
+          contentTypeId: ct.id,
+          entryTitle: 'Acme Corp',
+          entryKey: `acme-corp-${suffix}`,
+          slug: null,
+          versions: {
+            create: [
+              {
+                status: CONTENT_STATUSES.DRAFT,
+                entryTitle: 'Acme Corp',
+                data: { title: 'Acme Corp' },
+              },
+            ],
+          },
+        },
+      });
+
+      const isoPublished = '2023-11-14T22:13:20.000Z';
+      const main = await prisma.contentEntry.create({
+        data: {
+          contentTypeId: ct.id,
+          entryTitle: 'Main',
+          entryKey: `main-${suffix}`,
+          slug: null,
+          versions: {
+            create: [
+              {
+                status: CONTENT_STATUSES.DRAFT,
+                entryTitle: 'Main',
+                data: {
+                  title: 'Main',
+                  name: 'Widget',
+                  publishedAt: isoPublished,
+                  author: { contentTypeId: ct.id, entryId: target.id },
+                },
+              },
+            ],
+          },
+        },
+      });
+
+      const res = await fetch(
+        `/api/content-entries?contentTypeId=${ct.id}&columns=name,publishedAt,author`,
+        { headers: { cookie } }
+      );
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        items: Array<Record<string, unknown> & { id: string }>;
+      };
+      const item = body.items.find((i) => i.id === main.id);
+      expect(item).toBeDefined();
+      expect(item!.fields).toEqual({
+        name: 'Widget',
+        publishedAt: Date.parse(isoPublished),
+        author: { entryId: target.id, entryTitle: 'Acme Corp' },
+      });
+
+      // No `columns` requested → no `fields` key (browse callers unaffected).
+      const plainRes = await fetch(
+        `/api/content-entries?contentTypeId=${ct.id}`,
+        { headers: { cookie } }
+      );
+      expect(plainRes.status).toBe(200);
+      const plain = (await plainRes.json()) as {
+        items: Array<Record<string, unknown> & { id: string }>;
+      };
+      const plainItem = plain.items.find((i) => i.id === main.id);
+      expect(plainItem).toBeDefined();
+      expect(plainItem).not.toHaveProperty('fields');
+    });
+  });
 });
