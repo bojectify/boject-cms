@@ -204,9 +204,12 @@ describe('builder machine', () => {
     expect(s.query.filters).toHaveLength(0);
   });
 
-  it('clearing a locked content type emits a broaden intent (query keeps q)', () => {
-    let s = initState({ contentTypes: [article], lockedContentType: article });
-    s = reduce(s, { kind: 'setFreeText', q: 'keep me' });
+  it('clearing a locked content type emits a broaden intent (query keeps committed q)', () => {
+    const s = initState({
+      contentTypes: [article],
+      lockedContentType: article,
+      initialQuery: { contentType: 'Article', q: 'keep me', filters: [] },
+    });
     const out = reduce(s, { kind: 'removeContentType' });
     expect(out.intent).toEqual({ kind: 'broaden', q: 'keep me' });
   });
@@ -222,13 +225,14 @@ describe('builder machine', () => {
     expect(reduce(ran, { kind: 'setFreeText', q: 'x' }).intent).toBeNull();
   });
 
-  it('picking a content type clears the type-search text from query.q', () => {
+  it('picking a content type drops the never-committed type-finder text (no stray query.q)', () => {
     let s = initState({ contentTypes: [article] });
-    s = reduce(s, { kind: 'setFreeText', q: 'art' });
-    expect(s.query.q).toBe('art');
+    s = reduce(s, { kind: 'setFreeText', q: 'art' }); // type-finder text only
+    expect(s.text).toBe('art');
+    expect(s.query.q).toBeUndefined(); // typing never commits q
     s = reduce(s, { kind: 'pickContentType', contentType: article });
-    expect(s.text).toBe('');
-    expect(s.query.q).toBeUndefined();
+    expect(s.text).toBe(''); // finder text dropped on scoping
+    expect(s.query.q).toBeUndefined(); // no stray free-text leaked
     expect(s.query.contentType).toBe(article.identifier);
   });
 
@@ -452,5 +456,112 @@ describe('builder machine — pre-scope system fields', () => {
       { field: '$status', op: 'eq', value: 'DRAFT' },
     ]);
     expect(s.step).toBe(STEPS.CONTENT_TYPE); // unscoped → back to contentType, not field
+  });
+});
+
+describe('free-text chip (#363)', () => {
+  it('setFreeText at the content-type step sets text only, never query.q', () => {
+    let s = initState({ contentTypes: [article] });
+    expect(s.step).toBe(STEPS.CONTENT_TYPE);
+    s = reduce(s, { kind: 'setFreeText', q: 'dave' });
+    expect(s.text).toBe('dave');
+    expect(s.query.q).toBeUndefined();
+  });
+
+  it('setFreeText at the field step sets text only, never query.q', () => {
+    let s = initState({ contentTypes: [article], lockedContentType: article });
+    expect(s.step).toBe(STEPS.FIELD);
+    s = reduce(s, { kind: 'setFreeText', q: 'dave' });
+    expect(s.text).toBe('dave');
+    expect(s.query.q).toBeUndefined();
+  });
+
+  it('commitFreeText moves text into query.q and clears text', () => {
+    let s = initState({ contentTypes: [article] });
+    s = reduce(s, { kind: 'setFreeText', q: 'dave' });
+    s = reduce(s, { kind: 'commitFreeText' });
+    expect(s.query.q).toBe('dave');
+    expect(s.text).toBe('');
+  });
+
+  it('commitFreeText with empty text clears a previously committed query.q', () => {
+    let s = initState({
+      contentTypes: [article],
+      initialQuery: { q: 'dave', filters: [] },
+    });
+    s = reduce(s, { kind: 'setFreeText', q: '' });
+    s = reduce(s, { kind: 'commitFreeText' });
+    expect(s.query.q).toBeUndefined();
+  });
+
+  it('pickContentType preserves a committed query.q while clearing finder text', () => {
+    let s = initState({ contentTypes: [article] });
+    s = reduce(s, { kind: 'setFreeText', q: 'dave' });
+    s = reduce(s, { kind: 'commitFreeText' }); // committed q = 'dave'
+    expect(s.query.q).toBe('dave');
+    s = reduce(s, { kind: 'pickContentType', contentType: article });
+    expect(s.query.q).toBe('dave'); // committed q survives scoping
+    expect(s.query.contentType).toBe(article.identifier);
+    expect(s.text).toBe('');
+  });
+
+  it('editFreeText loads query.q into text, clears the chip, unscoped → content-type step', () => {
+    let s = initState({
+      contentTypes: [article],
+      initialQuery: { q: 'dave', filters: [] },
+    });
+    s = reduce(s, { kind: 'editFreeText' });
+    expect(s.text).toBe('dave');
+    expect(s.query.q).toBeUndefined();
+    expect(s.step).toBe(STEPS.CONTENT_TYPE);
+  });
+
+  it('editFreeText returns to the field step when scoped to a content type', () => {
+    let s = initState({
+      contentTypes: [article],
+      lockedContentType: article,
+      initialQuery: { contentType: 'Article', q: 'dave', filters: [] },
+    });
+    s = reduce(s, { kind: 'editFreeText' });
+    expect(s.text).toBe('dave');
+    expect(s.query.q).toBeUndefined();
+    expect(s.step).toBe(STEPS.FIELD);
+  });
+
+  it('removeFreeText clears query.q', () => {
+    let s = initState({
+      contentTypes: [article],
+      initialQuery: { q: 'dave', filters: [] },
+    });
+    s = reduce(s, { kind: 'removeFreeText' });
+    expect(s.query.q).toBeUndefined();
+  });
+
+  it('backspace on an empty input deletes the free-text chip before any filter chip', () => {
+    let s = initState({
+      contentTypes: [article],
+      initialQuery: {
+        q: 'dave',
+        filters: [{ field: '$status', op: 'eq', value: 'PUBLISHED' }],
+      },
+    });
+    // The free-text chip renders LAST (rightmost), so it goes first.
+    s = reduce(s, { kind: 'backspace' });
+    expect(s.query.q).toBeUndefined();
+    expect(s.query.filters).toHaveLength(1); // filter chip untouched
+  });
+
+  it('backspace deletes the last filter chip only once the free-text chip is gone', () => {
+    let s = initState({
+      contentTypes: [article],
+      initialQuery: {
+        q: 'dave',
+        filters: [{ field: '$status', op: 'eq', value: 'PUBLISHED' }],
+      },
+    });
+    s = reduce(s, { kind: 'backspace' }); // removes the q chip
+    s = reduce(s, { kind: 'backspace' }); // now removes the filter chip
+    expect(s.query.q).toBeUndefined();
+    expect(s.query.filters).toHaveLength(0);
   });
 });

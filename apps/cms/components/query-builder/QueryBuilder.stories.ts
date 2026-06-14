@@ -11,6 +11,7 @@ import { QA_QUERY_BUILDER } from './queryBuilder.config.js';
 import { QA_QUERY_CHIPS } from '../query-chips/queryChips.config.js';
 import { QA_QUERY_DROPDOWN } from '../query-dropdown/queryDropdown.config.js';
 import { QA_FILTER_CHIP } from '../filter-chip/filterChip.config.js';
+import { QA_FREE_TEXT_CHIP } from '../free-text-chip/freeTextChip.config.js';
 import { QA_VALUE_EDITOR } from '../value-editor/valueEditor.config.js';
 import { QA_CONTENT_TYPE_CHIP } from '../content-type-chip/contentTypeChip.config.js';
 import { QA_MULTI_SELECT_EDITOR } from '../multi-select-editor/multiSelectEditor.config.js';
@@ -349,7 +350,12 @@ export const BackspaceDeletesChip: Story = {
 };
 
 export const Locked: Story = {
-  args: { lockedContentType: ARTICLE_CT },
+  args: {
+    lockedContentType: ARTICLE_CT,
+    // A committed free-text q (the chip) is what broaden carries — not the
+    // uncommitted input candidate (#363).
+    modelValue: { contentType: 'Article', q: 'goal', filters: [] },
+  },
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
     // pre-scoped: chip present, dropdown already on fields
@@ -359,8 +365,7 @@ export const Locked: Story = {
     await expect(
       canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))
     ).toHaveTextContent('Summary');
-    // ✕ on the pinned chip broadens, keeping q
-    await userEvent.type(canvas.getByTestId(QA_QUERY_BUILDER.INPUT), 'goal');
+    // ✕ on the pinned chip broadens, keeping the committed free-text q
     await userEvent.click(
       canvas.getByTestId(QA_CONTENT_TYPE_CHIP.REMOVE_BUTTON)
     );
@@ -973,6 +978,151 @@ export const EntryTitleFieldFilter: Story = {
         filters: [{ field: 'title', op: 'eq', value: 'quarterly' }],
       })
     );
+  },
+};
+
+// --- Free-text `q` chip (#363) ---
+
+// Re-open (unscoped) with `?q=dave`: the committed free-text shows as a chip,
+// the input stays empty, and the content-type list is still pickable (the term
+// no longer filters the type list to nothing). Acceptance #1.
+export const FreeTextChipFromUrl: Story = {
+  args: { modelValue: { q: 'dave', filters: [] } },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByTestId(QA_FREE_TEXT_CHIP.EDIT_BUTTON)
+    ).toHaveTextContent('dave');
+    // input is empty → the type list is unfiltered + pickable
+    await expect(canvas.getByTestId(QA_QUERY_BUILDER.INPUT)).toHaveValue('');
+    await expect(canvas.getByRole('option', { name: 'Article' })).toBeVisible();
+  },
+};
+
+// Re-open on a per-type page with `?q=dave`: the free-text chip shows alongside
+// the locked content-type chip, and the field list is still pickable. Acceptance #2.
+export const FreeTextChipFromUrlScoped: Story = {
+  args: {
+    lockedContentType: ARTICLE_CT,
+    modelValue: { contentType: 'Article', q: 'dave', filters: [] },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByTestId(QA_QUERY_CHIPS.CONTENT_TYPE_CHIP)
+    ).toHaveTextContent('Article');
+    await expect(
+      canvas.getByTestId(QA_FREE_TEXT_CHIP.EDIT_BUTTON)
+    ).toHaveTextContent('dave');
+    await expect(
+      canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0))
+    ).toHaveTextContent('Summary');
+  },
+};
+
+// Scoping to a content type while `q` is set carries the free-text onto the
+// per-type query: the chip persists and the emitted model has both contentType
+// and q (NOT the unfiltered list). Acceptance #3.
+export const ScopingCarriesFreeTextQ: Story = {
+  args: { modelValue: { q: 'dave', filters: [] } },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole('option', { name: 'Article' }));
+    await expect(
+      canvas.getByTestId(QA_FREE_TEXT_CHIP.EDIT_BUTTON)
+    ).toHaveTextContent('dave');
+    expect(args['onUpdate:modelValue']).toHaveBeenLastCalledWith(
+      expect.objectContaining({ contentType: 'Article', q: 'dave' })
+    );
+  },
+};
+
+// Clicking the chip loads the term back into the input for editing (chip → input);
+// the chip disappears while editing.
+export const EditFreeTextChip: Story = {
+  args: { modelValue: { q: 'dave', filters: [] } },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByTestId(QA_FREE_TEXT_CHIP.EDIT_BUTTON));
+    await expect(canvas.getByTestId(QA_QUERY_BUILDER.INPUT)).toHaveValue(
+      'dave'
+    );
+    await expect(
+      canvas.queryByTestId(QA_FREE_TEXT_CHIP.EDIT_BUTTON)
+    ).toBeNull();
+  },
+};
+
+// The chip's ✕ clears the free-text query (chip gone, model q dropped).
+export const RemoveFreeTextChip: Story = {
+  args: { modelValue: { q: 'dave', filters: [] } },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByTestId(QA_FREE_TEXT_CHIP.REMOVE_BUTTON));
+    await expect(
+      canvas.queryByTestId(QA_FREE_TEXT_CHIP.EDIT_BUTTON)
+    ).toBeNull();
+    const lastModel = (
+      args['onUpdate:modelValue'] as ReturnType<typeof fn>
+    ).mock.calls.at(-1)![0] as { q?: string };
+    expect(lastModel.q).toBeUndefined();
+  },
+};
+
+// Typing free text + clicking the "Search for …" action commits the candidate as
+// the free-text chip and runs (the explicit free-text commit/keep path). Acceptance #4.
+export const TypingCommitsFreeTextChip: Story = {
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await userEvent.type(canvas.getByTestId(QA_QUERY_BUILDER.INPUT), 'dave');
+    await userEvent.click(
+      canvas.getByTestId(QA_QUERY_DROPDOWN.FREE_TEXT_ACTION)
+    );
+    // committed: runs with q, and the chip now renders the term (input cleared)
+    expect(args.onRun).toHaveBeenLastCalledWith(
+      expect.objectContaining({ q: 'dave' })
+    );
+    await expect(
+      canvas.getByTestId(QA_FREE_TEXT_CHIP.EDIT_BUTTON)
+    ).toHaveTextContent('dave');
+    await expect(canvas.getByTestId(QA_QUERY_BUILDER.INPUT)).toHaveValue('');
+  },
+};
+
+// Backspace on the empty input deletes the free-text chip FIRST (it's the
+// rightmost committed chip), then the filter chip — matching the chip row's
+// visual right-to-left order (#363 follow-up).
+export const BackspaceDeletesFreeTextChipFirst: Story = {
+  args: {
+    modelValue: {
+      q: 'dave',
+      filters: [{ field: '$status', op: 'eq', value: 'PUBLISHED' }],
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const input = canvas.getByTestId(QA_QUERY_BUILDER.INPUT);
+    // both chips present
+    await expect(
+      canvas.getByTestId(QA_FREE_TEXT_CHIP.EDIT_BUTTON)
+    ).toHaveTextContent('dave');
+    await expect(
+      canvas.getByTestId(QA_QUERY_CHIPS.FILTER_CHIP(0))
+    ).toBeVisible();
+    // Backspace deletes the free-text chip first; the filter chip survives
+    await userEvent.click(input);
+    await userEvent.keyboard('{Backspace}');
+    await expect(
+      canvas.queryByTestId(QA_FREE_TEXT_CHIP.EDIT_BUTTON)
+    ).toBeNull();
+    await expect(
+      canvas.getByTestId(QA_QUERY_CHIPS.FILTER_CHIP(0))
+    ).toBeVisible();
+    // Backspace again deletes the filter chip
+    await userEvent.keyboard('{Backspace}');
+    await expect(
+      canvas.queryByTestId(QA_QUERY_CHIPS.FILTER_CHIP(0))
+    ).toBeNull();
   },
 };
 

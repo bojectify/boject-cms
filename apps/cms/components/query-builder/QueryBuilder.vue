@@ -16,9 +16,10 @@ import {
 import { resolveQueryField } from '~/utils/queryBuilder/systemFields';
 import { STEPS } from '~/utils/queryBuilder/machine';
 
-// QueryChips / QueryDropdown / FilterChip / ValueEditor / MultiSelectEditor /
-// MultiEntryEditor / DateEditor / DateRangeEditor are auto-registered (Nuxt +
-// Storybook scan components/), so they need no explicit import.
+// QueryChips / QueryDropdown / FilterChip / FreeTextChip / ValueEditor /
+// MultiSelectEditor / MultiEntryEditor / DateEditor / DateRangeEditor are
+// auto-registered (Nuxt + Storybook scan components/), so they need no explicit
+// import.
 
 const props = withDefaults(defineProps<QueryBuilderProps>(), {
   enableRichOperators: false,
@@ -74,6 +75,19 @@ function onRemoveFilter(index: number) {
 }
 function onRemoveContentType() {
   handle({ kind: 'removeContentType' });
+  focusActiveInput();
+}
+// Edit the free-text chip: load `query.q` back into the input (chip → input).
+// Re-home focus — editFreeText may not change the step (already at field/
+// content-type), so the focus watcher wouldn't otherwise fire.
+function onEditFreeText() {
+  handle({ kind: 'editFreeText' });
+  focusActiveInput();
+}
+// The chip's ✕: drop `query.q`. Re-home focus off the now-gone ✕ button (mirrors
+// onRemoveFilter) so Enter keeps running the search.
+function onRemoveFreeText() {
+  handle({ kind: 'removeFreeText' });
   focusActiveInput();
 }
 
@@ -263,6 +277,11 @@ function submit() {
     } else if (isFreeEntry.value && state.value.text !== '') {
       commitTypedValue();
     }
+  } else if (state.value.text !== '') {
+    // content-type / field step: a typed candidate commits as the free-text `q`
+    // chip before running — the free-text analogue of the value-step commit, and
+    // the path the "Search for …" dropdown row + Enter share.
+    handle({ kind: 'commitFreeText' });
   }
   handle({ kind: 'run' });
 }
@@ -378,6 +397,18 @@ function onKeydown(e: KeyboardEvent) {
         "
       />
       <!--
+        The committed free-text `q` as a chip — last of the committed chips
+        (after the content-type + filter chips), before the in-progress draft.
+        Click to edit (chip → input), ✕ to clear. Rendered here (not in
+        QueryChips) so it never bleeds into the results-page summary bar.
+      -->
+      <FreeTextChip
+        v-if="state.query.q"
+        :value="state.query.q"
+        @edit="onEditFreeText"
+        @remove="onRemoveFreeText"
+      />
+      <!--
         The draft chip — a NEW filter being added OR an existing one being
         re-edited — renders with field + operator labels and an editable,
         auto-focused value segment (so picking/editing lands the cursor on the
@@ -462,7 +493,7 @@ function onKeydown(e: KeyboardEvent) {
       :state="state"
       :active-id="activeId"
       :test-id="QA_QUERY_BUILDER.DROPDOWN"
-      @run-free-text="handle({ kind: 'run' })"
+      @run-free-text="submit"
       @pick-content-type="
         (id: string) =>
           handle({
