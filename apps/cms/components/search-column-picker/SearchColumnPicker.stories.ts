@@ -30,7 +30,7 @@ export const TogglesAColumn: Story = {
     // 'author' (RELATION) is columnable + currently OFF — toggling adds it. The
     // testid is on the outer row <button>; click that (not the inner checkbox).
     await userEvent.click(
-      body.getByTestId(QA_SEARCH_COLUMN_PICKER.ROW.id('author'))
+      body.getByTestId(QA_SEARCH_COLUMN_PICKER.ROW('author'))
     );
     expect(args['onUpdate:modelValue']).toHaveBeenLastCalledWith([
       'summary',
@@ -47,7 +47,7 @@ export const RemovesAColumn: Story = {
     await body.findByTestId(QA_SEARCH_COLUMN_PICKER.PANEL);
     // 'summary' is currently ON (modelValue: ['summary']) — toggling removes it.
     await userEvent.click(
-      body.getByTestId(QA_SEARCH_COLUMN_PICKER.ROW.id('summary'))
+      body.getByTestId(QA_SEARCH_COLUMN_PICKER.ROW('summary'))
     );
     expect(args['onUpdate:modelValue']).toHaveBeenLastCalledWith([]);
   },

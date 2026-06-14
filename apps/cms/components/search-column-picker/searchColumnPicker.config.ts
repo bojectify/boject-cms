@@ -5,5 +5,5 @@ export const QA_SEARCH_COLUMN_PICKER = {
     TRIGGER: 'trigger',
     PANEL: 'panel',
   }),
-  ROW: testIdModifier('SEARCH_COLUMN_PICKER', 'row'),
+  ROW: testIdModifier('SEARCH_COLUMN_PICKER', 'row').id,
 };

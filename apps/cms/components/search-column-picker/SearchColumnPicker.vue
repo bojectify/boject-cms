@@ -55,7 +55,7 @@ function toggle(id: string): void {
         <button
           v-for="field in columnableFields"
           :key="field.identifier"
-          :data-testid="QA_SEARCH_COLUMN_PICKER.ROW.id(field.identifier)"
+          :data-testid="QA_SEARCH_COLUMN_PICKER.ROW(field.identifier)"
           type="button"
           role="option"
           :aria-selected="isActive(field.identifier)"
