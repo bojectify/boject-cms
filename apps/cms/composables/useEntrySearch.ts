@@ -1,6 +1,7 @@
 import type { MaybeRefOrGetter } from 'vue';
 import { isSearchMode } from '~/utils/queryBuilder/compile';
 import type { RouteQuery } from '~/utils/queryBuilder/compile';
+import { parseColumnsParam } from '~/utils/searchColumns';
 
 interface SearchHit {
   id: string;
@@ -10,6 +11,7 @@ interface SearchHit {
   status: string;
   snippet: string | null;
   publishedAt: string | null;
+  fields?: Record<string, unknown>;
 }
 interface SearchResponse {
   hits: SearchHit[];
@@ -56,6 +58,7 @@ export function useEntrySearch(
         q: route.query.q,
         contentType: toValue(contentType),
         filter: route.query.filter,
+        columns: route.query.columns,
         page: page.value,
         perPage: 15,
       })),
@@ -80,6 +83,8 @@ export function useEntrySearch(
     () => (error.value as { statusCode?: number } | null)?.statusCode === 503
   );
 
+  const columns = computed(() => parseColumnsParam(route.query.columns));
+
   return {
     searchMode,
     hits: computed(() => data.value?.hits ?? []),
@@ -87,6 +92,7 @@ export function useEntrySearch(
     loading: computed(() => status.value === 'pending'),
     unavailable,
     page,
+    columns,
     refresh: () => execute(),
   };
 }
