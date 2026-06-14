@@ -373,3 +373,70 @@ describe('runSearch — operators', () => {
     ).rejects.toThrow(/2 values/i);
   });
 });
+
+describe('runSearch — columns', () => {
+  const c1 = doc('c1', 'Article', 'First', {
+    summary: 'hello world',
+    views: 7,
+    publishedAt: 1700000000000,
+    author: 'auth-1',
+    tags: ['t1', 't2'],
+    body: 'rich text body that should not be projected',
+  });
+
+  beforeEach(async () => {
+    await ensureEntriesIndex(meili, resolveEntriesIndex());
+    await clearTestIndex();
+    await addTestDocuments([c1]);
+  });
+  afterAll(async () => {
+    await clearTestIndex();
+  });
+
+  it('projects the requested fields onto hit.fields (raw indexed values)', async () => {
+    const res = await runSearch(index, {
+      q: '',
+      contentType: 'Article',
+      filters: [{ field: 'summary', value: 'hello world' }],
+      columns: ['summary', 'views', 'publishedAt', 'author', 'tags'],
+      offset: 0,
+      limit: 20,
+    });
+    expect(res.hits).toHaveLength(1);
+    // RELATION/MULTIRELATION come back as raw entry ids here — the API layer
+    // hydrates titles. publishedAt is epoch-ms (a number).
+    expect(res.hits[0]!.fields).toEqual({
+      summary: 'hello world',
+      views: 7,
+      publishedAt: 1700000000000,
+      author: 'auth-1',
+      tags: ['t1', 't2'],
+    });
+  });
+
+  it('omits hit.fields entirely when no columns are requested', async () => {
+    const res = await runSearch(index, {
+      q: '',
+      contentType: 'Article',
+      filters: [{ field: 'summary', value: 'hello world' }],
+      offset: 0,
+      limit: 20,
+    });
+    expect(res.hits[0]!.fields).toBeUndefined();
+  });
+
+  it('projects a missing field as null', async () => {
+    const res = await runSearch(index, {
+      q: '',
+      contentType: 'Article',
+      filters: [{ field: 'summary', value: 'hello world' }],
+      columns: ['summary', 'ghost'],
+      offset: 0,
+      limit: 20,
+    });
+    expect(res.hits[0]!.fields).toEqual({
+      summary: 'hello world',
+      ghost: null,
+    });
+  });
+});
