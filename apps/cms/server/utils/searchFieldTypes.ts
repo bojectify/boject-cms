@@ -31,3 +31,14 @@ export async function resolveContentTypeFieldTypes(
   });
   return ct ? toFieldTypeMap(ct.fields) : {};
 }
+
+/** Like resolveContentTypeFieldTypes but keyed by the content type's UUID id. */
+export async function resolveContentTypeFieldTypesById(
+  id: string
+): Promise<Record<string, FieldTypeName>> {
+  const ct = await prisma.contentType.findUnique({
+    where: { id },
+    select: { fields: { select: { identifier: true, type: true } } },
+  });
+  return ct ? toFieldTypeMap(ct.fields) : {};
+}

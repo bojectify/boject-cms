@@ -2904,6 +2904,19 @@ describe('GraphQL API', async () => {
           publishedAt: null,
           fields: { price: 25 },
         },
+        // Column-projection doc: carries BOTH scalar SearchWidget fields so a
+        // `columns` query can project them onto the `fields` JSON.
+        {
+          id: 'gcol-1',
+          entryId: 'gcol-1',
+          status: 'PUBLISHED',
+          isWorkingVersion: true,
+          entryKey: 'gcol-1',
+          contentType: 'SearchWidget',
+          entryTitle: 'Col Widget',
+          publishedAt: null,
+          fields: { price: 99, colour: 'teal' },
+        },
       ];
       await addTestDocuments(docs);
 
@@ -3035,7 +3048,8 @@ describe('GraphQL API', async () => {
 
       expect(errors).toBeUndefined();
       const keys = data.searchEntries.edges.map((e) => e.node.entryKey).sort();
-      expect(keys).toEqual(['w-mid', 'w-pricey']);
+      // `gcol-1` (price 99) also exceeds the threshold alongside w-mid/w-pricey.
+      expect(keys).toEqual(['gcol-1', 'w-mid', 'w-pricey']);
     });
 
     it('rejects an operator invalid for the field type with BAD_USER_INPUT', async () => {
@@ -3139,6 +3153,33 @@ describe('GraphQL API', async () => {
       const ids = data.searchEntries.edges.map((e) => e.node.id);
       expect(ids).toEqual(['draftparity-pub']);
       expect(data.searchEntries.edges[0]!.node.status).toBe('PUBLISHED');
+    });
+
+    it('projects field columns onto the fields JSON', async () => {
+      const COLUMNS_QUERY = `
+        query ($q: String!, $contentType: String, $columns: [String!]) {
+          searchEntries(q: $q, first: 10, contentType: $contentType, columns: $columns) {
+            edges { node { id fields } }
+          }
+        }
+      `;
+      const { data, errors } = await gqlVars<{
+        searchEntries: {
+          edges: {
+            node: { id: string; fields: Record<string, unknown> | null };
+          }[];
+        };
+      }>(COLUMNS_QUERY, {
+        q: '',
+        contentType: 'SearchWidget',
+        columns: ['price', 'colour'],
+      });
+
+      expect(errors).toBeUndefined();
+      const node = data.searchEntries.edges.find(
+        (e) => e.node.id === 'gcol-1'
+      )!.node;
+      expect(node.fields).toEqual({ price: 99, colour: 'teal' });
     });
   });
 });

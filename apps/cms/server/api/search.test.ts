@@ -23,6 +23,7 @@ type SearchHit = {
   status: string;
   snippet: string | null;
   publishedAt: string | null;
+  fields?: Record<string, unknown>;
 };
 
 type SearchResponse = {
@@ -687,6 +688,203 @@ describe('GET /api/search', async () => {
       });
       expect(changed.hits.map((h) => h.id)).toEqual(['twoslot']);
       expect(changed.hits[0]!.status).toBe('CHANGED');
+    });
+  });
+
+  describe('field columns (data grid)', () => {
+    let gridTypeId: string;
+    let makerEntryId: string;
+    let maker2EntryId: string;
+
+    beforeAll(async () => {
+      const ct = await prisma.contentType.create({
+        data: {
+          name: 'GridWidget',
+          identifier: 'GridWidget',
+          fields: {
+            create: [
+              {
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                order: 0,
+              },
+              { identifier: 'price', name: 'Price', type: 'NUMBER', order: 1 },
+              {
+                identifier: 'category',
+                name: 'Category',
+                type: 'SELECT',
+                order: 2,
+                options: { choices: ['a', 'b', 'c'] },
+              },
+              { identifier: 'colour', name: 'Colour', type: 'TEXT', order: 3 },
+              {
+                identifier: 'notes',
+                name: 'Notes',
+                type: 'TEXTAREA',
+                order: 4,
+              },
+            ],
+          },
+        },
+      });
+      gridTypeId = ct.id;
+      // A relation field pointing at GridWidget itself, added after the type
+      // exists so its targetContentTypeIds can reference the type id.
+      await prisma.contentTypeField.create({
+        data: {
+          contentTypeId: gridTypeId,
+          identifier: 'maker',
+          name: 'Maker',
+          type: 'RELATION',
+          order: 5,
+          options: { targetContentTypeIds: [gridTypeId] },
+        },
+      });
+      await prisma.contentTypeField.create({
+        data: {
+          contentTypeId: gridTypeId,
+          identifier: 'makers',
+          name: 'Makers',
+          type: 'MULTIRELATION',
+          order: 6,
+          options: { targetContentTypeIds: [gridTypeId] },
+        },
+      });
+      // The maker target entry — its title is what hydration must resolve.
+      const maker = await prisma.contentEntry.create({
+        data: {
+          contentTypeId: gridTypeId,
+          entryTitle: 'Acme Corp',
+          entryKey: `acme-corp-${Date.now()}`,
+        },
+      });
+      makerEntryId = maker.id;
+      const maker2 = await prisma.contentEntry.create({
+        data: {
+          contentTypeId: gridTypeId,
+          entryTitle: 'Beta Inc',
+          entryKey: `beta-inc-${Date.now()}`,
+        },
+      });
+      maker2EntryId = maker2.id;
+    });
+
+    afterAll(async () => {
+      await prisma.contentEntry.deleteMany({
+        where: { contentTypeId: gridTypeId },
+      });
+      await prisma.contentTypeField.deleteMany({
+        where: { contentTypeId: gridTypeId },
+      });
+      await prisma.contentType.delete({ where: { id: gridTypeId } });
+    });
+
+    beforeEach(async () => {
+      await clearTestIndex();
+      await addTestDocuments([
+        doc({
+          id: 'gw-1',
+          contentType: 'GridWidget',
+          entryTitle: 'Gadget',
+          fields: {
+            price: 10,
+            category: 'a',
+            colour: 'red',
+            notes: 'long note',
+            maker: makerEntryId,
+            makers: [makerEntryId, maker2EntryId],
+          },
+        }),
+      ]);
+    });
+
+    it('projects scalar columns from the engine and hydrates relation titles', async () => {
+      const res = await search({
+        q: '',
+        contentType: 'GridWidget',
+        filter: 'colour:red',
+        columns: 'price,category,colour,maker',
+      });
+      expect(res.hits).toHaveLength(1);
+      expect(res.hits[0]!.fields).toEqual({
+        price: 10,
+        category: 'a',
+        colour: 'red',
+        maker: { entryId: makerEntryId, entryTitle: 'Acme Corp' },
+      });
+    });
+
+    it('hydrates a MULTIRELATION column to ordered { entryId, entryTitle } cells', async () => {
+      const res = await search({
+        q: '',
+        contentType: 'GridWidget',
+        filter: 'colour:red',
+        columns: 'makers',
+      });
+      expect(res.hits[0]!.fields).toEqual({
+        makers: [
+          { entryId: makerEntryId, entryTitle: 'Acme Corp' },
+          { entryId: maker2EntryId, entryTitle: 'Beta Inc' },
+        ],
+      });
+    });
+
+    it('silently drops unknown + non-columnable (TEXTAREA) columns', async () => {
+      const res = await search({
+        q: '',
+        contentType: 'GridWidget',
+        filter: 'colour:red',
+        columns: 'price,notes,ghost',
+      });
+      expect(res.hits[0]!.fields).toEqual({ price: 10 });
+    });
+
+    it('returns no fields when columns is omitted', async () => {
+      const res = await search({
+        q: '',
+        contentType: 'GridWidget',
+        filter: 'colour:red',
+      });
+      expect(res.hits[0]!.fields).toBeUndefined();
+    });
+
+    it('ignores columns when no contentType is scoped (cross-type)', async () => {
+      const res = await search({
+        q: '',
+        filter: 'colour:red',
+        columns: 'price',
+      });
+      expect(res.hits[0]!.fields).toBeUndefined();
+    });
+
+    it('DictionaryKey-style: startsWith filter + projected columns', async () => {
+      await clearTestIndex();
+      await addTestDocuments([
+        doc({
+          id: 'gw-k1',
+          contentType: 'GridWidget',
+          entryTitle: 'K1',
+          fields: { colour: 'matchCentre.stats.possession', price: 1 },
+        }),
+        doc({
+          id: 'gw-k2',
+          contentType: 'GridWidget',
+          entryTitle: 'K2',
+          fields: { colour: 'other.value', price: 2 },
+        }),
+      ]);
+      const res = await search({
+        q: '',
+        contentType: 'GridWidget',
+        filter: 'colour:startsWith:matchCentre.stats',
+        columns: 'colour,price',
+      });
+      expect(res.hits.map((h) => h.id)).toEqual(['gw-k1']);
+      expect(res.hits[0]!.fields).toEqual({
+        colour: 'matchCentre.stats.possession',
+        price: 1,
+      });
     });
   });
 });

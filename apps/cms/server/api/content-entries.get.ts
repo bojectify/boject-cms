@@ -10,6 +10,13 @@ import {
   parseArchiveFilter,
   resolveDisplayVersion,
 } from '../utils/listEntries';
+import {
+  parseColumnsParam,
+  filterColumnableColumns,
+} from '../../utils/searchColumns';
+import { resolveContentTypeFieldTypesById } from '../utils/searchFieldTypes';
+import { projectEntryDataColumns } from '../utils/projectEntryColumns';
+import { hydrateRelationColumns } from '../utils/hydrateRelationColumns';
 
 const VALID_STATUSES = new Set<string>(CONTENT_STATUS_NAMES);
 
@@ -23,6 +30,15 @@ export default defineEventHandler(async (event) => {
     });
   }
   const contentTypeId = assertUuid(query.contentTypeId, 'contentTypeId');
+
+  // Data-grid columns: resolve the type's field-type map only when columns were
+  // requested, then keep just the columnable ids. Mirrors /api/search so the
+  // emitted `fields` map is byte-identical (browse-mode parity, #303).
+  const requestedColumns = parseColumnsParam(query.columns);
+  const fieldTypes = requestedColumns.length
+    ? await resolveContentTypeFieldTypesById(contentTypeId)
+    : {};
+  const columns = filterColumnableColumns(requestedColumns, fieldTypes);
 
   const page = Math.max(1, Number(query.page) || 1);
   const perPage = Math.min(100, Math.max(1, Number(query.perPage) || 15));
@@ -58,16 +74,34 @@ export default defineEventHandler(async (event) => {
     { includeData: true }
   );
 
-  const items = entries
+  const items: Array<
+    Record<string, unknown> & { fields?: Record<string, unknown> }
+  > = entries
     .map((entry) => {
       const version = resolveDisplayVersion(
         versionsByEntry.get(entry.id) ?? [],
         { isCms, archiveFilter }
       );
       if (!version) return null;
-      return flattenEntryWithVersion(entry, version);
+      return flattenEntryWithVersion(
+        entry,
+        version,
+        columns.length
+          ? {
+              fields: projectEntryDataColumns(
+                version.data,
+                columns,
+                fieldTypes
+              ),
+            }
+          : undefined
+      );
     })
     .filter((item): item is NonNullable<typeof item> => item !== null);
+
+  // Upgrade RELATION/MULTIRELATION column cells from bare entry id(s) to
+  // { entryId, entryTitle } via one batched lookup — identical to /api/search.
+  if (columns.length) await hydrateRelationColumns(items, columns, fieldTypes);
 
   return { items, total };
 });

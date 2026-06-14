@@ -1,9 +1,14 @@
 <script setup lang="ts">
+import { h } from 'vue';
 import type { TableColumn } from '@nuxt/ui';
 import { routeToSearchQuery, compileQuery } from '~/utils/queryBuilder/compile';
 import type { RouteQuery } from '~/utils/queryBuilder/compile';
 import type { SearchQuery } from '~/utils/queryBuilder/types';
 import type { RowLike } from '~/composables/useRowSelection';
+import SearchFieldCell from '~/components/search-field-cell/SearchFieldCell.vue';
+import { DEFAULT_CONTENT_COLUMNS } from '~/components/content-table/contentTable.columns';
+import { isColumnableFieldType, serializeColumns } from '~/utils/searchColumns';
+import type { FieldTypeName } from '~/utils/fieldTypes';
 
 type ArchiveFilter = 'active' | 'archived' | 'all';
 
@@ -35,6 +40,7 @@ const {
   loading: searchLoading,
   unavailable,
   page: searchPage,
+  columns: activeColumnIds,
   refresh: refreshSearch,
 } = useEntrySearch(() => contentType.value?.identifier);
 
@@ -50,17 +56,68 @@ const { relationLabels: chipRelationLabels, pending: chipLabelsPending } =
 
 // Hits → ContentTable rows. Scoped, so no Type column (all one type).
 const searchRows = computed(() =>
-  hits.value.map((h) => ({
-    id: h.id,
-    entryTitle: h.entryTitle,
-    snippet: h.snippet,
-    status: h.status,
+  hits.value.map((hit) => ({
+    id: hit.id,
+    entryTitle: hit.entryTitle,
+    snippet: hit.snippet,
+    status: hit.status,
+    fields: hit.fields,
   }))
 );
-const searchColumns: TableColumn<Record<string, unknown>>[] = [
+
+// Fields offerable as data-grid columns (columnable types, in content-type order).
+const columnableFields = computed(() =>
+  (contentType.value?.fields ?? []).filter(
+    (f): f is { identifier: string; name: string; type: FieldTypeName } =>
+      isColumnableFieldType(f.type)
+  )
+);
+
+// The active columns, resolved to their field defs (URL order; unknown ids dropped).
+const activeFieldColumns = computed(() =>
+  activeColumnIds.value
+    .map((id) => columnableFields.value.find((f) => f.identifier === id))
+    .filter((f): f is NonNullable<typeof f> => !!f)
+);
+
+function onColumnsChange(ids: string[]) {
+  const query = { ...route.query };
+  if (ids.length) query.columns = serializeColumns(ids);
+  else delete query.columns;
+  router.replace({ path: route.path, query });
+}
+
+const fieldColumnDefs = computed<TableColumn<Record<string, unknown>>[]>(() =>
+  activeFieldColumns.value.map((field) => ({
+    id: `field_${field.identifier}`,
+    header: field.name,
+    cell: ({ row }: { row: { original: Record<string, unknown> } }) =>
+      h(SearchFieldCell, {
+        value: (row.original.fields as Record<string, unknown> | undefined)?.[
+          field.identifier
+        ],
+        fieldType: field.type,
+      }),
+  }))
+);
+
+const searchColumns = computed<TableColumn<Record<string, unknown>>[]>(() => [
   { accessorKey: 'entryTitle', header: 'Entry Title' },
+  ...fieldColumnDefs.value,
   { accessorKey: 'status', header: 'Status' },
-];
+]);
+
+// Browse columns = Entry Title, then field columns, then the default Created /
+// Updated / Status (same field-column injection as search).
+const browseColumns = computed<TableColumn<Record<string, unknown>>[]>(() => [
+  DEFAULT_CONTENT_COLUMNS[0]!, // Entry Title
+  ...fieldColumnDefs.value,
+  ...DEFAULT_CONTENT_COLUMNS.slice(1), // Created, Updated, Status
+]);
+
+const searchSubtitle = computed(() =>
+  searchMode.value ? `${searchTotal.value} matching entries` : undefined
+);
 
 function onClear() {
   router.push({ path: `/content-types/${contentTypeId}/entries`, query: {} });
@@ -84,6 +141,8 @@ watch(archiveFilter, () => {
   page.value = 1;
 });
 
+const browseColumnsParam = computed(() => route.query.columns);
+
 const {
   data,
   status,
@@ -96,11 +155,18 @@ const {
     status: string;
     createdAt: string;
     updatedAt: string;
+    fields?: Record<string, unknown>;
   }>;
   total: number;
 }>('/api/content-entries', {
-  query: { contentTypeId, page, perPage: 15, archiveFilter },
-  watch: [page, archiveFilter],
+  query: {
+    contentTypeId,
+    page,
+    perPage: 15,
+    archiveFilter,
+    columns: browseColumnsParam,
+  },
+  watch: [page, archiveFilter, browseColumnsParam],
 });
 
 const tableData = computed(() =>
@@ -111,6 +177,7 @@ const tableData = computed(() =>
     status: item.status,
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
+    fields: item.fields,
   }))
 );
 
@@ -141,6 +208,7 @@ const filterOptions: Array<{ label: string; value: ArchiveFilter }> = [
       <ContentTable
         v-model:page="searchPage"
         :title="contentType?.name ?? 'Entries'"
+        :subtitle="searchSubtitle"
         :data="searchRows"
         :loading="searchLoading"
         :columns="searchColumns"
@@ -153,6 +221,15 @@ const filterOptions: Array<{ label: string; value: ArchiveFilter }> = [
         @row-select="(e, id, index) => selection.toggle(id, index, e.shiftKey)"
         @select-all="selection.toggleAll"
       >
+        <template #actions>
+          <SearchColumnPicker
+            v-if="contentType"
+            :content-type-identifier="contentType.identifier"
+            :fields="columnableFields"
+            :model-value="activeColumnIds"
+            @update:model-value="onColumnsChange"
+          />
+        </template>
         <template #toolbar>
           <SearchBar
             :query="searchQuery"
@@ -203,6 +280,7 @@ const filterOptions: Array<{ label: string; value: ArchiveFilter }> = [
       :title="contentType?.name ?? 'Entries'"
       :data="tableData"
       :loading="status === 'pending'"
+      :columns="browseColumns"
       :total="data?.total ?? 0"
       :row-link="(row) => `/entries/${row.id}`"
       selectable
@@ -220,6 +298,13 @@ const filterOptions: Array<{ label: string; value: ArchiveFilter }> = [
       </template>
       <template #actions>
         <div class="flex items-center gap-2">
+          <SearchColumnPicker
+            v-if="contentType"
+            :content-type-identifier="contentType.identifier"
+            :fields="columnableFields"
+            :model-value="activeColumnIds"
+            @update:model-value="onColumnsChange"
+          />
           <UFieldGroup>
             <UButton
               v-for="opt in filterOptions"

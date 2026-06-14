@@ -7,6 +7,8 @@ import { runSearch, type SearchHit } from '../utils/searchEntries';
 import type { SearchDocument } from '../utils/searchDocument';
 import { SearchInputError } from '../utils/compileSearchFilter';
 import { resolveContentTypeFieldTypes } from '../utils/searchFieldTypes';
+import { hydrateRelationColumns } from '../utils/hydrateRelationColumns';
+import { filterColumnableColumns } from '../../utils/searchColumns';
 
 /**
  * Register the public `searchEntries` GraphQL field — a Relay connection of
@@ -38,6 +40,13 @@ export function registerSearchQuery(builder: Builder): void {
         nullable: true,
         resolve: (h) => (h.publishedAt ? new Date(h.publishedAt) : null),
       }),
+      // Per-column field values (data grid). JSON map; relation cells are
+      // hydrated to { entryId, entryTitle }. Null unless `columns` was passed.
+      fields: t.field({
+        type: 'JSON',
+        nullable: true,
+        resolve: (h) => h.fields ?? null,
+      }),
     }),
   });
 
@@ -48,6 +57,7 @@ export function registerSearchQuery(builder: Builder): void {
         q: t.arg.string({ required: true }),
         contentType: t.arg.string(),
         filters: t.arg({ type: [SearchFilterInput] }),
+        columns: t.arg.stringList(),
       },
       resolve: (_parent, args) =>
         resolveOffsetConnection({ args }, async ({ limit, offset }) => {
@@ -63,6 +73,12 @@ export function registerSearchQuery(builder: Builder): void {
               value: f.value ?? undefined,
               values: f.values ?? undefined,
             }));
+          const columns = args.contentType
+            ? filterColumnableColumns(
+                (args.columns ?? []).filter((c): c is string => c != null),
+                fieldTypes
+              )
+            : [];
           try {
             const res = await runSearch(
               meili.index<SearchDocument>(resolveEntriesIndex()),
@@ -72,10 +88,12 @@ export function registerSearchQuery(builder: Builder): void {
                 filters,
                 fieldTypes,
                 envelopeFilters: ['status = "PUBLISHED"'],
+                columns,
                 offset,
                 limit,
               }
             );
+            await hydrateRelationColumns(res.hits, columns, fieldTypes);
             return res.hits;
           } catch (err) {
             if (err instanceof SearchInputError) {

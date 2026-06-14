@@ -28,6 +28,8 @@ export interface RunSearchParams {
   fieldTypes?: Record<string, FieldTypeName>;
   /** Restrict the free-text search to these attributes (e.g. `['entryTitle']`). */
   attributesToSearchOn?: string[];
+  /** Field identifiers to project onto each hit's `fields` map (data-grid columns). */
+  columns?: string[];
   /** Pre-compiled raw envelope filter clauses (the auth status gate) appended verbatim. */
   envelopeFilters?: string[];
   offset: number;
@@ -42,6 +44,13 @@ export interface SearchHit {
   status: string;
   snippet: string | null;
   publishedAt: string | null;
+  /**
+   * Per-column field values, present only when `columns` was requested. Values
+   * are the raw indexed values (DATETIME = epoch-ms; RELATION = target entryId;
+   * MULTIRELATION = entryId[]); the API layer hydrates relation cells to
+   * { entryId, entryTitle }.
+   */
+  fields?: Record<string, unknown>;
 }
 
 export interface RunSearchResult {
@@ -100,6 +109,20 @@ function buildSnippet(
   return null;
 }
 
+/** Pick the requested column ids out of a document's stored `fields` map. */
+function projectColumns(
+  fields: Record<string, unknown> | undefined,
+  columns: string[]
+): Record<string, unknown> {
+  const src =
+    fields && typeof fields === 'object'
+      ? (fields as Record<string, unknown>)
+      : {};
+  const out: Record<string, unknown> = {};
+  for (const c of columns) out[c] = c in src ? src[c] : null;
+  return out;
+}
+
 /**
  * Run a search against the entries index and project engine `SearchHit`s.
  * Pure of HTTP/auth concerns (those live in the REST handler / GraphQL
@@ -116,10 +139,27 @@ export async function runSearch(
       throw new SearchInputError(`Invalid attributesToSearchOn "${attr}"`);
     }
   }
+  const columns = params.columns ?? [];
   const res = await index.search(params.q, {
     filter,
     ...(params.attributesToSearchOn
       ? { attributesToSearchOn: params.attributesToSearchOn }
+      : {}),
+    // When columns are requested, restrict retrieval to the envelope keys runSearch
+    // reads + the whole `fields` map. Keeping `fields` whole leaves `_formatted`
+    // intact so the snippet logic is unaffected; we project the requested ids below.
+    ...(columns.length
+      ? {
+          attributesToRetrieve: [
+            'entryId',
+            'entryKey',
+            'contentType',
+            'entryTitle',
+            'status',
+            'publishedAt',
+            'fields',
+          ],
+        }
       : {}),
     offset: params.offset,
     limit: params.limit,
@@ -140,6 +180,7 @@ export async function runSearch(
     status: h.status,
     publishedAt: h.publishedAt,
     snippet: hasQuery ? buildSnippet(h._formatted) : null,
+    ...(columns.length ? { fields: projectColumns(h.fields, columns) } : {}),
   }));
 
   return {

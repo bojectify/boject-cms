@@ -15,6 +15,11 @@ import {
 } from '../../utils/queryBuilder/operators';
 import { resolveContentTypeFieldTypes } from '../utils/searchFieldTypes';
 import { isCmsRequest } from '../utils/resolveVersion';
+import {
+  parseColumnsParam,
+  filterColumnableColumns,
+} from '../../utils/searchColumns';
+import { hydrateRelationColumns } from '../utils/hydrateRelationColumns';
 
 const DEFAULT_PER_PAGE = 15;
 const MAX_PER_PAGE = 100;
@@ -126,12 +131,20 @@ export default defineEventHandler(async (event) => {
           .filter(Boolean)
       : undefined;
 
-  // Only resolve field types when there are structured filters to compile —
-  // a free-text-only search within a content type needs no Postgres hop.
+  const requestedColumns = parseColumnsParam(query.columns);
+
+  // Field types are needed to compile structured filters AND to validate /
+  // hydrate columns; resolve once when a type is scoped and either is present.
   const fieldTypes =
-    contentType && effectiveFilters.length > 0
+    contentType && (effectiveFilters.length > 0 || requestedColumns.length > 0)
       ? await resolveContentTypeFieldTypes(contentType)
       : {};
+
+  // Columns are only honoured for a single scoped type; unknown / non-columnable
+  // ids are silently dropped (a removed field must not 400 a shared link).
+  const columns = contentType
+    ? filterColumnableColumns(requestedColumns, fieldTypes)
+    : [];
 
   const index = meili.index<SearchDocument>(resolveEntriesIndex());
   try {
@@ -142,9 +155,14 @@ export default defineEventHandler(async (event) => {
       fieldTypes,
       attributesToSearchOn,
       envelopeFilters,
+      columns,
       offset: (page - 1) * perPage,
       limit: perPage,
     });
+    // A Postgres failure here folds into the catch below as 503
+    // SEARCH_UNAVAILABLE. Intentional: it's a cheap indexed findMany-by-PK, so a
+    // failure means the DB is down — where a retryable 503 is a reasonable signal.
+    await hydrateRelationColumns(result.hits, columns, fieldTypes);
     return {
       hits: result.hits,
       total: result.total,

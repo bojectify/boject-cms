@@ -1,10 +1,14 @@
 import type { SearchQuery, QueryContentType } from '~/utils/queryBuilder/types';
-import { planNavigation } from '~/utils/queryBuilder/navigation';
+import {
+  planNavigation,
+  withPreservedColumns,
+} from '~/utils/queryBuilder/navigation';
 
 /** Global palette open-state + the single navigation authority for run/broaden/edit. */
 export function useSearchPalette() {
   const isOpen = useState('search-palette-open', () => false);
   const router = useRouter();
+  const route = useRoute();
 
   function open() {
     isOpen.value = true;
@@ -18,7 +22,12 @@ export function useSearchPalette() {
     query: SearchQuery,
     contentTypes: QueryContentType[]
   ) {
-    const plan = planNavigation(query, contentTypes);
+    const base = planNavigation(query, contentTypes);
+    const plan = withPreservedColumns(
+      base,
+      route.path,
+      route.query.columns as string | string[] | undefined
+    );
     close();
     await router.push({ path: plan.path, query: plan.query });
   }
