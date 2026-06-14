@@ -6,6 +6,7 @@ import type { RouteQuery } from '~/utils/queryBuilder/compile';
 import type { SearchQuery } from '~/utils/queryBuilder/types';
 import type { RowLike } from '~/composables/useRowSelection';
 import SearchFieldCell from '~/components/search-field-cell/SearchFieldCell.vue';
+import { DEFAULT_CONTENT_COLUMNS } from '~/components/content-table/contentTable.columns';
 import { isColumnableFieldType, serializeColumns } from '~/utils/searchColumns';
 import type { FieldTypeName } from '~/utils/fieldTypes';
 
@@ -86,9 +87,8 @@ function onColumnsChange(ids: string[]) {
   router.replace({ path: route.path, query });
 }
 
-const searchColumns = computed<TableColumn<Record<string, unknown>>[]>(() => [
-  { accessorKey: 'entryTitle', header: 'Entry Title' },
-  ...activeFieldColumns.value.map((field) => ({
+const fieldColumnDefs = computed<TableColumn<Record<string, unknown>>[]>(() =>
+  activeFieldColumns.value.map((field) => ({
     id: `field_${field.identifier}`,
     header: field.name,
     cell: ({ row }: { row: { original: Record<string, unknown> } }) =>
@@ -98,8 +98,21 @@ const searchColumns = computed<TableColumn<Record<string, unknown>>[]>(() => [
         ],
         fieldType: field.type,
       }),
-  })),
+  }))
+);
+
+const searchColumns = computed<TableColumn<Record<string, unknown>>[]>(() => [
+  { accessorKey: 'entryTitle', header: 'Entry Title' },
+  ...fieldColumnDefs.value,
   { accessorKey: 'status', header: 'Status' },
+]);
+
+// Browse columns = Entry Title, then field columns, then the default Created /
+// Updated / Status (same field-column injection as search).
+const browseColumns = computed<TableColumn<Record<string, unknown>>[]>(() => [
+  DEFAULT_CONTENT_COLUMNS[0]!, // Entry Title
+  ...fieldColumnDefs.value,
+  ...DEFAULT_CONTENT_COLUMNS.slice(1), // Created, Updated, Status
 ]);
 
 const searchSubtitle = computed(() =>
@@ -128,6 +141,8 @@ watch(archiveFilter, () => {
   page.value = 1;
 });
 
+const browseColumnsParam = computed(() => route.query.columns);
+
 const {
   data,
   status,
@@ -140,11 +155,18 @@ const {
     status: string;
     createdAt: string;
     updatedAt: string;
+    fields?: Record<string, unknown>;
   }>;
   total: number;
 }>('/api/content-entries', {
-  query: { contentTypeId, page, perPage: 15, archiveFilter },
-  watch: [page, archiveFilter],
+  query: {
+    contentTypeId,
+    page,
+    perPage: 15,
+    archiveFilter,
+    columns: browseColumnsParam,
+  },
+  watch: [page, archiveFilter, browseColumnsParam],
 });
 
 const tableData = computed(() =>
@@ -155,6 +177,7 @@ const tableData = computed(() =>
     status: item.status,
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
+    fields: item.fields,
   }))
 );
 
@@ -257,6 +280,7 @@ const filterOptions: Array<{ label: string; value: ArchiveFilter }> = [
       :title="contentType?.name ?? 'Entries'"
       :data="tableData"
       :loading="status === 'pending'"
+      :columns="browseColumns"
       :total="data?.total ?? 0"
       :row-link="(row) => `/entries/${row.id}`"
       selectable
@@ -274,6 +298,13 @@ const filterOptions: Array<{ label: string; value: ArchiveFilter }> = [
       </template>
       <template #actions>
         <div class="flex items-center gap-2">
+          <SearchColumnPicker
+            v-if="contentType"
+            :content-type-identifier="contentType.identifier"
+            :fields="columnableFields"
+            :model-value="activeColumnIds"
+            @update:model-value="onColumnsChange"
+          />
           <UFieldGroup>
             <UButton
               v-for="opt in filterOptions"
