@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { planNavigation } from './navigation';
+import { planNavigation, withPreservedColumns } from './navigation';
 import type { QueryContentType } from './types';
 
 const CTS: QueryContentType[] = [
@@ -64,5 +64,38 @@ describe('planNavigation', () => {
       path: '/',
       query: { q: 'goal', filter: ['$entryKey:eq:fixture-1'] },
     });
+  });
+});
+
+describe('withPreservedColumns', () => {
+  const plan = { path: '/content-types/abc/entries', query: { q: 'x' } };
+
+  it('carries columns over when the destination path is unchanged (same type)', () => {
+    expect(
+      withPreservedColumns(plan, '/content-types/abc/entries', 'key,value')
+    ).toEqual({
+      path: '/content-types/abc/entries',
+      query: { q: 'x', columns: 'key,value' },
+    });
+  });
+
+  it('drops columns when the path changes (broaden / type switch)', () => {
+    expect(withPreservedColumns(plan, '/', 'key,value')).toEqual(plan);
+    expect(
+      withPreservedColumns(
+        { path: '/content-types/other/entries', query: {} },
+        '/content-types/abc/entries',
+        'key,value'
+      )
+    ).toEqual({ path: '/content-types/other/entries', query: {} });
+  });
+
+  it('is a no-op when there are no current columns (undefined or empty)', () => {
+    expect(
+      withPreservedColumns(plan, '/content-types/abc/entries', undefined)
+    ).toEqual(plan);
+    expect(
+      withPreservedColumns(plan, '/content-types/abc/entries', '')
+    ).toEqual(plan);
   });
 });

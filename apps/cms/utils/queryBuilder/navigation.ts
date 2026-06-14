@@ -37,3 +37,18 @@ export function planNavigation(
   }
   return { path: '/', query: routeQuery };
 }
+
+/**
+ * Carry a `columns=` selection onto a navigation plan when the destination is
+ * the SAME path as the current route (a filter/q edit within the same scoped
+ * type). On broaden / type-switch (different path) columns are dropped, since
+ * field identifiers are per-content-type.
+ */
+export function withPreservedColumns(
+  plan: NavigationPlan,
+  currentPath: string,
+  currentColumns: string | string[] | undefined
+): NavigationPlan {
+  if (plan.path !== currentPath || !currentColumns) return plan;
+  return { ...plan, query: { ...plan.query, columns: currentColumns } };
+}
