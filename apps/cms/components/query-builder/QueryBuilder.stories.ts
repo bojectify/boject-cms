@@ -1230,3 +1230,37 @@ export const ScrollsInBoundedViewport: Story = {
     expect(r.top).toBeGreaterThanOrEqual(d.top - 1);
   },
 };
+
+// --- Field-step type icon + label (#369) ---
+
+// Each field-step row shows a leading per-type icon (in a size-7 box) and a
+// trailing compact type-label pill, sourced from the field's `type`. Pre-scoped
+// to Article so the field step renders immediately.
+export const FieldStepTypeRows: Story = {
+  args: { lockedContentType: ARTICLE_CT },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const summary = canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(0));
+    await expect(summary).toHaveTextContent('Summary');
+    // trailing compact type-label pill…
+    await expect(summary).toHaveTextContent('Text');
+    // …and a leading icon box (size-7 container holds the per-type UIcon).
+    expect(summary.querySelector('.size-7')).not.toBeNull();
+    // labels track each field's type
+    await expect(
+      canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(1))
+    ).toHaveTextContent(
+      'Select' // Status
+    );
+    await expect(
+      canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(2))
+    ).toHaveTextContent(
+      'Relation' // Author
+    );
+    await expect(
+      canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(5))
+    ).toHaveTextContent(
+      'Number' // Read time
+    );
+  },
+};

@@ -7,7 +7,15 @@ import {
 import { SYSTEM_FIELDS } from '~/utils/queryBuilder/systemFields';
 import { STEPS } from '~/utils/queryBuilder/machine';
 import type { QueryDropdownProps } from './queryDropdown.types';
-import { QA_QUERY_DROPDOWN, QUERY_LISTBOX_ID } from './queryDropdown.config';
+import {
+  QA_QUERY_DROPDOWN,
+  QUERY_LISTBOX_ID,
+  TW_QUERY_DROPDOWN,
+} from './queryDropdown.config';
+import {
+  FIELD_TYPE_ICONS,
+  FIELD_TYPE_SHORT_LABELS,
+} from '~/utils/fieldTypePresentation';
 
 const props = withDefaults(defineProps<QueryDropdownProps>(), {
   testId: QA_QUERY_DROPDOWN.COMPONENT,
@@ -84,12 +92,6 @@ const isMultiValueStep = computed(() => {
 
 /** Whether an option id is the keyboard-highlighted one. */
 const isActive = (id: string) => props.activeId === id;
-
-// `shrink-0` keeps each option row at its `h-11` — as flex children of the
-// scrolling listbox they'd otherwise compress toward text-height before the list
-// scrolls. The rows hold their size; the container (below) does the scrolling.
-const buttonTW: string =
-  'flex shrink-0 items-center justify-between h-11 px-3 rounded-lg text-left hover:bg-elevated';
 </script>
 
 <template>
@@ -140,12 +142,26 @@ const buttonTW: string =
           type="button"
           role="option"
           :aria-selected="isActive(`qb-opt-sys-${i}`)"
-          :class="[buttonTW, { 'bg-elevated': isActive(`qb-opt-sys-${i}`) }]"
+          :aria-label="f.name"
+          :class="[
+            TW_QUERY_DROPDOWN.BUTTON,
+            'gap-3',
+            { 'bg-elevated': isActive(`qb-opt-sys-${i}`) },
+          ]"
           :data-testid="QA_QUERY_DROPDOWN.OPTION(i)"
           @click="emit('pickField', f.identifier)"
         >
-          <span class="text-highlighted text-[13px] font-medium">{{
+          <span :class="TW_QUERY_DROPDOWN.ICON_BOX">
+            <UIcon
+              :name="`i-lucide-${FIELD_TYPE_ICONS[f.type]}`"
+              class="size-[15px] text-dimmed"
+            />
+          </span>
+          <span class="grow text-highlighted text-[13px] font-medium">{{
             f.name
+          }}</span>
+          <span :class="TW_QUERY_DROPDOWN.PILL">{{
+            FIELD_TYPE_SHORT_LABELS[f.type]
           }}</span>
         </button>
       </template>
@@ -162,7 +178,10 @@ const buttonTW: string =
         type="button"
         role="option"
         :aria-selected="isActive(`qb-opt-ct-${i}`)"
-        :class="[buttonTW, { 'bg-elevated': isActive(`qb-opt-ct-${i}`) }]"
+        :class="[
+          TW_QUERY_DROPDOWN.BUTTON,
+          { 'bg-elevated': isActive(`qb-opt-ct-${i}`) },
+        ]"
         :data-testid="QA_QUERY_DROPDOWN.OPTION(unscopedSystemFields.length + i)"
         @click="emit('pickContentType', c.id)"
       >
@@ -186,12 +205,26 @@ const buttonTW: string =
         type="button"
         role="option"
         :aria-selected="isActive(`qb-opt-field-${i}`)"
-        :class="[buttonTW, { 'bg-elevated': isActive(`qb-opt-field-${i}`) }]"
+        :aria-label="f.name"
+        :class="[
+          TW_QUERY_DROPDOWN.BUTTON,
+          'gap-3',
+          { 'bg-elevated': isActive(`qb-opt-field-${i}`) },
+        ]"
         :data-testid="QA_QUERY_DROPDOWN.OPTION(i)"
         @click="emit('pickField', f.identifier)"
       >
-        <span class="text-highlighted text-[13px] font-medium">{{
+        <span :class="TW_QUERY_DROPDOWN.ICON_BOX">
+          <UIcon
+            :name="`i-lucide-${FIELD_TYPE_ICONS[f.type]}`"
+            class="size-[15px] text-dimmed"
+          />
+        </span>
+        <span class="grow text-highlighted text-[13px] font-medium">{{
           f.name
+        }}</span>
+        <span :class="TW_QUERY_DROPDOWN.PILL">{{
+          FIELD_TYPE_SHORT_LABELS[f.type]
         }}</span>
       </button>
       <template v-if="systemFields.length">
@@ -208,15 +241,26 @@ const buttonTW: string =
           type="button"
           role="option"
           :aria-selected="isActive(`qb-opt-field-${fields.length + i}`)"
+          :aria-label="f.name"
           :class="[
-            buttonTW,
+            TW_QUERY_DROPDOWN.BUTTON,
+            'gap-3',
             { 'bg-elevated': isActive(`qb-opt-field-${fields.length + i}`) },
           ]"
           :data-testid="QA_QUERY_DROPDOWN.OPTION(fields.length + i)"
           @click="emit('pickField', f.identifier)"
         >
-          <span class="text-highlighted text-[13px] font-medium">{{
+          <span :class="TW_QUERY_DROPDOWN.ICON_BOX">
+            <UIcon
+              :name="`i-lucide-${FIELD_TYPE_ICONS[f.type]}`"
+              class="size-[15px] text-dimmed"
+            />
+          </span>
+          <span class="grow text-highlighted text-[13px] font-medium">{{
             f.name
+          }}</span>
+          <span :class="TW_QUERY_DROPDOWN.PILL">{{
+            FIELD_TYPE_SHORT_LABELS[f.type]
           }}</span>
         </button>
       </template>
@@ -230,7 +274,10 @@ const buttonTW: string =
         type="button"
         role="option"
         :aria-selected="isActive(`qb-opt-op-${i}`)"
-        :class="[buttonTW, { 'bg-elevated': isActive(`qb-opt-op-${i}`) }]"
+        :class="[
+          TW_QUERY_DROPDOWN.BUTTON,
+          { 'bg-elevated': isActive(`qb-opt-op-${i}`) },
+        ]"
         :data-testid="QA_QUERY_DROPDOWN.OPTION(i)"
         @click="emit('pickOperator', o.id)"
       >
