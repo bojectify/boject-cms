@@ -4,7 +4,10 @@ import {
   FILTERABLE_FIELD_TYPES,
   valueInputKind,
 } from '~/utils/queryBuilder/operators';
-import { SYSTEM_FIELDS } from '~/utils/queryBuilder/systemFields';
+import {
+  SYSTEM_FIELDS,
+  isSystemFieldId,
+} from '~/utils/queryBuilder/systemFields';
 import { STEPS } from '~/utils/queryBuilder/machine';
 import type { QueryDropdownProps } from './queryDropdown.types';
 import {
@@ -75,6 +78,9 @@ const operators = computed(() =>
         rich: props.state.rich,
         multiValue: props.state.multiValue,
         range: props.state.range,
+        // System envelope fields ($entryKey / $status / $id) are always set, so
+        // they never offer the nullary presence ops (#359).
+        nullary: !isSystemFieldId(props.state.draft.field.identifier),
       })
     : []
 );

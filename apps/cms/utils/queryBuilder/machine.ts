@@ -1,11 +1,18 @@
-import type { QueryContentType, QueryField, SearchQuery } from './types';
+import type {
+  QueryContentType,
+  QueryField,
+  SearchFilter,
+  SearchQuery,
+} from './types';
 import {
+  ARITY,
   availableOperators,
   defaultOperator,
+  operatorArity,
   valueInputKind,
 } from './operators';
 import { addFilter, removeFilter } from './query';
-import { resolveQueryField } from './systemFields';
+import { isSystemFieldId, resolveQueryField } from './systemFields';
 
 // Object-const source of truth for the builder step; `Step` is derived from it
 // (mirrors the FIELD_TYPES / WEBHOOK_EVENTS / CONTENT_STATUSES convention). Note
@@ -88,6 +95,35 @@ function findField(
   return resolveQueryField(ct, identifier);
 }
 
+/**
+ * Commit `filter` into the query — replace in place when re-editing a committed
+ * filter (editingIndex), otherwise append — then clear the draft and return to
+ * the field step (scoped) / content-type step (unscoped). Shared by the
+ * value-step commit and the nullary operator commit (#359).
+ */
+function commitDraftFilter(
+  s: BuilderState,
+  filter: SearchFilter
+): BuilderState {
+  const query =
+    s.editingIndex !== null
+      ? {
+          ...s.query,
+          filters: s.query.filters.map((f, i) =>
+            i === s.editingIndex ? filter : f
+          ),
+        }
+      : addFilter(s.query, filter);
+  return {
+    ...s,
+    query,
+    draft: null,
+    editingIndex: null,
+    text: '',
+    step: s.query.contentType ? STEPS.FIELD : STEPS.CONTENT_TYPE,
+  };
+}
+
 export type Action =
   | { kind: 'setFreeText'; q: string }
   | { kind: 'pickContentType'; contentType: QueryContentType }
@@ -153,6 +189,9 @@ export function reduce(prev: BuilderState, action: Action): BuilderState {
         rich: s.rich,
         multiValue: s.multiValue,
         range: s.range,
+        // System fields ($entryKey / $status / $id) are always set → no nullary
+        // ops, so the offered set matches the dropdown's (#359).
+        nullary: !isSystemFieldId(action.field.identifier),
       });
       const op = ops[0] ?? defaultOperator(action.field.type);
       return {
@@ -166,6 +205,15 @@ export function reduce(prev: BuilderState, action: Action): BuilderState {
 
     case 'pickOperator': {
       if (!s.draft) return s;
+      // Nullary operators (is set / is not set) take no value — commit the chip
+      // straight after the operator, skipping the value step entirely (#359).
+      if (operatorArity(action.op) === ARITY.ZERO) {
+        return commitDraftFilter(s, {
+          field: s.draft.field.identifier,
+          op: action.op,
+          value: undefined,
+        });
+      }
       // Carry the draft's value into the value step. A fresh filter has value
       // null (→ empty input); re-editing an operator prefills the typed value so
       // e.g. is → is not on "three" keeps "three". Entry / select / boolean are
@@ -203,34 +251,13 @@ export function reduce(prev: BuilderState, action: Action): BuilderState {
       return { ...s, draft: { ...s.draft, value: next } };
     }
 
-    case 'commitValue': {
+    case 'commitValue':
       if (!s.draft) return s;
-      const filter = {
+      return commitDraftFilter(s, {
         field: s.draft.field.identifier,
         op: s.draft.op,
         value: s.draft.value,
-      };
-      // Re-editing an existing filter replaces it in place; a new draft appends.
-      const query =
-        s.editingIndex !== null
-          ? {
-              ...s.query,
-              filters: s.query.filters.map((f, i) =>
-                i === s.editingIndex ? filter : f
-              ),
-            }
-          : addFilter(s.query, filter);
-      return {
-        ...s,
-        query,
-        draft: null,
-        editingIndex: null,
-        text: '',
-        // Unscoped → back to contentType (offers system fields + content types);
-        // scoped → back to field. Mirrors the backspace empty-draft logic.
-        step: s.query.contentType ? STEPS.FIELD : STEPS.CONTENT_TYPE,
-      };
-    }
+      });
 
     case 'editFilter': {
       // Re-open a committed filter for editing. The original filter stays in

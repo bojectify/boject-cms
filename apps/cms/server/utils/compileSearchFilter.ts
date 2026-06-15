@@ -1,5 +1,7 @@
 import { FIELD_TYPES, type FieldTypeName } from '../../utils/fieldTypes';
 import {
+  ARITY,
+  OPERATORS,
   isOperatorAllowed,
   operatorArity,
 } from '../../utils/queryBuilder/operators';
@@ -72,12 +74,12 @@ function booleanLiteral(raw: string, field: string): string {
 }
 
 const NUMBER_SYMBOL: Record<string, string> = {
-  eq: '=',
-  neq: '!=',
-  gt: '>',
-  gte: '>=',
-  lt: '<',
-  lte: '<=',
+  [OPERATORS.EQ]: '=',
+  [OPERATORS.NEQ]: '!=',
+  [OPERATORS.GT]: '>',
+  [OPERATORS.GTE]: '>=',
+  [OPERATORS.LT]: '<',
+  [OPERATORS.LTE]: '<=',
 };
 
 function notValid(op: string, field: string): SearchInputError {
@@ -93,13 +95,13 @@ function textClause(
   field: string
 ): string {
   switch (op) {
-    case 'eq':
+    case OPERATORS.EQ:
       return `${path} = ${meiliLiteral(v)}`;
-    case 'neq':
+    case OPERATORS.NEQ:
       return `${path} != ${meiliLiteral(v)}`;
-    case 'contains':
+    case OPERATORS.CONTAINS:
       return `${path} CONTAINS ${meiliLiteral(v)}`;
-    case 'startsWith':
+    case OPERATORS.STARTS_WITH:
       return `${path} STARTS WITH ${meiliLiteral(v)}`;
     default:
       throw notValid(op, field);
@@ -113,13 +115,13 @@ function dateClause(
   field: string
 ): string {
   switch (op) {
-    case 'eq':
+    case OPERATORS.EQ:
       return `${path} = ${epochLiteral(values[0]!, field)}`;
-    case 'before':
+    case OPERATORS.BEFORE:
       return `${path} < ${epochLiteral(values[0]!, field)}`;
-    case 'after':
+    case OPERATORS.AFTER:
       return `${path} > ${epochLiteral(values[0]!, field)}`;
-    case 'between':
+    case OPERATORS.BETWEEN:
       return `${path} ${epochLiteral(values[0]!, field)} TO ${epochLiteral(values[1]!, field)}`;
     default:
       throw notValid(op, field);
@@ -133,11 +135,11 @@ function enumClause(
   field: string
 ): string {
   switch (op) {
-    case 'eq':
+    case OPERATORS.EQ:
       return `${path} = ${meiliLiteral(values[0]!)}`;
-    case 'neq':
+    case OPERATORS.NEQ:
       return `${path} != ${meiliLiteral(values[0]!)}`;
-    case 'in':
+    case OPERATORS.IN:
       return `${path} IN [${values.map(meiliLiteral).join(', ')}]`;
     default:
       throw notValid(op, field);
@@ -151,11 +153,11 @@ function multirelationClause(
   field: string
 ): string {
   switch (op) {
-    case 'eq': // "contains" — array membership of a single id
+    case OPERATORS.EQ: // "contains" — array membership of a single id
       return `${path} = ${meiliLiteral(values[0]!)}`;
-    case 'containsAny':
+    case OPERATORS.CONTAINS_ANY:
       return `${path} IN [${values.map(meiliLiteral).join(', ')}]`;
-    case 'containsAll':
+    case OPERATORS.CONTAINS_ALL:
       return `(${values.map((v) => `${path} = ${meiliLiteral(v)}`).join(' AND ')})`;
     default:
       throw notValid(op, field);
@@ -202,12 +204,12 @@ export function compileSearchFilter(
     path = type === FIELD_TYPES.ENTRY_TITLE ? 'entryTitle' : `fields.${field}`;
   }
 
-  const op = filter.op ?? 'eq';
+  const op = filter.op ?? OPERATORS.EQ;
   const values = valueList(filter);
 
   // Unknown field type (no content-type scope): equality-as-quoted-string only.
   if (!type) {
-    if (op !== 'eq') {
+    if (op !== OPERATORS.EQ) {
       throw new SearchInputError(
         `Operator "${op}" on "${field}" requires a content type scope`
       );
@@ -224,20 +226,43 @@ export function compileSearchFilter(
 
   // Arity check (cardinality is type-independent).
   const arity = operatorArity(op);
-  if (arity === 'two' && values.length !== 2) {
+  if (arity === ARITY.TWO && values.length !== 2) {
     throw new SearchInputError(
       `Operator "${op}" on "${field}" needs exactly 2 values`
     );
   }
-  if (arity === 'many' && values.length === 0) {
+  if (arity === ARITY.MANY && values.length === 0) {
     throw new SearchInputError(
       `Operator "${op}" on "${field}" needs at least 1 value`
     );
   }
-  if (arity === 'one' && values.length !== 1) {
+  if (arity === ARITY.ONE && values.length !== 1) {
     throw new SearchInputError(
       `Operator "${op}" on "${field}" needs exactly 1 value`
     );
+  }
+  if (arity === ARITY.ZERO && values.length !== 0) {
+    throw new SearchInputError(`Operator "${op}" on "${field}" takes no value`);
+  }
+
+  // Nullary "presence" ops compile to a uniform clause across every field type
+  // (#359): "is not set" matches a null / empty (empty string or array) /
+  // missing value — `IS EMPTY` covers '' and [], `IS NULL` covers null,
+  // `NOT EXISTS` covers a field absent from the document; "is set" is the exact
+  // inverse. The clause is type-independent, so it sits ahead of the per-type
+  // switch.
+  if (op === OPERATORS.IS_NOT_SET || op === OPERATORS.IS_SET) {
+    // System envelope fields ($entryKey / $status / $id) are structurally always
+    // set, so the nullary ops are meaningless there — reject them at every layer
+    // (the UI already hides them; this closes the URL/hand-crafted path). (#359)
+    if (isSystemFieldId(field)) {
+      throw new SearchInputError(
+        `Operator "${op}" is not supported on system field "${field}"`
+      );
+    }
+    return op === OPERATORS.IS_NOT_SET
+      ? `(${path} IS NULL OR ${path} IS EMPTY OR ${path} NOT EXISTS)`
+      : `(${path} EXISTS AND ${path} IS NOT NULL AND ${path} IS NOT EMPTY)`;
   }
 
   switch (type) {
@@ -257,7 +282,7 @@ export function compileSearchFilter(
       return enumClause(path, op, values, field);
 
     case FIELD_TYPES.RELATION:
-      return op === 'neq'
+      return op === OPERATORS.NEQ
         ? `${path} != ${meiliLiteral(values[0]!)}`
         : `${path} = ${meiliLiteral(values[0]!)}`;
 

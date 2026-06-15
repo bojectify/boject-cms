@@ -398,3 +398,59 @@ describe('compileSearchFilter — ENTRY_TITLE envelope path', () => {
     ).toThrow(SearchInputError);
   });
 });
+
+describe('compileSearchFilter — nullary presence ops (#359)', () => {
+  it('is not set → a uniform null/empty/not-exists clause across field types', () => {
+    // TEXT scalar
+    expect(compileSearchFilter({ field: 'title', op: 'isNotSet' }, types)).toBe(
+      '(fields.title IS NULL OR fields.title IS EMPTY OR fields.title NOT EXISTS)'
+    );
+    // RELATION (single id) — same clause; IS EMPTY simply never matches an id
+    expect(
+      compileSearchFilter({ field: 'author', op: 'isNotSet' }, types)
+    ).toBe(
+      '(fields.author IS NULL OR fields.author IS EMPTY OR fields.author NOT EXISTS)'
+    );
+    // MULTIRELATION (empty array) — IS EMPTY catches []
+    expect(compileSearchFilter({ field: 'tags', op: 'isNotSet' }, types)).toBe(
+      '(fields.tags IS NULL OR fields.tags IS EMPTY OR fields.tags NOT EXISTS)'
+    );
+  });
+
+  it('is set → the exact inverse clause', () => {
+    expect(compileSearchFilter({ field: 'author', op: 'isSet' }, types)).toBe(
+      '(fields.author EXISTS AND fields.author IS NOT NULL AND fields.author IS NOT EMPTY)'
+    );
+  });
+
+  it('rejects a value passed to a nullary op (arity zero)', () => {
+    expect(() =>
+      compileSearchFilter(
+        { field: 'author', op: 'isNotSet', value: 'x' },
+        types
+      )
+    ).toThrow(SearchInputError);
+  });
+
+  it('is not allowed for ENTRY_TITLE (always set)', () => {
+    expect(() =>
+      compileSearchFilter(
+        { field: 'name', op: 'isNotSet' },
+        { name: FIELD_TYPES.ENTRY_TITLE }
+      )
+    ).toThrow(SearchInputError);
+  });
+
+  it('rejects nullary ops on system fields ($status / $id / $entryKey — always set)', () => {
+    // System fields need no scope, so an empty fieldTypes still resolves them.
+    expect(() =>
+      compileSearchFilter({ field: '$status', op: 'isNotSet' }, {})
+    ).toThrow(SearchInputError);
+    expect(() =>
+      compileSearchFilter({ field: '$status', op: 'isSet' }, {})
+    ).toThrow('is not supported on system field');
+    expect(() =>
+      compileSearchFilter({ field: '$entryKey', op: 'isNotSet' }, {})
+    ).toThrow(SearchInputError);
+  });
+});

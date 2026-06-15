@@ -10,6 +10,8 @@ import { throwRateLimited } from '../utils/rateLimitEndpoint';
 import { assertApiKeyScope } from '../utils/assertApiKeyScope';
 import type { SearchDocument } from '../utils/searchDocument';
 import {
+  ARITY,
+  OPERATORS,
   isOperatorId,
   operatorArity,
 } from '../../utils/queryBuilder/operators';
@@ -52,15 +54,22 @@ function parseFilters(raw: unknown): SearchFilter[] {
     if (secondColon > 0) {
       const maybeOp = rest.slice(0, secondColon);
       if (isOperatorId(maybeOp)) {
+        const arity = operatorArity(maybeOp);
         const rawValue = rest.slice(secondColon + 1);
+        // Nullary ops (is set / is not set) carry no value; list ops are
+        // comma-separated.
         const vals =
-          operatorArity(maybeOp) === 'one' ? [rawValue] : rawValue.split(',');
+          arity === ARITY.ZERO
+            ? []
+            : arity === ARITY.ONE
+              ? [rawValue]
+              : rawValue.split(',');
         filters.push({ field, op: maybeOp, values: vals });
         continue;
       }
     }
     // Legacy 2-part, or a value that contains colons but no registered op prefix.
-    filters.push({ field, op: 'eq', values: [rest] });
+    filters.push({ field, op: OPERATORS.EQ, values: [rest] });
   }
   return filters;
 }

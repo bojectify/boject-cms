@@ -6,6 +6,7 @@ import {
   dayToBoundaryIso,
   isoToCalendarDate,
 } from '~/utils/queryBuilder/dateFilter';
+import { OPERATORS } from '~/utils/queryBuilder/operators';
 
 const props = withDefaults(defineProps<DateEditorProps>(), {
   testId: QA_DATE_EDITOR.COMPONENT,
@@ -24,7 +25,7 @@ const seed = computed<CalendarDate | undefined>(() =>
 
 // `before` filters on the start of the picked day; `after` on the end of it.
 const edge = computed<'start' | 'end'>(() =>
-  props.draft.op === 'after' ? 'end' : 'start'
+  props.draft.op === OPERATORS.AFTER ? 'end' : 'start'
 );
 
 function onSelect(value: unknown) {

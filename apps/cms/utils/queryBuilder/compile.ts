@@ -1,5 +1,5 @@
 import type { SearchQuery, SearchFilter } from './types';
-import { isOperatorId, operatorArity } from './operators';
+import { ARITY, OPERATORS, isOperatorId, operatorArity } from './operators';
 
 /** The /api/search param shape — also the URL query shape (minus contentType, which rides the path for per-type routes). */
 export interface SearchParams {
@@ -37,21 +37,28 @@ export function serializeFilter(f: SearchFilter): string {
  */
 export function parseFilter(s: string): SearchFilter {
   const firstColon = s.indexOf(':');
-  if (firstColon < 0) return { field: s, op: 'eq', value: '' };
+  if (firstColon < 0) return { field: s, op: OPERATORS.EQ, value: '' };
   const field = s.slice(0, firstColon);
   const rest = s.slice(firstColon + 1);
   const secondColon = rest.indexOf(':');
   if (secondColon > 0) {
     const maybeOp = rest.slice(0, secondColon);
     if (isOperatorId(maybeOp)) {
+      const arity = operatorArity(maybeOp);
       const raw = rest.slice(secondColon + 1);
-      // List ops carry comma-separated values; comma is the delimiter, so a
-      // value cannot itself contain a literal comma (known limit, see #332).
-      const value = operatorArity(maybeOp) === 'one' ? raw : raw.split(',');
+      // Nullary ops (is set / is not set) carry NO value — `field:isNotSet:` has
+      // an empty trailing segment. List ops carry comma-separated values (comma
+      // is the delimiter, so a value cannot contain a literal comma, see #332).
+      const value =
+        arity === ARITY.ZERO
+          ? undefined
+          : arity === ARITY.ONE
+            ? raw
+            : raw.split(',');
       return { field, op: maybeOp, value };
     }
   }
-  return { field, op: 'eq', value: rest };
+  return { field, op: OPERATORS.EQ, value: rest };
 }
 
 /** SearchQuery → /api/search params. Filters serialize to the `field:op:value` URL form. */
