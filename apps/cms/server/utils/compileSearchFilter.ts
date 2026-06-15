@@ -1,5 +1,6 @@
 import { FIELD_TYPES, type FieldTypeName } from '../../utils/fieldTypes';
 import {
+  ARITY,
   isOperatorAllowed,
   operatorArity,
 } from '../../utils/queryBuilder/operators';
@@ -224,22 +225,22 @@ export function compileSearchFilter(
 
   // Arity check (cardinality is type-independent).
   const arity = operatorArity(op);
-  if (arity === 'two' && values.length !== 2) {
+  if (arity === ARITY.TWO && values.length !== 2) {
     throw new SearchInputError(
       `Operator "${op}" on "${field}" needs exactly 2 values`
     );
   }
-  if (arity === 'many' && values.length === 0) {
+  if (arity === ARITY.MANY && values.length === 0) {
     throw new SearchInputError(
       `Operator "${op}" on "${field}" needs at least 1 value`
     );
   }
-  if (arity === 'one' && values.length !== 1) {
+  if (arity === ARITY.ONE && values.length !== 1) {
     throw new SearchInputError(
       `Operator "${op}" on "${field}" needs exactly 1 value`
     );
   }
-  if (arity === 'zero' && values.length !== 0) {
+  if (arity === ARITY.ZERO && values.length !== 0) {
     throw new SearchInputError(`Operator "${op}" on "${field}" takes no value`);
   }
 

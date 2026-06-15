@@ -5,6 +5,7 @@ import type {
   SearchQuery,
 } from './types';
 import {
+  ARITY,
   availableOperators,
   defaultOperator,
   operatorArity,
@@ -206,7 +207,7 @@ export function reduce(prev: BuilderState, action: Action): BuilderState {
       if (!s.draft) return s;
       // Nullary operators (is set / is not set) take no value — commit the chip
       // straight after the operator, skipping the value step entirely (#359).
-      if (operatorArity(action.op) === 'zero') {
+      if (operatorArity(action.op) === ARITY.ZERO) {
         return commitDraftFilter(s, {
           field: s.draft.field.identifier,
           op: action.op,

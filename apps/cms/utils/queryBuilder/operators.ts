@@ -194,12 +194,24 @@ export function isOperatorAllowed(type: FieldTypeName, opId: string): boolean {
   return (REGISTRY[type] ?? []).some((o) => o.id === opId);
 }
 
-/** Value cardinality the operator expects: none / scalar / range pair / list. */
-export function operatorArity(opId: string): 'zero' | 'one' | 'two' | 'many' {
-  if (NULLARY_OP_IDS.has(opId)) return 'zero';
-  if (RANGE_OPS.has(opId)) return 'two';
-  if (LIST_OPS.has(opId)) return 'many';
-  return 'one';
+/**
+ * Value cardinality an operator expects: none / scalar / range pair / list.
+ * Object-const source of truth (mirrors FIELD_TYPES / STEPS) so call sites read
+ * `arity === ARITY.ZERO` instead of comparing bare string literals.
+ */
+export const ARITY = {
+  ZERO: 'zero',
+  ONE: 'one',
+  TWO: 'two',
+  MANY: 'many',
+} as const;
+export type Arity = (typeof ARITY)[keyof typeof ARITY];
+
+export function operatorArity(opId: string): Arity {
+  if (NULLARY_OP_IDS.has(opId)) return ARITY.ZERO;
+  if (RANGE_OPS.has(opId)) return ARITY.TWO;
+  if (LIST_OPS.has(opId)) return ARITY.MANY;
+  return ARITY.ONE;
 }
 
 /**
@@ -222,10 +234,10 @@ export function availableOperators(
   const richFiltered = rich ? all : all.filter((o) => !o.rich);
   return richFiltered.filter((o) => {
     const arity = operatorArity(o.id);
-    if (arity === 'many') return multiValue;
-    if (arity === 'two') return range;
-    if (arity === 'zero') return nullary;
-    return true; // 'one'
+    if (arity === ARITY.MANY) return multiValue;
+    if (arity === ARITY.TWO) return range;
+    if (arity === ARITY.ZERO) return nullary;
+    return true; // ARITY.ONE
   });
 }
 

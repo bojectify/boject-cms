@@ -10,6 +10,7 @@ import { throwRateLimited } from '../utils/rateLimitEndpoint';
 import { assertApiKeyScope } from '../utils/assertApiKeyScope';
 import type { SearchDocument } from '../utils/searchDocument';
 import {
+  ARITY,
   isOperatorId,
   operatorArity,
 } from '../../utils/queryBuilder/operators';
@@ -57,9 +58,9 @@ function parseFilters(raw: unknown): SearchFilter[] {
         // Nullary ops (is set / is not set) carry no value; list ops are
         // comma-separated.
         const vals =
-          arity === 'zero'
+          arity === ARITY.ZERO
             ? []
-            : arity === 'one'
+            : arity === ARITY.ONE
               ? [rawValue]
               : rawValue.split(',');
         filters.push({ field, op: maybeOp, values: vals });

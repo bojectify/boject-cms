@@ -1,5 +1,5 @@
 import type { SearchQuery, SearchFilter } from './types';
-import { isOperatorId, operatorArity } from './operators';
+import { ARITY, isOperatorId, operatorArity } from './operators';
 
 /** The /api/search param shape — also the URL query shape (minus contentType, which rides the path for per-type routes). */
 export interface SearchParams {
@@ -50,7 +50,11 @@ export function parseFilter(s: string): SearchFilter {
       // an empty trailing segment. List ops carry comma-separated values (comma
       // is the delimiter, so a value cannot contain a literal comma, see #332).
       const value =
-        arity === 'zero' ? undefined : arity === 'one' ? raw : raw.split(',');
+        arity === ARITY.ZERO
+          ? undefined
+          : arity === ARITY.ONE
+            ? raw
+            : raw.split(',');
       return { field, op: maybeOp, value };
     }
   }
