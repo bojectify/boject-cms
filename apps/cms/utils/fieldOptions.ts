@@ -16,8 +16,22 @@ import type { FieldType } from '#prisma';
  * detection here — a future field-options key can be added without
  * breaking older readers.
  */
-export const SelectOptionsSchema = z.object({
-  choices: z.array(z.string()).default([]),
+export const SelectOptionsSchema = z
+  .object({
+    choices: z.array(z.string()).default([]),
+    default: z.string().optional(),
+  })
+  .refine((o) => o.default === undefined || o.choices.includes(o.default), {
+    message: 'default must be one of the configured choices',
+    path: ['default'],
+  });
+
+export const BooleanOptionsSchema = z.object({
+  default: z.boolean().optional(),
+});
+
+export const NumberOptionsSchema = z.object({
+  default: z.number().finite().optional(),
 });
 
 export const RelationOptionsSchema = z.object({
@@ -35,7 +49,9 @@ export const RichtextOptionsSchema = z.object({
  * narrow with `switch (opts.type)` without threading the column separately.
  */
 export type FieldOptions =
-  | { type: 'SELECT'; choices: string[] }
+  | { type: 'SELECT'; choices: string[]; default?: string }
+  | { type: 'BOOLEAN'; default?: boolean }
+  | { type: 'NUMBER'; default?: number }
   | { type: 'RELATION'; targetContentTypeIds: string[] }
   | { type: 'MULTIRELATION'; targetContentTypeIds: string[] }
   | {
@@ -44,22 +60,12 @@ export type FieldOptions =
       linkTargetContentTypeIds: string[];
     }
   | {
-      type:
-        | 'TEXT'
-        | 'TEXTAREA'
-        | 'NUMBER'
-        | 'BOOLEAN'
-        | 'DATETIME'
-        | 'IMAGE'
-        | 'ENTRY_TITLE'
-        | 'SLUG';
+      type: 'TEXT' | 'TEXTAREA' | 'DATETIME' | 'IMAGE' | 'ENTRY_TITLE' | 'SLUG';
     };
 
 const NO_PAYLOAD_FIELD_TYPES = [
   'TEXT',
   'TEXTAREA',
-  'NUMBER',
-  'BOOLEAN',
   'DATETIME',
   'IMAGE',
   'ENTRY_TITLE',
@@ -146,6 +152,10 @@ export function parseFieldOptions(field: {
       return { type: 'MULTIRELATION', ...RelationOptionsSchema.parse(raw) };
     case 'RICHTEXT':
       return { type: 'RICHTEXT', ...RichtextOptionsSchema.parse(raw) };
+    case 'BOOLEAN':
+      return { type: 'BOOLEAN', ...BooleanOptionsSchema.parse(raw) };
+    case 'NUMBER':
+      return { type: 'NUMBER', ...NumberOptionsSchema.parse(raw) };
     default:
       return { type: assertNoPayloadFieldType(field.type) };
   }

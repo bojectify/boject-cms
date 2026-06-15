@@ -240,4 +240,89 @@ describe('parseFieldOptions', () => {
       });
     });
   });
+
+  describe('default values (#344)', () => {
+    it('parses a BOOLEAN default', () => {
+      expect(
+        parseFieldOptions({
+          type: FIELD_TYPES.BOOLEAN,
+          options: { default: false },
+        })
+      ).toEqual({ type: FIELD_TYPES.BOOLEAN, default: false });
+    });
+
+    it('parses a NUMBER default', () => {
+      expect(
+        parseFieldOptions({ type: FIELD_TYPES.NUMBER, options: { default: 0 } })
+      ).toEqual({ type: FIELD_TYPES.NUMBER, default: 0 });
+    });
+
+    it('rejects a non-finite NUMBER default', () => {
+      expect(() =>
+        parseFieldOptions({
+          type: FIELD_TYPES.NUMBER,
+          options: { default: Infinity },
+        })
+      ).toThrow();
+    });
+
+    it('rejects a non-boolean BOOLEAN default', () => {
+      expect(() =>
+        parseFieldOptions({
+          type: FIELD_TYPES.BOOLEAN,
+          options: { default: 'true' },
+        })
+      ).toThrow();
+    });
+
+    it('parses a SELECT default that is one of the choices', () => {
+      expect(
+        parseFieldOptions({
+          type: FIELD_TYPES.SELECT,
+          options: { choices: ['a', 'b'], default: 'b' },
+        })
+      ).toEqual({
+        type: FIELD_TYPES.SELECT,
+        choices: ['a', 'b'],
+        default: 'b',
+      });
+    });
+
+    it('rejects a SELECT default that is not one of the choices', () => {
+      expect(() =>
+        parseFieldOptions({
+          type: FIELD_TYPES.SELECT,
+          options: { choices: ['a', 'b'], default: 'c' },
+        })
+      ).toThrow();
+    });
+
+    it('rejects a SELECT default when there are no choices', () => {
+      expect(() =>
+        parseFieldOptions({
+          type: FIELD_TYPES.SELECT,
+          options: { choices: [], default: 'a' },
+        })
+      ).toThrow();
+    });
+
+    it('no default present parses cleanly (BOOLEAN / NUMBER / SELECT)', () => {
+      expect(
+        parseFieldOptions({ type: FIELD_TYPES.BOOLEAN, options: null })
+      ).toEqual({
+        type: FIELD_TYPES.BOOLEAN,
+      });
+      expect(
+        parseFieldOptions({ type: FIELD_TYPES.NUMBER, options: {} })
+      ).toEqual({
+        type: FIELD_TYPES.NUMBER,
+      });
+      expect(
+        parseFieldOptions({
+          type: FIELD_TYPES.SELECT,
+          options: { choices: ['a'] },
+        })
+      ).toEqual({ type: FIELD_TYPES.SELECT, choices: ['a'] });
+    });
+  });
 });
