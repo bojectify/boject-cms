@@ -1264,3 +1264,44 @@ export const FieldStepTypeRows: Story = {
     );
   },
 };
+
+// --- Nullary "is not set" / "is set" operators (#359) ---
+
+// Picking a nullary operator commits the chip immediately with NO value segment,
+// skipping the value step. Author (RELATION) under rich offers is / is not / is
+// not set / is set — "is not set" is the 3rd operator (OPTION(2)).
+export const NullaryIsNotSet: Story = {
+  args: { lockedContentType: ARTICLE_CT, enableRichOperators: true },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    // field step (pre-scoped to Article): pick Author (RELATION) → operator step
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(2)));
+    await expect(
+      canvas.getByTestId(QA_QUERY_BUILDER.DROPDOWN)
+    ).toHaveTextContent('is not set');
+    // pick "is not set" (eq / neq / isNotSet / isSet → OPTION(2)) → commits now
+    await userEvent.click(canvas.getByTestId(QA_QUERY_DROPDOWN.OPTION(2)));
+    // committed chip: field + operator, and NO value segment (value is undefined)
+    const chip = within(canvas.getByTestId(QA_QUERY_CHIPS.FILTER_CHIP(0)));
+    await expect(
+      chip.getByTestId(QA_FILTER_CHIP.FIELD_SEGMENT)
+    ).toHaveTextContent('Author');
+    await expect(
+      chip.getByTestId(QA_FILTER_CHIP.OPERATOR_SEGMENT)
+    ).toHaveTextContent('is not set');
+    expect(chip.queryByTestId(QA_FILTER_CHIP.VALUE_SEGMENT)).toBeNull();
+    // model carries the nullary filter; the draft is cleared (value step skipped)
+    const lastModel = (
+      args['onUpdate:modelValue'] as ReturnType<typeof fn>
+    ).mock.calls.at(-1)![0];
+    expect(lastModel.filters[0]).toMatchObject({
+      field: 'author',
+      op: 'isNotSet',
+    });
+    await expect(canvas.queryByTestId(QA_QUERY_BUILDER.DRAFT_CHIP)).toBeNull();
+    // Enter runs the search with the committed nullary chip
+    await userEvent.click(canvas.getByTestId(QA_QUERY_BUILDER.INPUT));
+    await userEvent.keyboard('{Enter}');
+    expect(args.onRun).toHaveBeenCalled();
+  },
+};

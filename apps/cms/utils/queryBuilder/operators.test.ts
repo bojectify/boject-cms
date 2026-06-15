@@ -117,7 +117,9 @@ describe('operators registry', () => {
       availableOperators('MULTIRELATION', { rich: true, ...o }).map(
         (x) => x.id
       );
-    expect(mr({ multiValue: false })).toEqual(['eq']); // only single contains
+    // only the single-value `contains` (eq) survives multiValue:false — plus the
+    // arity-zero nullary ops, which multiValue does not gate (#359).
+    expect(mr({ multiValue: false })).toEqual(['eq', 'isNotSet', 'isSet']);
     expect(mr({ multiValue: true })).toEqual(
       expect.arrayContaining(['eq', 'containsAny', 'containsAll'])
     );
@@ -137,6 +139,48 @@ describe('operators registry', () => {
     const ops = availableOperators('DATETIME', { rich: true, range: true }).map(
       (o) => o.id
     );
-    expect(ops).toEqual(['before', 'after', 'between']);
+    // before/after/between, then the nullary presence ops (#359).
+    expect(ops).toEqual(['before', 'after', 'between', 'isNotSet', 'isSet']);
+  });
+
+  it('nullary presence ops are arity-zero, rich, and offered for every value type except ENTRY_TITLE (#359)', () => {
+    expect(operatorArity('isNotSet')).toBe('zero');
+    expect(operatorArity('isSet')).toBe('zero');
+    expect(isOperatorId('isNotSet')).toBe(true);
+
+    const applicable = [
+      'TEXT',
+      'TEXTAREA',
+      'SLUG',
+      'NUMBER',
+      'BOOLEAN',
+      'SELECT',
+      'DATETIME',
+      'RELATION',
+      'MULTIRELATION',
+    ] as const;
+    for (const t of applicable) {
+      const richIds = availableOperators(t, { rich: true }).map((o) => o.id);
+      expect(richIds).toContain('isNotSet');
+      expect(richIds).toContain('isSet');
+      expect(isOperatorAllowed(t, 'isNotSet')).toBe(true);
+      // rich ops → hidden in equality-only (non-rich) mode
+      const plainIds = availableOperators(t, { rich: false }).map((o) => o.id);
+      expect(plainIds).not.toContain('isNotSet');
+    }
+
+    // ENTRY_TITLE is always set → never offers the nullary ops
+    expect(
+      availableOperators('ENTRY_TITLE', { rich: true }).map((o) => o.id)
+    ).not.toContain('isNotSet');
+    expect(isOperatorAllowed('ENTRY_TITLE', 'isNotSet')).toBe(false);
+
+    // `nullary: false` suppresses them (used for always-set system envelope
+    // fields like $entryKey / $status / $id).
+    expect(
+      availableOperators('SLUG', { rich: true, nullary: false }).map(
+        (o) => o.id
+      )
+    ).not.toContain('isNotSet');
   });
 });

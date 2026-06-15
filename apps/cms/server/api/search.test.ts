@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, beforeAll, afterAll } from 'vitest';
 import { setup, $fetch, fetch } from '@nuxt/test-utils/e2e';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../../generated/prisma/client';
 import { TEST_USERNAME, TEST_PASSWORD } from '../test/credentials';
@@ -106,6 +106,22 @@ describe('GET /api/search', async () => {
               options: { choices: ['a', 'b', 'c'] },
             },
             { identifier: 'colour', name: 'Colour', type: 'TEXT', order: 3 },
+            {
+              identifier: 'ref',
+              name: 'Ref',
+              type: 'RELATION',
+              order: 4,
+              // Real UUID target — the search-filter path only reads the field
+              // TYPE, but parseFieldOptions enforces UUID shape elsewhere.
+              options: { targetContentTypeIds: [randomUUID()] },
+            },
+            {
+              identifier: 'tags',
+              name: 'Tags',
+              type: 'MULTIRELATION',
+              order: 5,
+              options: { targetContentTypeIds: [randomUUID()] },
+            },
           ],
         },
       },
@@ -273,6 +289,52 @@ describe('GET /api/search', async () => {
     });
     expect(res.hits).toHaveLength(1);
     expect(res.hits[0]!.id).toBe('colour-red');
+  });
+
+  it('nullary "is not set" / "is set" filters scalar, relation, and multirelation fields (#359)', async () => {
+    const ids = (r: SearchResponse) => r.hits.map((h) => h.id).sort();
+    await addTestDocuments([
+      // every field populated
+      doc({
+        id: 'w-set',
+        contentType: 'Widget',
+        entryTitle: 'Set',
+        fields: { colour: 'red', ref: 'r1', tags: ['t1', 't2'] },
+      }),
+      // empty representations: '' string, null relation, [] array
+      doc({
+        id: 'w-empty',
+        contentType: 'Widget',
+        entryTitle: 'Empty',
+        fields: { colour: '', ref: null, tags: [] },
+      }),
+      // fields entirely absent from the document
+      doc({ id: 'w-missing', contentType: 'Widget', entryTitle: 'Missing' }),
+    ]);
+
+    // TEXT scalar: empty string + missing count as "not set"; only the set one is "set".
+    expect(
+      ids(await search({ contentType: 'Widget', filter: 'colour:isNotSet:' }))
+    ).toEqual(['w-empty', 'w-missing']);
+    expect(
+      ids(await search({ contentType: 'Widget', filter: 'colour:isSet:' }))
+    ).toEqual(['w-set']);
+
+    // RELATION: null + missing are "not set".
+    expect(
+      ids(await search({ contentType: 'Widget', filter: 'ref:isNotSet:' }))
+    ).toEqual(['w-empty', 'w-missing']);
+    expect(
+      ids(await search({ contentType: 'Widget', filter: 'ref:isSet:' }))
+    ).toEqual(['w-set']);
+
+    // MULTIRELATION: empty array + missing are "not set".
+    expect(
+      ids(await search({ contentType: 'Widget', filter: 'tags:isNotSet:' }))
+    ).toEqual(['w-empty', 'w-missing']);
+    expect(
+      ids(await search({ contentType: 'Widget', filter: 'tags:isSet:' }))
+    ).toEqual(['w-set']);
   });
 
   it('filters ENTRY_TITLE via the envelope entryTitle (legacy 2-part eq)', async () => {

@@ -113,6 +113,23 @@ describe('compileQuery', () => {
       value: 'foo',
     });
   });
+
+  it('nullary ops round-trip with an empty trailing value segment (#359)', () => {
+    // serialize → `field:op:` (empty value); parse → no value
+    expect(
+      serializeFilter({ field: 'author', op: 'isNotSet', value: undefined })
+    ).toBe('author:isNotSet:');
+    const parsed = parseFilter('author:isNotSet:');
+    expect(parsed.field).toBe('author');
+    expect(parsed.op).toBe('isNotSet');
+    expect(parsed.value).toBeUndefined();
+    // full query round-trip
+    const q: SearchQuery = {
+      contentType: 'Article',
+      filters: [{ field: 'author', op: 'isNotSet', value: undefined }],
+    };
+    expect(compileQuery(q).filter).toEqual(['author:isNotSet:']);
+  });
 });
 
 describe('routeToSearchQuery', () => {

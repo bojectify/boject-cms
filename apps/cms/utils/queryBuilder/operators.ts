@@ -16,8 +16,9 @@ const EQ: Operator = {
   rich: false,
 };
 
-// The full string-field operator set, shared verbatim by TEXT and ENTRY_TITLE
-// (a single const so the two can never silently de-mirror).
+// The full string-field VALUE operators, shared by TEXT and ENTRY_TITLE (a
+// single const so the two can never silently de-mirror). TEXT additionally gets
+// the nullary ops below; ENTRY_TITLE does not (an entry always has a title).
 const TEXT_OPERATORS: Operator[] = [
   EQ,
   { id: 'neq', label: 'is not', description: 'Excludes matches', rich: true },
@@ -35,11 +36,30 @@ const TEXT_OPERATORS: Operator[] = [
   },
 ];
 
+// Nullary operators (#359) — take NO value (arity 'zero'): they filter on a
+// field's presence. Offered for every field type that can be unset/empty so an
+// editor can find e.g. "Articles with no Author" or "entries missing an Image".
+// NOT offered for ENTRY_TITLE (an entry always has a title). `is not set` is
+// listed first — it's the primary use case.
+const IS_NOT_SET: Operator = {
+  id: 'isNotSet',
+  label: 'is not set',
+  description: 'Empty or missing',
+  rich: true,
+};
+const IS_SET: Operator = {
+  id: 'isSet',
+  label: 'is set',
+  description: 'Has any value',
+  rich: true,
+};
+const NULLARY_OPS: Operator[] = [IS_NOT_SET, IS_SET];
+
 // Operators per field type. `eq` is first (the locked default) for every type
 // except DATETIME, which is range-only (before/after/between) — equality on a
 // timestamp is rarely what an editor wants, so `eq` is intentionally omitted.
 const REGISTRY: Partial<Record<FieldTypeName, Operator[]>> = {
-  TEXT: TEXT_OPERATORS,
+  TEXT: [...TEXT_OPERATORS, ...NULLARY_OPS],
   TEXTAREA: [
     EQ,
     {
@@ -48,6 +68,7 @@ const REGISTRY: Partial<Record<FieldTypeName, Operator[]>> = {
       description: 'Matches part of the value',
       rich: true,
     },
+    ...NULLARY_OPS,
   ],
   SLUG: [
     EQ,
@@ -57,9 +78,12 @@ const REGISTRY: Partial<Record<FieldTypeName, Operator[]>> = {
       description: 'Matches the beginning',
       rich: true,
     },
+    ...NULLARY_OPS,
   ],
-  // ENTRY_TITLE mirrors TEXT, but its filters compile to the index envelope
-  // path `entryTitle` (not `fields.<id>`) — see compileSearchFilter.
+  // ENTRY_TITLE mirrors TEXT's value operators, but its filters compile to the
+  // index envelope path `entryTitle` (not `fields.<id>`) — see
+  // compileSearchFilter. It deliberately omits the nullary ops: an entry always
+  // has a title, so "is not set" would never match.
   ENTRY_TITLE: TEXT_OPERATORS,
   NUMBER: [
     { id: 'eq', label: '=', description: 'Equals', rich: false },
@@ -68,8 +92,9 @@ const REGISTRY: Partial<Record<FieldTypeName, Operator[]>> = {
     { id: 'gte', label: '≥', description: 'At least', rich: true },
     { id: 'lt', label: '<', description: 'Less than', rich: true },
     { id: 'lte', label: '≤', description: 'At most', rich: true },
+    ...NULLARY_OPS,
   ],
-  BOOLEAN: [EQ],
+  BOOLEAN: [EQ, ...NULLARY_OPS],
   DATETIME: [
     {
       id: 'before',
@@ -84,6 +109,7 @@ const REGISTRY: Partial<Record<FieldTypeName, Operator[]>> = {
       description: 'Within a range',
       rich: true,
     },
+    ...NULLARY_OPS,
   ],
   SELECT: [
     EQ,
@@ -99,6 +125,7 @@ const REGISTRY: Partial<Record<FieldTypeName, Operator[]>> = {
       description: 'Matches any selected',
       rich: true,
     },
+    ...NULLARY_OPS,
   ],
   RELATION: [
     EQ,
@@ -108,6 +135,7 @@ const REGISTRY: Partial<Record<FieldTypeName, Operator[]>> = {
       description: 'Excludes the entry',
       rich: true,
     },
+    ...NULLARY_OPS,
   ],
   MULTIRELATION: [
     {
@@ -128,6 +156,7 @@ const REGISTRY: Partial<Record<FieldTypeName, Operator[]>> = {
       description: 'Contains all selected',
       rich: true,
     },
+    ...NULLARY_OPS,
   ],
 };
 
@@ -135,6 +164,7 @@ export const FILTERABLE_FIELD_TYPES = Object.keys(REGISTRY) as FieldTypeName[];
 
 // Value cardinality is a pure function of the operator id (ids don't collide
 // across types with different cardinalities), so arity is type-independent.
+const NULLARY_OP_IDS: ReadonlySet<string> = new Set(['isSet', 'isNotSet']);
 const RANGE_OPS: ReadonlySet<string> = new Set(['between']);
 const LIST_OPS: ReadonlySet<string> = new Set([
   'in',
@@ -164,8 +194,9 @@ export function isOperatorAllowed(type: FieldTypeName, opId: string): boolean {
   return (REGISTRY[type] ?? []).some((o) => o.id === opId);
 }
 
-/** Value cardinality the operator expects: scalar / range pair / list. */
-export function operatorArity(opId: string): 'one' | 'two' | 'many' {
+/** Value cardinality the operator expects: none / scalar / range pair / list. */
+export function operatorArity(opId: string): 'zero' | 'one' | 'two' | 'many' {
+  if (NULLARY_OP_IDS.has(opId)) return 'zero';
   if (RANGE_OPS.has(opId)) return 'two';
   if (LIST_OPS.has(opId)) return 'many';
   return 'one';
@@ -174,7 +205,9 @@ export function operatorArity(opId: string): 'one' | 'two' | 'many' {
 /**
  * Operators offered for `type`. `rich: false` returns equality-only (v1).
  * `multiValue: false` hides arity-many (list) ops (in / containsAny / containsAll).
- * `range: false` hides arity-two (range) ops (between). Both default to "on".
+ * `range: false` hides arity-two (range) ops (between). `nullary: false` hides
+ * arity-zero presence ops (is set / is not set) — passed for system envelope
+ * fields ($entryKey / $status / $id), which are always set (#359). All default on.
  */
 export function availableOperators(
   type: FieldTypeName,
@@ -182,7 +215,8 @@ export function availableOperators(
     rich,
     multiValue = true,
     range = true,
-  }: { rich: boolean; multiValue?: boolean; range?: boolean }
+    nullary = true,
+  }: { rich: boolean; multiValue?: boolean; range?: boolean; nullary?: boolean }
 ): Operator[] {
   const all = REGISTRY[type] ?? [EQ];
   const richFiltered = rich ? all : all.filter((o) => !o.rich);
@@ -190,6 +224,7 @@ export function availableOperators(
     const arity = operatorArity(o.id);
     if (arity === 'many') return multiValue;
     if (arity === 'two') return range;
+    if (arity === 'zero') return nullary;
     return true; // 'one'
   });
 }

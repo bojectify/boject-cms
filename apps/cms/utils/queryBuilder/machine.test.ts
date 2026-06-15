@@ -261,18 +261,60 @@ describe('builder machine', () => {
     expect(s1.draft?.field.identifier).toBe('summary');
   });
 
-  it('rich: picking a single-operator field (BOOLEAN) skips straight to the value step', () => {
+  it('non-rich: picking a single-operator field (BOOLEAN) skips straight to the value step', () => {
+    // Non-rich BOOLEAN is `eq`-only (the nullary presence ops are rich, #359),
+    // so picking it skips the operator step. Under rich it now offers eq + is
+    // (not) set — see the nullary-operator tests below.
     const s0 = initState({
       contentTypes: CONTENT_TYPES,
       lockedContentType: ARTICLE_CT,
-      rich: true,
-      multiValue: false,
+      rich: false,
     });
     const featured = ARTICLE_CT.fields.find(
       (f) => f.identifier === 'featured'
     )!;
     const s1 = reduce(s0, { kind: 'pickField', field: featured });
-    expect(s1.step).toBe(STEPS.VALUE); // BOOLEAN has only `eq` → no operator step
+    expect(s1.step).toBe(STEPS.VALUE);
+  });
+
+  it('rich: BOOLEAN now offers the operator step; picking a nullary op commits with no value and skips the value step (#359)', () => {
+    const s0 = initState({
+      contentTypes: CONTENT_TYPES,
+      lockedContentType: ARTICLE_CT,
+      rich: true,
+    });
+    const featured = ARTICLE_CT.fields.find(
+      (f) => f.identifier === 'featured'
+    )!;
+    const s1 = reduce(s0, { kind: 'pickField', field: featured });
+    expect(s1.step).toBe(STEPS.OPERATOR); // eq + is (not) set → operator step
+    const s2 = reduce(s1, { kind: 'pickOperator', op: 'isNotSet' });
+    // committed immediately — no value step, draft cleared, back to field
+    expect(s2.draft).toBeNull();
+    expect(s2.step).toBe(STEPS.FIELD);
+    expect(s2.query.filters).toHaveLength(1);
+    expect(s2.query.filters[0]).toMatchObject({
+      field: 'featured',
+      op: 'isNotSet',
+    });
+    expect(s2.query.filters[0]!.value).toBeUndefined();
+  });
+
+  it('re-editing a committed nullary filter operator replaces it in place (is not set → is set) (#359)', () => {
+    let s = initState({
+      contentTypes: CONTENT_TYPES,
+      lockedContentType: ARTICLE_CT,
+      rich: true,
+    });
+    const author = ARTICLE_CT.fields.find((f) => f.identifier === 'author')!;
+    s = reduce(s, { kind: 'pickField', field: author });
+    s = reduce(s, { kind: 'pickOperator', op: 'isNotSet' });
+    expect(s.query.filters).toHaveLength(1);
+    s = reduce(s, { kind: 'editFilter', index: 0, segment: 'operator' });
+    expect(s.step).toBe(STEPS.OPERATOR);
+    s = reduce(s, { kind: 'pickOperator', op: 'isSet' });
+    expect(s.query.filters).toHaveLength(1); // replaced in place, not appended
+    expect(s.query.filters[0]).toMatchObject({ field: 'author', op: 'isSet' });
   });
 
   it('editFilter on the operator segment re-opens the operator step with a clear input; the value carries to the value step on pickOperator', () => {

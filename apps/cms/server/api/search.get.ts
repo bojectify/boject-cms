@@ -52,9 +52,16 @@ function parseFilters(raw: unknown): SearchFilter[] {
     if (secondColon > 0) {
       const maybeOp = rest.slice(0, secondColon);
       if (isOperatorId(maybeOp)) {
+        const arity = operatorArity(maybeOp);
         const rawValue = rest.slice(secondColon + 1);
+        // Nullary ops (is set / is not set) carry no value; list ops are
+        // comma-separated.
         const vals =
-          operatorArity(maybeOp) === 'one' ? [rawValue] : rawValue.split(',');
+          arity === 'zero'
+            ? []
+            : arity === 'one'
+              ? [rawValue]
+              : rawValue.split(',');
         filters.push({ field, op: maybeOp, values: vals });
         continue;
       }

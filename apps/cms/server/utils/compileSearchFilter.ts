@@ -239,6 +239,29 @@ export function compileSearchFilter(
       `Operator "${op}" on "${field}" needs exactly 1 value`
     );
   }
+  if (arity === 'zero' && values.length !== 0) {
+    throw new SearchInputError(`Operator "${op}" on "${field}" takes no value`);
+  }
+
+  // Nullary "presence" ops compile to a uniform clause across every field type
+  // (#359): "is not set" matches a null / empty (empty string or array) /
+  // missing value — `IS EMPTY` covers '' and [], `IS NULL` covers null,
+  // `NOT EXISTS` covers a field absent from the document; "is set" is the exact
+  // inverse. The clause is type-independent, so it sits ahead of the per-type
+  // switch.
+  if (op === 'isNotSet' || op === 'isSet') {
+    // System envelope fields ($entryKey / $status / $id) are structurally always
+    // set, so the nullary ops are meaningless there — reject them at every layer
+    // (the UI already hides them; this closes the URL/hand-crafted path). (#359)
+    if (isSystemFieldId(field)) {
+      throw new SearchInputError(
+        `Operator "${op}" is not supported on system field "${field}"`
+      );
+    }
+    return op === 'isNotSet'
+      ? `(${path} IS NULL OR ${path} IS EMPTY OR ${path} NOT EXISTS)`
+      : `(${path} EXISTS AND ${path} IS NOT NULL AND ${path} IS NOT EMPTY)`;
+  }
 
   switch (type) {
     case FIELD_TYPES.TEXT:
