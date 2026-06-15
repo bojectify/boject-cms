@@ -39,6 +39,23 @@ type ContentTypeShape = {
   }>;
 };
 
+// For existing entries, derive the content type from the entry response.
+// For new entries, fetch /api/content-types/:id directly.
+// Conditional URL: return null to skip the fetch (Nuxt useFetch behaviour).
+// The `as string` cast is required because Nuxt's type signature doesn't
+// expose the null-skip behaviour, but it works at runtime. Declared above the
+// editor composable so its raw `.fields` can seed new-entry defaults (#344).
+const { data: contentTypeFromApi } = useAuthedFetch<ContentTypeShape>(
+  (() => {
+    if (props.entryId) return null;
+    if (!props.contentTypeId) return null;
+    return `/api/content-types/${props.contentTypeId}`;
+  }) as () => string,
+  {
+    watch: [() => props.contentTypeId, () => props.entryId],
+  }
+);
+
 // Entry editor composable (fetches the entry when editing existing)
 const {
   isNew,
@@ -62,23 +79,11 @@ const {
   generateSlug,
 } = useContentEntryEditor(
   () => props.contentTypeId ?? '',
-  () => props.entryId ?? 'new'
-);
-
-// For existing entries, derive the content type from the entry response.
-// For new entries, fetch /api/content-types/:id directly.
-// Conditional URL: return null to skip the fetch (Nuxt useFetch behaviour).
-// The `as string` cast is required because Nuxt's type signature doesn't
-// expose the null-skip behaviour, but it works at runtime.
-const { data: contentTypeFromApi } = useAuthedFetch<ContentTypeShape>(
-  (() => {
-    if (props.entryId) return null;
-    if (!props.contentTypeId) return null;
-    return `/api/content-types/${props.contentTypeId}`;
-  }) as () => string,
-  {
-    watch: [() => props.contentTypeId, () => props.entryId],
-  }
+  () => props.entryId ?? 'new',
+  // Raw field rows (identifier/type/options) from the new-entry content-type
+  // fetch — the editor seeds each supported field's configured default (#344).
+  // The mapped FieldConfig[] lacks `options`, so we pass the raw rows.
+  () => contentTypeFromApi.value?.fields ?? []
 );
 
 const contentTypeFromEntry = computed<ContentTypeShape | null>(() => {

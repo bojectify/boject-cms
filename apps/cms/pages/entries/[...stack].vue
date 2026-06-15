@@ -79,6 +79,22 @@ function resolveRootContentTypeId(): string {
   return contentTypeFromEntry.value?.id ?? '';
 }
 
+// For new entries, fetch /api/content-types/:id. Conditional URL: return
+// null to skip the fetch. The `as () => string` cast matches the
+// Task 2a approach — Nuxt's type signature doesn't expose the null-skip
+// behaviour but it works at runtime. Declared above the editor composable
+// so its raw `.fields` can seed the new-entry form defaults (#344).
+const { data: contentTypeFromApi } = useAuthedFetch<ContentTypeShape>(
+  (() => {
+    if (!rootIsNew.value) return null;
+    if (!rootContentTypeIdSentinel.value) return null;
+    return `/api/content-types/${rootContentTypeIdSentinel.value}`;
+  }) as () => string,
+  {
+    watch: [() => rootIsNew.value, () => rootContentTypeIdSentinel.value],
+  }
+);
+
 const {
   isNew,
   entry: rootEntry,
@@ -101,7 +117,11 @@ const {
   generateSlug,
 } = useContentEntryEditor(
   () => resolveRootContentTypeId(),
-  () => rootEntryIdForComposable.value
+  () => rootEntryIdForComposable.value,
+  // Raw field rows (identifier/type/options) from the new-entry content-type
+  // fetch — the editor seeds each supported field's configured default (#344).
+  // The mapped FieldConfig[] lacks `options`, so we pass the raw rows.
+  () => contentTypeFromApi.value?.fields ?? []
 );
 
 // Derive content type from whichever source is active
@@ -110,21 +130,6 @@ const contentTypeFromEntry = computed<ContentTypeShape | null>(() => {
     ?.contentType;
   return ct ?? null;
 });
-
-// For new entries, fetch /api/content-types/:id. Conditional URL: return
-// null to skip the fetch. The `as () => string` cast matches the
-// Task 2a approach — Nuxt's type signature doesn't expose the null-skip
-// behaviour but it works at runtime.
-const { data: contentTypeFromApi } = useAuthedFetch<ContentTypeShape>(
-  (() => {
-    if (!rootIsNew.value) return null;
-    if (!rootContentTypeIdSentinel.value) return null;
-    return `/api/content-types/${rootContentTypeIdSentinel.value}`;
-  }) as () => string,
-  {
-    watch: [() => rootIsNew.value, () => rootContentTypeIdSentinel.value],
-  }
-);
 
 const contentType = computed<ContentTypeShape | null>(() => {
   if (rootIsNew.value) {

@@ -1,5 +1,5 @@
 import type { FieldType } from '#prisma';
-import { parseFieldOptions } from '../../utils/fieldOptions';
+import { defaultsForFields } from '../../utils/fieldDefaults';
 
 interface FieldDef {
   identifier: string;
@@ -20,20 +20,10 @@ export function applyFieldDefaults(
   data: Record<string, unknown>,
   fields: FieldDef[]
 ): Record<string, unknown> {
+  const defaults = defaultsForFields(fields);
   const out = { ...data };
-  for (const field of fields) {
-    const absent =
-      !(field.identifier in out) || out[field.identifier] === undefined;
-    if (!absent) continue;
-    const opts = parseFieldOptions(field);
-    if (
-      (opts.type === 'BOOLEAN' ||
-        opts.type === 'NUMBER' ||
-        opts.type === 'SELECT') &&
-      opts.default !== undefined
-    ) {
-      out[field.identifier] = opts.default;
-    }
+  for (const id of Object.keys(defaults)) {
+    if (!(id in out) || out[id] === undefined) out[id] = defaults[id];
   }
   return out;
 }
