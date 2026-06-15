@@ -1,8 +1,34 @@
 import { FIELD_TYPES, type FieldTypeName } from '../fieldTypes';
 import type { ValueInputKind } from './types';
 
+/**
+ * Object-const source of truth for operator ids (mirrors FIELD_TYPES / STEPS /
+ * ARITY) so the registry definitions and every comparison read `OPERATORS.EQ`
+ * rather than a bare string literal. The string VALUES are the wire form (the
+ * URL `field:op:value` token, serialized filters) — keep them stable.
+ */
+export const OPERATORS = {
+  EQ: 'eq',
+  NEQ: 'neq',
+  CONTAINS: 'contains',
+  STARTS_WITH: 'startsWith',
+  GT: 'gt',
+  GTE: 'gte',
+  LT: 'lt',
+  LTE: 'lte',
+  BEFORE: 'before',
+  AFTER: 'after',
+  BETWEEN: 'between',
+  IN: 'in',
+  CONTAINS_ANY: 'containsAny',
+  CONTAINS_ALL: 'containsAll',
+  IS_SET: 'isSet',
+  IS_NOT_SET: 'isNotSet',
+} as const;
+export type OperatorId = (typeof OPERATORS)[keyof typeof OPERATORS];
+
 export interface Operator {
-  id: string;
+  id: OperatorId;
   label: string; // shown in the operator chip segment + dropdown
   description: string; // dropdown helper line
   /** true once #301 lands; v1 only renders `eq`. */
@@ -10,7 +36,7 @@ export interface Operator {
 }
 
 const EQ: Operator = {
-  id: 'eq',
+  id: OPERATORS.EQ,
   label: 'is',
   description: 'Exact match',
   rich: false,
@@ -21,15 +47,20 @@ const EQ: Operator = {
 // the nullary ops below; ENTRY_TITLE does not (an entry always has a title).
 const TEXT_OPERATORS: Operator[] = [
   EQ,
-  { id: 'neq', label: 'is not', description: 'Excludes matches', rich: true },
   {
-    id: 'contains',
+    id: OPERATORS.NEQ,
+    label: 'is not',
+    description: 'Excludes matches',
+    rich: true,
+  },
+  {
+    id: OPERATORS.CONTAINS,
     label: 'contains',
     description: 'Matches part of the value',
     rich: true,
   },
   {
-    id: 'startsWith',
+    id: OPERATORS.STARTS_WITH,
     label: 'starts with',
     description: 'Matches the beginning',
     rich: true,
@@ -42,13 +73,13 @@ const TEXT_OPERATORS: Operator[] = [
 // NOT offered for ENTRY_TITLE (an entry always has a title). `is not set` is
 // listed first — it's the primary use case.
 const IS_NOT_SET: Operator = {
-  id: 'isNotSet',
+  id: OPERATORS.IS_NOT_SET,
   label: 'is not set',
   description: 'Empty or missing',
   rich: true,
 };
 const IS_SET: Operator = {
-  id: 'isSet',
+  id: OPERATORS.IS_SET,
   label: 'is set',
   description: 'Has any value',
   rich: true,
@@ -63,7 +94,7 @@ const REGISTRY: Partial<Record<FieldTypeName, Operator[]>> = {
   TEXTAREA: [
     EQ,
     {
-      id: 'contains',
+      id: OPERATORS.CONTAINS,
       label: 'contains',
       description: 'Matches part of the value',
       rich: true,
@@ -73,7 +104,7 @@ const REGISTRY: Partial<Record<FieldTypeName, Operator[]>> = {
   SLUG: [
     EQ,
     {
-      id: 'startsWith',
+      id: OPERATORS.STARTS_WITH,
       label: 'starts with',
       description: 'Matches the beginning',
       rich: true,
@@ -86,25 +117,30 @@ const REGISTRY: Partial<Record<FieldTypeName, Operator[]>> = {
   // has a title, so "is not set" would never match.
   ENTRY_TITLE: TEXT_OPERATORS,
   NUMBER: [
-    { id: 'eq', label: '=', description: 'Equals', rich: false },
-    { id: 'neq', label: '≠', description: 'Not equal', rich: true },
-    { id: 'gt', label: '>', description: 'Greater than', rich: true },
-    { id: 'gte', label: '≥', description: 'At least', rich: true },
-    { id: 'lt', label: '<', description: 'Less than', rich: true },
-    { id: 'lte', label: '≤', description: 'At most', rich: true },
+    { id: OPERATORS.EQ, label: '=', description: 'Equals', rich: false },
+    { id: OPERATORS.NEQ, label: '≠', description: 'Not equal', rich: true },
+    { id: OPERATORS.GT, label: '>', description: 'Greater than', rich: true },
+    { id: OPERATORS.GTE, label: '≥', description: 'At least', rich: true },
+    { id: OPERATORS.LT, label: '<', description: 'Less than', rich: true },
+    { id: OPERATORS.LTE, label: '≤', description: 'At most', rich: true },
     ...NULLARY_OPS,
   ],
   BOOLEAN: [EQ, ...NULLARY_OPS],
   DATETIME: [
     {
-      id: 'before',
+      id: OPERATORS.BEFORE,
       label: 'before',
       description: 'Before the date',
       rich: true,
     },
-    { id: 'after', label: 'after', description: 'After the date', rich: true },
     {
-      id: 'between',
+      id: OPERATORS.AFTER,
+      label: 'after',
+      description: 'After the date',
+      rich: true,
+    },
+    {
+      id: OPERATORS.BETWEEN,
       label: 'is between',
       description: 'Within a range',
       rich: true,
@@ -114,13 +150,13 @@ const REGISTRY: Partial<Record<FieldTypeName, Operator[]>> = {
   SELECT: [
     EQ,
     {
-      id: 'neq',
+      id: OPERATORS.NEQ,
       label: 'is not',
       description: 'Excludes the choice',
       rich: true,
     },
     {
-      id: 'in',
+      id: OPERATORS.IN,
       label: 'is any of',
       description: 'Matches any selected',
       rich: true,
@@ -130,7 +166,7 @@ const REGISTRY: Partial<Record<FieldTypeName, Operator[]>> = {
   RELATION: [
     EQ,
     {
-      id: 'neq',
+      id: OPERATORS.NEQ,
       label: 'is not',
       description: 'Excludes the entry',
       rich: true,
@@ -139,19 +175,19 @@ const REGISTRY: Partial<Record<FieldTypeName, Operator[]>> = {
   ],
   MULTIRELATION: [
     {
-      id: 'eq',
+      id: OPERATORS.EQ,
       label: 'contains',
       description: 'Contains the entry',
       rich: false,
     },
     {
-      id: 'containsAny',
+      id: OPERATORS.CONTAINS_ANY,
       label: 'contains any',
       description: 'Contains any selected',
       rich: true,
     },
     {
-      id: 'containsAll',
+      id: OPERATORS.CONTAINS_ALL,
       label: 'contains all',
       description: 'Contains all selected',
       rich: true,
@@ -164,12 +200,15 @@ export const FILTERABLE_FIELD_TYPES = Object.keys(REGISTRY) as FieldTypeName[];
 
 // Value cardinality is a pure function of the operator id (ids don't collide
 // across types with different cardinalities), so arity is type-independent.
-const NULLARY_OP_IDS: ReadonlySet<string> = new Set(['isSet', 'isNotSet']);
-const RANGE_OPS: ReadonlySet<string> = new Set(['between']);
+const NULLARY_OP_IDS: ReadonlySet<string> = new Set([
+  OPERATORS.IS_SET,
+  OPERATORS.IS_NOT_SET,
+]);
+const RANGE_OPS: ReadonlySet<string> = new Set([OPERATORS.BETWEEN]);
 const LIST_OPS: ReadonlySet<string> = new Set([
-  'in',
-  'containsAny',
-  'containsAll',
+  OPERATORS.IN,
+  OPERATORS.CONTAINS_ANY,
+  OPERATORS.CONTAINS_ALL,
 ]);
 
 /** Every operator id that appears anywhere in the registry. */
@@ -266,13 +305,13 @@ export function valueInputKind(
   type: FieldTypeName,
   op: string
 ): ValueInputKind {
-  if (type === FIELD_TYPES.SELECT && op === 'in') return 'multiSelect';
+  if (type === FIELD_TYPES.SELECT && op === OPERATORS.IN) return 'multiSelect';
   if (
     type === FIELD_TYPES.MULTIRELATION &&
-    (op === 'containsAny' || op === 'containsAll')
+    (op === OPERATORS.CONTAINS_ANY || op === OPERATORS.CONTAINS_ALL)
   )
     return 'multiEntry';
   if (type === FIELD_TYPES.DATETIME)
-    return op === 'between' ? 'dateRange' : 'date';
+    return op === OPERATORS.BETWEEN ? 'dateRange' : 'date';
   return VALUE_KIND[type] ?? 'text';
 }

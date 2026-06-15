@@ -1,5 +1,5 @@
 import type { SearchQuery, SearchFilter } from './types';
-import { ARITY, isOperatorId, operatorArity } from './operators';
+import { ARITY, OPERATORS, isOperatorId, operatorArity } from './operators';
 
 /** The /api/search param shape — also the URL query shape (minus contentType, which rides the path for per-type routes). */
 export interface SearchParams {
@@ -37,7 +37,7 @@ export function serializeFilter(f: SearchFilter): string {
  */
 export function parseFilter(s: string): SearchFilter {
   const firstColon = s.indexOf(':');
-  if (firstColon < 0) return { field: s, op: 'eq', value: '' };
+  if (firstColon < 0) return { field: s, op: OPERATORS.EQ, value: '' };
   const field = s.slice(0, firstColon);
   const rest = s.slice(firstColon + 1);
   const secondColon = rest.indexOf(':');
@@ -58,7 +58,7 @@ export function parseFilter(s: string): SearchFilter {
       return { field, op: maybeOp, value };
     }
   }
-  return { field, op: 'eq', value: rest };
+  return { field, op: OPERATORS.EQ, value: rest };
 }
 
 /** SearchQuery → /api/search params. Filters serialize to the `field:op:value` URL form. */

@@ -11,6 +11,7 @@ import { assertApiKeyScope } from '../utils/assertApiKeyScope';
 import type { SearchDocument } from '../utils/searchDocument';
 import {
   ARITY,
+  OPERATORS,
   isOperatorId,
   operatorArity,
 } from '../../utils/queryBuilder/operators';
@@ -68,7 +69,7 @@ function parseFilters(raw: unknown): SearchFilter[] {
       }
     }
     // Legacy 2-part, or a value that contains colons but no registered op prefix.
-    filters.push({ field, op: 'eq', values: [rest] });
+    filters.push({ field, op: OPERATORS.EQ, values: [rest] });
   }
   return filters;
 }
