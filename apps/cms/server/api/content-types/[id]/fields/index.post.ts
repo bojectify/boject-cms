@@ -8,6 +8,7 @@ import { withPrismaErrors } from '../../../../utils/prismaErrors';
 import { enforceMutationRateLimit } from '../../../../utils/rateLimitEndpoint';
 import { invalidateSchema } from '../../../../graphql/schema';
 import { resolveUniqueFlag } from '../../../../utils/validateFieldUnique';
+import { validateFieldDefault } from '../../../../utils/validateFieldDefault';
 import { assertSchemaEditable } from '../../../../utils/schemaReadOnly';
 import {
   parseFieldOptions,
@@ -108,6 +109,10 @@ export default defineEventHandler(async (event) => {
       }
     }
   }
+
+  // Validate a configured default value (#344): reject on unsupported types and
+  // reject a default failing the per-type zod rules (incl. SELECT ∉ choices).
+  validateFieldDefault(type, body.options);
 
   // Check content type exists and load existing fields
   const contentType = await prisma.contentType.findUnique({

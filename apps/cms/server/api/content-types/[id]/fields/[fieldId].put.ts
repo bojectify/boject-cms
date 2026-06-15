@@ -4,6 +4,7 @@ import { withPrismaErrors } from '../../../../utils/prismaErrors';
 import { enforceMutationRateLimit } from '../../../../utils/rateLimitEndpoint';
 import { invalidateSchema } from '../../../../graphql/schema';
 import { resolveUniqueFlag } from '../../../../utils/validateFieldUnique';
+import { validateFieldDefault } from '../../../../utils/validateFieldDefault';
 import { assertSchemaEditable } from '../../../../utils/schemaReadOnly';
 import {
   parseFieldOptions,
@@ -108,6 +109,8 @@ export default defineEventHandler(async (event) => {
         });
       }
     }
+    // Validate a configured default value (#344) against the field's type.
+    validateFieldDefault(field.type, body.options);
     data.options = body.options ?? undefined;
   }
   if ('unique' in body) {
