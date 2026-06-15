@@ -374,7 +374,7 @@ function onKeydown(e: KeyboardEvent) {
 <template>
   <div
     :data-testid="testId"
-    class="flex flex-col w-full rounded-2xl border border-default bg-default shadow-xl overflow-clip font-sans"
+    class="flex flex-col min-h-0 w-full rounded-2xl border border-default bg-default shadow-xl overflow-clip font-sans"
   >
     <div
       :data-testid="QA_QUERY_BUILDER.CHIP_ROW"
