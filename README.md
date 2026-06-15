@@ -11,6 +11,7 @@ Workspace-wide tooling:
 - **pnpm 11** — package manager and workspace orchestrator
 - **Node.js 24** — runtime (containerised; see [Containerised dev environment](#containerised-dev-environment))
 - **PostgreSQL 17** — database (local via Docker)
+- **Meilisearch** — full-text search engine, run as a docker-compose sidecar (see [`apps/cms/README.md`](apps/cms/README.md#search))
 - **Docker** + [OrbStack](https://orbstack.dev/) on macOS — container runtime
 - **TypeScript** — ESM-only (`"type": "module"`)
 

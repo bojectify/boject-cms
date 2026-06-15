@@ -395,14 +395,48 @@ For workspace-wide scripts (`db:up`, `lint`, `format`, `test`), see the [repo ro
 
 ## Search
 
-Full-text search is backed by [Meilisearch](https://www.meilisearch.com/), run as a sidecar container alongside Postgres (`docker compose up -d` starts both). The CMS connects via the `meili` client singleton; on boot it idempotently creates a single global `entries` index. Downstream Search-epic work populates the index from content webhooks and exposes `/api/search`.
+Full-text search is backed by [Meilisearch](https://www.meilisearch.com/), run as a sidecar container alongside Postgres (`docker compose up -d` starts both). The CMS connects via the `meili` client singleton (`server/utils/meili.ts`); on boot it idempotently creates a single global `entries` index (`server/utils/searchIndex.ts`). The ⌘K command palette and the list-view results are powered by `GET /api/search` (and the `searchEntries` GraphQL field).
 
-**Operator setup:**
+### How it works
 
-- **Dev:** nothing to configure — the `meilisearch` service in `docker-compose.yml` runs in development mode (no master key) and is reachable at `http://localhost:7700`.
-- **Production:** set `MEILI_MASTER_KEY` to a strong secret on both the Meilisearch container and the CMS. The CMS fails fast at boot if it is unset. Point `MEILI_URL` at your engine if it is not co-located on `localhost:7700`.
+- **One global index, scoped per query.** Every entry across every content type lives in the same `entries` index; a search scopes to one type with a `contentType` filter rather than a per-type index. The index holds one document per indexable version (DRAFT / CHANGED / PUBLISHED, keyed `${entryId}__${status}`); ARCHIVED versions are never indexed. API-key and GraphQL reads are forced to PUBLISHED.
+- **Sync transport — internal webhooks.** The index is kept in step with Postgres over the existing `WebhookDelivery` queue: a system-managed **internal** webhook ("Search index sync", `kind = INTERNAL`, seeded once at boot) subscribes to the entry-lifecycle and `CONTENT_TYPE_SCHEMA_CHANGED` events. The webhook worker's internal branch calls `syncToSearchIndex(...)` in-process — no HTTP, no SSRF surface — reusing the same retry / dead-letter machinery as external webhooks. Publish, unpublish, archive, draft save/discard, and schema changes all reconcile the index automatically.
+- **The index is derived state.** It is fully rebuildable from Postgres and is therefore **not** a backup target — there are still only [two stores to back up](#backup--disaster-recovery) (Postgres + the asset store). If the index is lost, drifts, or you adopt search on an existing database, rebuild it (below).
+- **Graceful degradation.** Search is non-essential. If Meilisearch is unreachable, `GET /api/search` returns `503 SEARCH_UNAVAILABLE` (never a 500), list views fall back to their type / status / archive filters, and `/api/health` reports `search: "unavailable"` — but the HTTP status stays 200 (Postgres is the only liveness-critical dependency).
 
-Search is treated as non-essential: if Meilisearch is unreachable, `/api/health` reports `search: "unavailable"` and the CMS keeps serving everything else. (Once admin search lands later in the epic, the list view will fall back to its type/status/archive filters when the engine is unreachable.) Check reachability any time with `curl http://localhost:7700/health`.
+### Operator setup
+
+- **Dev:** nothing to configure — the `meilisearch` service in `docker-compose.yml` runs in development mode (no master key), reachable at `http://localhost:7700`. Check reachability with `curl http://localhost:7700/health`.
+- **Production:** set `MEILI_MASTER_KEY` to a strong secret on **both** the Meilisearch container and the CMS (the CMS fails fast at boot if it is unset). Point `MEILI_URL` at your engine if it is not co-located on `localhost:7700`. The per-caller `/api/search` rate cap is `BOJECT_SEARCH_RATE_LIMIT_RPM` (default 120).
+
+### Reindexing — `pnpm search:reindex`
+
+Rebuilds the `entries` index from current Postgres state. This is both the first-time adoption path (existing database, empty index) and the disaster-recovery path (after a Postgres restore, or if the index drifts).
+
+```bash
+pnpm search:reindex                          # upsert every indexable version (safe while live)
+pnpm search:reindex --content-type Article   # scope to one content type
+pnpm search:reindex --dry-run                # count what would be written, write nothing
+pnpm search:reindex --rebuild                # clear the index first, then upsert (one-time re-key migration)
+```
+
+Upsert-only by default, so it is safe to run against a live deployment (search stays up) and is idempotent. Run it after first adopting search, after restoring Postgres from a backup, or any time the index and the database have drifted.
+
+### Snapshots & recovery
+
+Because the index is rebuildable from Postgres, an index backup is optional — `pnpm search:reindex` is the authoritative recovery path. If you nonetheless want point-in-time index snapshots (e.g. to skip a full reindex after engine loss on a very large corpus), use Meilisearch's built-in snapshots and restore them into a fresh engine (see the [Meilisearch docs](https://www.meilisearch.com/docs)).
+
+### Scaling to a separate host
+
+For V1 the engine is co-located on the docker-compose network. To scale, run Meilisearch on its own host (or a managed Meilisearch) and point `MEILI_URL` / `MEILI_MASTER_KEY` at it — no CMS code change. Engine sizing, persistence, and replication are Meilisearch's own concern (see the [Meilisearch docs](https://www.meilisearch.com/docs)).
+
+### Swapping the search engine (Algolia / Typesense / …)
+
+The sync transport is just a webhook subscription, so you can replace the bundled Meilisearch integration without forking the CMS:
+
+1. **Disable** the system internal "Search index sync" webhook — toggle `Enabled` off on its `/webhooks/<id>` page (internal rows are read-only except that toggle, and the boot seeder will not re-enable an operator-disabled row).
+2. **Register your own** (external) webhook subscribed to the same events — `ENTRY_PUBLISHED`, `ENTRY_UNPUBLISHED`, `ENTRY_DELETED`, `CONTENT_TYPE_SCHEMA_CHANGED` — with the same `contentTypeIds` scope, pointing at a service that writes to your engine. (Draft indexing is an internal-only nicety; external subscribers index the published lifecycle, which is all API-key / GraphQL readers ever see.)
+3. **Point your read path** at your engine — the bundled `/api/search` + `searchEntries` are Meilisearch-specific.
 
 ## Environment Variables
 
@@ -412,6 +446,7 @@ Search is treated as non-essential: if Meilisearch is unreachable, `/api/health`
 | `NUXT_SESSION_PASSWORD`              | Session encryption key (required in prod)                                                                       | Auto-generated in dev                              |
 | `MEILI_URL`                          | Meilisearch connection URL for the search sidecar.                                                              | `http://localhost:7700`                            |
 | `MEILI_MASTER_KEY`                   | Meilisearch API key. Required in production (CMS refuses to boot without it); dev sidecar runs unauthenticated. | unset (dev) / required (prod)                      |
+| `BOJECT_SEARCH_RATE_LIMIT_RPM`       | Per-caller (API key / IP) rate cap on `GET /api/search`, in requests per minute.                                | `120`                                              |
 | `BOJECT_SCHEMA_DIR`                  | Directory of `*.boject.json` files applied on every container boot.                                             | unset (skips the step)                             |
 | `BOJECT_SCHEMA_READONLY`             | Set to `true` to disable schema-editing endpoints + UI affordances.                                             | unset                                              |
 | `BOJECT_ALLOW_DESTRUCTIVE_SCHEMA`    | Set to `true` to let the entrypoint applier remove content types / fields on bundle changes.                    | unset                                              |
