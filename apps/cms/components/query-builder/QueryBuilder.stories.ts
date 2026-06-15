@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/vue3-vite';
+import type { Meta, StoryObj, Decorator } from '@storybook/vue3-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import QueryBuilder from './QueryBuilder.vue';
 import {
@@ -1162,5 +1162,71 @@ export const NarrowedFieldStepKeepsSystemRow: Story = {
         filters: [{ field: '$entryKey', op: 'eq', value: 'fix' }],
       })
     );
+  },
+};
+
+// --- Short-viewport scroll (#364) ---
+
+// On a short viewport the palette card must cap to the available height and make
+// the option list the scroll region: the input row (top) and keyboard-hint footer
+// (bottom) stay fixed while the dropdown scrolls — nothing clipped off-screen.
+// In the app, SearchPalette supplies the bound via `max-h-[76dvh] flex flex-col`;
+// here a bounded-height flex-column decorator stands in for it so the same
+// QueryBuilder card (`min-h-0`) + QueryDropdown (`flex-1 min-h-0 overflow-y-auto`)
+// scroll mechanism is exercised in isolation. The unscoped content-type step
+// (System + Content types groups) overflows the 280px bound.
+const BoundedHeightDecorator =
+  (height: number): Decorator =>
+  () => ({
+    setup: () => ({ h: `${height}px` }),
+    template: `<div :style="{ display: 'flex', flexDirection: 'column', height: h, maxHeight: h }"><story /></div>`,
+  });
+
+export const ScrollsInBoundedViewport: Story = {
+  decorators: [BoundedHeightDecorator(200)],
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const card = canvas.getByTestId(QA_QUERY_BUILDER.COMPONENT);
+    const chipRow = canvas.getByTestId(QA_QUERY_BUILDER.CHIP_ROW);
+    const dropdown = canvas.getByTestId(QA_QUERY_BUILDER.DROPDOWN);
+    const footer = canvas.getByTestId(QA_QUERY_BUILDER.FOOTER);
+
+    // The card fills, but never exceeds, the 200px bound — no off-screen growth.
+    expect(card.getBoundingClientRect().height).toBeLessThanOrEqual(202);
+
+    // The dropdown is the scroll region and its content overflows the bound.
+    expect(getComputedStyle(dropdown).overflowY).toBe('auto');
+    expect(dropdown.scrollHeight).toBeGreaterThan(dropdown.clientHeight);
+
+    // Input row (top) + footer (bottom) are visible and sit inside the card.
+    await expect(chipRow).toBeVisible();
+    await expect(footer).toBeVisible();
+    const cardBottom = card.getBoundingClientRect().bottom;
+    expect(footer.getBoundingClientRect().bottom).toBeLessThanOrEqual(
+      cardBottom + 1
+    );
+
+    // The last content type ("Report") is clipped below the dropdown fold first…
+    const report = canvas.getByRole('option', { name: 'Report' });
+    expect(report.getBoundingClientRect().bottom).toBeGreaterThan(
+      dropdown.getBoundingClientRect().bottom
+    );
+
+    const footerTop = footer.getBoundingClientRect().top;
+    const chipTop = chipRow.getBoundingClientRect().top;
+
+    // …scroll the dropdown to the bottom — only the list moves.
+    dropdown.scrollTop = dropdown.scrollHeight;
+    await waitFor(() => expect(dropdown.scrollTop).toBeGreaterThan(0));
+
+    // The input row + footer stayed put (they are NOT in the scroll region).
+    expect(footer.getBoundingClientRect().top).toBeCloseTo(footerTop, 1);
+    expect(chipRow.getBoundingClientRect().top).toBeCloseTo(chipTop, 1);
+
+    // …and the previously-clipped option is now within the dropdown's viewport.
+    const r = report.getBoundingClientRect();
+    const d = dropdown.getBoundingClientRect();
+    expect(r.bottom).toBeLessThanOrEqual(d.bottom + 1);
+    expect(r.top).toBeGreaterThanOrEqual(d.top - 1);
   },
 };

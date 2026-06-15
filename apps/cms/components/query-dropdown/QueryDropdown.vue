@@ -84,6 +84,12 @@ const isMultiValueStep = computed(() => {
 
 /** Whether an option id is the keyboard-highlighted one. */
 const isActive = (id: string) => props.activeId === id;
+
+// `shrink-0` keeps each option row at its `h-11` — as flex children of the
+// scrolling listbox they'd otherwise compress toward text-height before the list
+// scrolls. The rows hold their size; the container (below) does the scrolling.
+const buttonTW: string =
+  'flex shrink-0 items-center justify-between h-11 px-3 rounded-lg text-left hover:bg-elevated';
 </script>
 
 <template>
@@ -93,7 +99,7 @@ const isActive = (id: string) => props.activeId === id;
     role="listbox"
     aria-label="Search options"
     :aria-multiselectable="isMultiValueStep || undefined"
-    class="flex flex-col p-2 gap-0.5"
+    class="flex grow min-h-0 flex-col overflow-y-auto p-2 gap-0.5"
   >
     <button
       v-if="showFreeTextAction"
@@ -101,7 +107,7 @@ const isActive = (id: string) => props.activeId === id;
       type="button"
       role="option"
       :aria-selected="isActive('qb-opt-freetext')"
-      class="flex items-center gap-2.5 h-11 px-3 rounded-lg text-left"
+      class="flex shrink-0 items-center gap-2.5 h-11 px-3 rounded-lg text-left"
       :class="isActive('qb-opt-freetext') ? 'bg-accented' : 'bg-elevated'"
       :data-testid="QA_QUERY_DROPDOWN.FREE_TEXT_ACTION"
       @click="emit('runFreeText')"
@@ -123,7 +129,7 @@ const isActive = (id: string) => props.activeId === id;
       <template v-if="unscopedSystemFields.length">
         <div
           aria-hidden="true"
-          class="px-3 py-1 text-[11px] font-semibold tracking-wide text-dimmed uppercase"
+          class="shrink-0 px-3 py-1 text-[11px] font-semibold tracking-wide text-dimmed uppercase"
         >
           System
         </div>
@@ -134,8 +140,7 @@ const isActive = (id: string) => props.activeId === id;
           type="button"
           role="option"
           :aria-selected="isActive(`qb-opt-sys-${i}`)"
-          class="flex items-center h-11 px-3 rounded-lg text-left hover:bg-elevated"
-          :class="{ 'bg-elevated': isActive(`qb-opt-sys-${i}`) }"
+          :class="[buttonTW, { 'bg-elevated': isActive(`qb-opt-sys-${i}`) }]"
           :data-testid="QA_QUERY_DROPDOWN.OPTION(i)"
           @click="emit('pickField', f.identifier)"
         >
@@ -146,7 +151,7 @@ const isActive = (id: string) => props.activeId === id;
       </template>
       <div
         aria-hidden="true"
-        class="px-3 py-1 text-[11px] font-semibold tracking-wide text-dimmed uppercase"
+        class="shrink-0 px-3 py-1 text-[11px] font-semibold tracking-wide text-dimmed uppercase"
       >
         Content types
       </div>
@@ -157,8 +162,7 @@ const isActive = (id: string) => props.activeId === id;
         type="button"
         role="option"
         :aria-selected="isActive(`qb-opt-ct-${i}`)"
-        class="flex items-center h-12 px-3 rounded-lg text-left hover:bg-elevated"
-        :class="{ 'bg-elevated': isActive(`qb-opt-ct-${i}`) }"
+        :class="[buttonTW, { 'bg-elevated': isActive(`qb-opt-ct-${i}`) }]"
         :data-testid="QA_QUERY_DROPDOWN.OPTION(unscopedSystemFields.length + i)"
         @click="emit('pickContentType', c.id)"
       >
@@ -171,7 +175,7 @@ const isActive = (id: string) => props.activeId === id;
     <template v-else-if="state.step === STEPS.FIELD">
       <div
         aria-hidden="true"
-        class="px-3 py-1 text-[11px] font-semibold tracking-wide text-dimmed uppercase"
+        class="shrink-0 px-3 py-1 text-[11px] font-semibold tracking-wide text-dimmed uppercase"
       >
         Filter {{ ct?.name }} by field
       </div>
@@ -182,8 +186,7 @@ const isActive = (id: string) => props.activeId === id;
         type="button"
         role="option"
         :aria-selected="isActive(`qb-opt-field-${i}`)"
-        class="flex items-center justify-between h-11 px-3 rounded-lg text-left hover:bg-elevated"
-        :class="{ 'bg-elevated': isActive(`qb-opt-field-${i}`) }"
+        :class="[buttonTW, { 'bg-elevated': isActive(`qb-opt-field-${i}`) }]"
         :data-testid="QA_QUERY_DROPDOWN.OPTION(i)"
         @click="emit('pickField', f.identifier)"
       >
@@ -194,7 +197,7 @@ const isActive = (id: string) => props.activeId === id;
       <template v-if="systemFields.length">
         <div
           aria-hidden="true"
-          class="px-3 py-1 text-[11px] font-semibold tracking-wide text-dimmed uppercase"
+          class="shrink-0 px-3 py-1 text-[11px] font-semibold tracking-wide text-dimmed uppercase"
         >
           System
         </div>
@@ -205,10 +208,10 @@ const isActive = (id: string) => props.activeId === id;
           type="button"
           role="option"
           :aria-selected="isActive(`qb-opt-field-${fields.length + i}`)"
-          class="flex items-center justify-between h-11 px-3 rounded-lg text-left hover:bg-elevated"
-          :class="{
-            'bg-elevated': isActive(`qb-opt-field-${fields.length + i}`),
-          }"
+          :class="[
+            buttonTW,
+            { 'bg-elevated': isActive(`qb-opt-field-${fields.length + i}`) },
+          ]"
           :data-testid="QA_QUERY_DROPDOWN.OPTION(fields.length + i)"
           @click="emit('pickField', f.identifier)"
         >
@@ -227,8 +230,7 @@ const isActive = (id: string) => props.activeId === id;
         type="button"
         role="option"
         :aria-selected="isActive(`qb-opt-op-${i}`)"
-        class="flex items-center justify-between h-10 px-3 rounded-lg text-left hover:bg-elevated"
-        :class="{ 'bg-elevated': isActive(`qb-opt-op-${i}`) }"
+        :class="[buttonTW, { 'bg-elevated': isActive(`qb-opt-op-${i}`) }]"
         :data-testid="QA_QUERY_DROPDOWN.OPTION(i)"
         @click="emit('pickOperator', o.id)"
       >
