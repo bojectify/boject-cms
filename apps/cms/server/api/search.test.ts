@@ -5,9 +5,16 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../../generated/prisma/client';
 import { TEST_USERNAME, TEST_PASSWORD } from '../test/credentials';
 import { getTestDatabaseUrl } from '../../test/dbUrl';
-import { addTestDocuments, clearTestIndex } from '../test/meiliTestUtils';
+import {
+  addTestDocuments,
+  clearTestIndex,
+  waitForIndexing,
+} from '../test/meiliTestUtils';
 import type { SearchDocument } from '../utils/searchDocument';
 import type { RateLimitedBody } from '../utils/rateLimitEndpoint';
+import { runReindex } from '../../scripts/manage-search/reindex';
+import { meili } from '../utils/meili';
+import { resolveEntriesIndex } from '../utils/searchIndex';
 
 const prismaUrl = getTestDatabaseUrl();
 const prismaAdapter = new PrismaPg({ connectionString: prismaUrl });
@@ -947,6 +954,113 @@ describe('GET /api/search', async () => {
         colour: 'matchCentre.stats.possession',
         price: 1,
       });
+    });
+  });
+
+  describe('BOOLEAN default false — end-to-end acceptance (#344)', () => {
+    // The headline acceptance for #344: a BOOLEAN field whose options.default is
+    // `false` makes `filter=flag:eq:false` match an entry that was created
+    // WITHOUT supplying `flag` (applyFieldDefaults seeds `false` at create).
+    // This drives the FULL pipeline inline: direct-Prisma content type →
+    // POST /api/content-entries (omitting flag) → publish via PUT → runReindex
+    // the DB into the entries_test index → GET /api/search. No seeded Meili docs.
+    let boolTypeId: string;
+    const index = meili.index<SearchDocument>(resolveEntriesIndex());
+
+    beforeAll(async () => {
+      const ct = await prisma.contentType.create({
+        data: {
+          name: `BoolDefault344_${Date.now()}`,
+          identifier: `BoolDefault344_${Date.now()}`,
+          fields: {
+            create: [
+              {
+                identifier: 'title',
+                name: 'Title',
+                type: 'ENTRY_TITLE',
+                order: 0,
+                required: true,
+                unique: true,
+              },
+              {
+                identifier: 'flag',
+                name: 'Flag',
+                type: 'BOOLEAN',
+                order: 1,
+                options: { default: false },
+              },
+            ],
+          },
+        },
+      });
+      boolTypeId = ct.id;
+    });
+
+    afterAll(async () => {
+      await prisma.contentEntry.deleteMany({
+        where: { contentTypeId: boolTypeId },
+      });
+      await prisma.contentType.delete({ where: { id: boolTypeId } });
+    });
+
+    beforeEach(async () => {
+      await clearTestIndex();
+    });
+
+    it('filter=flag:eq:false matches an entry created without supplying flag', async () => {
+      const cookie = await getSessionCookie();
+      const identifier = (
+        await prisma.contentType.findUniqueOrThrow({
+          where: { id: boolTypeId },
+        })
+      ).identifier;
+
+      // Create an entry OMITTING `flag` — applyFieldDefaults seeds `false`.
+      const created = await $fetch<{ id: string; data: { flag: unknown } }>(
+        '/api/content-entries',
+        {
+          method: 'POST',
+          headers: { cookie, 'X-Forwarded-For': '203.0.113.80' },
+          body: {
+            contentTypeId: boolTypeId,
+            data: { title: `Bool Default ${Date.now()}` },
+          },
+        }
+      );
+      expect(created.data.flag).toBe(false);
+
+      // Publish so the entry is indexable. Omit `data` so publishEntry promotes
+      // the existing DRAFT (which carries the seeded `flag: false`) as-is —
+      // re-sending a payload without `flag` would drop it, since defaults are
+      // create-only and don't re-fire on publish.
+      await $fetch(`/api/content-entries/${created.id}`, {
+        method: 'PUT',
+        headers: { cookie, 'X-Forwarded-For': '203.0.113.80' },
+        body: { status: 'PUBLISHED' },
+      });
+
+      // Index the DB into the entries_test index via the reindex core, then
+      // wait for Meili to finish (mirrors the reindex/search test wait pattern).
+      await runReindex(
+        { prisma, index, logger: { info: () => {} } },
+        { contentType: identifier }
+      );
+      await waitForIndexing();
+
+      // flag:eq:false matches; flag:eq:true does NOT.
+      const matchesFalse = await search({
+        q: '',
+        contentType: identifier,
+        filter: 'flag:eq:false',
+      });
+      expect(matchesFalse.hits.map((h) => h.id)).toEqual([created.id]);
+
+      const matchesTrue = await search({
+        q: '',
+        contentType: identifier,
+        filter: 'flag:eq:true',
+      });
+      expect(matchesTrue.hits).toEqual([]);
     });
   });
 });
