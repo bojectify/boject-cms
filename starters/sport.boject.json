@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "exportedAt": "2026-05-13T12:22:41.676Z",
+  "exportedAt": "2026-06-15T20:42:46.922Z",
   "portable": true,
   "contentTypes": [
     {
@@ -253,7 +253,9 @@
           "type": "BOOLEAN",
           "required": false,
           "order": 11,
-          "options": null
+          "options": {
+            "default": false
+          }
         }
       ]
     },

@@ -253,7 +253,7 @@
           "type": "BOOLEAN",
           "required": false,
           "order": 11,
-          "options": null
+          "options": { "default": false }
         }
       ]
     },
