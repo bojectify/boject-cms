@@ -220,11 +220,13 @@ defineExpose({ validate: runValidation });
             size="xl"
           >
             <USelect
-              :model-value="(state[field.key] as string) ?? ''"
-              :items="field.options"
+              :model-value="selectModelValue(field.required, state[field.key])"
+              :items="selectItems(field.required, field.options)"
               value-key="value"
               class="w-full"
-              @update:model-value="state[field.key] = $event"
+              @update:model-value="
+                state[field.key] = $event === SELECT_NONE ? null : $event
+              "
             />
           </UFormField>
 
