@@ -201,6 +201,57 @@ describe('export → import round-trip', () => {
     expect(reimportedTagline?.unique).toBe(false);
   });
 
+  it('preserves a field default (options.default) through export → import (#344)', async () => {
+    // A field's `default` lives inside its `options` JSON. Because export
+    // serialises `options` verbatim and import writes it back verbatim, the
+    // default round-trips with zero default-aware code in the bundle path.
+    await reset();
+    await prisma.contentType.create({
+      data: {
+        identifier: 'DefaultRoundtrip',
+        name: 'DefaultRoundtrip',
+        fields: {
+          create: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: FIELD_TYPES.ENTRY_TITLE,
+              required: true,
+              unique: true,
+              order: 0,
+            },
+            {
+              identifier: 'flag',
+              name: 'Flag',
+              type: FIELD_TYPES.BOOLEAN,
+              required: false,
+              order: 1,
+              options: { default: false },
+            },
+          ],
+        },
+      },
+    });
+
+    const exported = await exportBundle(prisma, {
+      mode: 'schema',
+      portable: true,
+    });
+    const exportedFlag = exported
+      .contentTypes!.find((c) => c.identifier === 'DefaultRoundtrip')!
+      .fields.find((f) => f.identifier === 'flag')!;
+    expect(exportedFlag.options).toEqual({ default: false });
+
+    await reset();
+    await importBundle(prisma, exported, { mode: 'schema' });
+
+    const reimportedFlag = await prisma.contentTypeField.findFirst({
+      where: { identifier: 'flag' },
+    });
+    // The default survived the round-trip, byte-for-byte.
+    expect(reimportedFlag!.options).toEqual({ default: false });
+  });
+
   it('imports a legacy bundle (no unique field) with ENTRY_TITLE/SLUG implicit-true', async () => {
     // Simulates a bundle exported by an older version of the CMS that
     // didn't carry `unique`. ENTRY_TITLE and SLUG must still come in

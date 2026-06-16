@@ -51,11 +51,25 @@ watch(formName, (val) => {
   }
 });
 
-const canSave = computed(() => {
-  if (props.mode === 'add') {
-    return formName.value.trim() && formIdentifier.value.trim();
+// A required BOOLEAN must carry an explicit True/False default — "None" is not
+// a legal value for a required field, so block save until one is picked (#344).
+const requiredBooleanMissingDefault = computed(() => {
+  if (formType.value !== FIELD_TYPES.BOOLEAN || !formRequired.value) {
+    return false;
   }
-  return formName.value.trim();
+  const opts = formOptions.value;
+  const def = isObject(opts)
+    ? (opts as Record<string, unknown>).default
+    : undefined;
+  return def === undefined;
+});
+
+const canSave = computed(() => {
+  if (requiredBooleanMissingDefault.value) return false;
+  if (props.mode === 'add') {
+    return !!(formName.value.trim() && formIdentifier.value.trim());
+  }
+  return !!formName.value.trim();
 });
 
 const showUniqueToggle = computed(
@@ -248,6 +262,7 @@ const canDelete = computed(() => {
           :type="formType"
           :options="formOptions"
           :update-options="updateOptions"
+          :required="formRequired"
         />
 
         <!-- Danger zone (edit mode, non-ENTRY_TITLE) -->

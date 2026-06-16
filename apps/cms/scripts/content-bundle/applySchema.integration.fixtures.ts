@@ -158,3 +158,46 @@ export const dryRunArticleBundle: Bundle = makeBundle({
 export const blockedDryRunBundle: Bundle = makeBundle({
   contentTypes: [ct('BlockedDryRun', {}, [titleField()])],
 });
+
+/**
+ * Article with a title + a BOOLEAN `flag` field carrying `options.default:
+ * false` and a NUMBER `qty` field carrying `options.default: 0` (#344). The
+ * defaults ride inside `options`, so applySchema persists and diffs them like
+ * any other options key — a re-apply must be a no-op.
+ */
+export const articleWithFieldDefaults: Bundle = makeBundle({
+  contentTypes: [
+    ct('Article', {}, [
+      titleField(),
+      field('flag', FIELD_TYPES.BOOLEAN, {
+        name: 'Flag',
+        order: 1,
+        options: { default: false },
+      }),
+      field('qty', FIELD_TYPES.NUMBER, {
+        name: 'Qty',
+        order: 2,
+        options: { default: 0 },
+      }),
+    ]),
+  ],
+});
+
+/**
+ * Article with a required BOOLEAN `flag` carrying NO default (#344) — illegal,
+ * since "None" is not a legal value for a required field. applySchema must
+ * reject this with BUNDLE_INVALID before opening a transaction, closing the
+ * import-path gap where validateFieldDefault never ran.
+ */
+export const articleRequiredBooleanNoDefault: Bundle = makeBundle({
+  contentTypes: [
+    ct('Article', {}, [
+      titleField(),
+      field('flag', FIELD_TYPES.BOOLEAN, {
+        name: 'Flag',
+        order: 1,
+        required: true,
+      }),
+    ]),
+  ],
+});

@@ -4,6 +4,7 @@ import { withPrismaErrors } from '../../../../utils/prismaErrors';
 import { enforceMutationRateLimit } from '../../../../utils/rateLimitEndpoint';
 import { invalidateSchema } from '../../../../graphql/schema';
 import { resolveUniqueFlag } from '../../../../utils/validateFieldUnique';
+import { validateFieldDefault } from '../../../../utils/validateFieldDefault';
 import { assertSchemaEditable } from '../../../../utils/schemaReadOnly';
 import {
   parseFieldOptions,
@@ -110,6 +111,16 @@ export default defineEventHandler(async (event) => {
     }
     data.options = body.options ?? undefined;
   }
+
+  // Re-validate the field default against its effective (post-update) options
+  // and required flag (#344) — covers a `required` toggle even when `options`
+  // is unchanged. Rejects unsupported-type / type-mismatched defaults and a
+  // required BOOLEAN left without a True/False default.
+  const effectiveOptions = 'options' in body ? body.options : field.options;
+  const effectiveRequired =
+    'required' in body ? (body.required as boolean) : field.required;
+  validateFieldDefault(field.type, effectiveOptions, effectiveRequired);
+
   if ('unique' in body) {
     if (typeof body.unique !== 'boolean') {
       throw createError({

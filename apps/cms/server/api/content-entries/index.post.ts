@@ -4,6 +4,7 @@ import { translatePrismaError } from '../../utils/prismaErrors';
 import { enforceMutationRateLimit } from '../../utils/rateLimitEndpoint';
 import { assertApiKeyScope } from '../../utils/assertApiKeyScope';
 import { assertUniqueFieldValues } from '../../utils/assertUniqueFieldValues';
+import { applyFieldDefaults } from '../../utils/applyFieldDefaults';
 import { enrichEntryDataWithEmbedIdentifiers } from '../../utils/enrichRichtextEmbeds';
 import {
   enqueueWebhookDeliveries,
@@ -46,7 +47,11 @@ export default defineEventHandler(async (event) => {
       ? (body.data as Record<string, unknown>)
       : {};
 
-  const validatedData = await validateEntryData(rawData, contentType.fields);
+  const dataWithDefaults = applyFieldDefaults(rawData, contentType.fields);
+  const validatedData = await validateEntryData(
+    dataWithDefaults,
+    contentType.fields
+  );
   await assertUniqueFieldValues(
     validatedData,
     contentType.fields,

@@ -15,10 +15,12 @@ import type { Bundle, BundleField } from './types';
 import type { SchemaPlan } from './schemaPlan.types';
 import { effectiveBundleUnique } from './schemaPlan.types';
 import { validateBundle } from './validate';
+import { checkFieldDefault } from '../../utils/fieldDefaults';
 import {
   SchemaApplyBlockedError,
   SchemaApplyValidationError,
   SchemaChangedDuringApplyError,
+  type BundleValidationError,
 } from './applySchemaErrors';
 import { snapshotCurrentSchema } from './snapshotCurrentSchema';
 import { planSchema } from './planSchema';
@@ -97,6 +99,30 @@ export async function applySchema(
   const validation = validateBundle(bundle);
   if (!validation.ok) {
     throw new SchemaApplyValidationError(validation.errors);
+  }
+
+  // Semantic field-default validation (#344). The import path otherwise never
+  // runs validateFieldDefault, so without this a bundle could carry a default
+  // on an unsupported type, a type-mismatched default, or a required BOOLEAN
+  // with no True/False default — all rejected by the CMS UI + field REST API.
+  const defaultErrors: BundleValidationError[] = [];
+  for (const ct of bundle.contentTypes ?? []) {
+    for (const field of ct.fields) {
+      const message = checkFieldDefault(
+        field.type,
+        field.options,
+        field.required
+      );
+      if (message) {
+        defaultErrors.push({
+          path: `contentTypes.${ct.identifier}.fields.${field.identifier}`,
+          message,
+        });
+      }
+    }
+  }
+  if (defaultErrors.length > 0) {
+    throw new SchemaApplyValidationError(defaultErrors);
   }
 
   let captured: ApplySchemaResult | null = null;

@@ -7,7 +7,10 @@ import {
 
 export function useContentEntryEditor(
   contentTypeId: MaybeRefOrGetter<string>,
-  entryId: MaybeRefOrGetter<string>
+  entryId: MaybeRefOrGetter<string>,
+  fields?: MaybeRefOrGetter<
+    Array<{ identifier: string; type: string; options: unknown }>
+  >
 ) {
   const toast = useToast();
   const contentTypeIdRef = computed(() => toValue(contentTypeId));
@@ -63,8 +66,12 @@ export function useContentEntryEditor(
     return JSON.stringify(formState) !== snapshot.value;
   });
 
-  // Populate formState for new entries and take initial snapshot
+  // For a NEW entry, seed each supported field's configured default as the
+  // initial form value (#344), then snapshot so the default is the clean
+  // baseline (not flagged dirty). Existing entries hydrate from the fetched
+  // version below.
   if (isNew.value) {
+    Object.assign(formState, defaultsForFields(toValue(fields) ?? []));
     takeSnapshot();
   }
 

@@ -110,6 +110,7 @@ let testContentType: ContentTypeResponse;
  *   .40-.49   pre-existing unarchive lifecycle tests
  *   .50-.59   pre-existing republish lifecycle tests
  *   .60-.69   archiveFilter tests
+ *   .70-.79   field default values tests (#344)
  *   .180-.199 ad-hoc / one-off IPs (currently: .99, .183,
  *             .184-.186 entryKey derivation tests (#205),
  *             .187-.188 entryKey immutability tests (#205),
@@ -4301,6 +4302,178 @@ describe('Content Entry endpoints', async () => {
       const plainItem = plain.items.find((i) => i.id === main.id);
       expect(plainItem).toBeDefined();
       expect(plainItem).not.toHaveProperty('fields');
+    });
+  });
+
+  describe('field default values (#344)', () => {
+    // Direct-prisma content-type create (the #264 / #302 / #303 convention) so
+    // the `options.default` JSON is persisted verbatim, independent of whether
+    // the content-type API persists the `default` key. Defaults are configured
+    // on a BOOLEAN, a required NUMBER, and a SELECT field.
+    let defaultsCtId: string;
+
+    beforeAll(async () => {
+      const suffix = Date.now();
+      const ct = await prisma.contentType.create({
+        data: {
+          identifier: `FieldDefaults344_${suffix}`,
+          name: `Field Defaults 344 ${suffix}`,
+          fields: {
+            create: [
+              {
+                identifier: 'title',
+                name: 'Title',
+                type: FIELD_TYPES.ENTRY_TITLE,
+                order: 0,
+                required: true,
+                unique: true,
+              },
+              {
+                identifier: 'flag',
+                name: 'Flag',
+                type: FIELD_TYPES.BOOLEAN,
+                order: 1,
+                options: { default: false },
+              },
+              {
+                identifier: 'qty',
+                name: 'Qty',
+                type: FIELD_TYPES.NUMBER,
+                order: 2,
+                required: true,
+                options: { default: 0 },
+              },
+              {
+                identifier: 'status',
+                name: 'Status',
+                type: FIELD_TYPES.SELECT,
+                order: 3,
+                options: { choices: ['draft', 'live'], default: 'draft' },
+              },
+            ],
+          },
+        },
+      });
+      defaultsCtId = ct.id;
+    });
+
+    afterAll(async () => {
+      // Entries (and their cascade-deleted versions) must go before the type —
+      // the content_type FK on ContentEntry blocks deleting a referenced type.
+      await prisma.contentEntry.deleteMany({
+        where: { contentTypeId: defaultsCtId },
+      });
+      await prisma.contentType.delete({ where: { id: defaultsCtId } });
+    });
+
+    it('seeds BOOLEAN/NUMBER/SELECT defaults for absent fields on create', async () => {
+      const cookie = await getSessionCookie();
+      const created = await $fetch<EntryResponse>('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie, 'X-Forwarded-For': '203.0.113.70' },
+        body: {
+          contentTypeId: defaultsCtId,
+          data: { title: `Defaults A ${Date.now()}` },
+        },
+      });
+      expect(created.data.flag).toBe(false);
+      expect(created.data.qty).toBe(0);
+      expect(created.data.status).toBe('draft');
+    });
+
+    it('a NUMBER default satisfies a required field omitted from the payload', async () => {
+      const cookie = await getSessionCookie();
+      const res = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': '203.0.113.71',
+        },
+        body: JSON.stringify({
+          contentTypeId: defaultsCtId,
+          data: { title: `Defaults B ${Date.now()}` },
+        }),
+      });
+      // `qty` is required but omitted — its default `0` satisfies required.
+      expect(res.status).toBe(201);
+    });
+
+    it('rejects an explicit null on a required field (explicit clear is respected)', async () => {
+      const cookie = await getSessionCookie();
+      const res = await fetch('/api/content-entries', {
+        method: 'POST',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': '203.0.113.72',
+        },
+        body: JSON.stringify({
+          contentTypeId: defaultsCtId,
+          data: { title: `Defaults C ${Date.now()}`, qty: null },
+        }),
+      });
+      // Explicit null is not absent, so the default does not fill it and the
+      // required check fails.
+      expect(res.status).toBe(400);
+    });
+
+    it('explicit values override defaults on create', async () => {
+      const cookie = await getSessionCookie();
+      const created = await $fetch<EntryResponse>('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie, 'X-Forwarded-For': '203.0.113.73' },
+        body: {
+          contentTypeId: defaultsCtId,
+          data: {
+            title: `Defaults D ${Date.now()}`,
+            flag: true,
+            qty: 5,
+            status: 'live',
+          },
+        },
+      });
+      expect(created.data.flag).toBe(true);
+      expect(created.data.qty).toBe(5);
+      expect(created.data.status).toBe('live');
+    });
+
+    it('does NOT apply defaults on update (PUT)', async () => {
+      const cookie = await getSessionCookie();
+      const created = await $fetch<EntryResponse>('/api/content-entries', {
+        method: 'POST',
+        headers: { cookie, 'X-Forwarded-For': '203.0.113.74' },
+        body: {
+          contentTypeId: defaultsCtId,
+          data: {
+            title: `Defaults Update ${Date.now()}`,
+            flag: true,
+            qty: 5,
+            status: 'live',
+          },
+        },
+      });
+      expect(created.data.flag).toBe(true);
+
+      // PUT a payload that OMITS `flag`. Defaults are create-only, so the
+      // absent `flag` must NOT be seeded to `false` — validateEntryData maps an
+      // absent optional field to null.
+      const updated = await $fetch<EntryResponse>(
+        `/api/content-entries/${created.id}`,
+        {
+          method: 'PUT',
+          headers: { cookie, 'X-Forwarded-For': '203.0.113.74' },
+          body: {
+            data: {
+              title: `Defaults Update ${Date.now()}`,
+              qty: 7,
+              status: 'live',
+            },
+          },
+        }
+      );
+      expect(updated.data.flag).not.toBe(false);
+      expect(updated.data.flag).toBeNull();
     });
   });
 });

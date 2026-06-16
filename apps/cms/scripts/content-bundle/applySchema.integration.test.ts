@@ -30,6 +30,8 @@ import {
   newTypeBundle,
   dryRunArticleBundle,
   blockedDryRunBundle,
+  articleWithFieldDefaults,
+  articleRequiredBooleanNoDefault,
 } from './applySchema.integration.fixtures';
 
 const url = getTestDatabaseUrl();
@@ -103,6 +105,18 @@ describe('applySchema', () => {
       await expect(applySchema(prisma, malformedBundle)).rejects.toMatchObject({
         code: 'BUNDLE_INVALID',
       });
+    });
+
+    it('throws SchemaApplyValidationError for a required BOOLEAN with no default, DB unchanged (#344)', async () => {
+      await expect(
+        applySchema(prisma, articleRequiredBooleanNoDefault)
+      ).rejects.toThrow(/required BOOLEAN/i);
+      await expect(
+        applySchema(prisma, articleRequiredBooleanNoDefault)
+      ).rejects.toMatchObject({ code: 'BUNDLE_INVALID' });
+
+      // Rejected before the transaction — nothing was created.
+      expect(await prisma.contentType.count()).toBe(0);
     });
   });
 
@@ -497,6 +511,33 @@ describe('applySchema', () => {
         where: { identifier: 'oldField' },
       });
       expect(gone).toBeNull();
+    });
+  });
+
+  describe('field defaults (#344)', () => {
+    it('persists options.default on a fresh apply and is idempotent on re-apply', async () => {
+      // First apply: creates Article with a BOOLEAN `flag` default false and a
+      // NUMBER `qty` default 0. The defaults ride inside `options`.
+      const first = await applySchema(prisma, articleWithFieldDefaults);
+      expect(first.changed).toBe(true);
+      expect(first.applied.contentTypesCreated).toBe(1);
+
+      const flag = await prisma.contentTypeField.findFirst({
+        where: { identifier: 'flag' },
+      });
+      const qty = await prisma.contentTypeField.findFirst({
+        where: { identifier: 'qty' },
+      });
+      expect(flag!.options).toEqual({ default: false });
+      expect(qty!.options).toEqual({ default: 0 });
+
+      // Second apply of the SAME bundle: applySchema diffs `options`, so the
+      // unchanged defaults make the re-apply a complete no-op (no field churn).
+      const second = await applySchema(prisma, articleWithFieldDefaults);
+      expect(second.changed).toBe(false);
+      expect(second.applied.fieldsCreated).toBe(0);
+      expect(second.applied.fieldsUpdated).toBe(0);
+      expect(second.applied.fieldsRemoved).toBe(0);
     });
   });
 
