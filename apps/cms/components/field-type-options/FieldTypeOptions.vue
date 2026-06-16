@@ -38,11 +38,22 @@ const linkTargetContentTypeIds = computed(() =>
     : []
 );
 
-const booleanDefault = computed(() =>
-  parsed.value?.type === FIELD_TYPES.BOOLEAN
-    ? (parsed.value.default ?? false)
-    : false
+// Raw configured default: `true`, `false`, or `undefined` (no default). Kept
+// undefined-distinct (no `?? false`) so the tri-state control can highlight
+// "None" separately from an explicit "False".
+const booleanDefault = computed<boolean | undefined>(() =>
+  parsed.value?.type === FIELD_TYPES.BOOLEAN ? parsed.value.default : undefined
 );
+
+// A required BOOLEAN must default to True or False — "None" is disabled in the
+// control and the modal blocks save while this holds (#344).
+const requiredBooleanDefaultMissing = computed(
+  () =>
+    props.type === FIELD_TYPES.BOOLEAN &&
+    !!props.required &&
+    booleanDefault.value === undefined
+);
+
 const numberDefault = computed(() =>
   parsed.value?.type === FIELD_TYPES.NUMBER
     ? (parsed.value.default ?? null)
@@ -96,11 +107,22 @@ function onChoicesUpdate(val: string) {
       />
     </UFormField>
   </template>
-  <UFormField v-else-if="type === FIELD_TYPES.BOOLEAN" label="Default value">
-    <USwitch
-      :data-testid="QA_FIELD_TYPE_OPTIONS.DEFAULT"
+  <UFormField
+    v-else-if="type === FIELD_TYPES.BOOLEAN"
+    label="Default value"
+    :error="
+      requiredBooleanDefaultMissing
+        ? 'Required boolean fields must default to True or False.'
+        : undefined
+    "
+  >
+    <BooleanTriState
+      :test-id="QA_FIELD_TYPE_OPTIONS.DEFAULT"
       :model-value="booleanDefault"
-      @update:model-value="(v: boolean) => updateOptions({ default: v })"
+      :disable-none="required"
+      @update:model-value="
+        (v: boolean | undefined) => updateOptions({ default: v })
+      "
     />
   </UFormField>
   <UFormField v-else-if="type === FIELD_TYPES.NUMBER" label="Default value">

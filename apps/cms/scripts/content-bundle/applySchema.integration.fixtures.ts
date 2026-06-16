@@ -182,3 +182,22 @@ export const articleWithFieldDefaults: Bundle = makeBundle({
     ]),
   ],
 });
+
+/**
+ * Article with a required BOOLEAN `flag` carrying NO default (#344) — illegal,
+ * since "None" is not a legal value for a required field. applySchema must
+ * reject this with BUNDLE_INVALID before opening a transaction, closing the
+ * import-path gap where validateFieldDefault never ran.
+ */
+export const articleRequiredBooleanNoDefault: Bundle = makeBundle({
+  contentTypes: [
+    ct('Article', {}, [
+      titleField(),
+      field('flag', FIELD_TYPES.BOOLEAN, {
+        name: 'Flag',
+        order: 1,
+        required: true,
+      }),
+    ]),
+  ],
+});

@@ -109,10 +109,18 @@ export default defineEventHandler(async (event) => {
         });
       }
     }
-    // Validate a configured default value (#344) against the field's type.
-    validateFieldDefault(field.type, body.options);
     data.options = body.options ?? undefined;
   }
+
+  // Re-validate the field default against its effective (post-update) options
+  // and required flag (#344) — covers a `required` toggle even when `options`
+  // is unchanged. Rejects unsupported-type / type-mismatched defaults and a
+  // required BOOLEAN left without a True/False default.
+  const effectiveOptions = 'options' in body ? body.options : field.options;
+  const effectiveRequired =
+    'required' in body ? (body.required as boolean) : field.required;
+  validateFieldDefault(field.type, effectiveOptions, effectiveRequired);
+
   if ('unique' in body) {
     if (typeof body.unique !== 'boolean') {
       throw createError({

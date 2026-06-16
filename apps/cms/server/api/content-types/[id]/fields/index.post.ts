@@ -110,9 +110,12 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  // Validate a configured default value (#344): reject on unsupported types and
-  // reject a default failing the per-type zod rules (incl. SELECT ∉ choices).
-  validateFieldDefault(type, body.options);
+  const required = typeof body.required === 'boolean' ? body.required : false;
+
+  // Validate a configured default value (#344): reject on unsupported types,
+  // reject a default failing the per-type zod rules (incl. SELECT ∉ choices),
+  // and reject a required BOOLEAN with no True/False default.
+  validateFieldDefault(type, body.options, required);
 
   // Check content type exists and load existing fields
   const contentType = await prisma.contentType.findUnique({
@@ -166,8 +169,7 @@ export default defineEventHandler(async (event) => {
             identifier: fieldIdentifier,
             name,
             type,
-            required:
-              typeof body.required === 'boolean' ? body.required : false,
+            required,
             unique: uniqueFlag,
             order: maxOrder + 1,
             options: body.options ?? undefined,

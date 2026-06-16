@@ -57,6 +57,12 @@ function fromDatetimeLocal(val: string): string {
   return new Date(val).toISOString();
 }
 
+// Narrow a raw JSONB field value to the BooleanTriState model: only real
+// booleans pass through; null/undefined/anything else reads as "None".
+function booleanFieldValue(v: unknown): boolean | undefined {
+  return typeof v === 'boolean' ? v : undefined;
+}
+
 function validate(formData: Record<string, unknown>): FormError[] {
   const errors: FormError[] = [];
   const knownKeys = new Set(props.fields.map((f) => f.key));
@@ -177,13 +183,15 @@ defineExpose({ validate: runValidation });
 
           <UFormField
             v-else-if="field.type === 'boolean'"
+            :label="field.label"
             :name="field.key"
+            :required="field.required"
             size="xl"
           >
-            <USwitch
-              :model-value="(state[field.key] as boolean) ?? false"
-              :label="field.label"
-              @update:model-value="state[field.key] = $event"
+            <BooleanTriState
+              :model-value="booleanFieldValue(state[field.key])"
+              :disable-none="field.required"
+              @update:model-value="state[field.key] = $event ?? null"
             />
           </UFormField>
 

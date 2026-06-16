@@ -28,6 +28,7 @@ export interface BooleanFieldConfig {
   type: 'boolean';
   key: string;
   label: string;
+  required?: boolean;
 }
 
 export interface DatetimeFieldConfig {

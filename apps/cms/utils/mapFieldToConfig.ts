@@ -37,6 +37,7 @@ export function mapFieldToConfig(field: {
         type: 'boolean',
         key: field.identifier,
         label: field.name,
+        required: field.required,
       };
     case FIELD_TYPES.DATETIME:
       return {

@@ -31,6 +31,7 @@ import {
   dryRunArticleBundle,
   blockedDryRunBundle,
   articleWithFieldDefaults,
+  articleRequiredBooleanNoDefault,
 } from './applySchema.integration.fixtures';
 
 const url = getTestDatabaseUrl();
@@ -104,6 +105,18 @@ describe('applySchema', () => {
       await expect(applySchema(prisma, malformedBundle)).rejects.toMatchObject({
         code: 'BUNDLE_INVALID',
       });
+    });
+
+    it('throws SchemaApplyValidationError for a required BOOLEAN with no default, DB unchanged (#344)', async () => {
+      await expect(
+        applySchema(prisma, articleRequiredBooleanNoDefault)
+      ).rejects.toThrow(/required BOOLEAN/i);
+      await expect(
+        applySchema(prisma, articleRequiredBooleanNoDefault)
+      ).rejects.toMatchObject({ code: 'BUNDLE_INVALID' });
+
+      // Rejected before the transaction — nothing was created.
+      expect(await prisma.contentType.count()).toBe(0);
     });
   });
 

@@ -487,11 +487,12 @@ async function onFieldReorder() {
       @save="handleFieldSave"
       @delete="handleFieldDelete"
     >
-      <template #type-options="{ type, options, updateOptions }">
+      <template #type-options="{ type, options, updateOptions, required }">
         <FieldTypeOptions
           :type="type"
           :options="options"
           :update-options="updateOptions"
+          :required="required"
           :content-type-options="contentTypeOptions ?? []"
         />
       </template>

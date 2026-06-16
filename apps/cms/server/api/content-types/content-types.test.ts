@@ -2017,6 +2017,86 @@ describe('Content Type endpoints', async () => {
       });
       expect(res.status).toBe(400);
     });
+
+    it('rejects a required BOOLEAN with no default (POST)', async () => {
+      const cookie = await getSessionCookie();
+      const ctId = await getCtId();
+      const res = await fetch(`/api/content-types/${ctId}/fields`, {
+        method: 'POST',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': '203.0.113.250',
+        },
+        body: JSON.stringify({
+          identifier: 'mustFlag',
+          name: 'Must Flag',
+          type: FIELD_TYPES.BOOLEAN,
+          required: true,
+        }),
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('accepts a required BOOLEAN that carries an explicit default (POST)', async () => {
+      const cookie = await getSessionCookie();
+      const ctId = await getCtId();
+      const field = await $fetch<FieldResponse>(
+        `/api/content-types/${ctId}/fields`,
+        {
+          method: 'POST',
+          headers: { cookie, 'X-Forwarded-For': '203.0.113.251' },
+          body: {
+            identifier: 'reqFlag',
+            name: 'Req Flag',
+            type: FIELD_TYPES.BOOLEAN,
+            required: true,
+            options: { default: false },
+          },
+        }
+      );
+      expect(field.options).toEqual({ default: false });
+    });
+
+    it('rejects toggling required onto a BOOLEAN with no default (PUT), accepts it with one', async () => {
+      const cookie = await getSessionCookie();
+      const ctId = await getCtId();
+      const added = await $fetch<FieldResponse>(
+        `/api/content-types/${ctId}/fields`,
+        {
+          method: 'POST',
+          headers: { cookie, 'X-Forwarded-For': '203.0.113.252' },
+          body: {
+            identifier: 'optFlag',
+            name: 'Opt Flag',
+            type: FIELD_TYPES.BOOLEAN,
+          },
+        }
+      );
+
+      // required toggle alone, no default → 400 (options untouched).
+      const res = await fetch(`/api/content-types/${ctId}/fields/${added.id}`, {
+        method: 'PUT',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': '203.0.113.252',
+        },
+        body: JSON.stringify({ required: true }),
+      });
+      expect(res.status).toBe(400);
+
+      // required + an explicit default → accepted.
+      const ok = await $fetch<FieldResponse>(
+        `/api/content-types/${ctId}/fields/${added.id}`,
+        {
+          method: 'PUT',
+          headers: { cookie, 'X-Forwarded-For': '203.0.113.252' },
+          body: { required: true, options: { default: true } },
+        }
+      );
+      expect(ok.options).toMatchObject({ default: true });
+    });
   });
 
   describe('GET /api/content-types/options', () => {
