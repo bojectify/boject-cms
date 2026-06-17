@@ -102,7 +102,14 @@ export default defineNuxtConfig({
         base: './storage/images/transforms',
       },
     },
-    storage: buildStorageConfig(),
+    storage: {
+      ...buildStorageConfig(),
+      // Cache backend for the caching epic (#254). Redis via the unstorage
+      // redis driver; REDIS_URL overrides the ioredis default of
+      // localhost:6379. Kept inline (not in buildStorageConfig) because that
+      // helper is shared with the standalone bundle CLI, which has no cache.
+      cache: { driver: 'redis', url: process.env.REDIS_URL },
+    },
     experimental: { tasks: true },
     scheduledTasks: {
       '0 3 * * *': ['webhooks:cleanup'],
