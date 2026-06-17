@@ -13,6 +13,7 @@ services:
       - '127.0.0.1:5050:5050' # Prisma Studio (forwarded to dev; 5050 keeps host 5555 free for the dev Docker registry in docker-compose.dev.yml)
       - '127.0.0.1:24678:24678' # Vite HMR websocket (forwarded to dev)
       - '127.0.0.1:7700:7700' # Meilisearch (forwarded to dev via shared db namespace)
+      - '127.0.0.1:6379:6379' # Redis (forwarded to dev via shared db namespace)
     environment:
       POSTGRES_USER: boject
       POSTGRES_PASSWORD: boject
@@ -77,6 +78,11 @@ services:
       # works. Override on the host to point dev/tests at a remote engine.
       MEILI_URL: ${MEILI_URL:-}
       MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-}
+      # Cache backend (caching epic #254). The redis service below shares db's
+      # network namespace, so REDIS_URL=redis://localhost:6379 just works;
+      # ioredis even defaults to localhost:6379 when REDIS_URL is unset.
+      # Override on the host to point dev at a remote cache.
+      REDIS_URL: ${REDIS_URL:-}
 
   meilisearch:
     image: getmeili/meilisearch:v1.45.2
@@ -96,6 +102,22 @@ services:
       MEILI_NO_ANALYTICS: 'true'
     volumes:
       - meilidata:/meili_data
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    # Share db's network namespace (same reasoning as `dev` and
+    # `meilisearch`): `localhost:6379` inside dev — and on the host, via db's
+    # published 6379 port — resolves to Redis. Keeps
+    # REDIS_URL=redis://localhost:6379 identical for containerised and native
+    # dev with no .env rewriting.
+    network_mode: 'service:db'
+    depends_on:
+      - db
+    # Cache only — no persistence. --save "" disables RDB snapshots,
+    # --appendonly no disables the AOF, and there is no volume, so the cache
+    # holds data in memory and restarts cold by design.
+    command: redis-server --save "" --appendonly no
 
 volumes:
   pgdata:
