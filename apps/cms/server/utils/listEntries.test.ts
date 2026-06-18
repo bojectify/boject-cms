@@ -3,6 +3,8 @@ import {
   buildEntryListWhere,
   parseArchiveFilter,
   resolveDisplayVersion,
+  encodeCursor,
+  decodeCursor,
 } from './listEntries';
 import type { ContentStatus } from '#prisma';
 
@@ -113,5 +115,29 @@ describe('resolveDisplayVersion', () => {
         archiveFilter: 'active',
       })
     ).toBeNull();
+  });
+});
+
+describe('cursor codec', () => {
+  const id = '11111111-1111-4111-8111-111111111111';
+  it('round-trips (updatedAt, id)', () => {
+    const at = new Date('2026-06-18T10:00:00.000Z');
+    const decoded = decodeCursor(encodeCursor(at, id));
+    expect(decoded).not.toBeNull();
+    expect(decoded!.id).toBe(id);
+    expect(decoded!.updatedAt.getTime()).toBe(at.getTime());
+  });
+  it('rejects malformed input', () => {
+    expect(decodeCursor('')).toBeNull();
+    expect(decodeCursor('not-base64-$$')).toBeNull();
+    expect(
+      decodeCursor(Buffer.from('noseparator').toString('base64url'))
+    ).toBeNull();
+    expect(
+      decodeCursor(Buffer.from('abc_' + id).toString('base64url'))
+    ).toBeNull(); // non-numeric ms
+    expect(
+      decodeCursor(Buffer.from('123_not-a-uuid').toString('base64url'))
+    ).toBeNull(); // bad id
   });
 });

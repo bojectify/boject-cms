@@ -4,6 +4,7 @@ import {
   type ContentStatusName,
 } from '../../utils/contentStatus';
 import { getVersionForContext } from './resolveVersion';
+import { isUuid } from './validation';
 
 export const VALID_ARCHIVE_FILTERS = ['active', 'archived', 'all'] as const;
 export type ArchiveFilter = (typeof VALID_ARCHIVE_FILTERS)[number];
@@ -143,4 +144,31 @@ export function resolveDisplayVersion<V extends { status: ContentStatus }>(
       versions.find((v) => v.status === CONTENT_STATUSES.ARCHIVED) ?? null;
   }
   return version ?? null;
+}
+
+export class InvalidCursorError extends Error {
+  constructor() {
+    super('Invalid cursor');
+    this.name = 'InvalidCursorError';
+  }
+}
+
+/** Opaque forward/backward cursor over (updatedAt, id). `updatedAt` is
+ *  timestamp(3) so epoch-ms round-trips exactly; id is a UUID (no `_`), so the
+ *  first `_` is an unambiguous separator. */
+export function encodeCursor(updatedAt: Date, id: string): string {
+  return Buffer.from(`${updatedAt.getTime()}_${id}`).toString('base64url');
+}
+
+export function decodeCursor(
+  cursor: string
+): { updatedAt: Date; id: string } | null {
+  const raw = Buffer.from(cursor, 'base64url').toString('utf8');
+  const sep = raw.indexOf('_');
+  if (sep <= 0) return null;
+  const ms = Number(raw.slice(0, sep));
+  const id = raw.slice(sep + 1);
+  if (!Number.isFinite(ms) || ms < 0) return null;
+  if (!isUuid(id)) return null;
+  return { updatedAt: new Date(ms), id };
 }
