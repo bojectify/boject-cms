@@ -1,10 +1,25 @@
-import type { Prisma, ContentStatus, PrismaClient } from '#prisma';
+import type {
+  Prisma,
+  ContentStatus,
+  PrismaClient,
+  ContentEntry,
+} from '#prisma';
 import {
   CONTENT_STATUSES,
   type ContentStatusName,
 } from '../../utils/contentStatus';
-import { getVersionForContext } from './resolveVersion';
+import {
+  getVersionForContext,
+  flattenEntryWithVersion,
+} from './resolveVersion';
+import { projectEntryDataColumns } from './projectEntryColumns';
+import { hydrateRelationColumns } from './hydrateRelationColumns';
+import type { resolveContentTypeFieldTypesById } from './searchFieldTypes';
 import { isUuid } from './validation';
+
+type FieldTypeMap = Awaited<
+  ReturnType<typeof resolveContentTypeFieldTypesById>
+>;
 
 export const VALID_ARCHIVE_FILTERS = ['active', 'archived', 'all'] as const;
 export type ArchiveFilter = (typeof VALID_ARCHIVE_FILTERS)[number];
@@ -171,4 +186,58 @@ export function decodeCursor(
   if (!Number.isFinite(ms) || ms < 0) return null;
   if (!isUuid(id)) return null;
   return { updatedAt: new Date(ms), id };
+}
+
+export interface ResolveEntriesCtx {
+  isCms: boolean;
+  archiveFilter: ArchiveFilter;
+  columns?: string[];
+  fieldTypes?: FieldTypeMap;
+}
+
+/** Per-entry: pick the context-appropriate version (≤1 DB query for all rows
+ *  via fetchDisplayVersions), flatten it onto the envelope, optionally project +
+ *  hydrate data-grid `columns`. Shared by /api/entries and the public endpoint
+ *  (#256). Rows with no resolvable version are dropped. */
+export async function resolveAndFlattenEntries(
+  prisma: PrismaClient,
+  envelopeRows: ContentEntry[],
+  ctx: ResolveEntriesCtx
+): Promise<
+  Array<Record<string, unknown> & { fields?: Record<string, unknown> }>
+> {
+  const versionsByEntry = await fetchDisplayVersions(
+    prisma,
+    envelopeRows.map((e) => e.id),
+    { includeData: true }
+  );
+  const items = envelopeRows
+    .map((entry) => {
+      const version = resolveDisplayVersion(
+        versionsByEntry.get(entry.id) ?? [],
+        {
+          isCms: ctx.isCms,
+          archiveFilter: ctx.archiveFilter,
+        }
+      );
+      if (!version) return null;
+      return flattenEntryWithVersion(
+        entry,
+        version,
+        ctx.columns?.length
+          ? {
+              fields: projectEntryDataColumns(
+                version.data,
+                ctx.columns,
+                ctx.fieldTypes!
+              ),
+            }
+          : undefined
+      );
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null);
+  if (ctx.columns?.length) {
+    await hydrateRelationColumns(items, ctx.columns, ctx.fieldTypes!);
+  }
+  return items;
 }

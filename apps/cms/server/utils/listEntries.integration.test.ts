@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { prisma } from './prisma';
-import { fetchDisplayVersions } from './listEntries';
+import { fetchDisplayVersions, resolveAndFlattenEntries } from './listEntries';
 import { CONTENT_STATUSES } from '../../utils/contentStatus';
 
 describe('fetchDisplayVersions', () => {
@@ -130,5 +130,104 @@ describe('fetchDisplayVersions', () => {
     expect(new Set((byEntry.get(secondId) ?? []).map((r) => r.status))).toEqual(
       new Set(['PUBLISHED'])
     );
+  });
+});
+
+describe('resolveAndFlattenEntries', () => {
+  let entryId: string;
+
+  beforeEach(async () => {
+    await prisma.contentEntry.deleteMany();
+    await prisma.contentTypeField.deleteMany();
+    await prisma.contentType.deleteMany();
+
+    const ct = await prisma.contentType.create({
+      data: {
+        identifier: 'FetchThing',
+        name: 'FetchThing',
+        fields: {
+          create: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: 'ENTRY_TITLE',
+              required: true,
+              order: 0,
+            },
+          ],
+        },
+      },
+    });
+
+    const entry = await prisma.contentEntry.create({
+      data: {
+        contentTypeId: ct.id,
+        entryTitle: 'Heavy History',
+        entryKey: 'heavy-history',
+        slug: 'heavy-history',
+        versions: {
+          create: [
+            {
+              data: { title: 'Heavy History' },
+              entryTitle: 'Heavy History',
+              status: CONTENT_STATUSES.PUBLISHED,
+              publishedAt: new Date(),
+            },
+            {
+              data: { title: 'Heavy History (draft)' },
+              entryTitle: 'Heavy History',
+              status: CONTENT_STATUSES.CHANGED,
+            },
+          ],
+        },
+      },
+    });
+    entryId = entry.id;
+
+    for (let i = 0; i < 30; i++) {
+      await prisma.contentEntryVersion.create({
+        data: {
+          entryId,
+          data: { title: `archived ${i}` },
+          entryTitle: 'Heavy History',
+          status: CONTENT_STATUSES.ARCHIVED,
+          publishedAt: new Date(2020, 0, i + 1),
+        },
+      });
+    }
+  });
+
+  it('CMS sees the draft-priority (CHANGED) version flattened', async () => {
+    const ct = await prisma.contentType.findUniqueOrThrow({
+      where: { identifier: 'FetchThing' },
+    });
+    const rows = await prisma.contentEntry.findMany({
+      where: { contentTypeId: ct.id },
+    });
+    const items = await resolveAndFlattenEntries(prisma, rows, {
+      isCms: true,
+      archiveFilter: 'active',
+    });
+    const item = items.find((i) => i.id === entryId)!;
+    expect(item).toBeDefined();
+    expect(item.status).toBe('CHANGED');
+    expect((item.data as { title: string }).title).toBe(
+      'Heavy History (draft)'
+    );
+  });
+
+  it('API-key context sees the PUBLISHED version', async () => {
+    const ct = await prisma.contentType.findUniqueOrThrow({
+      where: { identifier: 'FetchThing' },
+    });
+    const rows = await prisma.contentEntry.findMany({
+      where: { contentTypeId: ct.id },
+    });
+    const items = await resolveAndFlattenEntries(prisma, rows, {
+      isCms: false,
+      archiveFilter: 'active',
+    });
+    const item = items.find((i) => i.id === entryId)!;
+    expect(item.status).toBe('PUBLISHED');
   });
 });

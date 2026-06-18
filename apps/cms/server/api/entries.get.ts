@@ -1,22 +1,19 @@
 import { assertUuid } from '../utils/validation';
-import { isCmsRequest, flattenEntryWithVersion } from '../utils/resolveVersion';
+import { isCmsRequest } from '../utils/resolveVersion';
 import {
   CONTENT_STATUS_NAMES,
   type ContentStatusName,
 } from '../../utils/contentStatus';
 import {
   buildEntryListWhere,
-  fetchDisplayVersions,
   parseArchiveFilter,
-  resolveDisplayVersion,
+  resolveAndFlattenEntries,
 } from '../utils/listEntries';
 import {
   parseColumnsParam,
   filterColumnableColumns,
 } from '../../utils/searchColumns';
 import { resolveContentTypeFieldTypesById } from '../utils/searchFieldTypes';
-import { projectEntryDataColumns } from '../utils/projectEntryColumns';
-import { hydrateRelationColumns } from '../utils/hydrateRelationColumns';
 
 const VALID_STATUSES = new Set<string>(CONTENT_STATUS_NAMES);
 
@@ -68,40 +65,12 @@ export default defineEventHandler(async (event) => {
     prisma.contentEntry.count({ where }),
   ]);
 
-  const versionsByEntry = await fetchDisplayVersions(
-    prisma,
-    entries.map((e) => e.id),
-    { includeData: true }
-  );
-
-  const items: Array<
-    Record<string, unknown> & { fields?: Record<string, unknown> }
-  > = entries
-    .map((entry) => {
-      const version = resolveDisplayVersion(
-        versionsByEntry.get(entry.id) ?? [],
-        { isCms, archiveFilter }
-      );
-      if (!version) return null;
-      return flattenEntryWithVersion(
-        entry,
-        version,
-        columns.length
-          ? {
-              fields: projectEntryDataColumns(
-                version.data,
-                columns,
-                fieldTypes
-              ),
-            }
-          : undefined
-      );
-    })
-    .filter((item): item is NonNullable<typeof item> => item !== null);
-
-  // Upgrade RELATION/MULTIRELATION column cells from bare entry id(s) to
-  // { entryId, entryTitle } via one batched lookup — identical to /api/search.
-  if (columns.length) await hydrateRelationColumns(items, columns, fieldTypes);
+  const items = await resolveAndFlattenEntries(prisma, entries, {
+    isCms,
+    archiveFilter,
+    columns,
+    fieldTypes,
+  });
 
   return { items, total };
 });
