@@ -75,7 +75,7 @@ export async function ensurePerfDbBootstrap(
 
   // Scopes the perf key needs:
   // - content:read   → GraphQL queries (graphql-flat, graphql-sitemap)
-  // - content:write  → POST /api/content-entries
+  // - content:write  → POST /api/entries
   // - schema:read    → GET /api/schema/export (used by `boject perf seed`
   //                    to introspect the live schema before generating)
   const PERF_KEY_SCOPES = ['content:read', 'content:write', 'schema:read'];

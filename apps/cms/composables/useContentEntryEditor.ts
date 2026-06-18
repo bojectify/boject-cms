@@ -29,7 +29,7 @@ export function useContentEntryEditor(
     loadingStatus.value = 'pending';
     try {
       entry.value = await useRequestFetch()<Record<string, unknown>>(
-        `/api/content-entries/${entryIdRef.value}`
+        `/api/entries/${entryIdRef.value}`
       );
       loadingStatus.value = 'success';
     } catch {
@@ -107,7 +107,7 @@ export function useContentEntryEditor(
     try {
       const data = { ...formState };
       if (isNew.value) {
-        const created = await $fetch<{ id: string }>('/api/content-entries', {
+        const created = await $fetch<{ id: string }>('/api/entries', {
           method: 'POST',
           body: { contentTypeId: contentTypeIdRef.value, data },
         });
@@ -118,7 +118,7 @@ export function useContentEntryEditor(
         });
         return created.id;
       } else {
-        await $fetch(`/api/content-entries/${entryIdRef.value}`, {
+        await $fetch(`/api/entries/${entryIdRef.value}`, {
           method: 'PUT',
           body: { data },
         });
@@ -160,7 +160,7 @@ export function useContentEntryEditor(
     try {
       const data = { ...formState };
       if (isNew.value) {
-        const created = await $fetch<{ id: string }>('/api/content-entries', {
+        const created = await $fetch<{ id: string }>('/api/entries', {
           method: 'POST',
           body: {
             contentTypeId: contentTypeIdRef.value,
@@ -175,7 +175,7 @@ export function useContentEntryEditor(
         });
         return created.id;
       } else {
-        await $fetch(`/api/content-entries/${entryIdRef.value}`, {
+        await $fetch(`/api/entries/${entryIdRef.value}`, {
           method: 'PUT',
           body: { data, status: CONTENT_STATUSES.PUBLISHED },
         });
@@ -214,7 +214,7 @@ export function useContentEntryEditor(
     isSaving.value = true;
     saveError.value = null;
     try {
-      await $fetch(`/api/content-entries/${entryIdRef.value}/draft`, {
+      await $fetch(`/api/entries/${entryIdRef.value}/draft`, {
         method: 'DELETE',
       });
       await refresh();

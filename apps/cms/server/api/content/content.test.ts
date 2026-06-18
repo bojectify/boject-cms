@@ -131,7 +131,7 @@ describe('Content API filters', async () => {
     });
 
     // Seed entries for the blog post type: 2 PUBLISHED, 1 DRAFT
-    await $fetch<EntryResponse>('/api/content-entries', {
+    await $fetch<EntryResponse>('/api/entries', {
       method: 'POST',
       headers: { cookie },
       body: {
@@ -140,7 +140,7 @@ describe('Content API filters', async () => {
         status: CONTENT_STATUSES.PUBLISHED,
       },
     });
-    await $fetch<EntryResponse>('/api/content-entries', {
+    await $fetch<EntryResponse>('/api/entries', {
       method: 'POST',
       headers: { cookie },
       body: {
@@ -149,7 +149,7 @@ describe('Content API filters', async () => {
         status: CONTENT_STATUSES.PUBLISHED,
       },
     });
-    await $fetch<EntryResponse>('/api/content-entries', {
+    await $fetch<EntryResponse>('/api/entries', {
       method: 'POST',
       headers: { cookie },
       body: {
@@ -160,7 +160,7 @@ describe('Content API filters', async () => {
     });
 
     // Seed entries for the second content type
-    await $fetch<EntryResponse>('/api/content-entries', {
+    await $fetch<EntryResponse>('/api/entries', {
       method: 'POST',
       headers: { cookie },
       body: {
@@ -179,7 +179,7 @@ describe('Content API filters', async () => {
     const title = `Unified Listing ${suffix}`;
     const expectedKey = `unified-listing-${suffix}`;
 
-    await $fetch<EntryResponse>('/api/content-entries', {
+    await $fetch<EntryResponse>('/api/entries', {
       method: 'POST',
       headers: { cookie },
       body: {

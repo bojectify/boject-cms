@@ -143,7 +143,7 @@ describe('Webhook delivery E2E', async () => {
         },
       });
       const entry = (await (
-        await fetch('/api/content-entries', {
+        await fetch('/api/entries', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Cookie: cookie },
           body: JSON.stringify({
@@ -152,7 +152,7 @@ describe('Webhook delivery E2E', async () => {
           }),
         })
       ).json()) as { id: string; data: { title: string } };
-      await fetch(`/api/content-entries/${entry.id}`, {
+      await fetch(`/api/entries/${entry.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Cookie: cookie },
         body: JSON.stringify({
@@ -301,7 +301,7 @@ describe('Webhook delivery E2E', async () => {
         },
       });
       const entry = (await (
-        await fetch('/api/content-entries', {
+        await fetch('/api/entries', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Cookie: cookie },
           body: JSON.stringify({
@@ -310,7 +310,7 @@ describe('Webhook delivery E2E', async () => {
           }),
         })
       ).json()) as { id: string; data: { title: string } };
-      await fetch(`/api/content-entries/${entry.id}`, {
+      await fetch(`/api/entries/${entry.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Cookie: cookie },
         body: JSON.stringify({
@@ -318,7 +318,7 @@ describe('Webhook delivery E2E', async () => {
           data: entry.data,
         }),
       });
-      await fetch(`/api/content-entries/${entry.id}/unpublish`, {
+      await fetch(`/api/entries/${entry.id}/unpublish`, {
         method: 'POST',
         headers: { Cookie: cookie },
       });

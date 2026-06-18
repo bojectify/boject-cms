@@ -18,7 +18,7 @@ import { CONTENT_STATUSES } from '../../../utils/contentStatus';
 
 export default defineEventHandler(async (event) => {
   assertApiKeyScope(event, 'content:write');
-  enforceMutationRateLimit(event, 'content-entries.put');
+  enforceMutationRateLimit(event, 'entries.put');
   const id = assertUuid(getRouterParam(event, 'id'), 'id');
   const body = await readBody<Record<string, unknown>>(event);
 

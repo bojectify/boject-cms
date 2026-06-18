@@ -37,7 +37,7 @@ const meta: Meta<typeof EntryEditorPane> = {
     layout: 'fullscreen',
     msw: {
       handlers: [
-        http.get('/api/content-entries/:id', ({ params }) =>
+        http.get('/api/entries/:id', ({ params }) =>
           HttpResponse.json({
             id: params.id,
             contentTypeId: CT_AUTHOR_UUID,
@@ -197,7 +197,7 @@ export const OpensRelationAtDepth: Story = {
             ],
           })
         ),
-        http.get('/api/content-entries/:id', ({ params }) => {
+        http.get('/api/entries/:id', ({ params }) => {
           if (params.id === 'a1') {
             return HttpResponse.json({
               id: 'a1',
@@ -324,7 +324,7 @@ export const EmitsSavedOnPublish: Story = {
             ],
           })
         ),
-        http.post('/api/content-entries', () =>
+        http.post('/api/entries', () =>
           HttpResponse.json({
             id: 'new-tag-1',
             contentTypeId: CT_TAG_UUID,
@@ -495,7 +495,7 @@ export const StackedPanesDemo: Story = {
             ? HttpResponse.json(ct)
             : new HttpResponse('not found', { status: 404 });
         }),
-        http.get('/api/content-entries/:id', ({ params }) =>
+        http.get('/api/entries/:id', ({ params }) =>
           buildDemoEntryResponse(params.id as string)
         ),
       ],

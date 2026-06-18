@@ -37,7 +37,7 @@ export const defaultHandlers = [
       fields: [{ identifier: 'title', type: FIELD_TYPES.ENTRY_TITLE }],
     });
   }),
-  http.get('/api/content-entries', ({ request }) => {
+  http.get('/api/entries', ({ request }) => {
     const url = new URL(request.url);
     const ctId = url.searchParams.get('contentTypeId');
     const items = Object.values(entries).filter(
@@ -48,7 +48,7 @@ export const defaultHandlers = [
       total: items.length,
     });
   }),
-  http.get('/api/content-entries/:id', ({ params }) => {
+  http.get('/api/entries/:id', ({ params }) => {
     const entry = entries[params.id as string];
     if (!entry)
       return HttpResponse.json({ error: 'Not found' }, { status: 404 });

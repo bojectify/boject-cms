@@ -64,7 +64,7 @@ async function makeEntry(
 }
 
 function bulkPublish(ids: unknown, key: string = KEY, ip = '203.0.113.210') {
-  return fetch('/api/content-entries/bulk-publish', {
+  return fetch('/api/entries/bulk-publish', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${key}`,
@@ -75,7 +75,7 @@ function bulkPublish(ids: unknown, key: string = KEY, ip = '203.0.113.210') {
   });
 }
 
-describe('POST /api/content-entries/bulk-publish', async () => {
+describe('POST /api/entries/bulk-publish', async () => {
   await setup({ dev: true });
 
   it('publishes every draft id and reports the count', async () => {

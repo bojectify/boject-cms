@@ -1,5 +1,8 @@
 import { assertUuid } from '../../../utils/validation';
-import { flattenEntryWithVersion } from '../../../utils/resolveVersion';
+import {
+  flattenEntryWithVersion,
+  getDraftVersion,
+} from '../../../utils/resolveVersion';
 import { enforceMutationRateLimit } from '../../../utils/rateLimitEndpoint';
 import { assertApiKeyScope } from '../../../utils/assertApiKeyScope';
 import {
@@ -7,11 +10,10 @@ import {
   planTransition,
 } from '../../../utils/entryTransitions';
 import { enqueueWebhookDeliveries } from '../../../utils/webhooks';
-import { CONTENT_STATUSES } from '../../../../utils/contentStatus';
 
 export default defineEventHandler(async (event) => {
   assertApiKeyScope(event, 'content:write');
-  enforceMutationRateLimit(event, 'content-entries.archive');
+  enforceMutationRateLimit(event, 'entries.unpublish');
   const id = assertUuid(getRouterParam(event, 'id'), 'id');
 
   const entry = await prisma.contentEntry.findUnique({
@@ -28,7 +30,7 @@ export default defineEventHandler(async (event) => {
     });
   }
 
-  const plan = planTransition(entry, 'archive');
+  const plan = planTransition(entry, 'unpublish');
   if (plan.kind === 'error') {
     throw createError({
       statusCode: 409,
@@ -52,16 +54,14 @@ export default defineEventHandler(async (event) => {
     where: { id },
     include: { versions: true, contentType: true },
   });
-  const archived = refreshed.versions.find(
-    (v) => v.status === CONTENT_STATUSES.ARCHIVED
-  );
-  if (!archived) {
+  const draft = getDraftVersion(refreshed.versions);
+  if (!draft) {
     throw createError({
       statusCode: 500,
-      statusMessage: 'Archive left entry without an ARCHIVED version',
+      statusMessage: 'Unpublish left entry with no draft',
     });
   }
-  return flattenEntryWithVersion(refreshed, archived, {
+  return flattenEntryWithVersion(refreshed, draft, {
     contentType: refreshed.contentType,
     hasPublishedVersion: false,
     publishedVersionPublishedAt: null,

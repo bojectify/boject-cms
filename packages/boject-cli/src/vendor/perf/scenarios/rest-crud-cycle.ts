@@ -1,6 +1,6 @@
 // Scenario 2 — REST CRUD churn for the rate-limit + write path.
 // 10 VUs run interleaved create / read / delete iterations against
-// /api/content-entries. PERF_CRUD_N controls the number of items per
+// /api/entries. PERF_CRUD_N controls the number of items per
 // phase (default 10000). Uses Bearer API key auth — requires the key
 // to carry content:write. CSRF middleware bypasses Bearer-authed
 // requests so no Origin threading is needed.
@@ -84,7 +84,7 @@ export default function crud(data: SetupData) {
         },
       };
       const res = http.post(
-        `${cfg.baseUrl}/api/content-entries`,
+        `${cfg.baseUrl}/api/entries`,
         JSON.stringify(body),
         { headers, tags: { phase: 'create' } }
       );
@@ -98,7 +98,7 @@ export default function crud(data: SetupData) {
   if (phase === 1) {
     group('read', () => {
       const list = http.get(
-        `${cfg.baseUrl}/api/content-entries?contentTypeId=${data.contentTypeId}&perPage=1`,
+        `${cfg.baseUrl}/api/entries?contentTypeId=${data.contentTypeId}&perPage=1`,
         { headers, tags: { phase: 'list' } }
       );
       if (list.status !== 200) {
@@ -107,10 +107,10 @@ export default function crud(data: SetupData) {
       }
       const items = (list.json() as { items: Array<{ id: string }> }).items;
       if (items.length === 0) return;
-      const res = http.get(
-        `${cfg.baseUrl}/api/content-entries/${items[0]!.id}`,
-        { headers, tags: { phase: 'read' } }
-      );
+      const res = http.get(`${cfg.baseUrl}/api/entries/${items[0]!.id}`, {
+        headers,
+        tags: { phase: 'read' },
+      });
       crudReadLatency.add(res.timings.duration);
       // 404 here means another VU's delete reached the same head item first.
       // That's a normal race under load, not an unexpected error.
@@ -122,7 +122,7 @@ export default function crud(data: SetupData) {
 
   group('delete', () => {
     const list = http.get(
-      `${cfg.baseUrl}/api/content-entries?contentTypeId=${data.contentTypeId}&perPage=1`,
+      `${cfg.baseUrl}/api/entries?contentTypeId=${data.contentTypeId}&perPage=1`,
       { headers, tags: { phase: 'list' } }
     );
     if (list.status !== 200) {
@@ -131,11 +131,10 @@ export default function crud(data: SetupData) {
     }
     const items = (list.json() as { items: Array<{ id: string }> }).items;
     if (items.length === 0) return;
-    const res = http.del(
-      `${cfg.baseUrl}/api/content-entries/${items[0]!.id}`,
-      null,
-      { headers, tags: { phase: 'delete' } }
-    );
+    const res = http.del(`${cfg.baseUrl}/api/entries/${items[0]!.id}`, null, {
+      headers,
+      tags: { phase: 'delete' },
+    });
     crudDeleteLatency.add(res.timings.duration);
     if (res.status === 429) intentional429s.add(1);
     // 404 here means another VU already deleted the same head item.

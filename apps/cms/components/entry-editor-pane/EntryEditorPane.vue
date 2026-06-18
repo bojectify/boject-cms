@@ -204,7 +204,7 @@ async function handleDelete() {
   if (!window.confirm(`Delete ${label}? This cannot be undone.`)) return;
 
   try {
-    const res = await fetch(`/api/content-entries/${props.entryId}`, {
+    const res = await fetch(`/api/entries/${props.entryId}`, {
       method: 'DELETE',
     });
     if (!res.ok) {
@@ -265,7 +265,7 @@ async function handleAction(action: EntryAction) {
   };
   const spec = endpointByAction[action];
   try {
-    await $fetch(`/api/content-entries/${props.entryId}/${spec.path}`, {
+    await $fetch(`/api/entries/${props.entryId}/${spec.path}`, {
       method: 'POST',
     });
     await refreshEntry();

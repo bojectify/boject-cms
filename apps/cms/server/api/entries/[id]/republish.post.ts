@@ -1,24 +1,27 @@
 import { assertUuid } from '../../../utils/validation';
 import {
   flattenEntryWithVersion,
-  getDraftVersion,
+  getPublishedVersion,
 } from '../../../utils/resolveVersion';
 import { enforceMutationRateLimit } from '../../../utils/rateLimitEndpoint';
 import { assertApiKeyScope } from '../../../utils/assertApiKeyScope';
 import {
-  applyTransitionMutations,
   planTransition,
+  applyTransitionMutations,
 } from '../../../utils/entryTransitions';
-import { enqueueEntryDraftSync } from '../../../utils/webhooks';
+import { enqueueWebhookDeliveries } from '../../../utils/webhooks';
 
 export default defineEventHandler(async (event) => {
   assertApiKeyScope(event, 'content:write');
-  enforceMutationRateLimit(event, 'content-entries.unarchive');
+  enforceMutationRateLimit(event, 'entries.republish');
   const id = assertUuid(getRouterParam(event, 'id'), 'id');
 
   const entry = await prisma.contentEntry.findUnique({
     where: { id },
-    include: { versions: true, contentType: true },
+    include: {
+      versions: true,
+      contentType: { select: { id: true, identifier: true } },
+    },
   });
   if (!entry) {
     throw createError({
@@ -27,7 +30,7 @@ export default defineEventHandler(async (event) => {
     });
   }
 
-  const plan = planTransition(entry, 'unarchive');
+  const plan = planTransition(entry, 'republish');
   if (plan.kind === 'error') {
     throw createError({
       statusCode: 409,
@@ -38,26 +41,29 @@ export default defineEventHandler(async (event) => {
 
   await prisma.$transaction(async (tx) => {
     await applyTransitionMutations(tx, plan.mutations);
-    await enqueueEntryDraftSync(tx, {
-      contentType: { id: entry.contentType.id },
-      entryId: entry.id,
-    });
+    if (plan.webhookEvent && plan.snapshot) {
+      await enqueueWebhookDeliveries(tx, {
+        event: plan.webhookEvent,
+        contentType: entry.contentType,
+        entry: plan.snapshot,
+      });
+    }
   });
 
-  const refreshed = await prisma.contentEntry.findUniqueOrThrow({
+  const full = await prisma.contentEntry.findUniqueOrThrow({
     where: { id },
     include: { versions: true, contentType: true },
   });
-  const draft = getDraftVersion(refreshed.versions);
-  if (!draft) {
+  const published = getPublishedVersion(full.versions);
+  if (!published) {
     throw createError({
       statusCode: 500,
-      statusMessage: 'Unarchive left entry with no draft',
+      statusMessage: 'Republish left entry without a PUBLISHED version',
     });
   }
-  return flattenEntryWithVersion(refreshed, draft, {
-    contentType: refreshed.contentType,
-    hasPublishedVersion: false,
-    publishedVersionPublishedAt: null,
+  return flattenEntryWithVersion(full, published, {
+    contentType: full.contentType,
+    hasPublishedVersion: true,
+    publishedVersionPublishedAt: published.publishedAt,
   });
 });

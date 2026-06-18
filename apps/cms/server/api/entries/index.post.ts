@@ -26,7 +26,7 @@ const VALID_STATUSES = new Set<string>(CONTENT_STATUS_NAMES);
 
 export default defineEventHandler(async (event) => {
   assertApiKeyScope(event, 'content:write');
-  enforceMutationRateLimit(event, 'content-entries.post');
+  enforceMutationRateLimit(event, 'entries.post');
   const body = await readBody<Record<string, unknown>>(event);
 
   const contentTypeId = assertUuid(body.contentTypeId, 'contentTypeId');

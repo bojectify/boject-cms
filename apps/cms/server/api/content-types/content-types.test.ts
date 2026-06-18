@@ -1197,7 +1197,7 @@ describe('Content Type endpoints', async () => {
       });
       const fieldId = ct.fields.find((f) => f.identifier === 'code')!.id;
 
-      await $fetch('/api/content-entries', {
+      await $fetch('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -1205,7 +1205,7 @@ describe('Content Type endpoints', async () => {
           data: { title: `Entry A ${Date.now()}`, code: 'DUP' },
         },
       });
-      await $fetch('/api/content-entries', {
+      await $fetch('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -1250,7 +1250,7 @@ describe('Content Type endpoints', async () => {
       });
       const fieldId = ct.fields.find((f) => f.identifier === 'issue')!.id;
 
-      await $fetch('/api/content-entries', {
+      await $fetch('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -1258,7 +1258,7 @@ describe('Content Type endpoints', async () => {
           data: { title: `Entry A ${Date.now()}`, issue: 7 },
         },
       });
-      await $fetch('/api/content-entries', {
+      await $fetch('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -1304,7 +1304,7 @@ describe('Content Type endpoints', async () => {
       });
       const fieldId = ct.fields.find((f) => f.identifier === 'code')!.id;
 
-      await $fetch('/api/content-entries', {
+      await $fetch('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -1312,7 +1312,7 @@ describe('Content Type endpoints', async () => {
           data: { title: `Entry A ${Date.now()}`, code: 'ONE' },
         },
       });
-      await $fetch('/api/content-entries', {
+      await $fetch('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -1352,7 +1352,7 @@ describe('Content Type endpoints', async () => {
       });
       const fieldId = ct.fields.find((f) => f.identifier === 'code')!.id;
 
-      await $fetch('/api/content-entries', {
+      await $fetch('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -1360,7 +1360,7 @@ describe('Content Type endpoints', async () => {
           data: { title: `Entry Empty ${Date.now()}`, code: '' },
         },
       });
-      await $fetch('/api/content-entries', {
+      await $fetch('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {

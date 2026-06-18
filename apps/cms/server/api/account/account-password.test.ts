@@ -58,7 +58,7 @@ describe('POST /api/account/password', () => {
     await resetTestUser();
     // Clear the in-process rate limiter between tests so the two cases
     // that pick random IPs from 192.0.2.0/24 can't collide (~0.4% per
-    // run otherwise). Matches the convention in csrf / content-entries /
+    // run otherwise). Matches the convention in csrf / entries /
     // content-types / webhooks / rate-limit unit tests.
     resetRateLimitStore();
   });

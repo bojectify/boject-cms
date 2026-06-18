@@ -8,7 +8,7 @@ import type { Bundle } from '../../../vendor/contentBundleTypes.js';
  *
  * Always passes `?portable=false` so the bundle carries real UUIDs in
  * the `id` fields. The HTTP writer needs these to construct valid
- * `contentTypeId` payloads on POST /api/content-entries; portable
+ * `contentTypeId` payloads on POST /api/entries; portable
  * bundles strip IDs to null and would 400 the writer's posts.
  */
 export async function fetchBundle(opts: {

@@ -102,12 +102,12 @@ describe('CSRF Origin check', async () => {
     expect(response.status).toBe(200);
   });
 
-  describe('Bearer auth bypass for /api/content-entries (#172)', () => {
-    it('skips Origin/Referer check on POST /api/content-entries with Bearer auth', async () => {
+  describe('Bearer auth bypass for /api/entries (#172)', () => {
+    it('skips Origin/Referer check on POST /api/entries with Bearer auth', async () => {
       // CSRF middleware bypasses Origin/Referer check when the request carries
       // a Bearer API key. Confirm this still applies after #172 added the path
       // to API_KEY_WRITABLE_PATHS.
-      const res = await fetch('/api/content-entries', {
+      const res = await fetch('/api/entries', {
         method: 'POST',
         headers: {
           Authorization: 'Bearer boject_test_key_for_integration_tests_only',

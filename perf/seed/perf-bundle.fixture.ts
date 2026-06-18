@@ -8,7 +8,7 @@ import { FIELD_TYPES } from '@boject/cli/vendor/fieldTypes';
  *
  * IDs are valid UUIDs (deterministic, in the unused 01900000-xxxx-4xxx-8xxx
  * range so they can never collide with real Prisma-generated v4s). Required
- * because /api/content-entries POST validates contentTypeId against a UUID
+ * because /api/entries POST validates contentTypeId against a UUID
  * regex — a non-UUID string would 400.
  */
 export const PERF_BUNDLE: Bundle = {

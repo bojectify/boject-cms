@@ -9,19 +9,16 @@ import {
   applyTransitionMutations,
   planTransition,
 } from '../../../utils/entryTransitions';
-import { enqueueWebhookDeliveries } from '../../../utils/webhooks';
+import { enqueueEntryDraftSync } from '../../../utils/webhooks';
 
 export default defineEventHandler(async (event) => {
   assertApiKeyScope(event, 'content:write');
-  enforceMutationRateLimit(event, 'content-entries.unpublish');
+  enforceMutationRateLimit(event, 'entries.unarchive');
   const id = assertUuid(getRouterParam(event, 'id'), 'id');
 
   const entry = await prisma.contentEntry.findUnique({
     where: { id },
-    include: {
-      versions: true,
-      contentType: { select: { id: true, identifier: true } },
-    },
+    include: { versions: true, contentType: true },
   });
   if (!entry) {
     throw createError({
@@ -30,7 +27,7 @@ export default defineEventHandler(async (event) => {
     });
   }
 
-  const plan = planTransition(entry, 'unpublish');
+  const plan = planTransition(entry, 'unarchive');
   if (plan.kind === 'error') {
     throw createError({
       statusCode: 409,
@@ -41,13 +38,10 @@ export default defineEventHandler(async (event) => {
 
   await prisma.$transaction(async (tx) => {
     await applyTransitionMutations(tx, plan.mutations);
-    if (plan.webhookEvent && plan.snapshot) {
-      await enqueueWebhookDeliveries(tx, {
-        event: plan.webhookEvent,
-        contentType: entry.contentType,
-        entry: plan.snapshot,
-      });
-    }
+    await enqueueEntryDraftSync(tx, {
+      contentType: { id: entry.contentType.id },
+      entryId: entry.id,
+    });
   });
 
   const refreshed = await prisma.contentEntry.findUniqueOrThrow({
@@ -58,7 +52,7 @@ export default defineEventHandler(async (event) => {
   if (!draft) {
     throw createError({
       statusCode: 500,
-      statusMessage: 'Unpublish left entry with no draft',
+      statusMessage: 'Unarchive left entry with no draft',
     });
   }
   return flattenEntryWithVersion(refreshed, draft, {
