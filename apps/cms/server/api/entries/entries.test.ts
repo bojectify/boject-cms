@@ -13,7 +13,10 @@ const prismaUrl = getTestDatabaseUrl();
 const prismaAdapter = new PrismaPg({ connectionString: prismaUrl });
 const prisma = new PrismaClient({ adapter: prismaAdapter });
 
-async function ensureBlogContentType(): Promise<{ id: string }> {
+async function ensureBlogContentType(): Promise<{
+  id: string;
+  identifier: string;
+}> {
   const existing = await prisma.contentType.findUnique({
     where: { identifier: 'WebhookBlog' },
   });
@@ -86,6 +89,14 @@ type EntryResponse = {
 
 type ListResponse = { items: EntryResponse[]; total: number };
 
+type KeysetPageInfo = {
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  startCursor: string | null;
+  endCursor: string | null;
+};
+type KeysetListResponse = { items: EntryResponse[]; pageInfo: KeysetPageInfo };
+
 let testContentType: ContentTypeResponse;
 
 /**
@@ -111,6 +122,9 @@ let testContentType: ContentTypeResponse;
  *   .50-.59   pre-existing republish lifecycle tests
  *   .60-.69   archiveFilter tests
  *   .70-.79   field default values tests (#344)
+ *   .80-.89   keyset pagination (#265) — the brief's .20-.29 was
+ *             already taken by the #172 family, so this block
+ *             claims the next free /10 range per the protocol below
  *   .180-.199 ad-hoc / one-off IPs (currently: .99, .183,
  *             .184-.186 entryKey derivation tests (#205),
  *             .187-.188 entryKey immutability tests (#205),
@@ -1290,17 +1304,19 @@ describe('Content Entry endpoints', async () => {
   describe('GET /api/entries', () => {
     it('lists entries with contentTypeId (session sees all)', async () => {
       const cookie = await getSessionCookie();
-      const { items, total } = await $fetch<ListResponse>(
+      const { items, pageInfo } = await $fetch<KeysetListResponse>(
         `/api/entries?contentTypeId=${testContentType.id}`,
         {
           headers: { cookie },
         }
       );
-      expect(total).toBeGreaterThanOrEqual(1);
       expect(items.length).toBeGreaterThanOrEqual(1);
       expect(items.every((i) => i.contentTypeId === testContentType.id)).toBe(
         true
       );
+      // Response is keyset-shaped now (#265): pageInfo, no total.
+      expect(pageInfo).toBeDefined();
+      expect(typeof pageInfo.hasNextPage).toBe('boolean');
     });
 
     it('API key only sees entries with PUBLISHED versions', async () => {
@@ -1366,6 +1382,106 @@ describe('Content Entry endpoints', async () => {
       expect(items.every((i) => i.status === CONTENT_STATUSES.PUBLISHED)).toBe(
         true
       );
+    });
+  });
+
+  describe('GET /api/entries keyset pagination (#265)', () => {
+    it('paginates forward with pageInfo and no total; accepts contentType identifier', async () => {
+      const cookie = await getSessionCookie();
+      const ct = await ensureBlogContentType(); // identifier known via ct.identifier
+      let seedIp = 80;
+      const mk = async (title: string) => {
+        const created = (await (
+          await fetch('/api/entries', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Cookie: cookie,
+              'X-Forwarded-For': `203.0.113.${seedIp++}`,
+            },
+            body: JSON.stringify({ contentTypeId: ct.id, data: { title } }),
+          })
+        ).json()) as { id: string };
+        return created.id;
+      };
+      const a = await mk(`KS A ${Date.now()}`);
+      const b = await mk(`KS B ${Date.now()}`);
+      const c = await mk(`KS C ${Date.now()}`);
+      const mine = new Set([a, b, c]);
+
+      // Page by contentTypeId
+      const p1 = (await $fetch(
+        `/api/entries?contentTypeId=${ct.id}&perPage=2`,
+        {
+          headers: { cookie },
+        }
+      )) as {
+        items: Array<{ id: string }>;
+        pageInfo: { hasNextPage: boolean; endCursor: string | null };
+      };
+      expect(p1).toHaveProperty('pageInfo');
+      expect(p1).not.toHaveProperty('total');
+      expect(p1.items.length).toBeLessThanOrEqual(2);
+      expect(p1.pageInfo.endCursor).toBeTruthy();
+
+      // Walk until we've seen all of mine; assert no dupes among my ids.
+      const seen: string[] = p1.items.map((i) => i.id);
+      let cursor = p1.pageInfo.endCursor;
+      let hasNext = p1.pageInfo.hasNextPage;
+      let guard = 0;
+      while (hasNext && guard++ < 50) {
+        const pn = (await $fetch(
+          `/api/entries?contentTypeId=${ct.id}&perPage=2&after=${encodeURIComponent(cursor!)}`,
+          { headers: { cookie } }
+        )) as {
+          items: Array<{ id: string }>;
+          pageInfo: { hasNextPage: boolean; endCursor: string | null };
+        };
+        seen.push(...pn.items.map((i) => i.id));
+        cursor = pn.pageInfo.endCursor;
+        hasNext = pn.pageInfo.hasNextPage;
+      }
+      const mineSeen = seen.filter((id) => mine.has(id));
+      expect(new Set(mineSeen)).toEqual(mine); // all present
+      expect(mineSeen.length).toBe(mine.size); // no dupes
+
+      // contentType identifier resolves to the same first page as contentTypeId
+      const byIdentifier = (await $fetch(
+        `/api/entries?contentType=${ct.identifier}&perPage=2`,
+        { headers: { cookie } }
+      )) as { items: Array<{ id: string }> };
+      const byUuid = (await $fetch(
+        `/api/entries?contentTypeId=${ct.id}&perPage=2`,
+        {
+          headers: { cookie },
+        }
+      )) as { items: Array<{ id: string }> };
+      expect(byIdentifier.items.map((i) => i.id)).toEqual(
+        byUuid.items.map((i) => i.id)
+      );
+    });
+
+    it('400 when neither contentType nor contentTypeId is given; 400 on bad cursor', async () => {
+      const cookie = await getSessionCookie();
+      const noType = await fetch('/api/entries', {
+        headers: { Cookie: cookie },
+      });
+      expect(noType.status).toBe(400);
+      const ct = await ensureBlogContentType();
+      const badCursor = await fetch(
+        `/api/entries?contentTypeId=${ct.id}&after=garbage`,
+        { headers: { Cookie: cookie } }
+      );
+      expect(badCursor.status).toBe(400);
+    });
+
+    it('unknown contentType identifier returns an empty page (not 404)', async () => {
+      const cookie = await getSessionCookie();
+      const res = (await $fetch('/api/entries?contentType=NoSuchTypeXYZ', {
+        headers: { cookie },
+      })) as { items: unknown[]; pageInfo: { hasNextPage: boolean } };
+      expect(res.items).toEqual([]);
+      expect(res.pageInfo.hasNextPage).toBe(false);
     });
   });
 
