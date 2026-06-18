@@ -46,32 +46,38 @@ async function searchEntries(
   targetContentTypeIds: string[],
   q: string
 ): Promise<EntryOption[]> {
-  // /api/content filters on the content-type IDENTIFIER, not its id — resolve
-  // each target id via the loaded content types so the picker is scoped.
-  const identifiers = targetContentTypeIds
-    .map((id) => contentTypes.value.find((c) => c.id === id)?.identifier)
-    .filter((identifier): identifier is string => !!identifier);
+  // Fetch per target content type from /api/entries (UUID-keyed). We already
+  // hold both the id and the display name in `contentTypes`, so there's no
+  // identifier round-trip and no reliance on the response carrying the type name.
+  const targets = targetContentTypeIds
+    .map((id) => contentTypes.value.find((c) => c.id === id))
+    .filter((c): c is QueryContentType => !!c);
   const lists = await Promise.all(
-    identifiers.map((identifier) =>
-      $fetch<{
-        items: Array<{ id: string; entryTitle: string; contentType: string }>;
-      }>('/api/content', {
-        query: {
-          contentType: identifier,
-          perPage: 50,
-          archiveFilter: 'active',
-        },
-      }).catch(() => ({ items: [] }))
+    targets.map((ct) =>
+      $fetch<{ items: Array<{ id: string; entryTitle: string }> }>(
+        '/api/entries',
+        {
+          query: {
+            contentTypeId: ct.id,
+            perPage: 50,
+            archiveFilter: 'active',
+          },
+        }
+      )
+        .then((res) => ({ name: ct.name, items: res.items }))
+        .catch(() => ({ name: ct.name, items: [] }))
     )
   );
   const needle = q.toLowerCase();
   return lists
-    .flatMap((l) => l.items)
-    .filter((e) => !needle || e.entryTitle.toLowerCase().includes(needle))
-    .map((e) => ({
-      id: e.id,
-      entryTitle: e.entryTitle,
-      contentTypeName: e.contentType,
+    .flatMap((l) => l.items.map((entry) => ({ entry, name: l.name })))
+    .filter(
+      ({ entry }) => !needle || entry.entryTitle.toLowerCase().includes(needle)
+    )
+    .map(({ entry, name }) => ({
+      id: entry.id,
+      entryTitle: entry.entryTitle,
+      contentTypeName: name,
     }));
 }
 
