@@ -30,23 +30,28 @@ export default defineEventHandler(async (event) => {
     return;
   }
 
-  // Try session auth first
-  const session = await getUserSession(event);
-  if (session.user) {
-    // Verify the session's passwordVersion still matches the DB.
-    // Cross-device session invalidation: when a user changes their password,
-    // we bump User.passwordVersion. Old cookies still claim the previous
-    // version and get 401'd here on their next request.
-    const dbUser = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { passwordVersion: true },
-    });
-    if (!dbUser || dbUser.passwordVersion !== session.user.passwordVersion) {
-      await clearUserSession(event);
-      throw createError({ statusCode: 401, message: 'Session invalidated' });
+  const isPublicNamespace = path.startsWith('/api/public/');
+
+  // Try session auth first — skipped for the public namespace, which is
+  // API-key-or-401 (never session-authed) so audience is encoded in the URL.
+  if (!isPublicNamespace) {
+    const session = await getUserSession(event);
+    if (session.user) {
+      // Verify the session's passwordVersion still matches the DB.
+      // Cross-device session invalidation: when a user changes their password,
+      // we bump User.passwordVersion. Old cookies still claim the previous
+      // version and get 401'd here on their next request.
+      const dbUser = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { passwordVersion: true },
+      });
+      if (!dbUser || dbUser.passwordVersion !== session.user.passwordVersion) {
+        await clearUserSession(event);
+        throw createError({ statusCode: 401, message: 'Session invalidated' });
+      }
+      event.context.authMethod = 'session';
+      return;
     }
-    event.context.authMethod = 'session';
-    return;
   }
 
   // Fall back to API key auth (read-only access by default)

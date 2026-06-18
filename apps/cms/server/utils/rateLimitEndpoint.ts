@@ -88,7 +88,8 @@ export type RateLimitKind =
   | 'login'
   | 'password'
   | 'transform'
-  | 'search';
+  | 'search'
+  | 'public';
 
 export const RATE_LIMIT_SUGGESTIONS: Record<RateLimitKind, string> = {
   graphql:
@@ -102,6 +103,8 @@ export const RATE_LIMIT_SUGGESTIONS: Record<RateLimitKind, string> = {
   transform:
     'Honour Retry-After. Cache transformed images at your edge; the public transform endpoint is not designed for hot-path serving.',
   search: 'Slow your search request rate, or cache results client-side.',
+  public:
+    'Honour Retry-After and cache responses at your edge — the public read API is cache-fronted, not built for un-cached hot-path polling.',
 };
 
 export interface RateLimitedBody {
