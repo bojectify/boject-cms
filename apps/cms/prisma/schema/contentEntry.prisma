@@ -12,6 +12,8 @@ model ContentEntry {
   @@unique([contentTypeId, slug])
   @@unique([contentTypeId, entryTitle])
   @@unique([contentTypeId, entryKey])
+  @@index([contentTypeId, updatedAt(sort: Desc), id])
+  @@index([updatedAt(sort: Desc), id])
 }
 
 model ContentEntryVersion {
@@ -28,4 +30,5 @@ model ContentEntryVersion {
   updatedAt   DateTime      @updatedAt
 
   @@index([data(ops: JsonbPathOps)], type: Gin, map: "ContentEntryVersion_data_gin_idx")
+  @@index([entryId, status, updatedAt(sort: Desc), id])
 }
