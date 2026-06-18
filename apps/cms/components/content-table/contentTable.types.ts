@@ -11,6 +11,8 @@ export type ContentTableProps = BasicComponentProps & {
   page?: number;
   total?: number;
   itemsPerPage?: number;
+  /** Cursor-mode pagination. When set, renders prev/next instead of UPagination. */
+  pageInfo?: { hasNextPage: boolean; hasPreviousPage: boolean };
   rowLink?: (_row: Record<string, unknown>) => string;
   /** Render a leading selection-checkbox column (search/editorial mode). */
   selectable?: boolean;

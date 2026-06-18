@@ -1,14 +1,20 @@
 import type { Meta, StoryObj } from '@storybook/vue3-vite';
-import { expect, fireEvent, userEvent, within } from 'storybook/test';
+import { expect, fireEvent, fn, userEvent, within } from 'storybook/test';
 import ContentTable from './ContentTable.vue';
+import { QA_CONTENT_TABLE } from './contentTable.config';
 import { useRowSelection } from '~/composables/useRowSelection';
 
 const meta: Meta<typeof ContentTable> = {
   title: 'Components/ContentTable',
   component: ContentTable,
+  args: {
+    onNext: fn(),
+    onPrev: fn(),
+  },
 };
 export default meta;
 type Story = StoryObj<typeof ContentTable>;
+type PlayContext = Parameters<NonNullable<Story['play']>>[0];
 
 // Wire a real useRowSelection over four rows so the controlled checkbox state
 // (the `:model-value` bound from `isSelected`) reflects the composable — the
@@ -65,5 +71,25 @@ export const Selectable: Story = {
     expect(checkboxes[2]!).toBeChecked();
     expect(checkboxes[3]!).toBeChecked();
     expect(checkboxes[4]!).toBeChecked();
+  },
+};
+
+// Cursor (prev/next) mode: when `pageInfo` is set, ContentTable renders the
+// prev/next block instead of the offset UPagination. Asserts disabled states
+// driven by hasPreviousPage/hasNextPage and that clicking Next emits `next`.
+export const CursorPagination: Story = {
+  args: {
+    title: 'Cursor',
+    data: [{ id: '1', entryTitle: 'One' }],
+    pageInfo: { hasNextPage: true, hasPreviousPage: false },
+  },
+  play: async ({ canvasElement, args }: PlayContext) => {
+    const canvas = within(canvasElement);
+    const next = await canvas.findByTestId(QA_CONTENT_TABLE.NEXT);
+    const prev = await canvas.findByTestId(QA_CONTENT_TABLE.PREV);
+    await expect(prev).toBeDisabled();
+    await expect(next).toBeEnabled();
+    await userEvent.click(next);
+    await expect(args.onNext).toHaveBeenCalled();
   },
 };
