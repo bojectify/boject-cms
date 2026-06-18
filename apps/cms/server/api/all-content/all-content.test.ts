@@ -77,11 +77,11 @@ function getContent(
     auth === 'apikey' ? { Authorization: `Bearer ${TEST_API_KEY}` } : {};
   return auth === 'session'
     ? getSessionCookie().then((cookie) =>
-        $fetch<ContentResponse>(`/api/content${qs ? `?${qs}` : ''}`, {
+        $fetch<ContentResponse>(`/api/all-content${qs ? `?${qs}` : ''}`, {
           headers: { cookie },
         })
       )
-    : $fetch<ContentResponse>(`/api/content${qs ? `?${qs}` : ''}`, {
+    : $fetch<ContentResponse>(`/api/all-content${qs ? `?${qs}` : ''}`, {
         headers,
       });
 }
@@ -173,7 +173,7 @@ describe('Content API filters', async () => {
 
   // ── entryKey (#205) ───────────────────────────────────────────
 
-  it('GET /api/content includes entryKey on every item (#205)', async () => {
+  it('GET /api/all-content includes entryKey on every item (#205)', async () => {
     const cookie = await getSessionCookie();
     const suffix = Date.now();
     const title = `Unified Listing ${suffix}`;
@@ -192,7 +192,7 @@ describe('Content API filters', async () => {
     const { items } = await $fetch<{
       items: Array<ContentItem & { entryKey: string }>;
       total: number;
-    }>(`/api/content?contentType=${blogPostType.identifier}&perPage=100`, {
+    }>(`/api/all-content?contentType=${blogPostType.identifier}&perPage=100`, {
       headers: { cookie },
     });
 

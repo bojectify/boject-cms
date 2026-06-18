@@ -241,7 +241,7 @@ pnpm test:storybook          # Storybook interaction tests (browser)
 **Integration tests:**
 
 - **GraphQL** — dynamic-type list queries, single-item lookups, where filtering, Relay cursor pagination, dev-mode unauthenticated access.
-- **Content** — `/api/content` contentType-identifier filter, status filter, combined filters, invalid-value handling.
+- **Content** — `/api/all-content` contentType-identifier filter, status filter, combined filters, invalid-value handling.
 - **Auth** — login validation, credential checking, session handling, middleware behaviour.
 - **Files** — primitive upload (auth, mime/size validation, successful upload), transform endpoint (resize, format conversion, public access, rate limiting).
 - **Content types** — CRUD, field management (add/update/delete/reorder), identifier validation, uniqueness constraints.
