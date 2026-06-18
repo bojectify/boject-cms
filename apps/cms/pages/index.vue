@@ -61,20 +61,64 @@ function onRemoveFilter(index: number) {
 }
 
 // --- Browse mode (existing behaviour) ---
-const page = ref(1);
 const archiveFilter = ref<ArchiveFilter>('active');
 
-watch(archiveFilter, () => {
-  page.value = 1;
-});
+const afterCursor = computed(() => (route.query.after as string) || undefined);
+const beforeCursor = computed(
+  () => (route.query.before as string) || undefined
+);
+
+function resetCursor() {
+  router.replace({
+    path: '/',
+    query: { ...route.query, after: undefined, before: undefined },
+  });
+}
+watch(archiveFilter, () => resetCursor());
+
+function goNext() {
+  if (!data.value?.pageInfo?.endCursor) return;
+  router.replace({
+    path: '/',
+    query: {
+      ...route.query,
+      after: data.value.pageInfo.endCursor,
+      before: undefined,
+    },
+  });
+}
+function goPrev() {
+  if (!data.value?.pageInfo?.startCursor) return;
+  router.replace({
+    path: '/',
+    query: {
+      ...route.query,
+      before: data.value.pageInfo.startCursor,
+      after: undefined,
+    },
+  });
+}
 
 const {
   data,
   status,
   refresh: refreshBrowse,
-} = await useAuthedFetch('/api/all-content', {
-  query: { page, perPage: 15, archiveFilter },
-  watch: [page, archiveFilter],
+} = await useAuthedFetch<{
+  items: Array<{ id: string } & Record<string, unknown>>;
+  pageInfo: {
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+    startCursor: string | null;
+    endCursor: string | null;
+  };
+}>('/api/all-content', {
+  query: {
+    perPage: 15,
+    archiveFilter,
+    after: afterCursor,
+    before: beforeCursor,
+  },
+  watch: [afterCursor, beforeCursor, archiveFilter],
 });
 
 const browseColumns: TableColumn<Record<string, unknown>>[] = [
@@ -163,16 +207,18 @@ const filterOptions: Array<{ label: string; value: ArchiveFilter }> = [
     </template>
     <ContentTable
       v-else
-      v-model:page="page"
       title="All Content"
       :data="data?.items ?? []"
       :loading="status === 'pending'"
       :columns="browseColumns"
+      :page-info="data?.pageInfo"
       :row-link="(row) => `/entries/${row.id}`"
       selectable
       :is-selected="selection.isSelected"
       :all-selected="selection.allSelected.value"
       :indeterminate="selection.indeterminate.value"
+      @next="goNext"
+      @prev="goPrev"
       @row-select="(e, id, index) => selection.toggle(id, index, e.shiftKey)"
       @select-all="selection.toggleAll"
     >
