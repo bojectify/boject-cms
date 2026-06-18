@@ -1,9 +1,25 @@
-import type { Prisma, ContentStatus, PrismaClient } from '#prisma';
+import type {
+  Prisma,
+  ContentStatus,
+  PrismaClient,
+  ContentEntry,
+} from '#prisma';
 import {
   CONTENT_STATUSES,
   type ContentStatusName,
 } from '../../utils/contentStatus';
-import { getVersionForContext } from './resolveVersion';
+import {
+  getVersionForContext,
+  flattenEntryWithVersion,
+} from './resolveVersion';
+import { projectEntryDataColumns } from './projectEntryColumns';
+import { hydrateRelationColumns } from './hydrateRelationColumns';
+import type { resolveContentTypeFieldTypesById } from './searchFieldTypes';
+import { isUuid } from './validation';
+
+type FieldTypeMap = Awaited<
+  ReturnType<typeof resolveContentTypeFieldTypesById>
+>;
 
 export const VALID_ARCHIVE_FILTERS = ['active', 'archived', 'all'] as const;
 export type ArchiveFilter = (typeof VALID_ARCHIVE_FILTERS)[number];
@@ -143,4 +159,185 @@ export function resolveDisplayVersion<V extends { status: ContentStatus }>(
       versions.find((v) => v.status === CONTENT_STATUSES.ARCHIVED) ?? null;
   }
   return version ?? null;
+}
+
+export class InvalidCursorError extends Error {
+  constructor() {
+    super('Invalid cursor');
+    this.name = 'InvalidCursorError';
+  }
+}
+
+/** Opaque forward/backward cursor over (updatedAt, id). `updatedAt` is
+ *  timestamp(3) so epoch-ms round-trips exactly; id is a UUID (no `_`), so the
+ *  first `_` is an unambiguous separator. */
+export function encodeCursor(updatedAt: Date, id: string): string {
+  return Buffer.from(`${updatedAt.getTime()}_${id}`).toString('base64url');
+}
+
+export function decodeCursor(
+  cursor: string
+): { updatedAt: Date; id: string } | null {
+  const raw = Buffer.from(cursor, 'base64url').toString('utf8');
+  const sep = raw.indexOf('_');
+  if (sep <= 0) return null;
+  const msSlice = raw.slice(0, sep);
+  const id = raw.slice(sep + 1);
+  // Strict: digits only. `Number('  123 ')` / `Number('1e3')` coerce, so a
+  // hand-crafted cursor could otherwise decode to an unintended timestamp.
+  if (!/^\d+$/.test(msSlice)) return null;
+  const ms = Number(msSlice);
+  if (!Number.isFinite(ms) || ms < 0) return null;
+  if (!isUuid(id)) return null;
+  return { updatedAt: new Date(ms), id };
+}
+
+export interface PageInfo {
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  startCursor: string | null;
+  endCursor: string | null;
+}
+
+export const EMPTY_PAGE_INFO: PageInfo = {
+  hasNextPage: false,
+  hasPreviousPage: false,
+  startCursor: null,
+  endCursor: null,
+};
+
+export interface KeysetPageArgs {
+  where: Prisma.ContentEntryWhereInput;
+  perPage: number;
+  after?: string | null;
+  before?: string | null;
+  select?: Prisma.ContentEntrySelect;
+}
+
+/** Bidirectional keyset over (updatedAt DESC, id ASC). Pass `after` (forward) or
+ *  `before` (backward); presentation order is always updatedAt DESC, id ASC.
+ *  Fetches perPage+1 to probe the far edge; the near edge is inferred from the
+ *  presence of the cursor (acceptable for button nav — see spec edge note). */
+export async function keysetPage<T extends { id: string; updatedAt: Date }>(
+  prisma: PrismaClient,
+  args: KeysetPageArgs
+): Promise<{ rows: T[]; pageInfo: PageInfo }> {
+  const { where: baseWhere, perPage, after, before, select } = args;
+  const backward = !!before && !after;
+  const token = backward ? before : after;
+  const cursor = token ? decodeCursor(token) : null;
+  if (token && !cursor) throw new InvalidCursorError();
+
+  const keysetWhere: Prisma.ContentEntryWhereInput | null = cursor
+    ? backward
+      ? {
+          OR: [
+            { updatedAt: { gt: cursor.updatedAt } },
+            { updatedAt: cursor.updatedAt, id: { lt: cursor.id } },
+          ],
+        }
+      : {
+          OR: [
+            { updatedAt: { lt: cursor.updatedAt } },
+            { updatedAt: cursor.updatedAt, id: { gt: cursor.id } },
+          ],
+        }
+    : null;
+
+  const where = keysetWhere ? { AND: [baseWhere, keysetWhere] } : baseWhere;
+  const orderBy: Prisma.ContentEntryOrderByWithRelationInput[] = backward
+    ? [{ updatedAt: 'asc' }, { id: 'desc' }]
+    : [{ updatedAt: 'desc' }, { id: 'asc' }];
+
+  const findArgs: Prisma.ContentEntryFindManyArgs = {
+    where,
+    orderBy,
+    take: perPage + 1,
+  };
+  if (select) findArgs.select = select;
+
+  // Prisma's findMany result type for the dynamic findArgs has no structural
+  // overlap with the caller-supplied generic T (which the caller pins to the
+  // shape its `select` projects), so the double cast is intentional.
+  // eslint-disable-next-line no-restricted-syntax
+  const fetched = (await prisma.contentEntry.findMany(
+    findArgs
+  )) as unknown as T[];
+  const hasExtra = fetched.length > perPage;
+  let rows = hasExtra ? fetched.slice(0, perPage) : fetched;
+  if (backward) rows = rows.reverse();
+
+  const first = rows[0];
+  const last = rows[rows.length - 1];
+  const startCursor = first ? encodeCursor(first.updatedAt, first.id) : null;
+  const endCursor = last ? encodeCursor(last.updatedAt, last.id) : null;
+
+  const pageInfo: PageInfo = backward
+    ? // hasNextPage is unconditionally true on the backward branch: you only
+      // navigate backward FROM a next page, so one provably exists. The near
+      // edge (hasPreviousPage) is inferred from the cursor probe — see the spec
+      // edge note on button-nav near-edge inference.
+      { hasPreviousPage: hasExtra, hasNextPage: true, startCursor, endCursor }
+    : {
+        hasNextPage: hasExtra,
+        hasPreviousPage: !!after,
+        startCursor,
+        endCursor,
+      };
+
+  return { rows, pageInfo };
+}
+
+export interface ResolveEntriesCtx {
+  isCms: boolean;
+  archiveFilter: ArchiveFilter;
+  columns?: string[];
+  fieldTypes?: FieldTypeMap;
+}
+
+/** Per-entry: pick the context-appropriate version (≤1 DB query for all rows
+ *  via fetchDisplayVersions), flatten it onto the envelope, optionally project +
+ *  hydrate data-grid `columns`. Shared by /api/entries and the public endpoint
+ *  (#256). Rows with no resolvable version are dropped. */
+export async function resolveAndFlattenEntries(
+  prisma: PrismaClient,
+  envelopeRows: ContentEntry[],
+  ctx: ResolveEntriesCtx
+): Promise<
+  Array<Record<string, unknown> & { fields?: Record<string, unknown> }>
+> {
+  const versionsByEntry = await fetchDisplayVersions(
+    prisma,
+    envelopeRows.map((e) => e.id),
+    { includeData: true }
+  );
+  const items = envelopeRows
+    .map((entry) => {
+      const version = resolveDisplayVersion(
+        versionsByEntry.get(entry.id) ?? [],
+        {
+          isCms: ctx.isCms,
+          archiveFilter: ctx.archiveFilter,
+        }
+      );
+      if (!version) return null;
+      return flattenEntryWithVersion(
+        entry,
+        version,
+        ctx.columns?.length
+          ? {
+              fields: projectEntryDataColumns(
+                version.data,
+                ctx.columns,
+                ctx.fieldTypes!
+              ),
+            }
+          : undefined
+      );
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null);
+  if (ctx.columns?.length) {
+    await hydrateRelationColumns(items, ctx.columns, ctx.fieldTypes!);
+  }
+  return items;
 }

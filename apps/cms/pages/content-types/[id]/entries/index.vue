@@ -135,11 +135,43 @@ function onRemoveFilter(index: number) {
 }
 
 // --- Browse mode (existing behaviour) ---
-const page = ref(1);
 const archiveFilter = ref<ArchiveFilter>('active');
-watch(archiveFilter, () => {
-  page.value = 1;
-});
+
+const afterCursor = computed(() => (route.query.after as string) || undefined);
+const beforeCursor = computed(
+  () => (route.query.before as string) || undefined
+);
+
+function resetCursor() {
+  const q = { ...route.query };
+  delete q.after;
+  delete q.before;
+  router.replace({ path: route.path, query: q });
+}
+watch(archiveFilter, () => resetCursor());
+
+function goNext() {
+  if (!data.value?.pageInfo?.endCursor) return;
+  router.replace({
+    path: route.path,
+    query: {
+      ...route.query,
+      after: data.value.pageInfo.endCursor,
+      before: undefined,
+    },
+  });
+}
+function goPrev() {
+  if (!data.value?.pageInfo?.startCursor) return;
+  router.replace({
+    path: route.path,
+    query: {
+      ...route.query,
+      before: data.value.pageInfo.startCursor,
+      after: undefined,
+    },
+  });
+}
 
 const browseColumnsParam = computed(() => route.query.columns);
 
@@ -157,16 +189,22 @@ const {
     updatedAt: string;
     fields?: Record<string, unknown>;
   }>;
-  total: number;
+  pageInfo: {
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+    startCursor: string | null;
+    endCursor: string | null;
+  };
 }>('/api/entries', {
   query: {
     contentTypeId,
-    page,
     perPage: 15,
     archiveFilter,
+    after: afterCursor,
+    before: beforeCursor,
     columns: browseColumnsParam,
   },
-  watch: [page, archiveFilter, browseColumnsParam],
+  watch: [afterCursor, beforeCursor, archiveFilter, browseColumnsParam],
 });
 
 const tableData = computed(() =>
@@ -276,17 +314,18 @@ const filterOptions: Array<{ label: string; value: ArchiveFilter }> = [
     </template>
     <ContentTable
       v-else
-      v-model:page="page"
       :title="contentType?.name ?? 'Entries'"
       :data="tableData"
       :loading="status === 'pending'"
       :columns="browseColumns"
-      :total="data?.total ?? 0"
+      :page-info="data?.pageInfo"
       :row-link="(row) => `/entries/${row.id}`"
       selectable
       :is-selected="selection.isSelected"
       :all-selected="selection.allSelected.value"
       :indeterminate="selection.indeterminate.value"
+      @next="goNext"
+      @prev="goPrev"
       @row-select="(e, id, index) => selection.toggle(id, index, e.shiftKey)"
       @select-all="selection.toggleAll"
     >

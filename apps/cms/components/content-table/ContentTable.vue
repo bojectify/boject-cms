@@ -12,6 +12,8 @@ const props = withDefaults(defineProps<ContentTableProps>(), {
 
 const emit = defineEmits<{
   'update:page': [value: number];
+  next: [];
+  prev: [];
   rowSelect: [event: MouseEvent, id: string, index: number];
   selectAll: [];
 }>();
@@ -138,7 +140,32 @@ const allColumns = computed<TableColumn<Record<string, unknown>>[]>(() => {
       </template>
     </UTable>
     <div
-      v-if="total !== undefined"
+      v-if="pageInfo"
+      class="flex justify-center gap-2 border-t border-default pt-8"
+    >
+      <UButton
+        :data-testid="QA_CONTENT_TABLE.PREV"
+        icon="i-lucide-chevron-left"
+        color="neutral"
+        variant="outline"
+        :disabled="!pageInfo.hasPreviousPage"
+        @click="emit('prev')"
+      >
+        Previous
+      </UButton>
+      <UButton
+        :data-testid="QA_CONTENT_TABLE.NEXT"
+        trailing-icon="i-lucide-chevron-right"
+        color="neutral"
+        variant="outline"
+        :disabled="!pageInfo.hasNextPage"
+        @click="emit('next')"
+      >
+        Next
+      </UButton>
+    </div>
+    <div
+      v-else-if="total !== undefined"
       class="flex justify-center border-t border-default pt-8"
     >
       <UPagination
