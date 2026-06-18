@@ -1,6 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { prisma } from './prisma';
-import { fetchDisplayVersions, resolveAndFlattenEntries } from './listEntries';
+import {
+  fetchDisplayVersions,
+  resolveAndFlattenEntries,
+  keysetPage,
+  InvalidCursorError,
+} from './listEntries';
+import type { ContentEntry } from '#prisma';
 import { CONTENT_STATUSES } from '../../utils/contentStatus';
 
 describe('fetchDisplayVersions', () => {
@@ -229,5 +235,136 @@ describe('resolveAndFlattenEntries', () => {
     });
     const item = items.find((i) => i.id === entryId)!;
     expect(item.status).toBe('PUBLISHED');
+  });
+});
+
+describe('keysetPage', () => {
+  let ctId: string;
+  // Entry ids in presentation order (updatedAt DESC, id ASC), derived from the
+  // DB after seeding so the assertions hold regardless of how Prisma's
+  // `@updatedAt` resolves an explicit-on-create timestamp.
+  let ordered: string[];
+
+  beforeEach(async () => {
+    await prisma.contentEntry.deleteMany();
+    await prisma.contentTypeField.deleteMany();
+    await prisma.contentType.deleteMany();
+
+    const ct = await prisma.contentType.create({
+      data: { identifier: 'KeysetThing', name: 'KeysetThing' },
+    });
+    ctId = ct.id;
+
+    const ids: string[] = [];
+    for (let i = 0; i < 5; i++) {
+      const e = await prisma.contentEntry.create({
+        data: {
+          contentTypeId: ctId,
+          entryTitle: `K${i}`,
+          entryKey: `k-${i}`,
+          slug: `k-${i}`,
+          versions: {
+            create: [
+              {
+                data: { title: `K${i}` },
+                entryTitle: `K${i}`,
+                status: CONTENT_STATUSES.PUBLISHED,
+                publishedAt: new Date(),
+              },
+            ],
+          },
+        },
+      });
+      ids.push(e.id);
+    }
+
+    // Prisma's `@updatedAt` ignores an explicit value on create, so set distinct
+    // timestamps via raw SQL to exercise the updatedAt-vs-id tiebreaker.
+    // i=0 newest => earliest in presentation order (updatedAt DESC).
+    for (let i = 0; i < ids.length; i++) {
+      await prisma.$executeRawUnsafe(
+        `UPDATE "ContentEntry" SET "updatedAt" = $1 WHERE id = $2`,
+        new Date(2026, 0, 10 - i),
+        ids[i]
+      );
+    }
+
+    // Derive the canonical presentation order straight from the DB so the walk
+    // assertions are deterministic no matter how the timestamps land.
+    ordered = (
+      await prisma.contentEntry.findMany({
+        where: { contentTypeId: ctId },
+        orderBy: [{ updatedAt: 'desc' }, { id: 'asc' }],
+        select: { id: true },
+      })
+    ).map((r) => r.id);
+  });
+
+  const where = () => ({ contentTypeId: ctId });
+
+  it('forward walk tiles with no dupes/gaps and reports hasNextPage', async () => {
+    const p1 = await keysetPage<ContentEntry>(prisma, {
+      where: where(),
+      perPage: 2,
+    });
+    expect(p1.rows.map((r) => r.id)).toEqual(ordered.slice(0, 2));
+    expect(p1.pageInfo.hasNextPage).toBe(true);
+    expect(p1.pageInfo.hasPreviousPage).toBe(false);
+    expect(p1.pageInfo.startCursor).not.toBeNull();
+    expect(p1.pageInfo.endCursor).not.toBeNull();
+
+    const p2 = await keysetPage<ContentEntry>(prisma, {
+      where: where(),
+      perPage: 2,
+      after: p1.pageInfo.endCursor!,
+    });
+    expect(p2.rows.map((r) => r.id)).toEqual(ordered.slice(2, 4));
+    expect(p2.pageInfo.hasNextPage).toBe(true);
+    expect(p2.pageInfo.hasPreviousPage).toBe(true);
+
+    const p3 = await keysetPage<ContentEntry>(prisma, {
+      where: where(),
+      perPage: 2,
+      after: p2.pageInfo.endCursor!,
+    });
+    expect(p3.rows.map((r) => r.id)).toEqual(ordered.slice(4, 5));
+    expect(p3.pageInfo.hasNextPage).toBe(false);
+
+    // The forward walk tiles to exactly `ordered` — no dupes, no gaps.
+    expect([
+      ...p1.rows.map((r) => r.id),
+      ...p2.rows.map((r) => r.id),
+      ...p3.rows.map((r) => r.id),
+    ]).toEqual(ordered);
+  });
+
+  it('backward walk returns the previous page in presentation order', async () => {
+    const p1 = await keysetPage<ContentEntry>(prisma, {
+      where: where(),
+      perPage: 2,
+    });
+    const p2 = await keysetPage<ContentEntry>(prisma, {
+      where: where(),
+      perPage: 2,
+      after: p1.pageInfo.endCursor!,
+    });
+    const back = await keysetPage<ContentEntry>(prisma, {
+      where: where(),
+      perPage: 2,
+      before: p2.pageInfo.startCursor!,
+    });
+    expect(back.rows.map((r) => r.id)).toEqual(ordered.slice(0, 2));
+    expect(back.pageInfo.hasNextPage).toBe(true);
+    expect(back.pageInfo.hasPreviousPage).toBe(false);
+  });
+
+  it('throws InvalidCursorError on a malformed cursor', async () => {
+    await expect(
+      keysetPage<ContentEntry>(prisma, {
+        where: where(),
+        perPage: 2,
+        after: 'garbage',
+      })
+    ).rejects.toBeInstanceOf(InvalidCursorError);
   });
 });
