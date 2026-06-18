@@ -168,7 +168,6 @@ const filterOptions: Array<{ label: string; value: ArchiveFilter }> = [
       :data="data?.items ?? []"
       :loading="status === 'pending'"
       :columns="browseColumns"
-      :total="data?.total ?? 0"
       :row-link="(row) => `/entries/${row.id}`"
       selectable
       :is-selected="selection.isSelected"

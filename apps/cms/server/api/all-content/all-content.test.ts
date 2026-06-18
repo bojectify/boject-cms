@@ -23,7 +23,15 @@ type ContentItem = {
   contentTypeId: string;
 };
 
-type ContentResponse = { items: ContentItem[]; total: number };
+type ContentResponse = {
+  items: ContentItem[];
+  pageInfo?: {
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+    startCursor: string | null;
+    endCursor: string | null;
+  };
+};
 
 type ContentTypeResponse = {
   id: string;
@@ -191,7 +199,6 @@ describe('Content API filters', async () => {
 
     const { items } = await $fetch<{
       items: Array<ContentItem & { entryKey: string }>;
-      total: number;
     }>(`/api/all-content?contentType=${blogPostType.identifier}&perPage=100`, {
       headers: { cookie },
     });
@@ -208,8 +215,7 @@ describe('Content API filters', async () => {
 
   it('returns all published content items (API key)', async () => {
     // API key only sees entries with a PUBLISHED version (3 published: 2 blog + 1 news)
-    const { items, total } = await getContent({ perPage: 50 });
-    expect(total).toBeGreaterThanOrEqual(3);
+    const { items } = await getContent({ perPage: 50 });
     expect(items.length).toBeGreaterThanOrEqual(3);
     expect(items.every((i) => i.status === CONTENT_STATUSES.PUBLISHED)).toBe(
       true
@@ -225,28 +231,37 @@ describe('Content API filters', async () => {
 
   it('returns all content items including drafts (session)', async () => {
     // Session sees all entries (2 published blogs + 1 draft blog + 1 published news)
-    const { items, total } = await getContent({ perPage: 50 }, 'session');
-    expect(total).toBeGreaterThanOrEqual(4);
+    const { items } = await getContent({ perPage: 50 }, 'session');
     expect(items.length).toBeGreaterThanOrEqual(4);
     expect(items[0]).toHaveProperty('contentType');
     expect(items[0]).toHaveProperty('entryTitle');
   });
 
-  it('paginates results', async () => {
-    const { items } = await getContent({ page: 1, perPage: 2 });
-    expect(items.length).toBeLessThanOrEqual(2);
+  it('cursor-paginates with pageInfo and no total', async () => {
+    const p1 = await getContent({ perPage: 2 });
+    expect(p1).toHaveProperty('pageInfo');
+    expect(p1).not.toHaveProperty('total');
+    expect(p1.items.length).toBeLessThanOrEqual(2);
+    if (p1.pageInfo!.hasNextPage) {
+      const p2 = await getContent({
+        perPage: 2,
+        after: p1.pageInfo!.endCursor!,
+      });
+      // No overlap between consecutive pages.
+      const p1ids = new Set(p1.items.map((i) => i.id));
+      expect(p2.items.every((i) => !p1ids.has(i.id))).toBe(true);
+    }
   });
 
   // ── contentType filter ────────────────────────────────────────
 
   describe('contentType filter', () => {
     it('filters by dynamic identifier (API key sees only published)', async () => {
-      const { items, total } = await getContent({
+      const { items } = await getContent({
         contentType: blogPostType.identifier,
         perPage: 50,
       });
       // API key only sees the 2 published blog entries (not the draft)
-      expect(total).toBeGreaterThanOrEqual(2);
       expect(items.length).toBeGreaterThanOrEqual(2);
       expect(items.every((i) => i.contentType === blogPostType.name)).toBe(
         true
@@ -257,12 +272,11 @@ describe('Content API filters', async () => {
     });
 
     it('filters by dynamic identifier (session sees all)', async () => {
-      const { items, total } = await getContent(
+      const { items } = await getContent(
         { contentType: blogPostType.identifier, perPage: 50 },
         'session'
       );
       // Session sees all 3 blog entries (2 published + 1 draft)
-      expect(total).toBeGreaterThanOrEqual(3);
       expect(items.length).toBeGreaterThanOrEqual(3);
       expect(items.every((i) => i.contentType === blogPostType.name)).toBe(
         true
@@ -270,11 +284,10 @@ describe('Content API filters', async () => {
     });
 
     it('returns empty for unknown contentType identifier', async () => {
-      const { items, total } = await getContent({
+      const { items } = await getContent({
         contentType: 'DoesNotExist',
         perPage: 50,
       });
-      expect(total).toBe(0);
       expect(items).toEqual([]);
     });
   });
@@ -283,11 +296,10 @@ describe('Content API filters', async () => {
 
   describe('status filter', () => {
     it('filters by status=PUBLISHED and all items have a string contentType', async () => {
-      const { items, total } = await getContent({
+      const { items } = await getContent({
         status: CONTENT_STATUSES.PUBLISHED,
         perPage: 100,
       });
-      expect(total).toBeGreaterThanOrEqual(3);
       expect(items.every((i) => i.status === CONTENT_STATUSES.PUBLISHED)).toBe(
         true
       );
@@ -314,12 +326,11 @@ describe('Content API filters', async () => {
     });
 
     it('API key ignores invalid status values and returns only published', async () => {
-      const { items, total } = await getContent({
+      const { items } = await getContent({
         status: 'INVALID',
         perPage: 50,
       });
       // API key sees only published entries; invalid status is ignored
-      expect(total).toBeGreaterThanOrEqual(3);
       expect(items.every((i) => i.status === CONTENT_STATUSES.PUBLISHED)).toBe(
         true
       );
@@ -330,11 +341,11 @@ describe('Content API filters', async () => {
 
   describe('combined filters', () => {
     it('filters by contentType and status together', async () => {
-      const { items, total } = await getContent({
+      const { items } = await getContent({
         contentType: blogPostType.identifier,
         status: CONTENT_STATUSES.PUBLISHED,
       });
-      expect(total).toBeGreaterThanOrEqual(2);
+      expect(items.length).toBeGreaterThanOrEqual(2);
       expect(
         items.every(
           (i) =>

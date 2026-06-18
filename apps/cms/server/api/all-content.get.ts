@@ -6,13 +6,26 @@ import {
   fetchDisplayVersions,
   parseArchiveFilter,
   resolveDisplayVersion,
+  keysetPage,
+  EMPTY_PAGE_INFO,
+  InvalidCursorError,
 } from '../utils/listEntries';
+
+type LeanRow = {
+  id: string;
+  entryTitle: string;
+  entryKey: string;
+  createdAt: Date;
+  updatedAt: Date;
+  contentTypeId: string;
+  contentType: { name: string };
+};
 
 export default defineEventHandler(async (event) => {
   const query = getQuery(event);
-  const page = Math.max(1, Number(query.page) || 1);
   const perPage = Math.min(100, Math.max(1, Number(query.perPage) || 15));
-  const offset = (page - 1) * perPage;
+  const after = typeof query.after === 'string' ? query.after : null;
+  const before = typeof query.before === 'string' ? query.before : null;
 
   const isCms = isCmsRequest(event);
   const archiveFilter = parseArchiveFilter(query.archiveFilter);
@@ -24,7 +37,7 @@ export default defineEventHandler(async (event) => {
       select: { id: true },
     });
     if (ct) contentTypeId = ct.id;
-    else return { items: [], total: 0 };
+    else return { items: [], pageInfo: EMPTY_PAGE_INFO };
   }
 
   const status =
@@ -40,12 +53,13 @@ export default defineEventHandler(async (event) => {
     contentTypeId,
   });
 
-  const [rows, total] = await Promise.all([
-    prisma.contentEntry.findMany({
+  let page;
+  try {
+    page = await keysetPage<LeanRow>(prisma, {
       where,
-      orderBy: { updatedAt: 'desc' },
-      skip: offset,
-      take: perPage,
+      perPage,
+      after,
+      before,
       select: {
         id: true,
         entryTitle: true,
@@ -55,17 +69,21 @@ export default defineEventHandler(async (event) => {
         contentTypeId: true,
         contentType: { select: { name: true } },
       },
-    }),
-    prisma.contentEntry.count({ where }),
-  ]);
+    });
+  } catch (e) {
+    if (e instanceof InvalidCursorError) {
+      throw createError({ statusCode: 400, statusMessage: 'Invalid cursor' });
+    }
+    throw e;
+  }
 
   const versionsByEntry = await fetchDisplayVersions(
     prisma,
-    rows.map((r) => r.id),
+    page.rows.map((r) => r.id),
     { includeData: false }
   );
 
-  const items = rows
+  const items = page.rows
     .map((r) => {
       const version = resolveDisplayVersion(versionsByEntry.get(r.id) ?? [], {
         isCms,
@@ -85,5 +103,5 @@ export default defineEventHandler(async (event) => {
     })
     .filter((item): item is NonNullable<typeof item> => item !== null);
 
-  return { items, total };
+  return { items, pageInfo: page.pageInfo };
 });
