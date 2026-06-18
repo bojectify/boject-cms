@@ -72,7 +72,7 @@ const {
   data,
   status,
   refresh: refreshBrowse,
-} = await useAuthedFetch('/api/content', {
+} = await useAuthedFetch('/api/all-content', {
   query: { page, perPage: 15, archiveFilter },
   watch: [page, archiveFilter],
 });
