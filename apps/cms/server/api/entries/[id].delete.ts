@@ -12,7 +12,7 @@ import { CONTENT_STATUSES } from '../../../utils/contentStatus';
 
 export default defineEventHandler(async (event) => {
   assertApiKeyScope(event, 'content:write');
-  enforceMutationRateLimit(event, 'content-entries.delete');
+  enforceMutationRateLimit(event, 'entries.delete');
   const id = assertUuid(getRouterParam(event, 'id'), 'id');
 
   const existing = await prisma.contentEntry.findUnique({

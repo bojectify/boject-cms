@@ -20,7 +20,7 @@ function classifyError(err: unknown): string {
 
 export default defineEventHandler(async (event) => {
   assertApiKeyScope(event, 'content:write');
-  enforceMutationRateLimit(event, 'content-entries.bulk-publish');
+  enforceMutationRateLimit(event, 'entries.bulk-publish');
 
   const body = await readBody<{ ids?: unknown }>(event);
   const raw = Array.isArray(body?.ids) ? body.ids : null;

@@ -85,7 +85,7 @@ describe('Schema read-only flag (BOJECT_SCHEMA_READONLY=true)', async () => {
   });
 
   // Per-endpoint tests land in Tasks 4-10.
-  // Negative tests (reads, content-entries, CSRF order) land in Task 11.
+  // Negative tests (reads, entries, CSRF order) land in Task 11.
 
   it('returns 403 SCHEMA_READONLY on POST /api/content-types', async () => {
     const cookie = await getSessionCookie();
@@ -231,9 +231,9 @@ describe('Schema read-only flag (BOJECT_SCHEMA_READONLY=true)', async () => {
       expect(res.status).toBe(200);
     });
 
-    it('POST /api/content-entries succeeds against the seeded type', async () => {
+    it('POST /api/entries succeeds against the seeded type', async () => {
       const cookie = await getSessionCookie();
-      const res = await fetch('/api/content-entries', {
+      const res = await fetch('/api/entries', {
         method: 'POST',
         headers: { cookie, 'Content-Type': 'application/json' },
         body: JSON.stringify({

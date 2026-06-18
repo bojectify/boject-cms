@@ -33,7 +33,7 @@ export const ErrorState: Story = {
   parameters: {
     msw: {
       handlers: [
-        http.get('/api/content-entries', () =>
+        http.get('/api/entries', () =>
           HttpResponse.json({ error: 'Boom' }, { status: 500 })
         ),
       ],
@@ -87,7 +87,7 @@ Global example in `preview.ts`: we install a memory-history `vue-router` via Sto
 
 | Boundary                      | Tool                                      | Example                           |
 | ----------------------------- | ----------------------------------------- | --------------------------------- |
-| Network (`fetch`, `$fetch`)   | MSW                                       | `/api/content-entries` list       |
+| Network (`fetch`, `$fetch`)   | MSW                                       | `/api/entries` list               |
 | Module import (explicit path) | Vite alias + `.mock.ts`                   | Swap a composable in stories only |
 | Nuxt auto-imports (globals)   | `unplugin-auto-import` dir + shim         | `useAuthedFetch`, `useToast`      |
 | Provide/inject                | Decorator (`app.provide` or `setup(app)`) | `paneOrchestrator`, `vue-router`  |

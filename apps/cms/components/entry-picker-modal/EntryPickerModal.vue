@@ -89,7 +89,7 @@ watch(
     for (const typeId of props.targetContentTypeIds) {
       const data = await $fetch<{
         items: Array<{ id: string; data: Record<string, unknown> }>;
-      }>('/api/content-entries', {
+      }>('/api/entries', {
         query: {
           contentTypeId: typeId,
           perPage: 100,

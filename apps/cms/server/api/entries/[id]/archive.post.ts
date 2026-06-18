@@ -1,19 +1,17 @@
 import { assertUuid } from '../../../utils/validation';
-import {
-  flattenEntryWithVersion,
-  getPublishedVersion,
-} from '../../../utils/resolveVersion';
+import { flattenEntryWithVersion } from '../../../utils/resolveVersion';
 import { enforceMutationRateLimit } from '../../../utils/rateLimitEndpoint';
 import { assertApiKeyScope } from '../../../utils/assertApiKeyScope';
 import {
-  planTransition,
   applyTransitionMutations,
+  planTransition,
 } from '../../../utils/entryTransitions';
 import { enqueueWebhookDeliveries } from '../../../utils/webhooks';
+import { CONTENT_STATUSES } from '../../../../utils/contentStatus';
 
 export default defineEventHandler(async (event) => {
   assertApiKeyScope(event, 'content:write');
-  enforceMutationRateLimit(event, 'content-entries.republish');
+  enforceMutationRateLimit(event, 'entries.archive');
   const id = assertUuid(getRouterParam(event, 'id'), 'id');
 
   const entry = await prisma.contentEntry.findUnique({
@@ -30,7 +28,7 @@ export default defineEventHandler(async (event) => {
     });
   }
 
-  const plan = planTransition(entry, 'republish');
+  const plan = planTransition(entry, 'archive');
   if (plan.kind === 'error') {
     throw createError({
       statusCode: 409,
@@ -50,20 +48,22 @@ export default defineEventHandler(async (event) => {
     }
   });
 
-  const full = await prisma.contentEntry.findUniqueOrThrow({
+  const refreshed = await prisma.contentEntry.findUniqueOrThrow({
     where: { id },
     include: { versions: true, contentType: true },
   });
-  const published = getPublishedVersion(full.versions);
-  if (!published) {
+  const archived = refreshed.versions.find(
+    (v) => v.status === CONTENT_STATUSES.ARCHIVED
+  );
+  if (!archived) {
     throw createError({
       statusCode: 500,
-      statusMessage: 'Republish left entry without a PUBLISHED version',
+      statusMessage: 'Archive left entry without an ARCHIVED version',
     });
   }
-  return flattenEntryWithVersion(full, published, {
-    contentType: full.contentType,
-    hasPublishedVersion: true,
-    publishedVersionPublishedAt: published.publishedAt,
+  return flattenEntryWithVersion(refreshed, archived, {
+    contentType: refreshed.contentType,
+    hasPublishedVersion: false,
+    publishedVersionPublishedAt: null,
   });
 });

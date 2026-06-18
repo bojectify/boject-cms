@@ -2,7 +2,7 @@ import type { SearchQuery } from '~/utils/queryBuilder/types';
 import type { ChipLabelField } from '~/utils/queryBuilder/chipLabels';
 import { collectRelationFilterIds } from '~/utils/queryBuilder/chipLabels';
 
-// GET /api/content-entries/:id is flattened (flattenEntryWithVersion), so the
+// GET /api/entries/:id is flattened (flattenEntryWithVersion), so the
 // resolved entry title is already top-level — no need to re-scan fields.
 interface ChipEntryResponse {
   entryTitle?: string | null;
@@ -37,7 +37,7 @@ export function useFilterChipLabels(
       // single chip carry many ids — batch or cap concurrency then.
       const results = await Promise.all(
         ids.value.map((id) =>
-          request$fetch<ChipEntryResponse>(`/api/content-entries/${id}`)
+          request$fetch<ChipEntryResponse>(`/api/entries/${id}`)
             .then((entry) => [id, entryTitleOf(entry)] as const)
             .catch(() => null)
         )

@@ -76,11 +76,11 @@ describe('GraphQL API', async () => {
     );
     if (already) {
       const entries = await $fetch<{ items: Array<{ id: string }> }>(
-        `/api/content-entries?contentTypeId=${already.id}&perPage=200`,
+        `/api/entries?contentTypeId=${already.id}&perPage=200`,
         { headers: { cookie } }
       ).catch(() => ({ items: [] }));
       for (const e of entries.items ?? []) {
-        await $fetch<unknown>(`/api/content-entries/${e.id}`, {
+        await $fetch<unknown>(`/api/entries/${e.id}`, {
           method: 'DELETE',
           headers: { cookie },
         }).catch(() => {});
@@ -126,7 +126,7 @@ describe('GraphQL API', async () => {
     });
     blogTypeId = type.id;
 
-    const a = await $fetch<{ id: string }>('/api/content-entries', {
+    const a = await $fetch<{ id: string }>('/api/entries', {
       method: 'POST',
       headers: { cookie },
       body: {
@@ -144,7 +144,7 @@ describe('GraphQL API', async () => {
     });
     blogEntryIds.push(a.id);
 
-    const b = await $fetch<{ id: string }>('/api/content-entries', {
+    const b = await $fetch<{ id: string }>('/api/entries', {
       method: 'POST',
       headers: { cookie },
       body: {
@@ -167,7 +167,7 @@ describe('GraphQL API', async () => {
     try {
       const cookie = await getSessionCookie();
       for (const id of blogEntryIds) {
-        await $fetch<unknown>(`/api/content-entries/${id}`, {
+        await $fetch<unknown>(`/api/entries/${id}`, {
           method: 'DELETE',
           headers: { cookie },
         }).catch(() => {});
@@ -473,7 +473,7 @@ describe('GraphQL API', async () => {
       });
       postTypeId = postType.id;
 
-      const tag1 = await $fetch<{ id: string }>('/api/content-entries', {
+      const tag1 = await $fetch<{ id: string }>('/api/entries', {
         method: 'POST',
         headers: { Cookie: await getSessionCookie() },
         body: {
@@ -484,7 +484,7 @@ describe('GraphQL API', async () => {
       });
       tagEntryId = tag1.id;
 
-      const tag2 = await $fetch<{ id: string }>('/api/content-entries', {
+      const tag2 = await $fetch<{ id: string }>('/api/entries', {
         method: 'POST',
         headers: { Cookie: await getSessionCookie() },
         body: {
@@ -494,7 +494,7 @@ describe('GraphQL API', async () => {
         },
       });
 
-      const post = await $fetch<{ id: string }>('/api/content-entries', {
+      const post = await $fetch<{ id: string }>('/api/entries', {
         method: 'POST',
         headers: { Cookie: await getSessionCookie() },
         body: {
@@ -554,18 +554,18 @@ describe('GraphQL API', async () => {
     });
 
     it('cleans up relation test data', async () => {
-      await $fetch<unknown>(`/api/content-entries/${postEntryId}`, {
+      await $fetch<unknown>(`/api/entries/${postEntryId}`, {
         method: 'DELETE',
         headers: { Cookie: await getSessionCookie() },
       });
       const tagEntries = await $fetch<{ items: Array<{ id: string }> }>(
-        `/api/content-entries?contentTypeId=${tagTypeId}`,
+        `/api/entries?contentTypeId=${tagTypeId}`,
         {
           headers: { Cookie: await getSessionCookie() },
         }
       );
       for (const entry of tagEntries.items) {
-        await $fetch<unknown>(`/api/content-entries/${entry.id}`, {
+        await $fetch<unknown>(`/api/entries/${entry.id}`, {
           method: 'DELETE',
           headers: { Cookie: await getSessionCookie() },
         });
@@ -643,7 +643,7 @@ describe('GraphQL API', async () => {
       });
 
       // GraphQL only serves PUBLISHED versions, so create as PUBLISHED
-      const entry = await $fetch<{ id: string }>('/api/content-entries', {
+      const entry = await $fetch<{ id: string }>('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -662,7 +662,7 @@ describe('GraphQL API', async () => {
       expect(data.fieldAddTest).not.toBeNull();
       expect(data.fieldAddTest!.description).toBe('A description');
 
-      await $fetch<unknown>(`/api/content-entries/${entry.id}`, {
+      await $fetch<unknown>(`/api/entries/${entry.id}`, {
         method: 'DELETE',
         headers: { cookie },
       });
@@ -772,7 +772,7 @@ describe('GraphQL API', async () => {
       const cookie = await getSessionCookie();
 
       // Create a draft-only entry
-      const draftEntry = await $fetch<{ id: string }>('/api/content-entries', {
+      const draftEntry = await $fetch<{ id: string }>('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -793,7 +793,7 @@ describe('GraphQL API', async () => {
       expect(data.blogPost).toBeNull();
 
       // Clean up
-      await $fetch<unknown>(`/api/content-entries/${draftEntry.id}`, {
+      await $fetch<unknown>(`/api/entries/${draftEntry.id}`, {
         method: 'DELETE',
         headers: { cookie },
       });
@@ -804,7 +804,7 @@ describe('GraphQL API', async () => {
       const ts = Date.now();
 
       // Create and publish an entry
-      const entry = await $fetch<{ id: string }>('/api/content-entries', {
+      const entry = await $fetch<{ id: string }>('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -826,7 +826,7 @@ describe('GraphQL API', async () => {
       expect(before.blogPost!.summary).toBe('Original published');
 
       // Save a draft edit (creates CHANGED version)
-      await $fetch(`/api/content-entries/${entry.id}`, {
+      await $fetch(`/api/entries/${entry.id}`, {
         method: 'PUT',
         headers: { cookie },
         body: {
@@ -846,7 +846,7 @@ describe('GraphQL API', async () => {
       expect(during.blogPost!.summary).toBe('Original published');
 
       // Publish the CHANGED version
-      await $fetch(`/api/content-entries/${entry.id}`, {
+      await $fetch(`/api/entries/${entry.id}`, {
         method: 'PUT',
         headers: { cookie },
         body: { status: CONTENT_STATUSES.PUBLISHED },
@@ -860,7 +860,7 @@ describe('GraphQL API', async () => {
       expect(after.blogPost!.summary).toBe('Draft changes');
 
       // Clean up
-      await $fetch<unknown>(`/api/content-entries/${entry.id}`, {
+      await $fetch<unknown>(`/api/entries/${entry.id}`, {
         method: 'DELETE',
         headers: { cookie },
       });
@@ -887,11 +887,11 @@ describe('GraphQL API', async () => {
         const ct = existing.items?.find?.((c) => c.identifier === id);
         if (!ct) continue;
         const entries = await $fetch<{ items: Array<{ id: string }> }>(
-          `/api/content-entries?contentTypeId=${ct.id}&perPage=200`,
+          `/api/entries?contentTypeId=${ct.id}&perPage=200`,
           { headers: { cookie } }
         ).catch(() => ({ items: [] }));
         for (const e of entries.items ?? []) {
-          await $fetch<unknown>(`/api/content-entries/${e.id}`, {
+          await $fetch<unknown>(`/api/entries/${e.id}`, {
             method: 'DELETE',
             headers: { cookie },
           }).catch(() => {});
@@ -922,7 +922,7 @@ describe('GraphQL API', async () => {
       });
       tagTypeId = tagType.id;
 
-      const tag1 = await $fetch<{ id: string }>('/api/content-entries', {
+      const tag1 = await $fetch<{ id: string }>('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -932,7 +932,7 @@ describe('GraphQL API', async () => {
         },
       });
       tag1Id = tag1.id;
-      const tag2 = await $fetch<{ id: string }>('/api/content-entries', {
+      const tag2 = await $fetch<{ id: string }>('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -968,7 +968,7 @@ describe('GraphQL API', async () => {
       });
       articleTypeId = articleType.id;
 
-      const article = await $fetch<{ id: string }>('/api/content-entries', {
+      const article = await $fetch<{ id: string }>('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -1062,7 +1062,7 @@ describe('GraphQL API', async () => {
 
     it('returns an empty references array for a body with no references', async () => {
       const cookie = await getSessionCookie();
-      const created = await $fetch<{ id: string }>('/api/content-entries', {
+      const created = await $fetch<{ id: string }>('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -1095,7 +1095,7 @@ describe('GraphQL API', async () => {
       expect(res.errors).toBeUndefined();
       expect(res.data.rtArticle.body.references).toEqual([]);
 
-      await $fetch<unknown>(`/api/content-entries/${created.id}`, {
+      await $fetch<unknown>(`/api/entries/${created.id}`, {
         method: 'DELETE',
         headers: { cookie },
       }).catch(() => {});
@@ -1104,7 +1104,7 @@ describe('GraphQL API', async () => {
     it('drops references whose target has no PUBLISHED version', async () => {
       const cookie = await getSessionCookie();
       // Create a draft-only tag
-      const draftTag = await $fetch<{ id: string }>('/api/content-entries', {
+      const draftTag = await $fetch<{ id: string }>('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -1114,7 +1114,7 @@ describe('GraphQL API', async () => {
         },
       });
 
-      const article = await $fetch<{ id: string }>('/api/content-entries', {
+      const article = await $fetch<{ id: string }>('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -1155,11 +1155,11 @@ describe('GraphQL API', async () => {
       expect(res.errors).toBeUndefined();
       expect(res.data.rtArticle.body.references).toEqual([]);
 
-      await $fetch<unknown>(`/api/content-entries/${article.id}`, {
+      await $fetch<unknown>(`/api/entries/${article.id}`, {
         method: 'DELETE',
         headers: { cookie },
       }).catch(() => {});
-      await $fetch<unknown>(`/api/content-entries/${draftTag.id}`, {
+      await $fetch<unknown>(`/api/entries/${draftTag.id}`, {
         method: 'DELETE',
         headers: { cookie },
       }).catch(() => {});
@@ -1195,7 +1195,7 @@ describe('GraphQL API', async () => {
         }
       );
 
-      const article = await $fetch<{ id: string }>('/api/content-entries', {
+      const article = await $fetch<{ id: string }>('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -1290,7 +1290,7 @@ describe('GraphQL API', async () => {
       }
 
       // Cleanup: delete this test's article so the wildcard sweep at the end is faster
-      await $fetch<unknown>(`/api/content-entries/${article.id}`, {
+      await $fetch<unknown>(`/api/entries/${article.id}`, {
         method: 'DELETE',
         headers: { cookie },
       }).catch(() => {});
@@ -1317,7 +1317,7 @@ describe('GraphQL API', async () => {
         },
       });
 
-      const otherEntry = await $fetch<{ id: string }>('/api/content-entries', {
+      const otherEntry = await $fetch<{ id: string }>('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -1327,7 +1327,7 @@ describe('GraphQL API', async () => {
         },
       });
 
-      const create = $fetch<unknown>('/api/content-entries', {
+      const create = $fetch<unknown>('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -1363,7 +1363,7 @@ describe('GraphQL API', async () => {
       });
 
       // Cleanup
-      await $fetch<unknown>(`/api/content-entries/${otherEntry.id}`, {
+      await $fetch<unknown>(`/api/entries/${otherEntry.id}`, {
         method: 'DELETE',
         headers: { cookie },
       }).catch(() => {});
@@ -1377,11 +1377,11 @@ describe('GraphQL API', async () => {
       const cookie = await getSessionCookie();
       for (const ctId of [articleTypeId, tagTypeId]) {
         const entries = await $fetch<{ items: Array<{ id: string }> }>(
-          `/api/content-entries?contentTypeId=${ctId}&perPage=200`,
+          `/api/entries?contentTypeId=${ctId}&perPage=200`,
           { headers: { cookie } }
         ).catch(() => ({ items: [] }));
         for (const e of entries.items ?? []) {
-          await $fetch<unknown>(`/api/content-entries/${e.id}`, {
+          await $fetch<unknown>(`/api/entries/${e.id}`, {
             method: 'DELETE',
             headers: { cookie },
           }).catch(() => {});
@@ -1495,7 +1495,7 @@ describe('GraphQL API', async () => {
       });
       articleTypeId = articleType.id;
 
-      const ta = await $fetch<{ id: string }>('/api/content-entries', {
+      const ta = await $fetch<{ id: string }>('/api/entries', {
         method: 'POST',
         headers: { Cookie: await getSessionCookie() },
         body: {
@@ -1505,7 +1505,7 @@ describe('GraphQL API', async () => {
         },
       });
       teamA = ta.id;
-      const tb = await $fetch<{ id: string }>('/api/content-entries', {
+      const tb = await $fetch<{ id: string }>('/api/entries', {
         method: 'POST',
         headers: { Cookie: await getSessionCookie() },
         body: {
@@ -1515,7 +1515,7 @@ describe('GraphQL API', async () => {
         },
       });
       teamB = tb.id;
-      const tx = await $fetch<{ id: string }>('/api/content-entries', {
+      const tx = await $fetch<{ id: string }>('/api/entries', {
         method: 'POST',
         headers: { Cookie: await getSessionCookie() },
         body: {
@@ -1525,7 +1525,7 @@ describe('GraphQL API', async () => {
         },
       });
       tagX = tx.id;
-      const ty = await $fetch<{ id: string }>('/api/content-entries', {
+      const ty = await $fetch<{ id: string }>('/api/entries', {
         method: 'POST',
         headers: { Cookie: await getSessionCookie() },
         body: {
@@ -1536,7 +1536,7 @@ describe('GraphQL API', async () => {
       });
       tagY = ty.id;
 
-      const pA = await $fetch<{ id: string }>('/api/content-entries', {
+      const pA = await $fetch<{ id: string }>('/api/entries', {
         method: 'POST',
         headers: { Cookie: await getSessionCookie() },
         body: {
@@ -1549,7 +1549,7 @@ describe('GraphQL API', async () => {
         },
       });
       playerOnA = pA.id;
-      const pB = await $fetch<{ id: string }>('/api/content-entries', {
+      const pB = await $fetch<{ id: string }>('/api/entries', {
         method: 'POST',
         headers: { Cookie: await getSessionCookie() },
         body: {
@@ -1562,7 +1562,7 @@ describe('GraphQL API', async () => {
         },
       });
       playerOnB = pB.id;
-      const pU = await $fetch<{ id: string }>('/api/content-entries', {
+      const pU = await $fetch<{ id: string }>('/api/entries', {
         method: 'POST',
         headers: { Cookie: await getSessionCookie() },
         body: {
@@ -1573,7 +1573,7 @@ describe('GraphQL API', async () => {
       });
       unassignedPlayer = pU.id;
 
-      const aXY = await $fetch<{ id: string }>('/api/content-entries', {
+      const aXY = await $fetch<{ id: string }>('/api/entries', {
         method: 'POST',
         headers: { Cookie: await getSessionCookie() },
         body: {
@@ -1589,7 +1589,7 @@ describe('GraphQL API', async () => {
         },
       });
       articleTaggedXY = aXY.id;
-      const aX = await $fetch<{ id: string }>('/api/content-entries', {
+      const aX = await $fetch<{ id: string }>('/api/entries', {
         method: 'POST',
         headers: { Cookie: await getSessionCookie() },
         body: {
@@ -1602,7 +1602,7 @@ describe('GraphQL API', async () => {
         },
       });
       articleTaggedX = aX.id;
-      const aU = await $fetch<{ id: string }>('/api/content-entries', {
+      const aU = await $fetch<{ id: string }>('/api/entries', {
         method: 'POST',
         headers: { Cookie: await getSessionCookie() },
         body: {
@@ -1802,7 +1802,7 @@ describe('GraphQL API', async () => {
         tagY,
       ].filter((id): id is string => Boolean(id));
       for (const id of allEntryIds) {
-        await $fetch<unknown>(`/api/content-entries/${id}`, {
+        await $fetch<unknown>(`/api/entries/${id}`, {
           method: 'DELETE',
           headers: { cookie },
         }).catch(() => {});
@@ -1968,7 +1968,7 @@ describe('GraphQL API', async () => {
       );
       multiTargetTypeId = multiTargetType.id;
 
-      const ta = await $fetch<{ id: string }>('/api/content-entries', {
+      const ta = await $fetch<{ id: string }>('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -1978,7 +1978,7 @@ describe('GraphQL API', async () => {
         },
       });
       teamA = ta.id;
-      const tb = await $fetch<{ id: string }>('/api/content-entries', {
+      const tb = await $fetch<{ id: string }>('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -1988,7 +1988,7 @@ describe('GraphQL API', async () => {
         },
       });
       teamB = tb.id;
-      const tx = await $fetch<{ id: string }>('/api/content-entries', {
+      const tx = await $fetch<{ id: string }>('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -1998,7 +1998,7 @@ describe('GraphQL API', async () => {
         },
       });
       tagX = tx.id;
-      const ty = await $fetch<{ id: string }>('/api/content-entries', {
+      const ty = await $fetch<{ id: string }>('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -2009,7 +2009,7 @@ describe('GraphQL API', async () => {
       });
       tagY = ty.id;
 
-      const pA = await $fetch<{ id: string }>('/api/content-entries', {
+      const pA = await $fetch<{ id: string }>('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -2022,7 +2022,7 @@ describe('GraphQL API', async () => {
         },
       });
       playerOnA = pA.id;
-      const pB = await $fetch<{ id: string }>('/api/content-entries', {
+      const pB = await $fetch<{ id: string }>('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -2036,7 +2036,7 @@ describe('GraphQL API', async () => {
       });
       playerOnB = pB.id;
 
-      const aXY = await $fetch<{ id: string }>('/api/content-entries', {
+      const aXY = await $fetch<{ id: string }>('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -2052,7 +2052,7 @@ describe('GraphQL API', async () => {
         },
       });
       articleTaggedXY = aXY.id;
-      const aX = await $fetch<{ id: string }>('/api/content-entries', {
+      const aX = await $fetch<{ id: string }>('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -2287,7 +2287,7 @@ describe('GraphQL API', async () => {
         tagY,
       ].filter((id): id is string => Boolean(id));
       for (const id of allEntryIds) {
-        await $fetch<unknown>(`/api/content-entries/${id}`, {
+        await $fetch<unknown>(`/api/entries/${id}`, {
           method: 'DELETE',
           headers: { cookie },
         }).catch(() => {});
@@ -2324,11 +2324,11 @@ describe('GraphQL API', async () => {
       const prior = existing.items?.find?.((c) => c.identifier === 'TestPhoto');
       if (prior) {
         const entries = await $fetch<{ items: Array<{ id: string }> }>(
-          `/api/content-entries?contentTypeId=${prior.id}&perPage=200`,
+          `/api/entries?contentTypeId=${prior.id}&perPage=200`,
           { headers: { cookie } }
         ).catch(() => ({ items: [] }));
         for (const e of entries.items ?? []) {
-          await $fetch<unknown>(`/api/content-entries/${e.id}`, {
+          await $fetch<unknown>(`/api/entries/${e.id}`, {
             method: 'DELETE',
             headers: { cookie },
           }).catch(() => {});
@@ -2369,7 +2369,7 @@ describe('GraphQL API', async () => {
       });
       imageTypeId = type.id;
 
-      const withImage = await $fetch<{ id: string }>('/api/content-entries', {
+      const withImage = await $fetch<{ id: string }>('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -2394,30 +2394,27 @@ describe('GraphQL API', async () => {
 
       // Entry with the optional 'cover' IMAGE field omitted, to check
       // null handling on optional IMAGE fields.
-      const withoutCover = await $fetch<{ id: string }>(
-        '/api/content-entries',
-        {
-          method: 'POST',
-          headers: { cookie },
-          body: {
-            contentTypeId: imageTypeId,
-            data: {
-              title: 'Plain entry',
-              photo: {
-                storageKey: 'def-456.png',
-                mimeType: 'image/png',
-                width: 800,
-                height: 600,
-                fileSize: 12345,
-                originalName: null,
-                focalPointX: 0.5,
-                focalPointY: 0.5,
-              },
+      const withoutCover = await $fetch<{ id: string }>('/api/entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: imageTypeId,
+          data: {
+            title: 'Plain entry',
+            photo: {
+              storageKey: 'def-456.png',
+              mimeType: 'image/png',
+              width: 800,
+              height: 600,
+              fileSize: 12345,
+              originalName: null,
+              focalPointX: 0.5,
+              focalPointY: 0.5,
             },
-            status: CONTENT_STATUSES.PUBLISHED,
           },
-        }
-      );
+          status: CONTENT_STATUSES.PUBLISHED,
+        },
+      });
       imagelessEntryId = withoutCover.id;
 
       expect(imageTypeId).toBeTruthy();
@@ -2550,7 +2547,7 @@ describe('GraphQL API', async () => {
         },
       });
 
-      const entry = await $fetch<{ id: string }>('/api/content-entries', {
+      const entry = await $fetch<{ id: string }>('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -2581,7 +2578,7 @@ describe('GraphQL API', async () => {
         expect(node).toBeTruthy();
         expect(node!.entryKey).toBe('graphql-read');
       } finally {
-        await $fetch<unknown>(`/api/content-entries/${entry.id}`, {
+        await $fetch<unknown>(`/api/entries/${entry.id}`, {
           method: 'DELETE',
           headers: { cookie },
         }).catch(() => {});
@@ -2611,7 +2608,7 @@ describe('GraphQL API', async () => {
         },
       });
 
-      const alpha = await $fetch<{ id: string }>('/api/content-entries', {
+      const alpha = await $fetch<{ id: string }>('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -2620,7 +2617,7 @@ describe('GraphQL API', async () => {
           status: CONTENT_STATUSES.PUBLISHED,
         },
       });
-      const beta = await $fetch<{ id: string }>('/api/content-entries', {
+      const beta = await $fetch<{ id: string }>('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -2641,7 +2638,7 @@ describe('GraphQL API', async () => {
         expect(data.postJList.edges[0]!.node.entryKey).toBe('beta');
       } finally {
         for (const id of [alpha.id, beta.id]) {
-          await $fetch<unknown>(`/api/content-entries/${id}`, {
+          await $fetch<unknown>(`/api/entries/${id}`, {
             method: 'DELETE',
             headers: { cookie },
           }).catch(() => {});
@@ -2672,7 +2669,7 @@ describe('GraphQL API', async () => {
         },
       });
 
-      const e1 = await $fetch<{ id: string }>('/api/content-entries', {
+      const e1 = await $fetch<{ id: string }>('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -2681,7 +2678,7 @@ describe('GraphQL API', async () => {
           status: CONTENT_STATUSES.PUBLISHED,
         },
       });
-      const e2 = await $fetch<{ id: string }>('/api/content-entries', {
+      const e2 = await $fetch<{ id: string }>('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -2690,7 +2687,7 @@ describe('GraphQL API', async () => {
           status: CONTENT_STATUSES.PUBLISHED,
         },
       });
-      const e3 = await $fetch<{ id: string }>('/api/content-entries', {
+      const e3 = await $fetch<{ id: string }>('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -2711,7 +2708,7 @@ describe('GraphQL API', async () => {
         expect(keys).toEqual(['x-one', 'x-three']);
       } finally {
         for (const id of [e1.id, e2.id, e3.id]) {
-          await $fetch<unknown>(`/api/content-entries/${id}`, {
+          await $fetch<unknown>(`/api/entries/${id}`, {
             method: 'DELETE',
             headers: { cookie },
           }).catch(() => {});
@@ -2742,7 +2739,7 @@ describe('GraphQL API', async () => {
         },
       });
 
-      const entry = await $fetch<{ id: string }>('/api/content-entries', {
+      const entry = await $fetch<{ id: string }>('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -2764,7 +2761,7 @@ describe('GraphQL API', async () => {
         expect(data.found!.entryKey).toBe('look-me-up');
         expect(data.missing).toBeNull();
       } finally {
-        await $fetch<unknown>(`/api/content-entries/${entry.id}`, {
+        await $fetch<unknown>(`/api/entries/${entry.id}`, {
           method: 'DELETE',
           headers: { cookie },
         }).catch(() => {});

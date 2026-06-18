@@ -220,7 +220,7 @@ For SQL bundles with deferred-edge patches: if a patch's target or `fieldUpdates
 
 #### `boject perf scenario rest-crud-cycle --content-type <id> [flags]`
 
-Write-load scenario: 10 VUs run interleaved CREATE / READ / DELETE iterations against `/api/content-entries`. Requires `--database-url <perf>`. Refuses `--read-only`. Use `--crud-n <n>` to control iterations per phase (default 10000, matches the canonical sweep).
+Write-load scenario: 10 VUs run interleaved CREATE / READ / DELETE iterations against `/api/entries`. Requires `--database-url <perf>`. Refuses `--read-only`. Use `--crud-n <n>` to control iterations per phase (default 10000, matches the canonical sweep).
 
 ```bash
 boject perf scenario rest-crud-cycle --content-type Article \

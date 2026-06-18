@@ -27,7 +27,7 @@ export function isApiKeyScope(value: unknown): value is ApiKeyScope {
 export const API_KEY_SCOPE_DESCRIPTIONS: Record<ApiKeyScope, string> = {
   'content:read': 'Read content via GraphQL.',
   'content:write':
-    'Create, update, delete, and transition content entries via /api/content-entries.',
+    'Create, update, delete, and transition content entries via /api/entries.',
   'content:export':
     'Export content entries as a portable bundle (/api/content-bundle/export), including draft versions.',
   'content:import':

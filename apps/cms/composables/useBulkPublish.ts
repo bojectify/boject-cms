@@ -34,7 +34,7 @@ export function useBulkPublish(
     busy.value = true;
     try {
       const res = await $fetch<BulkPublishResponse>(
-        '/api/content-entries/bulk-publish',
+        '/api/entries/bulk-publish',
         { method: 'POST', body: { ids } }
       );
       toast.add(

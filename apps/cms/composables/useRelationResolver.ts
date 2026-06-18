@@ -50,7 +50,7 @@ export function useRelationResolver() {
           name: string;
           fields: Array<{ identifier: string; type: string }>;
         };
-      }>(`/api/content-entries/${ref.entryId}`),
+      }>(`/api/entries/${ref.entryId}`),
       resolveContentTypeName(ref.contentTypeId),
     ]);
 

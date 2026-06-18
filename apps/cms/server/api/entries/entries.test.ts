@@ -175,10 +175,10 @@ describe('Content Entry endpoints', async () => {
     });
   });
 
-  describe('POST /api/content-entries', () => {
+  describe('POST /api/entries', () => {
     it('creates an entry with valid data', async () => {
       const cookie = await getSessionCookie();
-      const res = await fetch('/api/content-entries', {
+      const res = await fetch('/api/entries', {
         method: 'POST',
         headers: { cookie, 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -210,7 +210,7 @@ describe('Content Entry endpoints', async () => {
 
     it('rejects missing required field', async () => {
       const cookie = await getSessionCookie();
-      const res = await fetch('/api/content-entries', {
+      const res = await fetch('/api/entries', {
         method: 'POST',
         headers: { cookie, 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -226,7 +226,7 @@ describe('Content Entry endpoints', async () => {
 
     it('rejects invalid number value', async () => {
       const cookie = await getSessionCookie();
-      const res = await fetch('/api/content-entries', {
+      const res = await fetch('/api/entries', {
         method: 'POST',
         headers: { cookie, 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -243,7 +243,7 @@ describe('Content Entry endpoints', async () => {
 
     it('rejects invalid select value', async () => {
       const cookie = await getSessionCookie();
-      const res = await fetch('/api/content-entries', {
+      const res = await fetch('/api/entries', {
         method: 'POST',
         headers: { cookie, 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -270,7 +270,7 @@ describe('Content Entry endpoints', async () => {
         ],
       };
 
-      const res = await fetch('/api/content-entries', {
+      const res = await fetch('/api/entries', {
         method: 'POST',
         headers: { cookie, 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -289,7 +289,7 @@ describe('Content Entry endpoints', async () => {
 
     it('rejects non-object RICHTEXT value', async () => {
       const cookie = await getSessionCookie();
-      const res = await fetch('/api/content-entries', {
+      const res = await fetch('/api/entries', {
         method: 'POST',
         headers: { cookie, 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -307,7 +307,7 @@ describe('Content Entry endpoints', async () => {
     it('populates entryTitle column from the ENTRY_TITLE field value on create', async () => {
       const cookie = await getSessionCookie();
       const created = await $fetch<{ id: string; entryTitle: string }>(
-        '/api/content-entries',
+        '/api/entries',
         {
           method: 'POST',
           body: {
@@ -323,7 +323,7 @@ describe('Content Entry endpoints', async () => {
 
     it('rejects duplicate entryTitle within a content type with 409', async () => {
       const cookie = await getSessionCookie();
-      await $fetch('/api/content-entries', {
+      await $fetch('/api/entries', {
         method: 'POST',
         body: {
           contentTypeId: testContentType.id,
@@ -334,7 +334,7 @@ describe('Content Entry endpoints', async () => {
       });
 
       await expect(
-        $fetch('/api/content-entries', {
+        $fetch('/api/entries', {
           method: 'POST',
           body: {
             contentTypeId: testContentType.id,
@@ -348,7 +348,7 @@ describe('Content Entry endpoints', async () => {
 
     it('updates entryTitle column when title field changes via PUT', async () => {
       const cookie = await getSessionCookie();
-      const created = await $fetch<{ id: string }>('/api/content-entries', {
+      const created = await $fetch<{ id: string }>('/api/entries', {
         method: 'POST',
         body: {
           contentTypeId: testContentType.id,
@@ -358,7 +358,7 @@ describe('Content Entry endpoints', async () => {
         headers: { cookie },
       });
       const updated = await $fetch<{ entryTitle: string }>(
-        `/api/content-entries/${created.id}`,
+        `/api/entries/${created.id}`,
         {
           method: 'PUT',
           body: { data: { title: 'Renamed', summary: 'x' } },
@@ -372,7 +372,7 @@ describe('Content Entry endpoints', async () => {
       const cookie = await getSessionCookie();
 
       // Create first entry with a specific slug
-      await $fetch('/api/content-entries', {
+      await $fetch('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -385,7 +385,7 @@ describe('Content Entry endpoints', async () => {
       });
 
       // Try to create another entry with the same slug
-      const res = await fetch('/api/content-entries', {
+      const res = await fetch('/api/entries', {
         method: 'POST',
         headers: { cookie, 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -409,7 +409,7 @@ describe('Content Entry endpoints', async () => {
       const suffix = Date.now();
       const title = `Hello World ${suffix}`;
       const expectedKey = `hello-world-${suffix}`;
-      const res = await fetch('/api/content-entries', {
+      const res = await fetch('/api/entries', {
         method: 'POST',
         headers: {
           cookie,
@@ -436,7 +436,7 @@ describe('Content Entry endpoints', async () => {
       const secondTitle = `Hero - Banner ${suffix}`;
       const expectedKey = `hero-banner-${suffix}`;
 
-      const first = await fetch('/api/content-entries', {
+      const first = await fetch('/api/entries', {
         method: 'POST',
         headers: {
           cookie,
@@ -451,7 +451,7 @@ describe('Content Entry endpoints', async () => {
       });
       expect(first.status).toBe(201);
 
-      const res = await fetch('/api/content-entries', {
+      const res = await fetch('/api/entries', {
         method: 'POST',
         headers: {
           cookie,
@@ -480,7 +480,7 @@ describe('Content Entry endpoints', async () => {
 
     it('returns 400 ENTRY_KEY_EMPTY when entryTitle has no slug-safe chars', async () => {
       const cookie = await getSessionCookie();
-      const res = await fetch('/api/content-entries', {
+      const res = await fetch('/api/entries', {
         method: 'POST',
         headers: {
           cookie,
@@ -508,7 +508,7 @@ describe('Content Entry endpoints', async () => {
       const renamedTitle = `Renamed Title ${suffix}`;
       const expectedKey = `original-title-${suffix}`;
 
-      const createRes = await fetch('/api/content-entries', {
+      const createRes = await fetch('/api/entries', {
         method: 'POST',
         headers: {
           cookie,
@@ -527,7 +527,7 @@ describe('Content Entry endpoints', async () => {
       };
       expect(created.entryKey).toBe(expectedKey);
 
-      const putRes = await fetch(`/api/content-entries/${created.id}`, {
+      const putRes = await fetch(`/api/entries/${created.id}`, {
         method: 'PUT',
         headers: {
           cookie,
@@ -566,7 +566,7 @@ describe('Content Entry endpoints', async () => {
       const expectedKey = `lifecycle-target-${suffix}`;
 
       // Create entry as DRAFT then publish so archive is legal.
-      const createRes = await fetch('/api/content-entries', {
+      const createRes = await fetch('/api/entries', {
         method: 'POST',
         headers: {
           cookie,
@@ -585,7 +585,7 @@ describe('Content Entry endpoints', async () => {
       };
       expect(created.entryKey).toBe(expectedKey);
 
-      const publishRes = await fetch(`/api/content-entries/${created.id}`, {
+      const publishRes = await fetch(`/api/entries/${created.id}`, {
         method: 'PUT',
         headers: {
           cookie,
@@ -599,25 +599,19 @@ describe('Content Entry endpoints', async () => {
       });
       expect(publishRes.status).toBe(200);
 
-      const archiveRes = await fetch(
-        `/api/content-entries/${created.id}/archive`,
-        {
-          method: 'POST',
-          headers: { cookie, 'X-Forwarded-For': '203.0.113.188' },
-        }
-      );
+      const archiveRes = await fetch(`/api/entries/${created.id}/archive`, {
+        method: 'POST',
+        headers: { cookie, 'X-Forwarded-For': '203.0.113.188' },
+      });
       expect(archiveRes.status).toBe(200);
 
-      const unarchiveRes = await fetch(
-        `/api/content-entries/${created.id}/unarchive`,
-        {
-          method: 'POST',
-          headers: { cookie, 'X-Forwarded-For': '203.0.113.188' },
-        }
-      );
+      const unarchiveRes = await fetch(`/api/entries/${created.id}/unarchive`, {
+        method: 'POST',
+        headers: { cookie, 'X-Forwarded-For': '203.0.113.188' },
+      });
       expect(unarchiveRes.status).toBe(200);
 
-      const getRes = await fetch(`/api/content-entries/${created.id}`, {
+      const getRes = await fetch(`/api/entries/${created.id}`, {
         headers: { cookie, 'X-Forwarded-For': '203.0.113.188' },
       });
       expect(getRes.status).toBe(200);
@@ -636,13 +630,13 @@ describe('Content Entry endpoints', async () => {
   });
 
   describe('entryKey in REST responses (#205)', () => {
-    it('GET /api/content-entries/:id includes entryKey', async () => {
+    it('GET /api/entries/:id includes entryKey', async () => {
       const cookie = await getSessionCookie();
       const suffix = Date.now();
       const title = `Detail View ${suffix}`;
       const expectedKey = `detail-view-${suffix}`;
 
-      const createRes = await fetch('/api/content-entries', {
+      const createRes = await fetch('/api/entries', {
         method: 'POST',
         headers: {
           cookie,
@@ -658,7 +652,7 @@ describe('Content Entry endpoints', async () => {
       expect(createRes.status).toBe(201);
       const created = (await createRes.json()) as { id: string };
 
-      const getRes = await fetch(`/api/content-entries/${created.id}`, {
+      const getRes = await fetch(`/api/entries/${created.id}`, {
         headers: { cookie, 'X-Forwarded-For': '203.0.113.189' },
       });
       expect(getRes.status).toBe(200);
@@ -668,13 +662,13 @@ describe('Content Entry endpoints', async () => {
       expect(fetched.entryKey).toBe(expectedKey);
     });
 
-    it('GET /api/content-entries (list) includes entryKey on every item', async () => {
+    it('GET /api/entries (list) includes entryKey on every item', async () => {
       const cookie = await getSessionCookie();
       const suffix = Date.now();
       const title = `List Item ${suffix}`;
       const expectedKey = `list-item-${suffix}`;
 
-      const createRes = await fetch('/api/content-entries', {
+      const createRes = await fetch('/api/entries', {
         method: 'POST',
         headers: {
           cookie,
@@ -690,7 +684,7 @@ describe('Content Entry endpoints', async () => {
       expect(createRes.status).toBe(201);
 
       const listRes = await fetch(
-        `/api/content-entries?contentTypeId=${testContentType.id}&perPage=100`,
+        `/api/entries?contentTypeId=${testContentType.id}&perPage=100`,
         {
           headers: { cookie, 'X-Forwarded-For': '203.0.113.190' },
         }
@@ -709,14 +703,14 @@ describe('Content Entry endpoints', async () => {
     });
   });
 
-  describe('POST /api/content-entries — content:write scope (#172)', () => {
+  describe('POST /api/entries — content:write scope (#172)', () => {
     it('allows API keys with content:write scope', async () => {
       // The seeded test key has both content:read and content:write (T3).
       // Use a distinct X-Forwarded-For so this test gets its own rate-limit
       // bucket — the in-memory store lives in the dev-server process and
       // is not cleared by `resetRateLimitStore()` (which only clears the
       // test-process copy).
-      const res = await fetch('/api/content-entries', {
+      const res = await fetch('/api/entries', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${TEST_API_KEY}`,
@@ -745,7 +739,7 @@ describe('Content Entry endpoints', async () => {
         },
       });
       try {
-        const res = await fetch('/api/content-entries', {
+        const res = await fetch('/api/entries', {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${rawKey}`,
@@ -765,7 +759,7 @@ describe('Content Entry endpoints', async () => {
       }
     });
 
-    it('POST /api/content-entries returns 403 INSUFFICIENT_SCOPE for content:read-only API keys before body validation', async () => {
+    it('POST /api/entries returns 403 INSUFFICIENT_SCOPE for content:read-only API keys before body validation', async () => {
       // Pins the assertApiKeyScope-before-body-validation order. The
       // @boject/cli probeContentWriteScope helper (#183) depends on
       // this ordering to distinguish "missing scope" (403) from
@@ -788,7 +782,7 @@ describe('Content Entry endpoints', async () => {
         },
       });
       try {
-        const res = await fetch('/api/content-entries', {
+        const res = await fetch('/api/entries', {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${rawKey}`,
@@ -812,11 +806,11 @@ describe('Content Entry endpoints', async () => {
     });
   });
 
-  describe('PUT /api/content-entries/[id] — content:write scope (#172)', () => {
+  describe('PUT /api/entries/[id] — content:write scope (#172)', () => {
     it('allows API keys with content:write scope', async () => {
       // Create an entry via session auth first
       const cookie = await getSessionCookie();
-      const create = await fetch('/api/content-entries', {
+      const create = await fetch('/api/entries', {
         method: 'POST',
         headers: {
           cookie,
@@ -833,7 +827,7 @@ describe('Content Entry endpoints', async () => {
       // Update via API key with content:write. Publish so the API-key
       // response (which can only see PUBLISHED versions) has a version
       // to return — otherwise the handler 404s after saving the draft.
-      const res = await fetch(`/api/content-entries/${created.id}`, {
+      const res = await fetch(`/api/entries/${created.id}`, {
         method: 'PUT',
         headers: {
           Authorization: `Bearer ${TEST_API_KEY}`,
@@ -850,7 +844,7 @@ describe('Content Entry endpoints', async () => {
 
     it('rejects API keys without content:write scope', async () => {
       const cookie = await getSessionCookie();
-      const create = await fetch('/api/content-entries', {
+      const create = await fetch('/api/entries', {
         method: 'POST',
         headers: {
           cookie,
@@ -876,7 +870,7 @@ describe('Content Entry endpoints', async () => {
         },
       });
       try {
-        const res = await fetch(`/api/content-entries/${created.id}`, {
+        const res = await fetch(`/api/entries/${created.id}`, {
           method: 'PUT',
           headers: {
             Authorization: `Bearer ${rawKey}`,
@@ -894,10 +888,10 @@ describe('Content Entry endpoints', async () => {
     });
   });
 
-  describe('DELETE /api/content-entries/[id] — content:write scope (#172)', () => {
+  describe('DELETE /api/entries/[id] — content:write scope (#172)', () => {
     it('allows API keys with content:write scope', async () => {
       const cookie = await getSessionCookie();
-      const create = await fetch('/api/content-entries', {
+      const create = await fetch('/api/entries', {
         method: 'POST',
         headers: {
           cookie,
@@ -911,7 +905,7 @@ describe('Content Entry endpoints', async () => {
       });
       const created = (await create.json()) as { id: string };
 
-      const res = await fetch(`/api/content-entries/${created.id}`, {
+      const res = await fetch(`/api/entries/${created.id}`, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${TEST_API_KEY}`,
@@ -923,7 +917,7 @@ describe('Content Entry endpoints', async () => {
 
     it('rejects API keys without content:write scope', async () => {
       const cookie = await getSessionCookie();
-      const create = await fetch('/api/content-entries', {
+      const create = await fetch('/api/entries', {
         method: 'POST',
         headers: {
           cookie,
@@ -949,7 +943,7 @@ describe('Content Entry endpoints', async () => {
         },
       });
       try {
-        const res = await fetch(`/api/content-entries/${created.id}`, {
+        const res = await fetch(`/api/entries/${created.id}`, {
           method: 'DELETE',
           headers: {
             Authorization: `Bearer ${rawKey}`,
@@ -965,7 +959,7 @@ describe('Content Entry endpoints', async () => {
     });
   });
 
-  describe('DELETE /api/content-entries/[id]/draft — content:write scope (#172)', () => {
+  describe('DELETE /api/entries/[id]/draft — content:write scope (#172)', () => {
     // Helper: create entry, publish it, then make a CHANGED draft.
     // discardDraft requires a PUBLISHED fallback to exist.
     async function createWithDraft(ip: string): Promise<string> {
@@ -977,7 +971,7 @@ describe('Content Entry endpoints', async () => {
       // constraint.
       const title = `Discard target ${ip}`;
       const editedTitle = `Edited ${ip}`;
-      const create = await fetch('/api/content-entries', {
+      const create = await fetch('/api/entries', {
         method: 'POST',
         headers: {
           cookie,
@@ -991,7 +985,7 @@ describe('Content Entry endpoints', async () => {
       });
       const created = (await create.json()) as { id: string };
       // Publish
-      await fetch(`/api/content-entries/${created.id}`, {
+      await fetch(`/api/entries/${created.id}`, {
         method: 'PUT',
         headers: {
           cookie,
@@ -1004,7 +998,7 @@ describe('Content Entry endpoints', async () => {
         }),
       });
       // Update (creates a CHANGED draft)
-      await fetch(`/api/content-entries/${created.id}`, {
+      await fetch(`/api/entries/${created.id}`, {
         method: 'PUT',
         headers: {
           cookie,
@@ -1018,7 +1012,7 @@ describe('Content Entry endpoints', async () => {
 
     it('allows API keys with content:write scope', async () => {
       const id = await createWithDraft('203.0.113.26');
-      const res = await fetch(`/api/content-entries/${id}/draft`, {
+      const res = await fetch(`/api/entries/${id}/draft`, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${TEST_API_KEY}`,
@@ -1042,7 +1036,7 @@ describe('Content Entry endpoints', async () => {
         },
       });
       try {
-        const res = await fetch(`/api/content-entries/${id}/draft`, {
+        const res = await fetch(`/api/entries/${id}/draft`, {
           method: 'DELETE',
           headers: {
             Authorization: `Bearer ${rawKey}`,
@@ -1061,10 +1055,10 @@ describe('Content Entry endpoints', async () => {
     });
   });
 
-  describe('POST /api/content-entries/[id]/archive — content:write scope (#172)', () => {
+  describe('POST /api/entries/[id]/archive — content:write scope (#172)', () => {
     async function createPublished(ip: string): Promise<string> {
       const cookie = await getSessionCookie();
-      const create = await fetch('/api/content-entries', {
+      const create = await fetch('/api/entries', {
         method: 'POST',
         headers: {
           cookie,
@@ -1077,7 +1071,7 @@ describe('Content Entry endpoints', async () => {
         }),
       });
       const created = (await create.json()) as { id: string };
-      await fetch(`/api/content-entries/${created.id}`, {
+      await fetch(`/api/entries/${created.id}`, {
         method: 'PUT',
         headers: {
           cookie,
@@ -1094,7 +1088,7 @@ describe('Content Entry endpoints', async () => {
 
     it('allows API keys with content:write scope', async () => {
       const id = await createPublished('203.0.113.28');
-      const res = await fetch(`/api/content-entries/${id}/archive`, {
+      const res = await fetch(`/api/entries/${id}/archive`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${TEST_API_KEY}`,
@@ -1118,7 +1112,7 @@ describe('Content Entry endpoints', async () => {
         },
       });
       try {
-        const res = await fetch(`/api/content-entries/${id}/archive`, {
+        const res = await fetch(`/api/entries/${id}/archive`, {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${rawKey}`,
@@ -1136,10 +1130,10 @@ describe('Content Entry endpoints', async () => {
     });
   });
 
-  describe('POST /api/content-entries/[id]/unarchive — content:write scope (#172)', () => {
+  describe('POST /api/entries/[id]/unarchive — content:write scope (#172)', () => {
     async function createArchived(ip: string): Promise<string> {
       const cookie = await getSessionCookie();
-      const create = await fetch('/api/content-entries', {
+      const create = await fetch('/api/entries', {
         method: 'POST',
         headers: {
           cookie,
@@ -1152,7 +1146,7 @@ describe('Content Entry endpoints', async () => {
         }),
       });
       const created = (await create.json()) as { id: string };
-      await fetch(`/api/content-entries/${created.id}`, {
+      await fetch(`/api/entries/${created.id}`, {
         method: 'PUT',
         headers: {
           cookie,
@@ -1164,7 +1158,7 @@ describe('Content Entry endpoints', async () => {
           status: CONTENT_STATUSES.PUBLISHED,
         }),
       });
-      await fetch(`/api/content-entries/${created.id}/archive`, {
+      await fetch(`/api/entries/${created.id}/archive`, {
         method: 'POST',
         headers: {
           cookie,
@@ -1176,7 +1170,7 @@ describe('Content Entry endpoints', async () => {
 
     it('allows API keys with content:write scope', async () => {
       const id = await createArchived('203.0.113.30');
-      const res = await fetch(`/api/content-entries/${id}/unarchive`, {
+      const res = await fetch(`/api/entries/${id}/unarchive`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${TEST_API_KEY}`,
@@ -1200,7 +1194,7 @@ describe('Content Entry endpoints', async () => {
         },
       });
       try {
-        const res = await fetch(`/api/content-entries/${id}/unarchive`, {
+        const res = await fetch(`/api/entries/${id}/unarchive`, {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${rawKey}`,
@@ -1216,11 +1210,11 @@ describe('Content Entry endpoints', async () => {
     });
   });
 
-  describe('POST /api/content-entries/[id]/unpublish — content:write scope (#172)', () => {
+  describe('POST /api/entries/[id]/unpublish — content:write scope (#172)', () => {
     async function createPublished(ip: string): Promise<string> {
       const cookie = await getSessionCookie();
       const title = `Unpublish target ${Date.now()}-${Math.random()}`;
-      const create = await fetch('/api/content-entries', {
+      const create = await fetch('/api/entries', {
         method: 'POST',
         headers: {
           cookie,
@@ -1233,7 +1227,7 @@ describe('Content Entry endpoints', async () => {
         }),
       });
       const created = (await create.json()) as { id: string };
-      await fetch(`/api/content-entries/${created.id}`, {
+      await fetch(`/api/entries/${created.id}`, {
         method: 'PUT',
         headers: {
           cookie,
@@ -1250,7 +1244,7 @@ describe('Content Entry endpoints', async () => {
 
     it('allows API keys with content:write scope', async () => {
       const id = await createPublished('203.0.113.32');
-      const res = await fetch(`/api/content-entries/${id}/unpublish`, {
+      const res = await fetch(`/api/entries/${id}/unpublish`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${TEST_API_KEY}`,
@@ -1274,7 +1268,7 @@ describe('Content Entry endpoints', async () => {
         },
       });
       try {
-        const res = await fetch(`/api/content-entries/${id}/unpublish`, {
+        const res = await fetch(`/api/entries/${id}/unpublish`, {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${rawKey}`,
@@ -1293,11 +1287,11 @@ describe('Content Entry endpoints', async () => {
     });
   });
 
-  describe('GET /api/content-entries', () => {
+  describe('GET /api/entries', () => {
     it('lists entries with contentTypeId (session sees all)', async () => {
       const cookie = await getSessionCookie();
       const { items, total } = await $fetch<ListResponse>(
-        `/api/content-entries?contentTypeId=${testContentType.id}`,
+        `/api/entries?contentTypeId=${testContentType.id}`,
         {
           headers: { cookie },
         }
@@ -1313,7 +1307,7 @@ describe('Content Entry endpoints', async () => {
       const cookie = await getSessionCookie();
 
       // Create a published entry to ensure at least one is visible
-      await $fetch('/api/content-entries', {
+      await $fetch('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -1327,7 +1321,7 @@ describe('Content Entry endpoints', async () => {
       });
 
       const { items } = await $fetch<ListResponse>(
-        `/api/content-entries?contentTypeId=${testContentType.id}`,
+        `/api/entries?contentTypeId=${testContentType.id}`,
         {
           headers: { Authorization: `Bearer ${TEST_API_KEY}` },
         }
@@ -1339,7 +1333,7 @@ describe('Content Entry endpoints', async () => {
     });
 
     it('requires contentTypeId (400)', async () => {
-      const res = await fetch('/api/content-entries', {
+      const res = await fetch('/api/entries', {
         headers: { Authorization: `Bearer ${TEST_API_KEY}` },
       });
 
@@ -1349,7 +1343,7 @@ describe('Content Entry endpoints', async () => {
     it('filters by status', async () => {
       // Create a published entry
       const cookie = await getSessionCookie();
-      await $fetch('/api/content-entries', {
+      await $fetch('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -1363,7 +1357,7 @@ describe('Content Entry endpoints', async () => {
       });
 
       const { items } = await $fetch<ListResponse>(
-        `/api/content-entries?contentTypeId=${testContentType.id}&status=PUBLISHED`,
+        `/api/entries?contentTypeId=${testContentType.id}&status=PUBLISHED`,
         {
           headers: { cookie },
         }
@@ -1375,17 +1369,17 @@ describe('Content Entry endpoints', async () => {
     });
   });
 
-  describe('GET /api/content-entries/:id', () => {
+  describe('GET /api/entries/:id', () => {
     it('returns entry with contentType and fields (session)', async () => {
       const cookie = await getSessionCookie();
       const { items } = await $fetch<ListResponse>(
-        `/api/content-entries?contentTypeId=${testContentType.id}`,
+        `/api/entries?contentTypeId=${testContentType.id}`,
         {
           headers: { cookie },
         }
       );
       const entry = await $fetch<EntryResponse>(
-        `/api/content-entries/${items[0]!.id}`,
+        `/api/entries/${items[0]!.id}`,
         {
           headers: { cookie },
         }
@@ -1399,7 +1393,7 @@ describe('Content Entry endpoints', async () => {
 
     it('API key returns 404 for draft-only entry', async () => {
       const cookie = await getSessionCookie();
-      const created = await $fetch<EntryResponse>('/api/content-entries', {
+      const created = await $fetch<EntryResponse>('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -1409,7 +1403,7 @@ describe('Content Entry endpoints', async () => {
       });
       expect(created.status).toBe(CONTENT_STATUSES.DRAFT);
 
-      const res = await fetch(`/api/content-entries/${created.id}`, {
+      const res = await fetch(`/api/entries/${created.id}`, {
         headers: { Authorization: `Bearer ${TEST_API_KEY}` },
       });
       expect(res.status).toBe(404);
@@ -1417,7 +1411,7 @@ describe('Content Entry endpoints', async () => {
 
     it('API key returns published entry', async () => {
       const cookie = await getSessionCookie();
-      const created = await $fetch<EntryResponse>('/api/content-entries', {
+      const created = await $fetch<EntryResponse>('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -1427,19 +1421,16 @@ describe('Content Entry endpoints', async () => {
         },
       });
 
-      const entry = await $fetch<EntryResponse>(
-        `/api/content-entries/${created.id}`,
-        {
-          headers: { Authorization: `Bearer ${TEST_API_KEY}` },
-        }
-      );
+      const entry = await $fetch<EntryResponse>(`/api/entries/${created.id}`, {
+        headers: { Authorization: `Bearer ${TEST_API_KEY}` },
+      });
       expect(entry.id).toBe(created.id);
       expect(entry.status).toBe(CONTENT_STATUSES.PUBLISHED);
     });
 
     it('returns 404 for unknown id', async () => {
       const res = await fetch(
-        '/api/content-entries/00000000-0000-0000-0000-000000000000',
+        '/api/entries/00000000-0000-0000-0000-000000000000',
         {
           headers: { Authorization: `Bearer ${TEST_API_KEY}` },
         }
@@ -1448,12 +1439,12 @@ describe('Content Entry endpoints', async () => {
     });
   });
 
-  describe('PUT /api/content-entries/:id', () => {
+  describe('PUT /api/entries/:id', () => {
     it('updates data and status', async () => {
       const cookie = await getSessionCookie();
 
       // Create an entry to update
-      const created = await $fetch<EntryResponse>('/api/content-entries', {
+      const created = await $fetch<EntryResponse>('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -1467,7 +1458,7 @@ describe('Content Entry endpoints', async () => {
       });
 
       const updated = await $fetch<EntryResponse>(
-        `/api/content-entries/${created.id}`,
+        `/api/entries/${created.id}`,
         {
           method: 'PUT',
           headers: { cookie },
@@ -1490,7 +1481,7 @@ describe('Content Entry endpoints', async () => {
     it('sets publishedAt on first PUBLISHED', async () => {
       const cookie = await getSessionCookie();
 
-      const created = await $fetch<EntryResponse>('/api/content-entries', {
+      const created = await $fetch<EntryResponse>('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -1504,7 +1495,7 @@ describe('Content Entry endpoints', async () => {
       expect(created.publishedAt).toBeNull();
 
       const published = await $fetch<EntryResponse>(
-        `/api/content-entries/${created.id}`,
+        `/api/entries/${created.id}`,
         {
           method: 'PUT',
           headers: { cookie },
@@ -1538,7 +1529,7 @@ describe('Content Entry endpoints', async () => {
       },
     });
 
-    const entryRes = await fetch('/api/content-entries', {
+    const entryRes = await fetch('/api/entries', {
       method: 'POST',
       headers: { cookie, 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1583,7 +1574,7 @@ describe('Content Entry endpoints', async () => {
   describe('RELATION/MULTIRELATION entries', () => {
     it('creates an entry with a valid RELATION value', async () => {
       const cookie = await getSessionCookie();
-      const res = await fetch('/api/content-entries', {
+      const res = await fetch('/api/entries', {
         method: 'POST',
         headers: { cookie, 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1607,7 +1598,7 @@ describe('Content Entry endpoints', async () => {
 
     it('creates an entry with a valid MULTIRELATION value', async () => {
       const cookie = await getSessionCookie();
-      const res = await fetch('/api/content-entries', {
+      const res = await fetch('/api/entries', {
         method: 'POST',
         headers: { cookie, 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1635,7 +1626,7 @@ describe('Content Entry endpoints', async () => {
 
     it('accepts null RELATION value for non-required field', async () => {
       const cookie = await getSessionCookie();
-      const res = await fetch('/api/content-entries', {
+      const res = await fetch('/api/entries', {
         method: 'POST',
         headers: { cookie, 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1650,7 +1641,7 @@ describe('Content Entry endpoints', async () => {
 
     it('accepts empty array for MULTIRELATION', async () => {
       const cookie = await getSessionCookie();
-      const res = await fetch('/api/content-entries', {
+      const res = await fetch('/api/entries', {
         method: 'POST',
         headers: { cookie, 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1666,7 +1657,7 @@ describe('Content Entry endpoints', async () => {
 
     it('rejects RELATION with non-existent entryId', async () => {
       const cookie = await getSessionCookie();
-      const res = await fetch('/api/content-entries', {
+      const res = await fetch('/api/entries', {
         method: 'POST',
         headers: { cookie, 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1686,7 +1677,7 @@ describe('Content Entry endpoints', async () => {
     it('rejects RELATION with disallowed contentTypeId and surfaces the offending id', async () => {
       const cookie = await getSessionCookie();
       const offending = '11111111-1111-4111-8111-111111111111';
-      const res = await fetch('/api/content-entries', {
+      const res = await fetch('/api/entries', {
         method: 'POST',
         headers: { cookie, 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1708,7 +1699,7 @@ describe('Content Entry endpoints', async () => {
 
     it('rejects MULTIRELATION with duplicate entryIds', async () => {
       const cookie = await getSessionCookie();
-      const res = await fetch('/api/content-entries', {
+      const res = await fetch('/api/entries', {
         method: 'POST',
         headers: { cookie, 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1782,7 +1773,7 @@ describe('Content Entry endpoints', async () => {
 
     it('creates an entry with an IMAGE value', async () => {
       const cookie = await getSessionCookie();
-      const entry = await $fetch<EntryResponse>('/api/content-entries', {
+      const entry = await $fetch<EntryResponse>('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -1800,50 +1791,43 @@ describe('Content Entry endpoints', async () => {
 
     it('reads the entry back with the IMAGE value intact', async () => {
       const cookie = await getSessionCookie();
-      const entry = await $fetch<EntryResponse>(
-        `/api/content-entries/${entryId}`,
-        { headers: { cookie } }
-      );
+      const entry = await $fetch<EntryResponse>(`/api/entries/${entryId}`, {
+        headers: { cookie },
+      });
       expect(entry.data.hero).toEqual(sampleImage);
     });
 
     it('updates the IMAGE value to a new object', async () => {
       const cookie = await getSessionCookie();
       const nextImage = { ...sampleImage, storageKey: 'next.webp' };
-      const updated = await $fetch<EntryResponse>(
-        `/api/content-entries/${entryId}`,
-        {
-          method: 'PUT',
-          headers: { cookie },
-          body: {
-            data: { title: 'IMAGE field test entry', hero: nextImage },
-          },
-        }
-      );
+      const updated = await $fetch<EntryResponse>(`/api/entries/${entryId}`, {
+        method: 'PUT',
+        headers: { cookie },
+        body: {
+          data: { title: 'IMAGE field test entry', hero: nextImage },
+        },
+      });
       expect(updated.data.hero).toEqual(nextImage);
     });
 
     it('clears the IMAGE value with null', async () => {
       const cookie = await getSessionCookie();
-      const updated = await $fetch<EntryResponse>(
-        `/api/content-entries/${entryId}`,
-        {
-          method: 'PUT',
-          headers: { cookie },
-          body: {
-            data: { title: 'IMAGE field test entry', hero: null },
-          },
-        }
-      );
+      const updated = await $fetch<EntryResponse>(`/api/entries/${entryId}`, {
+        method: 'PUT',
+        headers: { cookie },
+        body: {
+          data: { title: 'IMAGE field test entry', hero: null },
+        },
+      });
       expect(updated.data.hero).toBeNull();
     });
   });
 
-  describe('DELETE /api/content-entries/:id', () => {
+  describe('DELETE /api/entries/:id', () => {
     it('deletes an entry', async () => {
       const cookie = await getSessionCookie();
 
-      const created = await $fetch<EntryResponse>('/api/content-entries', {
+      const created = await $fetch<EntryResponse>('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -1855,7 +1839,7 @@ describe('Content Entry endpoints', async () => {
         },
       });
 
-      const res = await fetch(`/api/content-entries/${created.id}`, {
+      const res = await fetch(`/api/entries/${created.id}`, {
         method: 'DELETE',
         headers: { Cookie: cookie },
       });
@@ -1864,7 +1848,7 @@ describe('Content Entry endpoints', async () => {
       expect(body.success).toBe(true);
 
       // Verify it's gone (use session — draft entries aren't visible to API key anyway)
-      const getRes = await fetch(`/api/content-entries/${created.id}`, {
+      const getRes = await fetch(`/api/entries/${created.id}`, {
         headers: { Cookie: cookie },
       });
       expect(getRes.status).toBe(404);
@@ -1876,7 +1860,7 @@ describe('Content Entry endpoints', async () => {
       const cookie = await getSessionCookie();
 
       // Create and publish an entry
-      const created = await $fetch<EntryResponse>('/api/content-entries', {
+      const created = await $fetch<EntryResponse>('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -1892,7 +1876,7 @@ describe('Content Entry endpoints', async () => {
 
       // Save a draft edit (no status: 'PUBLISHED' in body)
       const updated = await $fetch<EntryResponse>(
-        `/api/content-entries/${created.id}`,
+        `/api/entries/${created.id}`,
         {
           method: 'PUT',
           headers: { cookie },
@@ -1915,7 +1899,7 @@ describe('Content Entry endpoints', async () => {
       const ts = Date.now();
 
       // Create and publish
-      const created = await $fetch<EntryResponse>('/api/content-entries', {
+      const created = await $fetch<EntryResponse>('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -1926,7 +1910,7 @@ describe('Content Entry endpoints', async () => {
       });
 
       // Save a draft edit to create a CHANGED version
-      await $fetch<EntryResponse>(`/api/content-entries/${created.id}`, {
+      await $fetch<EntryResponse>(`/api/entries/${created.id}`, {
         method: 'PUT',
         headers: { cookie },
         body: {
@@ -1936,7 +1920,7 @@ describe('Content Entry endpoints', async () => {
 
       // Publish the CHANGED version
       const published = await $fetch<EntryResponse>(
-        `/api/content-entries/${created.id}`,
+        `/api/entries/${created.id}`,
         {
           method: 'PUT',
           headers: { cookie },
@@ -1949,7 +1933,7 @@ describe('Content Entry endpoints', async () => {
 
       // API key should now see the updated content
       const apiView = await $fetch<EntryResponse>(
-        `/api/content-entries/${created.id}`,
+        `/api/entries/${created.id}`,
         {
           headers: { Authorization: `Bearer ${TEST_API_KEY}` },
         }
@@ -1964,7 +1948,7 @@ describe('Content Entry endpoints', async () => {
       // DRAFT-only entry
       const draft = await $fetch<
         EntryResponse & { hasPublishedVersion?: boolean }
-      >('/api/content-entries', {
+      >('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -1976,11 +1960,11 @@ describe('Content Entry endpoints', async () => {
       // Fetch via session — should have hasPublishedVersion in response
       const fetched = await $fetch<
         EntryResponse & { hasPublishedVersion?: boolean }
-      >(`/api/content-entries/${draft.id}`, { headers: { cookie } });
+      >(`/api/entries/${draft.id}`, { headers: { cookie } });
       expect(fetched.hasPublishedVersion).toBe(false);
 
       // Publish it
-      await $fetch(`/api/content-entries/${draft.id}`, {
+      await $fetch(`/api/entries/${draft.id}`, {
         method: 'PUT',
         headers: { cookie },
         body: { status: CONTENT_STATUSES.PUBLISHED },
@@ -1988,7 +1972,7 @@ describe('Content Entry endpoints', async () => {
 
       const fetchedPublished = await $fetch<
         EntryResponse & { hasPublishedVersion?: boolean }
-      >(`/api/content-entries/${draft.id}`, { headers: { cookie } });
+      >(`/api/entries/${draft.id}`, { headers: { cookie } });
       expect(fetchedPublished.hasPublishedVersion).toBe(true);
     });
 
@@ -2001,7 +1985,7 @@ describe('Content Entry endpoints', async () => {
       };
 
       // DRAFT-only: no published version yet
-      const draft = await $fetch<WithMeta>('/api/content-entries', {
+      const draft = await $fetch<WithMeta>('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -2012,32 +1996,26 @@ describe('Content Entry endpoints', async () => {
       expect(draft.publishedVersionPublishedAt).toBeNull();
 
       // Publish it
-      const published = await $fetch<WithMeta>(
-        `/api/content-entries/${draft.id}`,
-        {
-          method: 'PUT',
-          headers: { cookie },
-          body: { status: CONTENT_STATUSES.PUBLISHED },
-        }
-      );
+      const published = await $fetch<WithMeta>(`/api/entries/${draft.id}`, {
+        method: 'PUT',
+        headers: { cookie },
+        body: { status: CONTENT_STATUSES.PUBLISHED },
+      });
       expect(published.publishedVersionPublishedAt).not.toBeNull();
       const originalPublishedAt = published.publishedVersionPublishedAt;
 
       // Save a draft edit on top of published -> CHANGED — timestamp should
       // still reflect the existing published version.
-      const changed = await $fetch<WithMeta>(
-        `/api/content-entries/${draft.id}`,
-        {
-          method: 'PUT',
-          headers: { cookie },
-          body: {
-            data: {
-              title: `PubTS Draft ${Date.now()}`,
-              summary: 'Changed content',
-            },
+      const changed = await $fetch<WithMeta>(`/api/entries/${draft.id}`, {
+        method: 'PUT',
+        headers: { cookie },
+        body: {
+          data: {
+            title: `PubTS Draft ${Date.now()}`,
+            summary: 'Changed content',
           },
-        }
-      );
+        },
+      });
       expect(changed.status).toBe(CONTENT_STATUSES.CHANGED);
       expect(changed.publishedVersionPublishedAt).toBe(originalPublishedAt);
     });
@@ -2045,7 +2023,7 @@ describe('Content Entry endpoints', async () => {
     it('hides publishedVersionPublishedAt from API key responses', async () => {
       const cookie = await getSessionCookie();
 
-      const entry = await $fetch<EntryResponse>('/api/content-entries', {
+      const entry = await $fetch<EntryResponse>('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -2057,7 +2035,7 @@ describe('Content Entry endpoints', async () => {
 
       const apiView = await $fetch<
         EntryResponse & { publishedVersionPublishedAt?: string | null }
-      >(`/api/content-entries/${entry.id}`, {
+      >(`/api/entries/${entry.id}`, {
         headers: { authorization: `Bearer ${TEST_API_KEY}` },
       });
       expect(apiView.publishedVersionPublishedAt).toBeUndefined();
@@ -2067,7 +2045,7 @@ describe('Content Entry endpoints', async () => {
       const cookie = await getSessionCookie();
 
       // Create a draft-only entry
-      const draftEntry = await $fetch<EntryResponse>('/api/content-entries', {
+      const draftEntry = await $fetch<EntryResponse>('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -2078,7 +2056,7 @@ describe('Content Entry endpoints', async () => {
 
       // API key list should not include this draft entry
       const { items } = await $fetch<ListResponse>(
-        `/api/content-entries?contentTypeId=${testContentType.id}`,
+        `/api/entries?contentTypeId=${testContentType.id}`,
         {
           headers: { Authorization: `Bearer ${TEST_API_KEY}` },
         }
@@ -2088,13 +2066,13 @@ describe('Content Entry endpoints', async () => {
     });
   });
 
-  describe('DELETE /api/content-entries/:id/draft', () => {
+  describe('DELETE /api/entries/:id/draft', () => {
     it('discards CHANGED version and returns published', async () => {
       const cookie = await getSessionCookie();
       const ts = Date.now();
 
       // Create and publish
-      const created = await $fetch<EntryResponse>('/api/content-entries', {
+      const created = await $fetch<EntryResponse>('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -2105,7 +2083,7 @@ describe('Content Entry endpoints', async () => {
       });
 
       // Save a draft edit to create CHANGED version
-      await $fetch(`/api/content-entries/${created.id}`, {
+      await $fetch(`/api/entries/${created.id}`, {
         method: 'PUT',
         headers: { cookie },
         body: {
@@ -2118,14 +2096,14 @@ describe('Content Entry endpoints', async () => {
 
       // Verify CMS sees CHANGED
       const changed = await $fetch<EntryResponse>(
-        `/api/content-entries/${created.id}`,
+        `/api/entries/${created.id}`,
         { headers: { cookie } }
       );
       expect(changed.status).toBe(CONTENT_STATUSES.CHANGED);
 
       // Discard the draft
       const discarded = await $fetch<EntryResponse>(
-        `/api/content-entries/${created.id}/draft`,
+        `/api/entries/${created.id}/draft`,
         {
           method: 'DELETE',
           headers: { Cookie: cookie },
@@ -2141,7 +2119,7 @@ describe('Content Entry endpoints', async () => {
       const cookie = await getSessionCookie();
 
       // Create a published-only entry (no draft)
-      const created = await $fetch<EntryResponse>('/api/content-entries', {
+      const created = await $fetch<EntryResponse>('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -2151,7 +2129,7 @@ describe('Content Entry endpoints', async () => {
         },
       });
 
-      const res = await fetch(`/api/content-entries/${created.id}/draft`, {
+      const res = await fetch(`/api/entries/${created.id}/draft`, {
         method: 'DELETE',
         headers: { Cookie: cookie },
       });
@@ -2162,7 +2140,7 @@ describe('Content Entry endpoints', async () => {
       const cookie = await getSessionCookie();
 
       // Create a draft-only entry
-      const created = await $fetch<EntryResponse>('/api/content-entries', {
+      const created = await $fetch<EntryResponse>('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -2172,7 +2150,7 @@ describe('Content Entry endpoints', async () => {
       });
       expect(created.status).toBe(CONTENT_STATUSES.DRAFT);
 
-      const res = await fetch(`/api/content-entries/${created.id}/draft`, {
+      const res = await fetch(`/api/entries/${created.id}/draft`, {
         method: 'DELETE',
         headers: { Cookie: cookie },
       });
@@ -2218,7 +2196,7 @@ describe('Content Entry endpoints', async () => {
       const ts = Date.now();
       const ct = await createUniqueContentType(cookie, `text-${ts}`);
 
-      await $fetch('/api/content-entries', {
+      await $fetch('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -2227,7 +2205,7 @@ describe('Content Entry endpoints', async () => {
         },
       });
 
-      const res = await fetch('/api/content-entries', {
+      const res = await fetch('/api/entries', {
         method: 'POST',
         headers: { cookie, 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -2248,7 +2226,7 @@ describe('Content Entry endpoints', async () => {
         'issue'
       );
 
-      await $fetch('/api/content-entries', {
+      await $fetch('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -2257,7 +2235,7 @@ describe('Content Entry endpoints', async () => {
         },
       });
 
-      const res = await fetch('/api/content-entries', {
+      const res = await fetch('/api/entries', {
         method: 'POST',
         headers: { cookie, 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -2273,7 +2251,7 @@ describe('Content Entry endpoints', async () => {
       const ts = Date.now();
       const ct = await createUniqueContentType(cookie, `empty-${ts}`);
 
-      const first = await $fetch<EntryResponse>('/api/content-entries', {
+      const first = await $fetch<EntryResponse>('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -2281,7 +2259,7 @@ describe('Content Entry endpoints', async () => {
           data: { title: `Empty 1 ${ts}`, sku: '' },
         },
       });
-      const second = await $fetch<EntryResponse>('/api/content-entries', {
+      const second = await $fetch<EntryResponse>('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -2289,7 +2267,7 @@ describe('Content Entry endpoints', async () => {
           data: { title: `Empty 2 ${ts}`, sku: null },
         },
       });
-      const third = await $fetch<EntryResponse>('/api/content-entries', {
+      const third = await $fetch<EntryResponse>('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -2308,7 +2286,7 @@ describe('Content Entry endpoints', async () => {
       const ts = Date.now();
       const ct = await createUniqueContentType(cookie, `self-${ts}`);
 
-      const created = await $fetch<EntryResponse>('/api/content-entries', {
+      const created = await $fetch<EntryResponse>('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -2318,7 +2296,7 @@ describe('Content Entry endpoints', async () => {
       });
 
       const updated = await $fetch<EntryResponse>(
-        `/api/content-entries/${created.id}`,
+        `/api/entries/${created.id}`,
         {
           method: 'PUT',
           headers: { cookie },
@@ -2336,7 +2314,7 @@ describe('Content Entry endpoints', async () => {
       const ts = Date.now();
       const ct = await createUniqueContentType(cookie, `draft-${ts}`);
 
-      await $fetch('/api/content-entries', {
+      await $fetch('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -2346,7 +2324,7 @@ describe('Content Entry endpoints', async () => {
         },
       });
 
-      const res = await fetch('/api/content-entries', {
+      const res = await fetch('/api/entries', {
         method: 'POST',
         headers: { cookie, 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -2363,7 +2341,7 @@ describe('Content Entry endpoints', async () => {
       const ts = Date.now();
       const ct = await createUniqueContentType(cookie, `shape-${ts}`);
 
-      await $fetch('/api/content-entries', {
+      await $fetch('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
@@ -2372,7 +2350,7 @@ describe('Content Entry endpoints', async () => {
         },
       });
 
-      const res = await fetch('/api/content-entries', {
+      const res = await fetch('/api/entries', {
         method: 'POST',
         headers: { cookie, 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -2410,7 +2388,7 @@ describe('Content Entry endpoints', async () => {
       });
 
       const ct = await ensureBlogContentType();
-      const createRes = await fetch('/api/content-entries', {
+      const createRes = await fetch('/api/entries', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Cookie: cookie },
         body: JSON.stringify({
@@ -2423,7 +2401,7 @@ describe('Content Entry endpoints', async () => {
         data: { title: string };
       };
 
-      const publishRes = await fetch(`/api/content-entries/${created.id}`, {
+      const publishRes = await fetch(`/api/entries/${created.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Cookie: cookie },
         body: JSON.stringify({
@@ -2483,7 +2461,7 @@ describe('Content Entry endpoints', async () => {
       // dev-server process and is not cleared by `resetRateLimitStore()`
       // (which only clears the test-process copy), so the default-IP bucket
       // accumulates across the file.
-      const createRes = await fetch('/api/content-entries', {
+      const createRes = await fetch('/api/entries', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2543,7 +2521,7 @@ describe('Content Entry endpoints', async () => {
 
       const ct = await ensureBlogContentType();
       // Distinct X-Forwarded-For for an isolated rate-limit bucket (see legend).
-      const createRes = await fetch('/api/content-entries', {
+      const createRes = await fetch('/api/entries', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2604,7 +2582,7 @@ describe('Content Entry endpoints', async () => {
       });
 
       const created = (await (
-        await fetch('/api/content-entries', {
+        await fetch('/api/entries', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Cookie: cookie },
           body: JSON.stringify({
@@ -2614,7 +2592,7 @@ describe('Content Entry endpoints', async () => {
         })
       ).json()) as { id: string; data: { title: string } };
 
-      await fetch(`/api/content-entries/${created.id}`, {
+      await fetch(`/api/entries/${created.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Cookie: cookie },
         body: JSON.stringify({
@@ -2645,7 +2623,7 @@ describe('Content Entry endpoints', async () => {
 
       const ct = await ensureBlogContentType();
       const created = (await (
-        await fetch('/api/content-entries', {
+        await fetch('/api/entries', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Cookie: cookie },
           body: JSON.stringify({
@@ -2655,7 +2633,7 @@ describe('Content Entry endpoints', async () => {
         })
       ).json()) as { id: string; data: { title: string } };
 
-      await fetch(`/api/content-entries/${created.id}`, {
+      await fetch(`/api/entries/${created.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Cookie: cookie },
         body: JSON.stringify({
@@ -2686,7 +2664,7 @@ describe('Content Entry endpoints', async () => {
 
       const ct = await ensureBlogContentType();
       const created = (await (
-        await fetch('/api/content-entries', {
+        await fetch('/api/entries', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Cookie: cookie },
           body: JSON.stringify({
@@ -2696,7 +2674,7 @@ describe('Content Entry endpoints', async () => {
         })
       ).json()) as { id: string; data: { title: string } };
 
-      await fetch(`/api/content-entries/${created.id}`, {
+      await fetch(`/api/entries/${created.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Cookie: cookie },
         body: JSON.stringify({
@@ -2733,7 +2711,7 @@ describe('Content Entry endpoints', async () => {
 
       const ct = await ensureBlogContentType();
       const created = (await (
-        await fetch('/api/content-entries', {
+        await fetch('/api/entries', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -2747,7 +2725,7 @@ describe('Content Entry endpoints', async () => {
         })
       ).json()) as { id: string; data: { title: string } };
 
-      await fetch(`/api/content-entries/${created.id}`, {
+      await fetch(`/api/entries/${created.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -2760,7 +2738,7 @@ describe('Content Entry endpoints', async () => {
         }),
       });
 
-      const delRes = await fetch(`/api/content-entries/${created.id}`, {
+      const delRes = await fetch(`/api/entries/${created.id}`, {
         method: 'DELETE',
         headers: { Cookie: cookie, ...ip },
       });
@@ -2801,7 +2779,7 @@ describe('Content Entry endpoints', async () => {
 
       const ct = await ensureBlogContentType();
       const created = (await (
-        await fetch('/api/content-entries', {
+        await fetch('/api/entries', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -2815,7 +2793,7 @@ describe('Content Entry endpoints', async () => {
         })
       ).json()) as { id: string };
 
-      await fetch(`/api/content-entries/${created.id}`, {
+      await fetch(`/api/entries/${created.id}`, {
         method: 'DELETE',
         headers: { Cookie: cookie, ...ip },
       });
@@ -2827,7 +2805,7 @@ describe('Content Entry endpoints', async () => {
     });
   });
 
-  describe('POST /api/content-entries/[id]/unpublish', () => {
+  describe('POST /api/entries/[id]/unpublish', () => {
     it('demotes a PUBLISHED entry to DRAFT and enqueues ENTRY_UNPUBLISHED', async () => {
       const cookie = await getSessionCookie();
       const ip = '203.0.113.20';
@@ -2845,7 +2823,7 @@ describe('Content Entry endpoints', async () => {
 
       const ct = await ensureBlogContentType();
       const created = (await (
-        await fetch('/api/content-entries', {
+        await fetch('/api/entries', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -2859,7 +2837,7 @@ describe('Content Entry endpoints', async () => {
         })
       ).json()) as { id: string; data: { title: string } };
 
-      await fetch(`/api/content-entries/${created.id}`, {
+      await fetch(`/api/entries/${created.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -2872,7 +2850,7 @@ describe('Content Entry endpoints', async () => {
         }),
       });
 
-      const res = await fetch(`/api/content-entries/${created.id}/unpublish`, {
+      const res = await fetch(`/api/entries/${created.id}/unpublish`, {
         method: 'POST',
         headers: { Cookie: cookie, 'X-Forwarded-For': ip },
       });
@@ -2901,7 +2879,7 @@ describe('Content Entry endpoints', async () => {
       const ip = '203.0.113.21';
       const ct = await ensureBlogContentType();
       const created = (await (
-        await fetch('/api/content-entries', {
+        await fetch('/api/entries', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -2915,7 +2893,7 @@ describe('Content Entry endpoints', async () => {
         })
       ).json()) as { id: string; data: { title: string } };
 
-      await fetch(`/api/content-entries/${created.id}`, {
+      await fetch(`/api/entries/${created.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -2928,7 +2906,7 @@ describe('Content Entry endpoints', async () => {
         }),
       });
       // Save a CHANGED draft with different text
-      await fetch(`/api/content-entries/${created.id}`, {
+      await fetch(`/api/entries/${created.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -2940,7 +2918,7 @@ describe('Content Entry endpoints', async () => {
         }),
       });
 
-      const res = await fetch(`/api/content-entries/${created.id}/unpublish`, {
+      const res = await fetch(`/api/entries/${created.id}/unpublish`, {
         method: 'POST',
         headers: { Cookie: cookie, 'X-Forwarded-For': ip },
       });
@@ -2958,7 +2936,7 @@ describe('Content Entry endpoints', async () => {
       const ip = '203.0.113.22';
       const ct = await ensureBlogContentType();
       const created = (await (
-        await fetch('/api/content-entries', {
+        await fetch('/api/entries', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -2972,7 +2950,7 @@ describe('Content Entry endpoints', async () => {
         })
       ).json()) as { id: string };
 
-      const res = await fetch(`/api/content-entries/${created.id}/unpublish`, {
+      const res = await fetch(`/api/entries/${created.id}/unpublish`, {
         method: 'POST',
         headers: { Cookie: cookie, 'X-Forwarded-For': ip },
       });
@@ -2982,7 +2960,7 @@ describe('Content Entry endpoints', async () => {
     });
   });
 
-  describe('POST /api/content-entries/[id]/archive', () => {
+  describe('POST /api/entries/[id]/archive', () => {
     it('flips PUBLISHED → ARCHIVED and enqueues ENTRY_UNPUBLISHED', async () => {
       const cookie = await getSessionCookie();
       const ip = '203.0.113.30';
@@ -3000,7 +2978,7 @@ describe('Content Entry endpoints', async () => {
 
       const ct = await ensureBlogContentType();
       const created = (await (
-        await fetch('/api/content-entries', {
+        await fetch('/api/entries', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -3014,7 +2992,7 @@ describe('Content Entry endpoints', async () => {
         })
       ).json()) as { id: string; data: { title: string } };
 
-      await fetch(`/api/content-entries/${created.id}`, {
+      await fetch(`/api/entries/${created.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -3027,7 +3005,7 @@ describe('Content Entry endpoints', async () => {
         }),
       });
 
-      const res = await fetch(`/api/content-entries/${created.id}/archive`, {
+      const res = await fetch(`/api/entries/${created.id}/archive`, {
         method: 'POST',
         headers: { Cookie: cookie, 'X-Forwarded-For': ip },
       });
@@ -3056,7 +3034,7 @@ describe('Content Entry endpoints', async () => {
       const ip = '203.0.113.31';
       const ct = await ensureBlogContentType();
       const created = (await (
-        await fetch('/api/content-entries', {
+        await fetch('/api/entries', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -3070,7 +3048,7 @@ describe('Content Entry endpoints', async () => {
         })
       ).json()) as { id: string; data: { title: string } };
 
-      await fetch(`/api/content-entries/${created.id}`, {
+      await fetch(`/api/entries/${created.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -3089,7 +3067,7 @@ describe('Content Entry endpoints', async () => {
       });
       expect(pub.publishedAt).not.toBeNull();
 
-      await fetch(`/api/content-entries/${created.id}/archive`, {
+      await fetch(`/api/entries/${created.id}/archive`, {
         method: 'POST',
         headers: { Cookie: cookie, 'X-Forwarded-For': ip },
       });
@@ -3107,7 +3085,7 @@ describe('Content Entry endpoints', async () => {
       const ip = '203.0.113.32';
       const ct = await ensureBlogContentType();
       const created = (await (
-        await fetch('/api/content-entries', {
+        await fetch('/api/entries', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -3121,7 +3099,7 @@ describe('Content Entry endpoints', async () => {
         })
       ).json()) as { id: string; data: { title: string } };
 
-      await fetch(`/api/content-entries/${created.id}`, {
+      await fetch(`/api/entries/${created.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -3133,7 +3111,7 @@ describe('Content Entry endpoints', async () => {
           data: created.data,
         }),
       });
-      await fetch(`/api/content-entries/${created.id}`, {
+      await fetch(`/api/entries/${created.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -3145,7 +3123,7 @@ describe('Content Entry endpoints', async () => {
         }),
       });
 
-      const res = await fetch(`/api/content-entries/${created.id}/archive`, {
+      const res = await fetch(`/api/entries/${created.id}/archive`, {
         method: 'POST',
         headers: { Cookie: cookie, 'X-Forwarded-For': ip },
       });
@@ -3155,7 +3133,7 @@ describe('Content Entry endpoints', async () => {
     });
   });
 
-  describe('POST /api/content-entries/[id]/unarchive', () => {
+  describe('POST /api/entries/[id]/unarchive', () => {
     it('flips ARCHIVED → DRAFT and does not enqueue a webhook delivery', async () => {
       const cookie = await getSessionCookie();
       const ip = '203.0.113.40';
@@ -3173,7 +3151,7 @@ describe('Content Entry endpoints', async () => {
 
       const ct = await ensureBlogContentType();
       const created = (await (
-        await fetch('/api/content-entries', {
+        await fetch('/api/entries', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -3186,7 +3164,7 @@ describe('Content Entry endpoints', async () => {
           }),
         })
       ).json()) as { id: string; data: { title: string } };
-      await fetch(`/api/content-entries/${created.id}`, {
+      await fetch(`/api/entries/${created.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -3198,7 +3176,7 @@ describe('Content Entry endpoints', async () => {
           data: created.data,
         }),
       });
-      await fetch(`/api/content-entries/${created.id}/archive`, {
+      await fetch(`/api/entries/${created.id}/archive`, {
         method: 'POST',
         headers: { Cookie: cookie, 'X-Forwarded-For': ip },
       });
@@ -3207,7 +3185,7 @@ describe('Content Entry endpoints', async () => {
         where: { webhookId: hook.id },
       });
 
-      const res = await fetch(`/api/content-entries/${created.id}/unarchive`, {
+      const res = await fetch(`/api/entries/${created.id}/unarchive`, {
         method: 'POST',
         headers: { Cookie: cookie, 'X-Forwarded-For': ip },
       });
@@ -3226,7 +3204,7 @@ describe('Content Entry endpoints', async () => {
       const ip = '203.0.113.41';
       const ct = await ensureBlogContentType();
       const created = (await (
-        await fetch('/api/content-entries', {
+        await fetch('/api/entries', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -3240,7 +3218,7 @@ describe('Content Entry endpoints', async () => {
         })
       ).json()) as { id: string };
 
-      const res = await fetch(`/api/content-entries/${created.id}/unarchive`, {
+      const res = await fetch(`/api/entries/${created.id}/unarchive`, {
         method: 'POST',
         headers: { Cookie: cookie, 'X-Forwarded-For': ip },
       });
@@ -3250,7 +3228,7 @@ describe('Content Entry endpoints', async () => {
     });
   });
 
-  describe('POST /api/content-entries/[id]/republish', () => {
+  describe('POST /api/entries/[id]/republish', () => {
     it('enqueues ENTRY_PUBLISHED without mutating the entry', async () => {
       const cookie = await getSessionCookie();
       const ip = '203.0.113.50';
@@ -3268,7 +3246,7 @@ describe('Content Entry endpoints', async () => {
 
       const ct = await ensureBlogContentType();
       const created = (await (
-        await fetch('/api/content-entries', {
+        await fetch('/api/entries', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -3281,7 +3259,7 @@ describe('Content Entry endpoints', async () => {
           }),
         })
       ).json()) as { id: string; data: { title: string } };
-      await fetch(`/api/content-entries/${created.id}`, {
+      await fetch(`/api/entries/${created.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -3307,7 +3285,7 @@ describe('Content Entry endpoints', async () => {
         where: { entryId: created.id, status: CONTENT_STATUSES.PUBLISHED },
       });
 
-      const res = await fetch(`/api/content-entries/${created.id}/republish`, {
+      const res = await fetch(`/api/entries/${created.id}/republish`, {
         method: 'POST',
         headers: { Cookie: cookie, 'X-Forwarded-For': ip },
       });
@@ -3340,7 +3318,7 @@ describe('Content Entry endpoints', async () => {
       const ip = '203.0.113.51';
       const ct = await ensureBlogContentType();
       const created = (await (
-        await fetch('/api/content-entries', {
+        await fetch('/api/entries', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -3354,7 +3332,7 @@ describe('Content Entry endpoints', async () => {
         })
       ).json()) as { id: string };
 
-      const res = await fetch(`/api/content-entries/${created.id}/republish`, {
+      const res = await fetch(`/api/entries/${created.id}/republish`, {
         method: 'POST',
         headers: { Cookie: cookie, 'X-Forwarded-For': ip },
       });
@@ -3368,7 +3346,7 @@ describe('Content Entry endpoints', async () => {
       const ip = '203.0.113.52';
       const ct = await ensureBlogContentType();
       const created = (await (
-        await fetch('/api/content-entries', {
+        await fetch('/api/entries', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -3382,7 +3360,7 @@ describe('Content Entry endpoints', async () => {
         })
       ).json()) as { id: string; data: { title: string } };
 
-      await fetch(`/api/content-entries/${created.id}`, {
+      await fetch(`/api/entries/${created.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -3394,7 +3372,7 @@ describe('Content Entry endpoints', async () => {
           data: created.data,
         }),
       });
-      await fetch(`/api/content-entries/${created.id}`, {
+      await fetch(`/api/entries/${created.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -3404,7 +3382,7 @@ describe('Content Entry endpoints', async () => {
         body: JSON.stringify({ data: { title: `${created.data.title} dr` } }),
       });
 
-      const res = await fetch(`/api/content-entries/${created.id}/republish`, {
+      const res = await fetch(`/api/entries/${created.id}/republish`, {
         method: 'POST',
         headers: { Cookie: cookie, 'X-Forwarded-For': ip },
       });
@@ -3414,11 +3392,11 @@ describe('Content Entry endpoints', async () => {
     });
   });
 
-  describe('POST /api/content-entries/[id]/republish — content:write scope (#172)', () => {
+  describe('POST /api/entries/[id]/republish — content:write scope (#172)', () => {
     async function createPublished(ip: string): Promise<string> {
       const cookie = await getSessionCookie();
       const title = `Republish target ${Date.now()}-${Math.random()}`;
-      const create = await fetch('/api/content-entries', {
+      const create = await fetch('/api/entries', {
         method: 'POST',
         headers: {
           cookie,
@@ -3431,7 +3409,7 @@ describe('Content Entry endpoints', async () => {
         }),
       });
       const created = (await create.json()) as { id: string };
-      await fetch(`/api/content-entries/${created.id}`, {
+      await fetch(`/api/entries/${created.id}`, {
         method: 'PUT',
         headers: {
           cookie,
@@ -3448,7 +3426,7 @@ describe('Content Entry endpoints', async () => {
 
     it('allows API keys with content:write scope', async () => {
       const id = await createPublished('203.0.113.34');
-      const res = await fetch(`/api/content-entries/${id}/republish`, {
+      const res = await fetch(`/api/entries/${id}/republish`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${TEST_API_KEY}`,
@@ -3472,7 +3450,7 @@ describe('Content Entry endpoints', async () => {
         },
       });
       try {
-        const res = await fetch(`/api/content-entries/${id}/republish`, {
+        const res = await fetch(`/api/entries/${id}/republish`, {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${rawKey}`,
@@ -3491,14 +3469,14 @@ describe('Content Entry endpoints', async () => {
     });
   });
 
-  describe('GET /api/content-entries archiveFilter', () => {
+  describe('GET /api/entries archiveFilter', () => {
     it('excludes archived entries by default (archiveFilter=active)', async () => {
       const cookie = await getSessionCookie();
       const ip = '203.0.113.60';
       const ct = await ensureBlogContentType();
 
       const live = (await (
-        await fetch('/api/content-entries', {
+        await fetch('/api/entries', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -3511,7 +3489,7 @@ describe('Content Entry endpoints', async () => {
           }),
         })
       ).json()) as { id: string; data: { title: string } };
-      await fetch(`/api/content-entries/${live.id}`, {
+      await fetch(`/api/entries/${live.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -3525,7 +3503,7 @@ describe('Content Entry endpoints', async () => {
       });
 
       const archived = (await (
-        await fetch('/api/content-entries', {
+        await fetch('/api/entries', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -3538,7 +3516,7 @@ describe('Content Entry endpoints', async () => {
           }),
         })
       ).json()) as { id: string; data: { title: string } };
-      await fetch(`/api/content-entries/${archived.id}`, {
+      await fetch(`/api/entries/${archived.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -3550,13 +3528,13 @@ describe('Content Entry endpoints', async () => {
           data: archived.data,
         }),
       });
-      await fetch(`/api/content-entries/${archived.id}/archive`, {
+      await fetch(`/api/entries/${archived.id}/archive`, {
         method: 'POST',
         headers: { Cookie: cookie, 'X-Forwarded-For': ip },
       });
 
       const defaultList = (await (
-        await fetch(`/api/content-entries?contentTypeId=${ct.id}`, {
+        await fetch(`/api/entries?contentTypeId=${ct.id}`, {
           headers: { Cookie: cookie, 'X-Forwarded-For': ip },
         })
       ).json()) as { items: Array<{ id: string }> };
@@ -3565,7 +3543,7 @@ describe('Content Entry endpoints', async () => {
 
       const archivedList = (await (
         await fetch(
-          `/api/content-entries?contentTypeId=${ct.id}&archiveFilter=archived`,
+          `/api/entries?contentTypeId=${ct.id}&archiveFilter=archived`,
           { headers: { Cookie: cookie, 'X-Forwarded-For': ip } }
         )
       ).json()) as { items: Array<{ id: string; status: string }> };
@@ -3576,10 +3554,9 @@ describe('Content Entry endpoints', async () => {
       ).toBe(true);
 
       const allList = (await (
-        await fetch(
-          `/api/content-entries?contentTypeId=${ct.id}&archiveFilter=all`,
-          { headers: { Cookie: cookie, 'X-Forwarded-For': ip } }
-        )
+        await fetch(`/api/entries?contentTypeId=${ct.id}&archiveFilter=all`, {
+          headers: { Cookie: cookie, 'X-Forwarded-For': ip },
+        })
       ).json()) as { items: Array<{ id: string }> };
       expect(allList.items.some((i) => i.id === archived.id)).toBe(true);
       expect(allList.items.some((i) => i.id === live.id)).toBe(true);
@@ -3593,7 +3570,7 @@ describe('Content Entry endpoints', async () => {
       const ct = await ensureBlogContentType();
 
       const target = (await (
-        await fetch('/api/content-entries', {
+        await fetch('/api/entries', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -3606,7 +3583,7 @@ describe('Content Entry endpoints', async () => {
           }),
         })
       ).json()) as { id: string; data: { title: string } };
-      await fetch(`/api/content-entries/${target.id}`, {
+      await fetch(`/api/entries/${target.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -3618,13 +3595,13 @@ describe('Content Entry endpoints', async () => {
           data: target.data,
         }),
       });
-      await fetch(`/api/content-entries/${target.id}/archive`, {
+      await fetch(`/api/entries/${target.id}/archive`, {
         method: 'POST',
         headers: { Cookie: cookie, 'X-Forwarded-For': ip },
       });
 
       const res = await fetch(
-        `/api/content-entries?contentTypeId=${ct.id}&archiveFilter=active`,
+        `/api/entries?contentTypeId=${ct.id}&archiveFilter=active`,
         { headers: { Cookie: cookie, 'X-Forwarded-For': ip } }
       );
       const body = (await res.json()) as { items: Array<{ id: string }> };
@@ -3744,7 +3721,7 @@ describe('Content Entry endpoints', async () => {
       // Use a distinct X-Forwarded-For so this test gets its own rate-limit
       // bucket — the cumulative POST mutations across the file can exceed the
       // 50-per-60s cap by the time these tests run.
-      const res = await fetch('/api/content-entries', {
+      const res = await fetch('/api/entries', {
         method: 'POST',
         headers: {
           cookie,
@@ -3781,7 +3758,7 @@ describe('Content Entry endpoints', async () => {
 
     it('rejects an embed whose contentTypeId is not in the allow-list', async () => {
       const cookie = await getSessionCookie();
-      const res = await fetch('/api/content-entries', {
+      const res = await fetch('/api/entries', {
         method: 'POST',
         headers: {
           cookie,
@@ -3818,7 +3795,7 @@ describe('Content Entry endpoints', async () => {
     it('persists contentTypeIdentifier on cmsEmbed.attrs when saving', async () => {
       const cookie = await getSessionCookie();
       const ip = '203.0.113.52';
-      const create = await fetch('/api/content-entries', {
+      const create = await fetch('/api/entries', {
         method: 'POST',
         headers: {
           cookie,
@@ -3856,7 +3833,7 @@ describe('Content Entry endpoints', async () => {
       };
 
       // Verify the persisted body carries the identifier
-      const get = await fetch(`/api/content-entries/${created.id}`, {
+      const get = await fetch(`/api/entries/${created.id}`, {
         headers: { cookie, 'X-Forwarded-For': ip },
       });
       const fetched = (await get.json()) as {
@@ -3872,14 +3849,14 @@ describe('Content Entry endpoints', async () => {
     });
   });
 
-  describe('Auth middleware — /api/content-entries (#172)', () => {
+  describe('Auth middleware — /api/entries (#172)', () => {
     it('allows API keys past the middleware (no longer 403 read-only)', async () => {
-      // After #172 Task 2, /api/content-entries is in API_KEY_WRITABLE_PATHS.
+      // After #172 Task 2, /api/entries is in API_KEY_WRITABLE_PATHS.
       // Without the per-handler scope check (added in T4), the request reaches
       // the handler and gets whatever response the handler produces. Without a
       // body, that's a 400 for missing contentTypeId. Anything other than the
       // middleware's 403 'API keys have read-only access' is acceptable here.
-      const res = await fetch('/api/content-entries', {
+      const res = await fetch('/api/entries', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${TEST_API_KEY}`,
@@ -3897,7 +3874,7 @@ describe('Content Entry endpoints', async () => {
     });
   });
 
-  describe('POST /api/content-entries — rate limit fires before scope (#172)', () => {
+  describe('POST /api/entries — rate limit fires before scope (#172)', () => {
     it('returns 429 from rate limiter even with content:write key', async () => {
       // The rate limiter is 50/60s per IP per endpoint. 60 rapid requests with
       // a content:write-scoped key should trip it. Use a unique IP so this
@@ -3905,7 +3882,7 @@ describe('Content Entry endpoints', async () => {
       const ip = '203.0.113.99';
       const responses: number[] = [];
       for (let i = 0; i < 60; i++) {
-        const res = await fetch('/api/content-entries', {
+        const res = await fetch('/api/entries', {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${TEST_API_KEY}`,
@@ -3923,7 +3900,7 @@ describe('Content Entry endpoints', async () => {
     }, 30_000);
   });
 
-  describe('GET /api/content-entries — single-version fetch (#264)', () => {
+  describe('GET /api/entries — single-version fetch (#264)', () => {
     it('returns draft-priority version + flatten keys with many ARCHIVED versions', async () => {
       const cookie = await getSessionCookie();
 
@@ -3985,7 +3962,7 @@ describe('Content Entry endpoints', async () => {
       // ARCHIVED }`). `all` keeps it visible and exercises draft-priority
       // (CHANGED) version resolution against the multi-version row.
       const defaultRes = await fetch(
-        `/api/content-entries?contentTypeId=${ct.id}&archiveFilter=all`,
+        `/api/entries?contentTypeId=${ct.id}&archiveFilter=all`,
         { headers: { Cookie: cookie } }
       );
       const defaultBody = (await defaultRes.json()) as {
@@ -4018,7 +3995,7 @@ describe('Content Entry endpoints', async () => {
       // updatedAt, which can't be controlled deterministically on create, so we
       // only assert status + membership in the archived set.
       const archivedRes = await fetch(
-        `/api/content-entries?contentTypeId=${ct.id}&archiveFilter=archived`,
+        `/api/entries?contentTypeId=${ct.id}&archiveFilter=archived`,
         { headers: { Cookie: cookie } }
       );
       const archivedBody = (await archivedRes.json()) as {
@@ -4092,14 +4069,14 @@ describe('Content Entry endpoints', async () => {
 
     it('a new DRAFT entry enqueues ENTRY_DRAFT_SYNC; publish-on-create does not', async () => {
       const ct = await makeType(`DraftSyncA_${Date.now()}`);
-      const draft = await $fetch<EntryResponse>('/api/content-entries', {
+      const draft = await $fetch<EntryResponse>('/api/entries', {
         method: 'POST',
         headers: auth('203.0.113.193'),
         body: { contentTypeId: ct.id, data: { title: `Draft ${Date.now()}` } },
       });
       expect(await draftSyncCount(draft.id)).toBe(1);
 
-      const pub = await $fetch<EntryResponse>('/api/content-entries', {
+      const pub = await $fetch<EntryResponse>('/api/entries', {
         method: 'POST',
         headers: auth('203.0.113.193'),
         body: {
@@ -4118,7 +4095,7 @@ describe('Content Entry endpoints', async () => {
 
     it('discarding a CHANGED draft enqueues ENTRY_DRAFT_SYNC', async () => {
       const ct = await makeType(`DraftSyncB_${Date.now()}`);
-      const created = await $fetch<EntryResponse>('/api/content-entries', {
+      const created = await $fetch<EntryResponse>('/api/entries', {
         method: 'POST',
         headers: auth('203.0.113.194'),
         body: {
@@ -4128,7 +4105,7 @@ describe('Content Entry endpoints', async () => {
         },
       });
       // Save a CHANGED draft (this PUT also enqueues one ENTRY_DRAFT_SYNC).
-      await $fetch(`/api/content-entries/${created.id}`, {
+      await $fetch(`/api/entries/${created.id}`, {
         method: 'PUT',
         headers: auth('203.0.113.194'),
         body: { data: { title: `HasDraft edited ${Date.now()}` } },
@@ -4136,7 +4113,7 @@ describe('Content Entry endpoints', async () => {
       const before = await draftSyncCount(created.id);
       expect(before).toBe(1);
       // Discard it → one more ENTRY_DRAFT_SYNC.
-      await $fetch(`/api/content-entries/${created.id}/draft`, {
+      await $fetch(`/api/entries/${created.id}/draft`, {
         method: 'DELETE',
         headers: auth('203.0.113.194'),
       });
@@ -4148,7 +4125,7 @@ describe('Content Entry endpoints', async () => {
 
       // Unarchive: publish → archive (fires ENTRY_UNPUBLISHED, not draft-sync) →
       // unarchive (ARCHIVED→DRAFT) fires the draft trigger.
-      const pub = await $fetch<EntryResponse>('/api/content-entries', {
+      const pub = await $fetch<EntryResponse>('/api/entries', {
         method: 'POST',
         headers: auth('203.0.113.195'),
         body: {
@@ -4157,12 +4134,12 @@ describe('Content Entry endpoints', async () => {
           data: { title: `Arch ${Date.now()}` },
         },
       });
-      await $fetch(`/api/content-entries/${pub.id}/archive`, {
+      await $fetch(`/api/entries/${pub.id}/archive`, {
         method: 'POST',
         headers: auth('203.0.113.195'),
       });
       const beforeUnarchive = await draftSyncCount(pub.id);
-      await $fetch(`/api/content-entries/${pub.id}/unarchive`, {
+      await $fetch(`/api/entries/${pub.id}/unarchive`, {
         method: 'POST',
         headers: auth('203.0.113.195'),
       });
@@ -4170,7 +4147,7 @@ describe('Content Entry endpoints', async () => {
 
       // Draft-only delete: a never-published entry's delete fires the draft
       // trigger (ENTRY_DELETED only fires when a published version existed).
-      const draft = await $fetch<EntryResponse>('/api/content-entries', {
+      const draft = await $fetch<EntryResponse>('/api/entries', {
         method: 'POST',
         headers: auth('203.0.113.195'),
         body: {
@@ -4179,7 +4156,7 @@ describe('Content Entry endpoints', async () => {
         },
       });
       const beforeDelete = await draftSyncCount(draft.id); // 1 from the create
-      await $fetch(`/api/content-entries/${draft.id}`, {
+      await $fetch(`/api/entries/${draft.id}`, {
         method: 'DELETE',
         headers: auth('203.0.113.195'),
       });
@@ -4275,7 +4252,7 @@ describe('Content Entry endpoints', async () => {
       });
 
       const res = await fetch(
-        `/api/content-entries?contentTypeId=${ct.id}&columns=name,publishedAt,author`,
+        `/api/entries?contentTypeId=${ct.id}&columns=name,publishedAt,author`,
         { headers: { cookie } }
       );
       expect(res.status).toBe(200);
@@ -4291,10 +4268,9 @@ describe('Content Entry endpoints', async () => {
       });
 
       // No `columns` requested → no `fields` key (browse callers unaffected).
-      const plainRes = await fetch(
-        `/api/content-entries?contentTypeId=${ct.id}`,
-        { headers: { cookie } }
-      );
+      const plainRes = await fetch(`/api/entries?contentTypeId=${ct.id}`, {
+        headers: { cookie },
+      });
       expect(plainRes.status).toBe(200);
       const plain = (await plainRes.json()) as {
         items: Array<Record<string, unknown> & { id: string }>;
@@ -4368,7 +4344,7 @@ describe('Content Entry endpoints', async () => {
 
     it('seeds BOOLEAN/NUMBER/SELECT defaults for absent fields on create', async () => {
       const cookie = await getSessionCookie();
-      const created = await $fetch<EntryResponse>('/api/content-entries', {
+      const created = await $fetch<EntryResponse>('/api/entries', {
         method: 'POST',
         headers: { cookie, 'X-Forwarded-For': '203.0.113.70' },
         body: {
@@ -4383,7 +4359,7 @@ describe('Content Entry endpoints', async () => {
 
     it('a NUMBER default satisfies a required field omitted from the payload', async () => {
       const cookie = await getSessionCookie();
-      const res = await fetch('/api/content-entries', {
+      const res = await fetch('/api/entries', {
         method: 'POST',
         headers: {
           cookie,
@@ -4401,7 +4377,7 @@ describe('Content Entry endpoints', async () => {
 
     it('rejects an explicit null on a required field (explicit clear is respected)', async () => {
       const cookie = await getSessionCookie();
-      const res = await fetch('/api/content-entries', {
+      const res = await fetch('/api/entries', {
         method: 'POST',
         headers: {
           cookie,
@@ -4420,7 +4396,7 @@ describe('Content Entry endpoints', async () => {
 
     it('explicit values override defaults on create', async () => {
       const cookie = await getSessionCookie();
-      const created = await $fetch<EntryResponse>('/api/content-entries', {
+      const created = await $fetch<EntryResponse>('/api/entries', {
         method: 'POST',
         headers: { cookie, 'X-Forwarded-For': '203.0.113.73' },
         body: {
@@ -4440,7 +4416,7 @@ describe('Content Entry endpoints', async () => {
 
     it('does NOT apply defaults on update (PUT)', async () => {
       const cookie = await getSessionCookie();
-      const created = await $fetch<EntryResponse>('/api/content-entries', {
+      const created = await $fetch<EntryResponse>('/api/entries', {
         method: 'POST',
         headers: { cookie, 'X-Forwarded-For': '203.0.113.74' },
         body: {
@@ -4459,7 +4435,7 @@ describe('Content Entry endpoints', async () => {
       // absent `flag` must NOT be seeded to `false` — validateEntryData maps an
       // absent optional field to null.
       const updated = await $fetch<EntryResponse>(
-        `/api/content-entries/${created.id}`,
+        `/api/entries/${created.id}`,
         {
           method: 'PUT',
           headers: { cookie, 'X-Forwarded-For': '203.0.113.74' },

@@ -962,7 +962,7 @@ describe('GET /api/search', async () => {
     // `false` makes `filter=flag:eq:false` match an entry that was created
     // WITHOUT supplying `flag` (applyFieldDefaults seeds `false` at create).
     // This drives the FULL pipeline inline: direct-Prisma content type →
-    // POST /api/content-entries (omitting flag) → publish via PUT → runReindex
+    // POST /api/entries (omitting flag) → publish via PUT → runReindex
     // the DB into the entries_test index → GET /api/search. No seeded Meili docs.
     let boolTypeId: string;
     const index = meili.index<SearchDocument>(resolveEntriesIndex());
@@ -1017,7 +1017,7 @@ describe('GET /api/search', async () => {
 
       // Create an entry OMITTING `flag` — applyFieldDefaults seeds `false`.
       const created = await $fetch<{ id: string; data: { flag: unknown } }>(
-        '/api/content-entries',
+        '/api/entries',
         {
           method: 'POST',
           headers: { cookie, 'X-Forwarded-For': '203.0.113.80' },
@@ -1033,7 +1033,7 @@ describe('GET /api/search', async () => {
       // the existing DRAFT (which carries the seeded `flag: false`) as-is —
       // re-sending a payload without `flag` would drop it, since defaults are
       // create-only and don't re-fire on publish.
-      await $fetch(`/api/content-entries/${created.id}`, {
+      await $fetch(`/api/entries/${created.id}`, {
         method: 'PUT',
         headers: { cookie, 'X-Forwarded-For': '203.0.113.80' },
         body: { status: 'PUBLISHED' },

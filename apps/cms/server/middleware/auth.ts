@@ -1,7 +1,7 @@
 const API_KEY_WRITABLE_PATHS = new Set([
   '/api/schema/apply',
   '/api/apikeys',
-  '/api/content-entries',
+  '/api/entries',
   '/api/content-bundle',
 ]);
 

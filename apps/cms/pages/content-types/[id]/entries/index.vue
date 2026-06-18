@@ -158,7 +158,7 @@ const {
     fields?: Record<string, unknown>;
   }>;
   total: number;
-}>('/api/content-entries', {
+}>('/api/entries', {
   query: {
     contentTypeId,
     page,
