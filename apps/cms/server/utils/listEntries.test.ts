@@ -140,4 +140,15 @@ describe('cursor codec', () => {
       decodeCursor(Buffer.from('123_not-a-uuid').toString('base64url'))
     ).toBeNull(); // bad id
   });
+  it('rejects a coercible-but-non-digit ms slice (strict digits only)', () => {
+    // Number(' 123 ') === 123 and Number('1e3') === 1000 would coerce, so a
+    // hand-crafted cursor could decode to an unintended timestamp. The strict
+    // /^\d+$/ guard rejects both even though the id is a valid UUID.
+    expect(
+      decodeCursor(Buffer.from(' 123 _' + id).toString('base64url'))
+    ).toBeNull(); // whitespace-padded
+    expect(
+      decodeCursor(Buffer.from('1e3_' + id).toString('base64url'))
+    ).toBeNull(); // exponential notation
+  });
 });

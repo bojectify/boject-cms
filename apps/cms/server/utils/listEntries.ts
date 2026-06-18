@@ -181,8 +181,12 @@ export function decodeCursor(
   const raw = Buffer.from(cursor, 'base64url').toString('utf8');
   const sep = raw.indexOf('_');
   if (sep <= 0) return null;
-  const ms = Number(raw.slice(0, sep));
+  const msSlice = raw.slice(0, sep);
   const id = raw.slice(sep + 1);
+  // Strict: digits only. `Number('  123 ')` / `Number('1e3')` coerce, so a
+  // hand-crafted cursor could otherwise decode to an unintended timestamp.
+  if (!/^\d+$/.test(msSlice)) return null;
+  const ms = Number(msSlice);
   if (!Number.isFinite(ms) || ms < 0) return null;
   if (!isUuid(id)) return null;
   return { updatedAt: new Date(ms), id };
@@ -269,7 +273,11 @@ export async function keysetPage<T extends { id: string; updatedAt: Date }>(
   const endCursor = last ? encodeCursor(last.updatedAt, last.id) : null;
 
   const pageInfo: PageInfo = backward
-    ? { hasPreviousPage: hasExtra, hasNextPage: true, startCursor, endCursor }
+    ? // hasNextPage is unconditionally true on the backward branch: you only
+      // navigate backward FROM a next page, so one provably exists. The near
+      // edge (hasPreviousPage) is inferred from the cursor probe — see the spec
+      // edge note on button-nav near-edge inference.
+      { hasPreviousPage: hasExtra, hasNextPage: true, startCursor, endCursor }
     : {
         hasNextPage: hasExtra,
         hasPreviousPage: !!after,
