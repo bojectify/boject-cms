@@ -44,6 +44,23 @@ export const articleTitleOnly: Bundle = makeBundle({
   contentTypes: [ct('Article', {}, [titleField()])],
 });
 
+/**
+ * Article carrying a reserved field identifier (`status` collides with the
+ * built-in entry envelope field) — rejected by applySchema's per-field check.
+ */
+export const articleWithReservedField: Bundle = makeBundle({
+  contentTypes: [
+    ct('Article', {}, [
+      titleField(),
+      field('status', FIELD_TYPES.SELECT, {
+        name: 'Status',
+        order: 1,
+        options: { choices: ['x'] },
+      }),
+    ]),
+  ],
+});
+
 /** Post whose SELECT `category` field gains an extra choice ('opinion'). */
 export const postWithUpdatedSelect: Bundle = makeBundle({
   contentTypes: [

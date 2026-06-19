@@ -1906,8 +1906,8 @@ describe('Content Type endpoints', async () => {
           method: 'POST',
           headers: { cookie, 'X-Forwarded-For': '203.0.113.245' },
           body: {
-            identifier: 'status',
-            name: 'Status',
+            identifier: 'state',
+            name: 'State',
             type: FIELD_TYPES.SELECT,
             options: { choices: ['draft', 'live'], default: 'draft' },
           },
@@ -1931,6 +1931,54 @@ describe('Content Type endpoints', async () => {
           name: 'Bad Select',
           type: FIELD_TYPES.SELECT,
           options: { choices: ['a'], default: 'z' },
+        }),
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('rejects a reserved field identifier with 400', async () => {
+      const cookie = await getSessionCookie();
+      const ctId = await getCtId();
+      const res = await fetch(`/api/content-types/${ctId}/fields`, {
+        method: 'POST',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': '203.0.113.231',
+        },
+        body: JSON.stringify({
+          identifier: 'status',
+          name: 'Status',
+          type: FIELD_TYPES.SELECT,
+          options: { choices: ['a', 'b'] },
+        }),
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('rejects creating a content type with a reserved field identifier', async () => {
+      const cookie = await getSessionCookie();
+      const res = await fetch('/api/content-types', {
+        method: 'POST',
+        headers: {
+          cookie,
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': '203.0.113.232',
+        },
+        body: JSON.stringify({
+          name: `ResvType ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: FIELD_TYPES.ENTRY_TITLE,
+            },
+            {
+              identifier: 'publishedAt',
+              name: 'Published At',
+              type: FIELD_TYPES.DATETIME,
+            },
+          ],
         }),
       });
       expect(res.status).toBe(400);

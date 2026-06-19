@@ -16,6 +16,7 @@ import type { SchemaPlan } from './schemaPlan.types';
 import { effectiveBundleUnique } from './schemaPlan.types';
 import { validateBundle } from './validate';
 import { checkFieldDefault } from '../../utils/fieldDefaults';
+import { isReservedFieldIdentifier } from '../../utils/reservedFieldIdentifiers';
 import {
   SchemaApplyBlockedError,
   SchemaApplyValidationError,
@@ -101,28 +102,36 @@ export async function applySchema(
     throw new SchemaApplyValidationError(validation.errors);
   }
 
-  // Semantic field-default validation (#344). The import path otherwise never
-  // runs validateFieldDefault, so without this a bundle could carry a default
-  // on an unsupported type, a type-mismatched default, or a required BOOLEAN
-  // with no True/False default — all rejected by the CMS UI + field REST API.
-  const defaultErrors: BundleValidationError[] = [];
+  // Per-field semantic validation the offline validateBundle doesn't carry:
+  // reserved-identifier rejection (a field whose identifier collides with the
+  // built-in entry envelope) + field-default validation (#344 — default on an
+  // unsupported type, a type-mismatched default, or a required BOOLEAN with no
+  // True/False default). Both are rejected by the CMS UI + field REST API, so
+  // the import path enforces them here too.
+  const fieldErrors: BundleValidationError[] = [];
   for (const ct of bundle.contentTypes ?? []) {
     for (const field of ct.fields) {
+      if (isReservedFieldIdentifier(field.identifier)) {
+        fieldErrors.push({
+          path: `contentTypes.${ct.identifier}.fields.${field.identifier}`,
+          message: `Field identifier '${field.identifier}' is reserved (it collides with a built-in entry field).`,
+        });
+      }
       const message = checkFieldDefault(
         field.type,
         field.options,
         field.required
       );
       if (message) {
-        defaultErrors.push({
+        fieldErrors.push({
           path: `contentTypes.${ct.identifier}.fields.${field.identifier}`,
           message,
         });
       }
     }
   }
-  if (defaultErrors.length > 0) {
-    throw new SchemaApplyValidationError(defaultErrors);
+  if (fieldErrors.length > 0) {
+    throw new SchemaApplyValidationError(fieldErrors);
   }
 
   let captured: ApplySchemaResult | null = null;
