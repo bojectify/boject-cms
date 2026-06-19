@@ -1,7 +1,7 @@
 /**
  * Content-type field identifiers that collide with the built-in GraphQL
- * `ContentEntry` envelope fields defined in
- * `apps/cms/server/graphql/dynamicTypes.ts` (~lines 386-409). A user field with
+ * `ContentEntry` envelope fields registered by `registerDynamicTypes`
+ * (`apps/cms/server/graphql/dynamicTypes.ts`). A user field with
  * any of these identifiers would overwrite the envelope field — crashing the
  * schema build (type mismatch, e.g. a SELECT `status` vs the interface's
  * `ContentStatus`) or silently shadowing it (same type). KEEP IN SYNC: adding
