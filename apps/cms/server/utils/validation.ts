@@ -1,4 +1,5 @@
 import { createError } from 'h3';
+import { isReservedFieldIdentifier } from '../../utils/reservedFieldIdentifiers';
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -60,6 +61,12 @@ export function assertFieldIdentifier(value: unknown, field: string): string {
     throw createError({
       statusCode: 400,
       statusMessage: `${field} must be camelCase (start with lowercase, alphanumeric only)`,
+    });
+  }
+  if (isReservedFieldIdentifier(value)) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: `${field} '${value}' is reserved (it collides with a built-in entry field) — choose another name.`,
     });
   }
   return value;

@@ -32,7 +32,9 @@ import {
   blockedDryRunBundle,
   articleWithFieldDefaults,
   articleRequiredBooleanNoDefault,
+  articleWithReservedField,
 } from './applySchema.integration.fixtures';
+import { SchemaApplyValidationError } from './applySchemaErrors';
 
 const url = getTestDatabaseUrl();
 const adapter = new PrismaPg({ connectionString: url });
@@ -114,6 +116,15 @@ describe('applySchema', () => {
       await expect(
         applySchema(prisma, articleRequiredBooleanNoDefault)
       ).rejects.toMatchObject({ code: 'BUNDLE_INVALID' });
+
+      // Rejected before the transaction — nothing was created.
+      expect(await prisma.contentType.count()).toBe(0);
+    });
+
+    it('rejects a bundle field with a reserved identifier', async () => {
+      await expect(
+        applySchema(prisma, articleWithReservedField, {})
+      ).rejects.toThrow(SchemaApplyValidationError);
 
       // Rejected before the transaction — nothing was created.
       expect(await prisma.contentType.count()).toBe(0);

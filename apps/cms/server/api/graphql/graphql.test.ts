@@ -707,6 +707,95 @@ describe('GraphQL API', async () => {
       expect(result.errors).toBeDefined();
       expect(result.errors!.length).toBeGreaterThan(0);
     });
+
+    it('a stored reserved-identifier field is skipped, not crashed (regression)', async () => {
+      const cookie = await getSessionCookie();
+      const { PrismaPg } = await import('@prisma/adapter-pg');
+      const { PrismaClient } = await import('../../../generated/prisma/client');
+      const adapter = new PrismaPg({ connectionString: getTestDatabaseUrl() });
+      const prisma = new PrismaClient({ adapter });
+
+      let ctId: string | undefined;
+      try {
+        // 1. Create the type via the API (valid fields only) — invalidates the schema.
+        const ct = await $fetch<{ id: string; identifier: string }>(
+          '/api/content-types',
+          {
+            method: 'POST',
+            headers: { cookie, 'X-Forwarded-For': '203.0.113.233' },
+            body: {
+              name: `ResvSkip ${Date.now()}`,
+              fields: [
+                {
+                  identifier: 'title',
+                  name: 'Title',
+                  type: FIELD_TYPES.ENTRY_TITLE,
+                },
+              ],
+            },
+          }
+        );
+        ctId = ct.id;
+
+        // 2. Inject a reserved-identifier field straight into the DB (bypasses validation).
+        await prisma.contentTypeField.create({
+          data: {
+            contentTypeId: ct.id,
+            identifier: 'status',
+            name: 'Status',
+            type: FIELD_TYPES.SELECT,
+            order: 1,
+            options: { choices: ['draft', 'live'] },
+          },
+        });
+
+        // 3. Force a schema rebuild via a no-op content-type update (PUT invalidates).
+        await $fetch<unknown>(`/api/content-types/${ct.id}`, {
+          method: 'PUT',
+          headers: { cookie, 'X-Forwarded-For': '203.0.113.233' },
+          body: { name: ct.identifier, description: 'rebuild' },
+        });
+
+        // 4. The schema builds (no 500) and `status` is the envelope
+        //    ContentStatus, not the user String field.
+        const res = await fetch('/api/graphql', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query: `{ __type(name: "${ct.identifier}") { fields { name type { name ofType { name } } } } }`,
+          }),
+        });
+        expect(res.status).toBe(200);
+        const body = (await res.json()) as {
+          data: {
+            __type: {
+              fields: Array<{
+                name: string;
+                type: { name: string | null; ofType: { name: string } | null };
+              }>;
+            };
+          };
+        };
+        const statusField = body.data.__type.fields.find(
+          (f) => f.name === 'status'
+        )!;
+        const typeName = statusField.type.name ?? statusField.type.ofType?.name;
+        expect(typeName).toBe('ContentStatus'); // envelope field intact; user `status` skipped
+      } finally {
+        if (ctId) {
+          await prisma.contentEntry
+            .deleteMany({ where: { contentTypeId: ctId } })
+            .catch(() => {});
+          await prisma.contentTypeField
+            .deleteMany({ where: { contentTypeId: ctId } })
+            .catch(() => {});
+          await prisma.contentType
+            .delete({ where: { id: ctId } })
+            .catch(() => {});
+        }
+        await prisma.$disconnect().catch(() => {});
+      }
+    });
   });
 
   describe('Cross-type contentEntryList query', () => {

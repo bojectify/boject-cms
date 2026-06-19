@@ -4309,8 +4309,8 @@ describe('Content Entry endpoints', async () => {
                 order: 1,
               },
               {
-                identifier: 'publishedAt',
-                name: 'Published At',
+                identifier: 'publishDate',
+                name: 'Publish Date',
                 type: FIELD_TYPES.DATETIME,
                 order: 2,
               },
@@ -4358,7 +4358,7 @@ describe('Content Entry endpoints', async () => {
                 data: {
                   title: 'Main',
                   name: 'Widget',
-                  publishedAt: isoPublished,
+                  publishDate: isoPublished,
                   author: { contentTypeId: ct.id, entryId: target.id },
                 },
               },
@@ -4368,7 +4368,7 @@ describe('Content Entry endpoints', async () => {
       });
 
       const res = await fetch(
-        `/api/entries?contentTypeId=${ct.id}&columns=name,publishedAt,author`,
+        `/api/entries?contentTypeId=${ct.id}&columns=name,publishDate,author`,
         { headers: { cookie } }
       );
       expect(res.status).toBe(200);
@@ -4379,7 +4379,7 @@ describe('Content Entry endpoints', async () => {
       expect(item).toBeDefined();
       expect(item!.fields).toEqual({
         name: 'Widget',
-        publishedAt: Date.parse(isoPublished),
+        publishDate: Date.parse(isoPublished),
         author: { entryId: target.id, entryTitle: 'Acme Corp' },
       });
 
@@ -4436,8 +4436,8 @@ describe('Content Entry endpoints', async () => {
                 options: { default: 0 },
               },
               {
-                identifier: 'status',
-                name: 'Status',
+                identifier: 'state',
+                name: 'State',
                 type: FIELD_TYPES.SELECT,
                 order: 3,
                 options: { choices: ['draft', 'live'], default: 'draft' },
@@ -4470,7 +4470,7 @@ describe('Content Entry endpoints', async () => {
       });
       expect(created.data.flag).toBe(false);
       expect(created.data.qty).toBe(0);
-      expect(created.data.status).toBe('draft');
+      expect(created.data.state).toBe('draft');
     });
 
     it('a NUMBER default satisfies a required field omitted from the payload', async () => {
@@ -4521,13 +4521,13 @@ describe('Content Entry endpoints', async () => {
             title: `Defaults D ${Date.now()}`,
             flag: true,
             qty: 5,
-            status: 'live',
+            state: 'live',
           },
         },
       });
       expect(created.data.flag).toBe(true);
       expect(created.data.qty).toBe(5);
-      expect(created.data.status).toBe('live');
+      expect(created.data.state).toBe('live');
     });
 
     it('does NOT apply defaults on update (PUT)', async () => {
@@ -4541,7 +4541,7 @@ describe('Content Entry endpoints', async () => {
             title: `Defaults Update ${Date.now()}`,
             flag: true,
             qty: 5,
-            status: 'live',
+            state: 'live',
           },
         },
       });
@@ -4559,7 +4559,7 @@ describe('Content Entry endpoints', async () => {
             data: {
               title: `Defaults Update ${Date.now()}`,
               qty: 7,
-              status: 'live',
+              state: 'live',
             },
           },
         }
