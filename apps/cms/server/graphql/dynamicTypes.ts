@@ -13,6 +13,7 @@ import {
 } from './jsonbFilters';
 import { Prisma } from '#prisma';
 import { FIELD_TYPES } from '../../utils/fieldTypes';
+import { isReservedFieldIdentifier } from '../../utils/reservedFieldIdentifiers';
 import {
   CONTENT_STATUSES,
   type ContentStatusName,
@@ -291,11 +292,27 @@ export function registerDynamicTypes(
   }
 
   for (const ct of contentTypes) {
-    const scalarFields = ct.fields.filter(
+    // Defensively drop any stored field whose identifier collides with a
+    // built-in ContentEntry envelope field (id, status, publishedAt, …).
+    // Such a field would overwrite the envelope field and crash
+    // builder.toSchema() (type mismatch) — taking down the whole GraphQL API.
+    // The write path (Task 2) rejects these, but a row that drifted in via
+    // direct SQL or a pre-fix migration must not be able to break the schema.
+    const safeFields = ct.fields.filter((f) => {
+      if (isReservedFieldIdentifier(f.identifier)) {
+        console.warn(
+          `[graphql] Skipping reserved field identifier '${f.identifier}' on content type '${ct.identifier}' — it collides with a built-in entry field.`
+        );
+        return false;
+      }
+      return true;
+    });
+
+    const scalarFields = safeFields.filter(
       (f) => FIELD_TYPE_TO_SCALAR[f.type] !== undefined
     );
 
-    const filterableFields = ct.fields.filter(
+    const filterableFields = safeFields.filter(
       (f) => getFilterKeyForFieldType(f.type) !== null
     );
 
@@ -429,7 +446,7 @@ export function registerDynamicTypes(
         }
 
         // RICHTEXT fields (object type with json + references)
-        const richtextFields = ct.fields.filter(
+        const richtextFields = safeFields.filter(
           (f) => f.type === FIELD_TYPES.RICHTEXT
         );
         for (const field of richtextFields) {
@@ -446,7 +463,7 @@ export function registerDynamicTypes(
         }
 
         // IMAGE fields (object type with file metadata + derived url)
-        const imageFields = ct.fields.filter(
+        const imageFields = safeFields.filter(
           (f) => f.type === FIELD_TYPES.IMAGE
         );
         for (const field of imageFields) {
@@ -459,7 +476,7 @@ export function registerDynamicTypes(
         }
 
         // RELATION fields (single polymorphic reference)
-        const relationFields = ct.fields.filter(
+        const relationFields = safeFields.filter(
           (f) => f.type === FIELD_TYPES.RELATION
         );
         for (const field of relationFields) {
@@ -526,7 +543,7 @@ export function registerDynamicTypes(
         }
 
         // MULTIRELATION fields (ordered list of polymorphic references)
-        const multiRelationFields = ct.fields.filter(
+        const multiRelationFields = safeFields.filter(
           (f) => f.type === FIELD_TYPES.MULTIRELATION
         );
         for (const field of multiRelationFields) {
@@ -650,7 +667,7 @@ export function registerDynamicTypes(
       })
     );
 
-    const hasSlug = ct.fields.some((f) => f.type === FIELD_TYPES.SLUG);
+    const hasSlug = safeFields.some((f) => f.type === FIELD_TYPES.SLUG);
     if (hasSlug) {
       builder.queryField(`${camelName}BySlug`, (t) =>
         t.field({
