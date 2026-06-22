@@ -93,3 +93,59 @@ export function createTaggedCache(deps: TaggedCacheDeps): TaggedCache {
     },
   };
 }
+
+/**
+ * Narrow an unknown driver instance to an ioredis client, or throw loudly.
+ * Tagged caching needs native set ops; a non-redis `cache` mount (misconfig,
+ * memory fallback) is a deploy error, not something to silently degrade — the
+ * loud-failure ethos of the meili prod guard.
+ */
+export function assertRedisInstance(instance: unknown): Redis {
+  const candidate = instance as Partial<Redis> | null | undefined;
+  if (
+    !candidate ||
+    typeof candidate.smembers !== 'function' ||
+    typeof candidate.sadd !== 'function'
+  ) {
+    throw new Error(
+      "taggedCache: the 'cache' storage mount is not redis-backed (no ioredis " +
+        'instance with set ops). Tagged caching requires nitro.storage.cache to ' +
+        'use the redis driver — check REDIS_URL and nuxt.config.ts.'
+    );
+  }
+  return candidate as Redis;
+}
+
+// Lazily-resolved production singleton. `useStorage` exists only in the Nitro
+// runtime, so deps resolve on first method call, memoised via the globalThis
+// guard (matches prisma.ts / meili.ts). Importing this module never touches
+// useStorage — so it loads cleanly in the unit project too.
+const globalForTaggedCache = globalThis as typeof globalThis & {
+  bojectTaggedCache: TaggedCache | undefined;
+};
+
+function resolveProdSingleton(): TaggedCache {
+  if (globalForTaggedCache.bojectTaggedCache) {
+    return globalForTaggedCache.bojectTaggedCache;
+  }
+  const storage = useStorage('cache');
+  // getMount/getInstance is mild unstorage-internal reach — pinned by the guard
+  // below. The cache mount normalises to base `cache:`.
+  const redis = assertRedisInstance(
+    useStorage().getMount('cache:').driver.getInstance?.()
+  );
+  const instance = createTaggedCache({ storage, redis });
+  globalForTaggedCache.bojectTaggedCache = instance;
+  return instance;
+}
+
+/**
+ * Production tagged cache. A stable object whose methods resolve the Nitro deps
+ * lazily on first call. Downstream consumers (#259 routeRules, #260 GraphQL
+ * plugin, #261 invalidation subscriber) import this.
+ */
+export const taggedCache: TaggedCache = {
+  set: (key, value, opts) => resolveProdSingleton().set(key, value, opts),
+  get: (key) => resolveProdSingleton().get(key),
+  invalidateByTag: (tag) => resolveProdSingleton().invalidateByTag(tag),
+};
