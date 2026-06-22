@@ -3,6 +3,7 @@ import { defineConfig } from 'vitest/config';
 import { storybookTest } from '@storybook/addon-vitest/vitest-plugin';
 import { playwright } from '@vitest/browser-playwright';
 import { getTestDatabaseUrl } from './test/dbUrl';
+import { getTestRedisUrl } from './test/redisUrl';
 
 // Tests use a separate database so dev data is never touched.
 process.env.DATABASE_URL = getTestDatabaseUrl();
@@ -14,6 +15,16 @@ process.env.DATABASE_URL = getTestDatabaseUrl();
 // from this process, exactly as it inherits DATABASE_URL above. A host-set
 // MEILI_INDEX still wins (parallel runners / dedicated engines).
 process.env.MEILI_INDEX = process.env.MEILI_INDEX || 'entries_test';
+
+// Tests target a separate Redis logical DB (DB 1) so a `pnpm test` run never
+// clobbers the dev cache on DB 0 of the shared local Redis container. Set
+// unconditionally (like DATABASE_URL above — NOT `||`-guarded like MEILI_INDEX):
+// a dev's REDIS_URL points at DB 0 (the live dev cache) and the integration
+// test FLUSHDB-s its target DB, so honouring a host REDIS_URL here would wipe
+// the dev cache and defeat the isolation. Override the test target via
+// INTEGRATION_TEST_REDIS_URL (honoured by getTestRedisUrl), exactly like
+// INTEGRATION_TEST_DATABASE_URL drives DATABASE_URL above.
+process.env.REDIS_URL = getTestRedisUrl();
 
 export default defineConfig({
   resolve: {
