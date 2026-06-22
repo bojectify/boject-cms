@@ -58,7 +58,7 @@ describe('createTaggedCache', () => {
     expect(await cache.get('b')).toBeNull();
     expect(await cache.get('c')).toEqual({ n: 3 });
     // The reverse index for the invalidated tag is gone too.
-    expect(await redis.exists('__tagindex:type:Article')).toBe(0);
+    expect(await redis.exists('__tagindex_p:type:Article')).toBe(0);
   });
 
   it('keeps the tag-set TTL >= the value TTL and never lowers it (EXPIRE GT)', async () => {
@@ -73,10 +73,32 @@ describe('createTaggedCache', () => {
     expect(ttlAfterSecond).toBeGreaterThan(10);
   });
 
-  it('leaves the tag set persistent when the value has no TTL', async () => {
+  it('puts a no-TTL value in the persistent index (no expiry, separate key)', async () => {
     await cache.set('persist', { v: 1 }, { tags: ['p'] });
-    // -1 == key exists with no expiry.
-    expect(await redis.ttl('__tagindex:p')).toBe(-1);
+    // No ttl'd index is created; the member lives in the persistent index.
+    expect(await redis.exists('__tagindex:p')).toBe(0);
+    expect(await redis.ttl('__tagindex_p:p')).toBe(-1); // -1 = exists, no expiry
+  });
+
+  it('a tag with both persistent and TTL-d members: invalidate clears both indexes', async () => {
+    await cache.set('p1', { v: 1 }, { tags: ['mix'] }); // persistent
+    await cache.set('t1', { v: 2 }, { tags: ['mix'], ttl: 100 }); // ttl'd
+
+    await cache.invalidateByTag('mix');
+
+    expect(await cache.get('p1')).toBeNull();
+    expect(await cache.get('t1')).toBeNull();
+    expect(await redis.exists('__tagindex:mix')).toBe(0);
+    expect(await redis.exists('__tagindex_p:mix')).toBe(0);
+  });
+
+  it('a TTL-d write never finite-izes a tag that has a persistent member', async () => {
+    await cache.set('p1', { v: 1 }, { tags: ['mix'] }); // persistent index, no expiry
+    await cache.set('t1', { v: 2 }, { tags: ['mix'], ttl: 5 }); // ttl'd index, TTL 5
+
+    // The persistent index must remain expiry-free; only the ttl'd index is finite.
+    expect(await redis.ttl('__tagindex_p:mix')).toBe(-1);
+    expect(await redis.ttl('__tagindex:mix')).toBeGreaterThan(0);
   });
 
   it('lets a short-TTL value expire out of the cache', async () => {

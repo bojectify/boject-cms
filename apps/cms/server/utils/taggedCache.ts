@@ -5,6 +5,14 @@ import type { Storage, StorageValue } from 'unstorage';
  *  cache keys (e.g. `public:content:Article:…`). */
 export const TAG_INDEX_PREFIX = '__tagindex:';
 
+/**
+ * Reverse-index for PERSISTENT (no-ttl) members. Never expires — only
+ * invalidateByTag clears it. Kept separate from the TTL'd index (TAG_INDEX_PREFIX)
+ * so a ttl'd write can never finite-ize a tag that has a persistent member, and
+ * so a ttl'd-only index can still self-expire.
+ */
+export const TAG_INDEX_PERSISTENT_PREFIX = '__tagindex_p:';
+
 export interface SetOptions {
   /** Tags this value depends on; `invalidateByTag` of any clears this key. */
   tags: string[];
@@ -44,17 +52,22 @@ export function createTaggedCache(deps: TaggedCacheDeps): TaggedCache {
 
       const pipeline = redis.pipeline();
       for (const tag of opts.tags) {
-        const tagKey = TAG_INDEX_PREFIX + tag;
-        pipeline.sadd(tagKey, key);
-        // Two-flag strategy: NX sets the TTL when the key has none (first write
-        // or after invalidation); GT only RAISES it — so a later short-TTL
-        // write to the same tag can never shorten the index below an existing
-        // member's life. Redis treats -1 (no expiry) as infinity for GT, so GT
-        // alone fails on a key without an existing TTL.
-        // No value TTL ⇒ no EXPIRE ⇒ the index stays persistent.
         if (opts.ttl !== undefined) {
+          // TTL'd member → the self-cleaning index. NX sets the TTL when the
+          // set has none (first write / post-invalidation); GT only ever RAISES
+          // it, so a later shorter-TTL write can't shorten the index below a
+          // live member. This index holds ONLY ttl'd members, so NX can never
+          // finite-ize a persistent tag — persistent members go to the index
+          // below.
+          const tagKey = TAG_INDEX_PREFIX + tag;
+          pipeline.sadd(tagKey, key);
           pipeline.expire(tagKey, opts.ttl, 'NX');
           pipeline.expire(tagKey, opts.ttl, 'GT');
+        } else {
+          // Persistent member → a no-expiry index, so the value stays
+          // invalidatable for as long as it's cached. Only invalidateByTag
+          // clears it.
+          pipeline.sadd(TAG_INDEX_PERSISTENT_PREFIX + tag, key);
         }
       }
       await pipeline.exec();
@@ -65,12 +78,18 @@ export function createTaggedCache(deps: TaggedCacheDeps): TaggedCache {
     },
 
     async invalidateByTag(tag) {
-      const tagKey = TAG_INDEX_PREFIX + tag;
-      const members = await redis.smembers(tagKey);
+      const ttlKey = TAG_INDEX_PREFIX + tag;
+      const persistentKey = TAG_INDEX_PERSISTENT_PREFIX + tag;
+      const [ttlMembers, persistentMembers] = await Promise.all([
+        redis.smembers(ttlKey),
+        redis.smembers(persistentKey),
+      ]);
+      // De-dup: a key tagged once with a ttl and once without appears in both.
+      const members = [...new Set([...ttlMembers, ...persistentMembers])];
       // removeItem of an absent key is a no-op, so dangling members (from a key
       // also tagged elsewhere) are harmless.
       await Promise.all(members.map((member) => storage.removeItem(member)));
-      await redis.del(tagKey);
+      await redis.del(ttlKey, persistentKey);
     },
   };
 }
