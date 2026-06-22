@@ -3,6 +3,7 @@ import { defineConfig } from 'vitest/config';
 import { storybookTest } from '@storybook/addon-vitest/vitest-plugin';
 import { playwright } from '@vitest/browser-playwright';
 import { getTestDatabaseUrl } from './test/dbUrl';
+import { getTestRedisUrl } from './test/redisUrl';
 
 // Tests use a separate database so dev data is never touched.
 process.env.DATABASE_URL = getTestDatabaseUrl();
@@ -14,6 +15,15 @@ process.env.DATABASE_URL = getTestDatabaseUrl();
 // from this process, exactly as it inherits DATABASE_URL above. A host-set
 // MEILI_INDEX still wins (parallel runners / dedicated engines).
 process.env.MEILI_INDEX = process.env.MEILI_INDEX || 'entries_test';
+
+// Tests target a separate Redis logical DB (DB 1) so a `pnpm test` run never
+// clobbers the dev cache on DB 0 of the shared local Redis container. The
+// integration test (taggedCache.integration.test.ts) builds its own ioredis
+// from getTestRedisUrl(); setting REDIS_URL here additionally points any Nitro
+// dev server a future cache-backed test boots at DB 1 — exactly as DATABASE_URL
+// / MEILI_INDEX above point it at the test DB / index. A host-set REDIS_URL
+// still wins.
+process.env.REDIS_URL = getTestRedisUrl();
 
 export default defineConfig({
   resolve: {
