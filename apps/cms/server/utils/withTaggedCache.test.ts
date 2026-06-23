@@ -34,9 +34,8 @@ const OPTS = { key: 'k', tags: ['content-type:Article'], ttl: 3600 };
 describe('withTaggedCache', () => {
   it('returns the cached value and sets X-Cache: HIT without calling fn', async () => {
     const { event, headers } = makeEvent();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const mockGet = vi.fn(async () => ({ cached: true })) as any;
-    const cache = makeCache({ get: mockGet });
+    const cache = makeCache();
+    vi.mocked(cache.get).mockResolvedValue({ cached: true });
     const fn = vi.fn(async () => ({ cached: false }));
 
     const result = await withTaggedCache(event, OPTS, fn, cache);
@@ -96,6 +95,7 @@ describe('withTaggedCache', () => {
     const result = await withTaggedCache(event, OPTS, fn, cache);
 
     expect(result).toEqual({ data: 3 });
+    expect(fn).toHaveBeenCalledOnce();
     expect(headers['X-Cache']).toBe('MISS');
   });
 });
