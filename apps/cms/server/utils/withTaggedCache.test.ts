@@ -36,7 +36,6 @@ describe('withTaggedCache', () => {
     const { event, headers } = makeEvent();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const mockGet = vi.fn(async () => ({ cached: true })) as any;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const cache = makeCache({ get: mockGet });
     const fn = vi.fn(async () => ({ cached: false }));
 
