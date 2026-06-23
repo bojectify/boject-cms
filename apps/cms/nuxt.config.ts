@@ -101,6 +101,11 @@ export default defineNuxtConfig({
         driver: 'fs',
         base: './storage/images/transforms',
       },
+      // Mirror the prod `storage.cache` Redis mount in dev so integration tests
+      // that boot a Nitro dev server (setup({ dev: true })) get a real Redis-backed
+      // cache. Without this, Nitro dev mode falls back to an fs driver for the
+      // `cache` mount and `taggedCache.assertRedisInstance` throws.
+      cache: { driver: 'redis', url: process.env.REDIS_URL },
     },
     storage: {
       ...buildStorageConfig(),
