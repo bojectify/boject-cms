@@ -13,7 +13,6 @@ function makeEvent() {
         setHeader: (name: string, value: string) => {
           headers[name] = value;
         },
-        getHeader: (name: string) => headers[name],
       },
     },
   } as H3Event;
