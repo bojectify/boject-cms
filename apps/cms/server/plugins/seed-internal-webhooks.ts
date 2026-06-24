@@ -1,5 +1,6 @@
 import { prisma } from '../utils/prisma';
 import { ensureSearchSyncWebhook } from '../utils/ensureSearchSyncWebhook';
+import { ensureCacheInvalidationWebhook } from '../utils/ensureCacheInvalidationWebhook';
 
 // `prisma` and `ensureSearchSyncWebhook` are imported explicitly: Nuxt server
 // auto-imports do not reliably resolve inside `defineNitroPlugin` callbacks in
@@ -15,10 +16,11 @@ export default defineNitroPlugin(async () => {
   }
   try {
     await ensureSearchSyncWebhook(prisma);
+    await ensureCacheInvalidationWebhook(prisma);
   } catch (error) {
     // Non-fatal: a boot with the DB briefly unreachable must not crash the CMS.
     console.warn(
-      '[search] failed to seed the internal search-sync webhook:',
+      '[internal-webhooks] failed to seed internal webhooks:',
       error
     );
   }
