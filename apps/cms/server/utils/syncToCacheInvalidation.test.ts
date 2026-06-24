@@ -62,6 +62,14 @@ describe('syncToCacheInvalidation', () => {
     expect(calls).toEqual([]);
   });
 
+  it('is a no-op for a schema event missing contentTypeIdentifier', async () => {
+    const { calls, deps } = makeFakeCache();
+    await expect(
+      syncToCacheInvalidation(deps, { event: 'CONTENT_TYPE_SCHEMA_CHANGED' })
+    ).resolves.toBeUndefined();
+    expect(calls).toEqual([]);
+  });
+
   it('is a no-op (no throw) for a malformed entry payload missing the identifier', async () => {
     const { calls, deps } = makeFakeCache();
     await expect(

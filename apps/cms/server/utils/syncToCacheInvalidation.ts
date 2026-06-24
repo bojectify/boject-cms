@@ -21,7 +21,7 @@ function asString(value: unknown): string | undefined {
  * (internal-transport) worker records a retry/dead-letter. Unknown /
  * unsubscribed events and malformed payloads are a logged no-op (mirrors
  * syncToSearchIndex). The per-entry clear is a no-op today (no surface writes
- * entry:<id> tags yet) but ready for the single-entry endpoint + GraphQL (#260).
+ * entry:<Identifier>:<entryId> tags yet) but ready for the single-entry endpoint + GraphQL (#260).
  */
 export async function syncToCacheInvalidation(
   { cache }: CacheInvalidationDeps,
