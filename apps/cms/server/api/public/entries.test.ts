@@ -73,6 +73,7 @@ describe('/api/public/entries', async () => {
   // Prisma so we own every id and can scope assertions to them in the shared
   // boject_test DB.
   let PUB_IDENTIFIER: string;
+  let REL_IDENTIFIER: string;
   let pubContentTypeUuid: string;
   let relTargetTypeId: string;
   let relTargetEntryId: string;
@@ -111,6 +112,7 @@ describe('/api/public/entries', async () => {
       },
     });
     relTargetTypeId = relType.id;
+    REL_IDENTIFIER = relType.identifier; // a second content type with one PUBLISHED entry — the invalidation control
     const relEntry = await prisma.contentEntry.create({
       data: {
         contentTypeId: relTargetTypeId,
@@ -389,5 +391,115 @@ describe('/api/public/entries', async () => {
     } finally {
       await prisma.apiKey.delete({ where: { id: created.id } });
     }
+  });
+
+  describe('response caching', () => {
+    // Standalone DB-1 cache handle (same logical DB the booted Nitro server's
+    // useStorage('cache') targets — vitest.config sets REDIS_URL to DB 1 and the
+    // dev server inherits it). A base-less unstorage redis handle reads/writes
+    // the same raw keys the server's `cache` mount does, because Nitro strips
+    // the mount prefix before the driver. Mirrors taggedCache.integration.test.ts.
+    let cacheStorage: import('unstorage').Storage;
+    let cacheRedis: import('ioredis').Redis;
+    let cache: import('../../utils/taggedCache').TaggedCache;
+
+    beforeAll(async () => {
+      const { Redis } = await import('ioredis');
+      const { createStorage } = await import('unstorage');
+      const redisDriver = (await import('unstorage/drivers/redis')).default;
+      const { getTestRedisUrl } = await import('../../../test/redisUrl');
+      const { createTaggedCache } = await import('../../utils/taggedCache');
+      const url = getTestRedisUrl();
+      cacheStorage = createStorage({ driver: redisDriver({ url }) });
+      cacheRedis = new Redis(url);
+      cache = createTaggedCache({ storage: cacheStorage, redis: cacheRedis });
+    });
+
+    afterAll(async () => {
+      await cacheRedis.quit();
+      await cacheStorage.dispose();
+    });
+
+    // Serial integration project (fileParallelism:false) — no other file races
+    // this flush. Start every cache test from an empty DB 1.
+    beforeEach(async () => {
+      await cacheRedis.flushdb();
+    });
+
+    const authed = (path: string) =>
+      fetch(path, { headers: { Authorization: `Bearer ${TEST_API_KEY}` } });
+
+    it('serves a second identical request from cache (MISS then HIT, same body)', async () => {
+      const url = `/api/public/entries?contentType=${PUB_IDENTIFIER}&perPage=100`;
+
+      const first = await authed(url);
+      expect(first.headers.get('x-cache')).toBe('MISS');
+      const firstBody = await first.json();
+
+      const second = await authed(url);
+      expect(second.headers.get('x-cache')).toBe('HIT');
+      const secondBody = await second.json();
+
+      expect(secondBody).toEqual(firstBody);
+    });
+
+    it('invalidateByTag clears the cached response (next request is MISS again)', async () => {
+      const url = `/api/public/entries?contentType=${PUB_IDENTIFIER}&perPage=100`;
+
+      await authed(url); // MISS — warms the cache
+      expect((await authed(url)).headers.get('x-cache')).toBe('HIT');
+
+      await cache.invalidateByTag(`content-type:${PUB_IDENTIFIER}`);
+
+      expect((await authed(url)).headers.get('x-cache')).toBe('MISS');
+    });
+
+    it('invalidating one content type does not clear another', async () => {
+      const articleUrl = `/api/public/entries?contentType=${PUB_IDENTIFIER}&perPage=100`;
+      const otherUrl = `/api/public/entries?contentType=${REL_IDENTIFIER}&perPage=100`;
+
+      await authed(articleUrl); // warm both
+      await authed(otherUrl);
+      expect((await authed(articleUrl)).headers.get('x-cache')).toBe('HIT');
+      expect((await authed(otherUrl)).headers.get('x-cache')).toBe('HIT');
+
+      await cache.invalidateByTag(`content-type:${PUB_IDENTIFIER}`);
+
+      expect((await authed(articleUrl)).headers.get('x-cache')).toBe('MISS'); // cleared
+      expect((await authed(otherUrl)).headers.get('x-cache')).toBe('HIT'); // survived
+    });
+
+    it('distinct perPage / after produce distinct cache entries', async () => {
+      const p2 = `/api/public/entries?contentType=${PUB_IDENTIFIER}&perPage=2`;
+      const p3 = `/api/public/entries?contentType=${PUB_IDENTIFIER}&perPage=3`;
+
+      expect((await authed(p2)).headers.get('x-cache')).toBe('MISS');
+      expect((await authed(p3)).headers.get('x-cache')).toBe('MISS'); // different key
+      expect((await authed(p2)).headers.get('x-cache')).toBe('HIT'); // p2 still cached
+    });
+
+    it('an unknown contentType is not cached and writes no tag index', async () => {
+      const res = await authed(
+        '/api/public/entries?contentType=NoSuchTypeXYZ&perPage=100'
+      );
+      const body = await res.json();
+      expect(body.items).toEqual([]);
+
+      // No cache value and no tag-index set was minted for the bogus identifier.
+      expect(
+        await cache.get('public:entries:NoSuchTypeXYZ:perPage=100:after=')
+      ).toBeNull();
+      expect(
+        await cacheRedis.smembers('__tagindex:content-type:NoSuchTypeXYZ')
+      ).toEqual([]);
+    });
+
+    it('auth still gates a cacheable URL — an unauthenticated request 401s even after the entry is cached', async () => {
+      const url = `/api/public/entries?contentType=${PUB_IDENTIFIER}&perPage=100`;
+      await authed(url); // warm the cache
+
+      const res = await fetch(url); // no Authorization header
+      expect(res.status).toBe(401);
+    });
   });
 });
