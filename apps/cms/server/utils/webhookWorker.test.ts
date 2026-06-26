@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { resolvePublicHost } from './resolvePublicHost';
 import { runWorkerTick } from './webhookWorker';
+import { SEARCH_SYNC_WEBHOOK_NAME } from './ensureSearchSyncWebhook';
 
 vi.mock('./resolvePublicHost', async (importOriginal) => {
   const original = await importOriginal<typeof import('./resolvePublicHost')>();
@@ -34,6 +35,7 @@ type DeliveryRow = {
 };
 type WebhookRow = {
   id: string;
+  name: string;
   kind: 'EXTERNAL' | 'INTERNAL';
   url: string | null;
   secret: string | null;
@@ -95,6 +97,7 @@ describe('runWorkerTick', () => {
     webhooks = [
       {
         id: 'w1',
+        name: 'Test hook',
         kind: 'EXTERNAL',
         url: 'https://example.com/hook',
         secret: 'sek',
@@ -204,6 +207,7 @@ describe('runWorkerTick — DNS resolution + IP pinning', () => {
     webhooks = [
       {
         id: 'w1',
+        name: 'Test hook',
         kind: 'EXTERNAL',
         url: 'https://example.com/hook',
         secret: 'sek',
@@ -239,6 +243,7 @@ describe('runWorkerTick — DNS resolution + IP pinning', () => {
     webhooks = [
       {
         id: 'w1',
+        name: 'Test hook',
         kind: 'EXTERNAL',
         url: 'https://203.0.113.5/hook',
         secret: 'sek',
@@ -350,19 +355,27 @@ describe('runWorkerTick — DNS resolution + IP pinning', () => {
   });
 });
 
-describe('runWorkerTick — internal (search sync) dispatch', () => {
+describe('runWorkerTick — internal dispatch (registry routing)', () => {
   let deliveries: DeliveryRow[];
   let webhooks: WebhookRow[];
 
   beforeEach(() => {
     deliveries = [{ ...baseDelivery, webhookId: 'wi' }];
-    webhooks = [{ id: 'wi', kind: 'INTERNAL', url: null, secret: null }];
+    webhooks = [
+      {
+        id: 'wi',
+        name: SEARCH_SYNC_WEBHOOK_NAME,
+        kind: 'INTERNAL',
+        url: null,
+        secret: null,
+      },
+    ];
   });
 
   const okFetch = () =>
     vi.fn(async () => new Response('', { status: 200, statusText: 'OK' }));
 
-  it('calls syncToSearchIndex and marks SUCCESS without any HTTP fetch', async () => {
+  it('routes to the handler registered for the webhook name and marks SUCCESS without HTTP', async () => {
     const sync = vi.fn(async () => {});
     const fetchSpy = okFetch();
     const prisma = makeFakePrisma(deliveries, webhooks);
@@ -370,7 +383,7 @@ describe('runWorkerTick — internal (search sync) dispatch', () => {
       prisma,
       fetch: fetchSpy,
       now: () => new Date(),
-      syncToSearchIndex: sync,
+      internalHandlers: { [SEARCH_SYNC_WEBHOOK_NAME]: sync },
     });
     expect(sync).toHaveBeenCalledWith(deliveries[0]!.payload);
     expect(fetchSpy).not.toHaveBeenCalled();
@@ -380,7 +393,7 @@ describe('runWorkerTick — internal (search sync) dispatch', () => {
     expect(deliveries[0]!.nextAttemptAt).toBeNull();
   });
 
-  it('reschedules with backoff when syncToSearchIndex throws (attempts < MAX)', async () => {
+  it('reschedules with backoff when the handler throws (attempts < MAX)', async () => {
     const now = new Date('2026-04-22T12:00:00Z');
     const sync = vi.fn(async () => {
       throw new Error('meili down');
@@ -390,7 +403,7 @@ describe('runWorkerTick — internal (search sync) dispatch', () => {
       prisma,
       fetch: okFetch(),
       now: () => now,
-      syncToSearchIndex: sync,
+      internalHandlers: { [SEARCH_SYNC_WEBHOOK_NAME]: sync },
     });
     expect(deliveries[0]!.status).toBe('PENDING');
     expect(deliveries[0]!.attempts).toBe(1);
@@ -398,7 +411,7 @@ describe('runWorkerTick — internal (search sync) dispatch', () => {
     expect(deliveries[0]!.nextAttemptAt?.getTime()).toBe(now.getTime() + 1_000);
   });
 
-  it('dead-letters after MAX attempts when sync keeps throwing', async () => {
+  it('dead-letters after MAX attempts when the handler keeps throwing', async () => {
     deliveries[0]!.attempts = 5;
     const sync = vi.fn(async () => {
       throw new Error('still down');
@@ -408,16 +421,21 @@ describe('runWorkerTick — internal (search sync) dispatch', () => {
       prisma,
       fetch: okFetch(),
       now: () => new Date(),
-      syncToSearchIndex: sync,
+      internalHandlers: { [SEARCH_SYNC_WEBHOOK_NAME]: sync },
     });
     expect(deliveries[0]!.status).toBe('DEAD_LETTERED');
     expect(deliveries[0]!.attempts).toBe(6);
   });
 
-  it('dead-letters an internal delivery when no syncToSearchIndex dep is wired', async () => {
+  it('dead-letters an internal delivery whose webhook name has no registered handler', async () => {
     const prisma = makeFakePrisma(deliveries, webhooks);
-    await runWorkerTick({ prisma, fetch: okFetch(), now: () => new Date() });
+    await runWorkerTick({
+      prisma,
+      fetch: okFetch(),
+      now: () => new Date(),
+      internalHandlers: {}, // nothing registered for SEARCH_SYNC_WEBHOOK_NAME
+    });
     expect(deliveries[0]!.status).toBe('DEAD_LETTERED');
-    expect(deliveries[0]!.lastError).toContain('not configured');
+    expect(deliveries[0]!.lastError).toContain('No internal handler');
   });
 });

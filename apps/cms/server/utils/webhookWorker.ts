@@ -28,6 +28,7 @@ export interface WorkerPrisma {
   webhook: {
     findUnique: (args: { where: { id: string } }) => Promise<{
       id: string;
+      name: string;
       kind: 'EXTERNAL' | 'INTERNAL';
       url: string | null;
       secret: string | null;
@@ -56,11 +57,13 @@ export interface RunWorkerTickDeps {
    */
   allowPrivate?: boolean;
   /**
-   * Called for INTERNAL webhooks instead of an HTTP POST. The plugin injects a
-   * closure over the real prisma + entries index. Undefined in unit tests that
-   * don't exercise internal delivery (and in that case an internal row dead-letters).
+   * Handlers for INTERNAL webhooks, keyed by the webhook's (immutable) name.
+   * The plugin injects one closure per internal subscriber (search sync, cache
+   * invalidation). An internal delivery whose webhook name has no registered
+   * handler dead-letters rather than retry-storming. Undefined/empty in unit
+   * tests that don't exercise internal delivery.
    */
-  syncToSearchIndex?: (payload: unknown) => Promise<void>;
+  internalHandlers?: Record<string, (payload: unknown) => Promise<void>>;
 }
 
 const DEFAULT_BATCH = 10;
@@ -133,7 +136,7 @@ async function dispatch(
   const now = deps.now();
 
   if (webhook.kind === 'INTERNAL') {
-    return dispatchInternal(deps, row, attempts, now);
+    return dispatchInternal(deps, row, webhook.name, attempts, now);
   }
 
   // EXTERNAL rows must have a URL + secret (DB allows null only for INTERNAL).
@@ -277,18 +280,20 @@ async function dispatch(
 async function dispatchInternal(
   deps: RunWorkerTickDeps,
   row: DeliveryRow,
+  webhookName: string,
   attempts: number,
   now: Date
 ): Promise<void> {
-  if (!deps.syncToSearchIndex) {
-    // Infra not wired (shouldn't happen in production) — dead-letter rather
-    // than retry-storm against a permanently-missing handler.
+  const handler = deps.internalHandlers?.[webhookName];
+  if (!handler) {
+    // No handler registered for this internal webhook — dead-letter rather than
+    // retry-storm against a permanently-missing handler.
     await deps.prisma.webhookDelivery.update({
       where: { id: row.id },
       data: {
         status: 'DEAD_LETTERED',
         attempts,
-        lastError: 'Internal sync handler not configured',
+        lastError: `No internal handler registered for webhook "${webhookName}"`,
         completedAt: now,
         nextAttemptAt: null,
       },
@@ -298,7 +303,7 @@ async function dispatchInternal(
 
   let error: string | null = null;
   try {
-    await deps.syncToSearchIndex(row.payload);
+    await handler(row.payload);
   } catch (err) {
     error = err instanceof Error ? err.message.slice(0, 500) : String(err);
   }

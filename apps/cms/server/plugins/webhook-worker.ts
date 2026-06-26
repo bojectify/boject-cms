@@ -4,6 +4,10 @@ import { meili } from '../utils/meili';
 import { resolveEntriesIndex } from '../utils/searchIndex';
 import { syncToSearchIndex } from '../utils/syncToSearchIndex';
 import type { SearchDocument } from '../utils/searchDocument';
+import { SEARCH_SYNC_WEBHOOK_NAME } from '../utils/ensureSearchSyncWebhook';
+import { taggedCache } from '../utils/taggedCache';
+import { syncToCacheInvalidation } from '../utils/syncToCacheInvalidation';
+import { CACHE_INVALIDATION_WEBHOOK_NAME } from '../utils/ensureCacheInvalidationWebhook';
 
 // `prisma` is imported explicitly here because Nuxt server auto-imports do
 // not consistently resolve inside `defineNitroPlugin` callbacks in the
@@ -33,11 +37,15 @@ export default defineNitroPlugin((nitroApp) => {
     fetch: (url, init) =>
       fetch(url, init as RequestInit & { dispatcher?: unknown }),
     allowPrivate,
-    syncToSearchIndex: (payload) =>
-      syncToSearchIndex(
-        { prisma, index: meili.index<SearchDocument>(resolveEntriesIndex()) },
-        payload
-      ),
+    internalHandlers: {
+      [SEARCH_SYNC_WEBHOOK_NAME]: (payload) =>
+        syncToSearchIndex(
+          { prisma, index: meili.index<SearchDocument>(resolveEntriesIndex()) },
+          payload
+        ),
+      [CACHE_INVALIDATION_WEBHOOK_NAME]: (payload) =>
+        syncToCacheInvalidation({ cache: taggedCache }, payload),
+    },
   });
 
   nitroApp.hooks.hookOnce('close', () => {
