@@ -1,25 +1,34 @@
 import type { GraphQLSchema } from 'graphql';
-import { buildSchema } from './buildSchema';
+import { buildSchema, type BuiltSchema } from './buildSchema';
 
-let cachedSchema: GraphQLSchema | null = null;
-let buildPromise: Promise<GraphQLSchema> | null = null;
+let cached: BuiltSchema | null = null;
+let buildPromise: Promise<BuiltSchema> | null = null;
 
-export async function getSchema(): Promise<GraphQLSchema> {
-  if (cachedSchema) return cachedSchema;
-
-  // Prevent concurrent builds
+function build(): Promise<BuiltSchema> {
+  // Prevent concurrent builds.
   if (!buildPromise) {
-    buildPromise = buildSchema().then((schema) => {
-      cachedSchema = schema;
+    buildPromise = buildSchema().then((built) => {
+      cached = built;
       buildPromise = null;
-      return schema;
+      return built;
     });
   }
-
   return buildPromise;
 }
 
+export async function getSchema(): Promise<GraphQLSchema> {
+  if (cached) return cached.schema;
+  return (await build()).schema;
+}
+
+export async function getContentTypeIdentifierMap(): Promise<
+  Map<string, string>
+> {
+  if (cached) return cached.identifierById;
+  return (await build()).identifierById;
+}
+
 export function invalidateSchema(): void {
-  cachedSchema = null;
+  cached = null;
   buildPromise = null;
 }
