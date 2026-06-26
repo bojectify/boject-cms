@@ -15,6 +15,7 @@ import {
 } from '../../utils/rateLimitEndpoint';
 import { complexityYogaPlugin } from '../../utils/graphqlComplexity';
 import { rateLimitExtensionPlugin } from '../../utils/graphqlRateLimitExtensions';
+import { graphqlCachePlugin } from '../../utils/graphqlCachePlugin';
 import type { YogaServerContext } from '../../utils/yogaContext';
 
 const yoga = createYoga<YogaServerContext>({
@@ -25,6 +26,7 @@ const yoga = createYoga<YogaServerContext>({
     maxDepthPlugin({ n: 15 }),
     complexityYogaPlugin,
     rateLimitExtensionPlugin,
+    graphqlCachePlugin,
   ],
 });
 
@@ -81,6 +83,23 @@ export default defineEventHandler(async (event) => {
     }
 
     event.context.rateLimitSnapshot = snapshot;
+  }
+
+  // #260: authenticated requests are cache-eligible (every prod request; dev
+  // requests that carry a Bearer key). The dev-GraphiQL bypass above returns
+  // before this line, so it's never cached.
+  //
+  // Under VITEST the webhook worker that drives cache invalidation is
+  // test-guarded off, so caching by default would let a stale entry survive a
+  // mutation. Tests therefore opt in per request via the `x-boject-test-cache`
+  // header (value `1`), which is consulted ONLY under VITEST and is completely
+  // inert in every other environment.
+  if (process.env.VITEST === 'true') {
+    if (getRequestHeader(event, 'x-boject-test-cache') === '1') {
+      event.context.gqlCacheEligible = true;
+    }
+  } else {
+    event.context.gqlCacheEligible = true;
   }
 
   return yoga(req, res, { event });
