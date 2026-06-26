@@ -3,6 +3,8 @@ import {
   assertCacheConfigured,
   resolvePublicCacheTtl,
   DEFAULT_PUBLIC_CACHE_TTL,
+  resolveGraphqlCacheMaxBytes,
+  DEFAULT_GRAPHQL_CACHE_MAX_BYTES,
 } from './cacheConfig';
 
 describe('assertCacheConfigured', () => {
@@ -49,5 +51,27 @@ describe('resolvePublicCacheTtl', () => {
     expect(resolvePublicCacheTtl('-5')).toBe(3600);
     expect(resolvePublicCacheTtl('abc')).toBe(3600);
     expect(resolvePublicCacheTtl('')).toBe(3600);
+  });
+});
+
+describe('resolveGraphqlCacheMaxBytes', () => {
+  it('defaults when unset', () => {
+    expect(resolveGraphqlCacheMaxBytes(undefined)).toBe(
+      DEFAULT_GRAPHQL_CACHE_MAX_BYTES
+    );
+  });
+  it('uses a positive override', () => {
+    expect(resolveGraphqlCacheMaxBytes('2048')).toBe(2048);
+  });
+  it('falls back on non-numeric / zero / negative', () => {
+    expect(resolveGraphqlCacheMaxBytes('abc')).toBe(
+      DEFAULT_GRAPHQL_CACHE_MAX_BYTES
+    );
+    expect(resolveGraphqlCacheMaxBytes('0')).toBe(
+      DEFAULT_GRAPHQL_CACHE_MAX_BYTES
+    );
+    expect(resolveGraphqlCacheMaxBytes('-5')).toBe(
+      DEFAULT_GRAPHQL_CACHE_MAX_BYTES
+    );
   });
 });
