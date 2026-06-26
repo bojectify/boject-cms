@@ -3,6 +3,7 @@ import type { ContentStatusEnumRef } from './types/contentStatus';
 import { resolveOffsetConnection } from '@pothos/plugin-relay';
 import { prisma } from '../utils/prisma';
 import { parseFieldOptions } from '../../utils/fieldOptions';
+import { recordResolvedEntry } from '../utils/entryTagCollector';
 import { collectRichtextReferences } from '../utils/collectRichtextReferences';
 import {
   registerDynamicFilterInputs,
@@ -70,6 +71,9 @@ function flattenToShape(
     updatedAt: Date;
   }
 ): ContentEntryShape {
+  // #260: harvest this entry's (contentTypeId, id) for cache tagging. No-op
+  // unless a cache-plugin collection scope is active around execution.
+  recordResolvedEntry(entry.contentTypeId, entry.id);
   return {
     id: entry.id,
     contentTypeId: entry.contentTypeId,
