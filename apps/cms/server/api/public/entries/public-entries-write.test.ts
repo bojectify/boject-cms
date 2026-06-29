@@ -190,4 +190,22 @@ describe('/api/public/entries (write surface)', async () => {
     });
     expect(res.status).toBe(400);
   });
+
+  it('DELETE removes the entry and 204s', async () => {
+    const created = await fetch('/api/public/entries', {
+      method: 'POST', headers: bearer,
+      body: JSON.stringify({ contentTypeId, data: { title: `Del ${sfx}-${randomUUID().slice(0,6)}` } }),
+    });
+    const { id } = (await created.json()) as { id: string };
+    const res = await fetch(`/api/public/entries/${id}`, { method: 'DELETE', headers: bearer });
+    expect(res.status).toBe(204);
+    // second delete 404s (gone)
+    const again = await fetch(`/api/public/entries/${id}`, { method: 'DELETE', headers: bearer });
+    expect(again.status).toBe(404);
+  });
+
+  it('DELETE 404s an unknown id', async () => {
+    const res = await fetch(`/api/public/entries/${randomUUID()}`, { method: 'DELETE', headers: bearer });
+    expect(res.status).toBe(404);
+  });
 });

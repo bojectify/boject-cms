@@ -1,14 +1,7 @@
-import type { ContentEntryVersion } from '#prisma';
 import { assertUuid } from '../../utils/validation';
-import { withPrismaErrors } from '../../utils/prismaErrors';
-import { enforceMutationRateLimit } from '../../utils/rateLimitEndpoint';
-import {
-  enqueueWebhookDeliveries,
-  enqueueEntryDraftSync,
-} from '../../utils/webhooks';
-import { getPublishedVersion } from '../../utils/resolveVersion';
 import { assertApiKeyScope } from '../../utils/assertApiKeyScope';
-import { CONTENT_STATUSES } from '../../../utils/contentStatus';
+import { enforceMutationRateLimit } from '../../utils/rateLimitEndpoint';
+import { deleteEntry } from '../../utils/deleteEntry';
 
 export default defineEventHandler(async (event) => {
   assertApiKeyScope(event, 'content:write');
@@ -29,40 +22,6 @@ export default defineEventHandler(async (event) => {
     });
   }
 
-  const publishedVersion: ContentEntryVersion | null = getPublishedVersion(
-    existing.versions
-  );
-
-  await withPrismaErrors(
-    () =>
-      prisma.$transaction(async (tx) => {
-        if (publishedVersion) {
-          await enqueueWebhookDeliveries(tx, {
-            event: 'ENTRY_DELETED',
-            contentType: existing.contentType,
-            entry: {
-              id: existing.id,
-              entryTitle: existing.entryTitle,
-              slug: existing.slug,
-              status: CONTENT_STATUSES.PUBLISHED,
-              publishedAt: publishedVersion.publishedAt,
-              createdAt: existing.createdAt,
-              updatedAt: existing.updatedAt,
-              data: publishedVersion.data,
-            },
-          });
-        } else {
-          // Draft-only delete: ENTRY_DELETED never fires here, so use the
-          // internal trigger to prune the entry's draft doc from the index.
-          await enqueueEntryDraftSync(tx, {
-            contentType: { id: existing.contentType.id },
-            entryId: existing.id,
-          });
-        }
-        await tx.contentEntry.delete({ where: { id } });
-      }),
-    { notFoundMessage: 'Content entry not found' }
-  );
-
+  await deleteEntry(existing);
   return { success: true };
 });
