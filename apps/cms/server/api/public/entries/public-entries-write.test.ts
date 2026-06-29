@@ -91,4 +91,44 @@ describe('/api/public/entries (write surface)', async () => {
     expect(body.data?.error).toBe('INSUFFICIENT_SCOPE');
     expect(body.data?.required).toBe('content:write');
   });
+
+  it('PUT replaces data as a CHANGED draft when published, returns it', async () => {
+    // seed a published entry
+    const created = await fetch('/api/public/entries', {
+      method: 'POST', headers: bearer,
+      body: JSON.stringify({ contentTypeId, publish: true, data: { title: `Put ${sfx}-${randomUUID().slice(0,6)}`, summary: 'orig' } }),
+    });
+    const { id } = (await created.json()) as { id: string };
+
+    const res = await fetch(`/api/public/entries/${id}`, {
+      method: 'PUT', headers: bearer,
+      body: JSON.stringify({ data: { title: `Put2 ${sfx}-${randomUUID().slice(0,6)}`, summary: 'replaced' } }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { status: string; data: Record<string, unknown> };
+    expect(body.status).toBe('CHANGED');
+    expect(body.data.summary).toBe('replaced');
+  });
+
+  it('PUT with publish:true publishes the full body', async () => {
+    const created = await fetch('/api/public/entries', {
+      method: 'POST', headers: bearer,
+      body: JSON.stringify({ contentTypeId, data: { title: `PutPub ${sfx}-${randomUUID().slice(0,6)}` } }),
+    });
+    const { id } = (await created.json()) as { id: string };
+    const res = await fetch(`/api/public/entries/${id}`, {
+      method: 'PUT', headers: bearer,
+      body: JSON.stringify({ publish: true, data: { title: `PutPub2 ${sfx}-${randomUUID().slice(0,6)}`, summary: 'live' } }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { status: string };
+    expect(body.status).toBe('PUBLISHED');
+  });
+
+  it('PUT 404s an unknown id', async () => {
+    const res = await fetch(`/api/public/entries/${randomUUID()}`, {
+      method: 'PUT', headers: bearer, body: JSON.stringify({ data: { title: 'x' } }),
+    });
+    expect(res.status).toBe(404);
+  });
 });
