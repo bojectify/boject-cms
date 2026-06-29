@@ -1,8 +1,9 @@
-// Scenario 2 — REST CRUD churn for the rate-limit + write path.
-// 10 VUs run interleaved create / read / delete iterations against
-// /api/entries. PERF_CRUD_N controls the number of items per
-// phase (default 10000). Uses Bearer API key auth — requires the key
-// to carry content:write. CSRF middleware bypasses Bearer-authed
+// Scenario 2 — public-write CRUD churn for the rate-limit + write path.
+// 10 VUs run interleaved create / read / delete iterations against the public
+// namespace (/api/public/entries). PERF_CRUD_N controls the number of items per
+// phase (default 10000). Uses Bearer API key auth — the key must carry
+// content:write (create/delete), content:read (the public list read), and
+// schema:read (content-type discovery). CSRF middleware bypasses Bearer-authed
 // requests so no Origin threading is needed.
 // Requires the perf DB seeded and a valid PERF_API_KEY in scope.
 import http from 'k6/http';
@@ -18,6 +19,7 @@ import {
 } from '../lib/metrics-k6.ts';
 
 const N = Number(__ENV.PERF_CRUD_N ?? '10000');
+const IDENTIFIER = __ENV.PERF_CONTENT_TYPE ?? 'PerfArticle';
 
 export const options = {
   scenarios: {
@@ -33,24 +35,31 @@ export const options = {
 
 interface SetupData {
   contentTypeId: string;
+  identifier: string;
 }
 
 export function setup(): SetupData {
   const cfg = loadK6Config();
   const headers = apiKeyHeaders();
 
-  // Find the PerfArticle content type id
-  const res = http.get(`${cfg.baseUrl}/api/content-types`, { headers });
-  const body = res.json() as {
-    items: Array<{ id: string; identifier: string }>;
+  // Discover the content-type UUID via the schema export (portable=false
+  // preserves real UUIDs) — a schema:read management endpoint, NOT the admin
+  // content surface, so perf needs no admin-content token (#395/#257).
+  const res = http.get(`${cfg.baseUrl}/api/schema/export?portable=false`, {
+    headers,
+  });
+  const bundle = res.json() as {
+    contentTypes?: Array<{ id: string | null; identifier: string }>;
   };
-  const ct = body.items.find((t) => t.identifier === 'PerfArticle');
-  if (!ct) {
+  const ct = (bundle.contentTypes ?? []).find(
+    (t) => t.identifier === IDENTIFIER
+  );
+  if (!ct || !ct.id) {
     throw new Error(
-      'PerfArticle content type not found — run `pnpm perf:seed --size=1` first'
+      `${IDENTIFIER} content type not found in schema export — run \`pnpm perf:seed --size=1\` first`
     );
   }
-  return { contentTypeId: ct.id };
+  return { contentTypeId: ct.id, identifier: IDENTIFIER };
 }
 
 export default function crud(data: SetupData) {
@@ -67,6 +76,10 @@ export default function crud(data: SetupData) {
     group('create', () => {
       const body = {
         contentTypeId: data.contentTypeId,
+        // Publish so the entry is PUBLISHED → visible to the public read list
+        // (the public namespace is PUBLISHED-only). Exercises the publish path
+        // + cache invalidation — the production-representative workload.
+        publish: true,
         data: {
           title: `CRUD ${__VU}-${iter}-${Date.now()}`,
           slug: `crud-${__VU}-${iter}-${Date.now()}`,
@@ -84,7 +97,7 @@ export default function crud(data: SetupData) {
         },
       };
       const res = http.post(
-        `${cfg.baseUrl}/api/entries`,
+        `${cfg.baseUrl}/api/public/entries`,
         JSON.stringify(body),
         { headers, tags: { phase: 'create' } }
       );
@@ -97,24 +110,13 @@ export default function crud(data: SetupData) {
 
   if (phase === 1) {
     group('read', () => {
-      const list = http.get(
-        `${cfg.baseUrl}/api/entries?contentTypeId=${data.contentTypeId}&perPage=1`,
-        { headers, tags: { phase: 'list' } }
+      // No single-entry public read exists; the cached public LIST is the read.
+      // crudReadLatency now measures the list GET (a list read, not by-id).
+      const res = http.get(
+        `${cfg.baseUrl}/api/public/entries?contentType=${data.identifier}&perPage=1`,
+        { headers, tags: { phase: 'read' } }
       );
-      if (list.status !== 200) {
-        unexpectedErrors.add(1);
-        return;
-      }
-      const items = (list.json() as { items: Array<{ id: string }> }).items;
-      if (items.length === 0) return;
-      const res = http.get(`${cfg.baseUrl}/api/entries/${items[0]!.id}`, {
-        headers,
-        tags: { phase: 'read' },
-      });
       crudReadLatency.add(res.timings.duration);
-      // 404 here means another VU's delete reached the same head item first.
-      // That's a normal race under load, not an unexpected error.
-      if (res.status === 404) return;
       if (res.status < 200 || res.status >= 300) unexpectedErrors.add(1);
     });
     return;
@@ -122,7 +124,7 @@ export default function crud(data: SetupData) {
 
   group('delete', () => {
     const list = http.get(
-      `${cfg.baseUrl}/api/entries?contentTypeId=${data.contentTypeId}&perPage=1`,
+      `${cfg.baseUrl}/api/public/entries?contentType=${data.identifier}&perPage=1`,
       { headers, tags: { phase: 'list' } }
     );
     if (list.status !== 200) {
@@ -131,10 +133,11 @@ export default function crud(data: SetupData) {
     }
     const items = (list.json() as { items: Array<{ id: string }> }).items;
     if (items.length === 0) return;
-    const res = http.del(`${cfg.baseUrl}/api/entries/${items[0]!.id}`, null, {
-      headers,
-      tags: { phase: 'delete' },
-    });
+    const res = http.del(
+      `${cfg.baseUrl}/api/public/entries/${items[0]!.id}`,
+      null,
+      { headers, tags: { phase: 'delete' } }
+    );
     crudDeleteLatency.add(res.timings.duration);
     if (res.status === 429) intentional429s.add(1);
     // 404 here means another VU already deleted the same head item.
