@@ -3,6 +3,7 @@ const API_KEY_WRITABLE_PATHS = new Set([
   '/api/apikeys',
   '/api/entries',
   '/api/content-bundle',
+  '/api/public/entries',
 ]);
 
 function isApiKeyWritablePath(path: string): boolean {
