@@ -1,20 +1,12 @@
-import type { Prisma } from '#prisma';
 import { assertUuid } from '../../utils/validation';
-import { translatePrismaError } from '../../utils/prismaErrors';
 import { enforceMutationRateLimit } from '../../utils/rateLimitEndpoint';
 import { assertApiKeyScope } from '../../utils/assertApiKeyScope';
-import { applyFieldDefaults } from '../../utils/applyFieldDefaults';
-import { validateAndEnrichEntryData } from '../../utils/validateAndEnrichEntryData';
-import {
-  enqueueWebhookDeliveries,
-  enqueueEntryDraftSync,
-} from '../../utils/webhooks';
+import { createEntry } from '../../utils/createEntry';
 import {
   flattenEntryWithVersion,
   getPublishedVersion,
   isCmsRequest,
 } from '../../utils/resolveVersion';
-import { slugify } from '../../../utils/slugify';
 import {
   CONTENT_STATUSES,
   CONTENT_STATUS_NAMES,
@@ -46,143 +38,12 @@ export default defineEventHandler(async (event) => {
       ? (body.data as Record<string, unknown>)
       : {};
 
-  const dataWithDefaults = applyFieldDefaults(rawData, contentType.fields);
-  const enrichedData = await validateAndEnrichEntryData(
-    contentType,
-    dataWithDefaults
-  );
-  const slug = extractSlug(enrichedData, contentType.fields);
-  const entryTitle = extractEntryTitle(enrichedData, contentType.fields);
-
-  const entryKey = slugify(entryTitle);
-  if (entryKey === '') {
-    throw createError({
-      statusCode: 400,
-      statusMessage: 'entryTitle contains no slug-safe characters',
-      data: {
-        error: 'ENTRY_KEY_EMPTY',
-        message:
-          'entryTitle must contain at least one alphanumeric character to derive an entryKey.',
-      },
-    });
-  }
-
-  const conflict = await prisma.contentEntry.findFirst({
-    where: { contentTypeId, entryKey },
-    select: { id: true, entryTitle: true },
-  });
-  if (conflict) {
-    throw createError({
-      statusCode: 409,
-      statusMessage: 'entryKey conflict',
-      data: {
-        error: 'ENTRY_KEY_CONFLICT',
-        entryKey,
-        conflictingEntryId: conflict.id,
-        conflictingEntryTitle: conflict.entryTitle,
-        message: 'Adjust entryTitle to produce a different entryKey.',
-      },
-    });
-  }
-
   let status: ContentStatusName = CONTENT_STATUSES.DRAFT;
   if (typeof body.status === 'string' && VALID_STATUSES.has(body.status)) {
     status = body.status as ContentStatusName;
   }
 
-  let created;
-  try {
-    created = await prisma.$transaction(async (tx) => {
-      const entry = await tx.contentEntry.create({
-        data: {
-          contentTypeId,
-          entryTitle,
-          entryKey,
-          slug,
-          versions: {
-            create: {
-              data: enrichedData as Prisma.InputJsonValue,
-              entryTitle,
-              status,
-              publishedAt:
-                status === CONTENT_STATUSES.PUBLISHED ? new Date() : undefined,
-            },
-          },
-        },
-        include: { versions: true },
-      });
-
-      // A brand-new entry published in one step must fire ENTRY_PUBLISHED too,
-      // exactly like the PUT [id] publish path — otherwise the search-index
-      // sync and external subscribers never see it (#330).
-      if (status === CONTENT_STATUSES.PUBLISHED) {
-        const version = entry.versions[0]!;
-        await enqueueWebhookDeliveries(tx, {
-          event: 'ENTRY_PUBLISHED',
-          contentType: {
-            id: contentType.id,
-            identifier: contentType.identifier,
-          },
-          entry: {
-            id: entry.id,
-            entryTitle,
-            slug,
-            status: CONTENT_STATUSES.PUBLISHED,
-            publishedAt: version.publishedAt,
-            createdAt: entry.createdAt,
-            updatedAt: entry.updatedAt,
-            data: version.data,
-          },
-        });
-      } else {
-        // DRAFT entry: the search index hears this only via the internal trigger.
-        await enqueueEntryDraftSync(tx, {
-          contentType: { id: contentType.id },
-          entryId: entry.id,
-        });
-      }
-
-      return entry;
-    });
-  } catch (err) {
-    // Race: another request inserted the same entryKey between our pre-check
-    // and create. Surface the same structured 409 the pre-check would have.
-    if (
-      typeof err === 'object' &&
-      err !== null &&
-      'code' in err &&
-      (err as { code: string }).code === 'P2002'
-    ) {
-      const target = (err as { meta?: { target?: string[] | string } }).meta
-        ?.target;
-      const targets = Array.isArray(target)
-        ? target
-        : typeof target === 'string'
-          ? [target]
-          : [];
-      if (targets.includes('entryKey')) {
-        const raceConflict = await prisma.contentEntry.findFirst({
-          where: { contentTypeId, entryKey },
-          select: { id: true, entryTitle: true },
-        });
-        throw createError({
-          statusCode: 409,
-          statusMessage: 'entryKey conflict',
-          data: {
-            error: 'ENTRY_KEY_CONFLICT',
-            entryKey,
-            conflictingEntryId: raceConflict?.id ?? null,
-            conflictingEntryTitle: raceConflict?.entryTitle ?? null,
-            message: 'Adjust entryTitle to produce a different entryKey.',
-          },
-        });
-      }
-    }
-    throw translatePrismaError(err, {
-      uniqueMessage:
-        'An entry with this slug, title, or entryKey already exists for this content type',
-    });
-  }
+  const created = await createEntry(contentType, rawData, { status });
 
   setResponseStatus(event, 201);
 
