@@ -131,4 +131,63 @@ describe('/api/public/entries (write surface)', async () => {
     });
     expect(res.status).toBe(404);
   });
+
+  it('PATCH merges a partial body onto the working version', async () => {
+    const created = await fetch('/api/public/entries', {
+      method: 'POST', headers: bearer,
+      body: JSON.stringify({ contentTypeId, publish: true, data: { title: `Pat ${sfx}-${randomUUID().slice(0,6)}`, summary: 'keep' } }),
+    });
+    const { id } = (await created.json()) as { id: string };
+    // PATCH only summary; title must survive (PATCH onto PUBLISHED-only ⇒ CHANGED = PUBLISHED+patch)
+    const res = await fetch(`/api/public/entries/${id}`, {
+      method: 'PATCH', headers: bearer,
+      body: JSON.stringify({ data: { summary: 'patched' } }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { status: string; data: Record<string, unknown> };
+    expect(body.status).toBe('CHANGED');
+    expect(body.data.summary).toBe('patched');
+    expect(body.data.title).toBeTruthy(); // untouched, preserved from PUBLISHED base
+  });
+
+  it('PATCH null clears an optional field', async () => {
+    const created = await fetch('/api/public/entries', {
+      method: 'POST', headers: bearer,
+      body: JSON.stringify({ contentTypeId, data: { title: `Clr ${sfx}-${randomUUID().slice(0,6)}`, summary: 'had value' } }),
+    });
+    const { id } = (await created.json()) as { id: string };
+    const res = await fetch(`/api/public/entries/${id}`, {
+      method: 'PATCH', headers: bearer, body: JSON.stringify({ data: { summary: null } }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { data: Record<string, unknown> };
+    expect(body.data.summary ?? null).toBeNull();
+  });
+
+  it('PATCH rejects an unknown field with 400 UNKNOWN_FIELD', async () => {
+    const created = await fetch('/api/public/entries', {
+      method: 'POST', headers: bearer,
+      body: JSON.stringify({ contentTypeId, data: { title: `Unk ${sfx}-${randomUUID().slice(0,6)}` } }),
+    });
+    const { id } = (await created.json()) as { id: string };
+    const res = await fetch(`/api/public/entries/${id}`, {
+      method: 'PATCH', headers: bearer, body: JSON.stringify({ data: { nope: 1 } }),
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { data?: { error?: string; field?: string } };
+    expect(body.data?.error).toBe('UNKNOWN_FIELD');
+    expect(body.data?.field).toBe('nope');
+  });
+
+  it('PATCH clearing a required field 400s (validated against the merged result)', async () => {
+    const created = await fetch('/api/public/entries', {
+      method: 'POST', headers: bearer,
+      body: JSON.stringify({ contentTypeId, data: { title: `Req ${sfx}-${randomUUID().slice(0,6)}` } }),
+    });
+    const { id } = (await created.json()) as { id: string };
+    const res = await fetch(`/api/public/entries/${id}`, {
+      method: 'PATCH', headers: bearer, body: JSON.stringify({ data: { title: null } }),
+    });
+    expect(res.status).toBe(400);
+  });
 });
