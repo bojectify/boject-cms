@@ -5,7 +5,13 @@ import { registerDynamicTypes } from './dynamicTypes';
 import { registerSearchQuery } from './searchQuery';
 import { prisma } from '../utils/prisma';
 
-export async function buildSchema(): Promise<GraphQLSchema> {
+export interface BuiltSchema {
+  schema: GraphQLSchema;
+  /** contentTypeId (UUID) → PascalCase identifier, for cache tag formatting. */
+  identifierById: Map<string, string>;
+}
+
+export async function buildSchema(): Promise<BuiltSchema> {
   const builder = createBuilder();
 
   // Query root must be declared so Pothos (and the Relay plugin) have a
@@ -20,5 +26,9 @@ export async function buildSchema(): Promise<GraphQLSchema> {
   registerDynamicTypes(builder, contentTypes, ContentStatusEnum);
   registerSearchQuery(builder);
 
-  return builder.toSchema();
+  const identifierById = new Map(
+    contentTypes.map((ct) => [ct.id, ct.identifier])
+  );
+
+  return { schema: builder.toSchema(), identifierById };
 }

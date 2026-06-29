@@ -69,7 +69,15 @@ function underCapQuery(identifier: string): string {
 }
 
 describe('GraphQL complexity scoring (#122) — default cap', async () => {
-  await setup({ dev: true });
+  // Pin the cap to the documented default (1000) on the booted server so this
+  // suite is independent of any BOJECT_GRAPHQL_COMPLEXITY_MAX_COST a developer
+  // sets in their local .env (a raised cap would stop the over-cap query below
+  // from tripping and silently break this test). setup({ env }) injects into
+  // the dev server's process.env, which wins over the .env-loaded value.
+  await setup({
+    dev: true,
+    env: { BOJECT_GRAPHQL_COMPLEXITY_MAX_COST: '1000' },
+  });
 
   let identifier: string;
   beforeAll(async () => {
