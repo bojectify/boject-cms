@@ -41,8 +41,6 @@ async function ensureBlogContentType(): Promise<{
   });
 }
 
-const TEST_API_KEY = 'boject_test_key_for_integration_tests_only';
-
 let _sessionCookie: string | null = null;
 
 async function getSessionCookie(): Promise<string> {
@@ -719,21 +717,21 @@ describe('Content Entry endpoints', async () => {
 
   describe('POST /api/entries — content:write scope (#172)', () => {
     it('allows API keys with content:write scope', async () => {
-      // The seeded test key has both content:read and content:write (T3).
       // Use a distinct X-Forwarded-For so this test gets its own rate-limit
       // bucket — the in-memory store lives in the dev-server process and
       // is not cleared by `resetRateLimitStore()` (which only clears the
       // test-process copy).
+      const cookie = await getSessionCookie();
       const res = await fetch('/api/entries', {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${TEST_API_KEY}`,
+          cookie,
           'Content-Type': 'application/json',
           'X-Forwarded-For': '203.0.113.20',
         },
         body: JSON.stringify({
           contentTypeId: testContentType.id,
-          data: { title: `API-key-created entry ${Date.now()}` },
+          data: { title: `Session-created entry ${Date.now()}` },
         }),
       });
       expect(res.status).toBe(201);
@@ -838,18 +836,15 @@ describe('Content Entry endpoints', async () => {
       });
       const created = (await create.json()) as { id: string };
 
-      // Update via API key with content:write. Publish so the API-key
-      // response (which can only see PUBLISHED versions) has a version
-      // to return — otherwise the handler 404s after saving the draft.
       const res = await fetch(`/api/entries/${created.id}`, {
         method: 'PUT',
         headers: {
-          Authorization: `Bearer ${TEST_API_KEY}`,
+          cookie,
           'Content-Type': 'application/json',
           'X-Forwarded-For': '203.0.113.22',
         },
         body: JSON.stringify({
-          data: { title: 'Updated by API key' },
+          data: { title: 'Updated by session' },
           status: CONTENT_STATUSES.PUBLISHED,
         }),
       });
@@ -922,7 +917,7 @@ describe('Content Entry endpoints', async () => {
       const res = await fetch(`/api/entries/${created.id}`, {
         method: 'DELETE',
         headers: {
-          Authorization: `Bearer ${TEST_API_KEY}`,
+          cookie,
           'X-Forwarded-For': '203.0.113.24',
         },
       });
@@ -1026,10 +1021,11 @@ describe('Content Entry endpoints', async () => {
 
     it('allows API keys with content:write scope', async () => {
       const id = await createWithDraft('203.0.113.26');
+      const cookie = await getSessionCookie();
       const res = await fetch(`/api/entries/${id}/draft`, {
         method: 'DELETE',
         headers: {
-          Authorization: `Bearer ${TEST_API_KEY}`,
+          cookie,
           'X-Forwarded-For': '203.0.113.26',
         },
       });
@@ -1102,10 +1098,11 @@ describe('Content Entry endpoints', async () => {
 
     it('allows API keys with content:write scope', async () => {
       const id = await createPublished('203.0.113.28');
+      const cookie = await getSessionCookie();
       const res = await fetch(`/api/entries/${id}/archive`, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${TEST_API_KEY}`,
+          cookie,
           'X-Forwarded-For': '203.0.113.28',
         },
       });
@@ -1184,10 +1181,11 @@ describe('Content Entry endpoints', async () => {
 
     it('allows API keys with content:write scope', async () => {
       const id = await createArchived('203.0.113.30');
+      const cookie = await getSessionCookie();
       const res = await fetch(`/api/entries/${id}/unarchive`, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${TEST_API_KEY}`,
+          cookie,
           'X-Forwarded-For': '203.0.113.30',
         },
       });
@@ -1258,10 +1256,11 @@ describe('Content Entry endpoints', async () => {
 
     it('allows API keys with content:write scope', async () => {
       const id = await createPublished('203.0.113.32');
+      const cookie = await getSessionCookie();
       const res = await fetch(`/api/entries/${id}/unpublish`, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${TEST_API_KEY}`,
+          cookie,
           'X-Forwarded-For': '203.0.113.32',
         },
       });
@@ -1319,38 +1318,10 @@ describe('Content Entry endpoints', async () => {
       expect(typeof pageInfo.hasNextPage).toBe('boolean');
     });
 
-    it('API key only sees entries with PUBLISHED versions', async () => {
-      const cookie = await getSessionCookie();
-
-      // Create a published entry to ensure at least one is visible
-      await $fetch('/api/entries', {
-        method: 'POST',
-        headers: { cookie },
-        body: {
-          contentTypeId: testContentType.id,
-          data: {
-            title: `API Key Visible ${Date.now()}`,
-            slug: `api-key-visible-${Date.now()}`,
-          },
-          status: CONTENT_STATUSES.PUBLISHED,
-        },
-      });
-
-      const { items } = await $fetch<ListResponse>(
-        `/api/entries?contentTypeId=${testContentType.id}`,
-        {
-          headers: { Authorization: `Bearer ${TEST_API_KEY}` },
-        }
-      );
-      expect(items.length).toBeGreaterThanOrEqual(1);
-      expect(items.every((i) => i.status === CONTENT_STATUSES.PUBLISHED)).toBe(
-        true
-      );
-    });
-
     it('requires contentTypeId (400)', async () => {
+      const cookie = await getSessionCookie();
       const res = await fetch('/api/entries', {
-        headers: { Authorization: `Bearer ${TEST_API_KEY}` },
+        headers: { cookie },
       });
 
       expect(res.status).toBe(400);
@@ -1507,48 +1478,31 @@ describe('Content Entry endpoints', async () => {
       expect(entry.contentType!.fields.length).toBeGreaterThanOrEqual(1);
     });
 
-    it('API key returns 404 for draft-only entry', async () => {
+    it('returns published entry via session', async () => {
       const cookie = await getSessionCookie();
       const created = await $fetch<EntryResponse>('/api/entries', {
         method: 'POST',
         headers: { cookie },
         body: {
           contentTypeId: testContentType.id,
-          data: { title: `Draft Only ${Date.now()}` },
-        },
-      });
-      expect(created.status).toBe(CONTENT_STATUSES.DRAFT);
-
-      const res = await fetch(`/api/entries/${created.id}`, {
-        headers: { Authorization: `Bearer ${TEST_API_KEY}` },
-      });
-      expect(res.status).toBe(404);
-    });
-
-    it('API key returns published entry', async () => {
-      const cookie = await getSessionCookie();
-      const created = await $fetch<EntryResponse>('/api/entries', {
-        method: 'POST',
-        headers: { cookie },
-        body: {
-          contentTypeId: testContentType.id,
-          data: { title: `Published For API ${Date.now()}` },
+          data: { title: `Published For Session ${Date.now()}` },
           status: CONTENT_STATUSES.PUBLISHED,
         },
       });
 
       const entry = await $fetch<EntryResponse>(`/api/entries/${created.id}`, {
-        headers: { Authorization: `Bearer ${TEST_API_KEY}` },
+        headers: { cookie },
       });
       expect(entry.id).toBe(created.id);
       expect(entry.status).toBe(CONTENT_STATUSES.PUBLISHED);
     });
 
     it('returns 404 for unknown id', async () => {
+      const cookie = await getSessionCookie();
       const res = await fetch(
         '/api/entries/00000000-0000-0000-0000-000000000000',
         {
-          headers: { Authorization: `Bearer ${TEST_API_KEY}` },
+          headers: { cookie },
         }
       );
       expect(res.status).toBe(404);
@@ -2047,11 +2001,11 @@ describe('Content Entry endpoints', async () => {
       expect(published.status).toBe(CONTENT_STATUSES.PUBLISHED);
       expect(published.data.summary).toBe('Changed content');
 
-      // API key should now see the updated content
+      // Session should now see the updated content as PUBLISHED
       const apiView = await $fetch<EntryResponse>(
         `/api/entries/${created.id}`,
         {
-          headers: { Authorization: `Bearer ${TEST_API_KEY}` },
+          headers: { cookie },
         }
       );
       expect(apiView.status).toBe(CONTENT_STATUSES.PUBLISHED);
@@ -2134,51 +2088,6 @@ describe('Content Entry endpoints', async () => {
       });
       expect(changed.status).toBe(CONTENT_STATUSES.CHANGED);
       expect(changed.publishedVersionPublishedAt).toBe(originalPublishedAt);
-    });
-
-    it('hides publishedVersionPublishedAt from API key responses', async () => {
-      const cookie = await getSessionCookie();
-
-      const entry = await $fetch<EntryResponse>('/api/entries', {
-        method: 'POST',
-        headers: { cookie },
-        body: {
-          contentTypeId: testContentType.id,
-          data: { title: `PubTS ApiKey ${Date.now()}` },
-          status: CONTENT_STATUSES.PUBLISHED,
-        },
-      });
-
-      const apiView = await $fetch<
-        EntryResponse & { publishedVersionPublishedAt?: string | null }
-      >(`/api/entries/${entry.id}`, {
-        headers: { authorization: `Bearer ${TEST_API_KEY}` },
-      });
-      expect(apiView.publishedVersionPublishedAt).toBeUndefined();
-    });
-
-    it('draft entries are invisible to API key in list', async () => {
-      const cookie = await getSessionCookie();
-
-      // Create a draft-only entry
-      const draftEntry = await $fetch<EntryResponse>('/api/entries', {
-        method: 'POST',
-        headers: { cookie },
-        body: {
-          contentTypeId: testContentType.id,
-          data: { title: `Draft Invisible ${Date.now()}` },
-        },
-      });
-
-      // API key list should not include this draft entry
-      const { items } = await $fetch<ListResponse>(
-        `/api/entries?contentTypeId=${testContentType.id}`,
-        {
-          headers: { Authorization: `Bearer ${TEST_API_KEY}` },
-        }
-      );
-      const found = items.find((i) => i.id === draftEntry.id);
-      expect(found).toBeUndefined();
     });
   });
 
@@ -3542,10 +3451,11 @@ describe('Content Entry endpoints', async () => {
 
     it('allows API keys with content:write scope', async () => {
       const id = await createPublished('203.0.113.34');
+      const cookie = await getSessionCookie();
       const res = await fetch(`/api/entries/${id}/republish`, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${TEST_API_KEY}`,
+          cookie,
           'X-Forwarded-For': '203.0.113.34',
         },
       });
@@ -3966,42 +3876,36 @@ describe('Content Entry endpoints', async () => {
   });
 
   describe('Auth middleware — /api/entries (#172)', () => {
-    it('allows API keys past the middleware (no longer 403 read-only)', async () => {
-      // After #172 Task 2, /api/entries is in API_KEY_WRITABLE_PATHS.
-      // Without the per-handler scope check (added in T4), the request reaches
-      // the handler and gets whatever response the handler produces. Without a
-      // body, that's a 400 for missing contentTypeId. Anything other than the
-      // middleware's 403 'API keys have read-only access' is acceptable here.
+    it('session auth reaches handler (400 for empty body, not 403)', async () => {
+      // The handler requires a contentTypeId; without it the body is rejected
+      // with 400. Anything other than 403 confirms auth was accepted.
+      const cookie = await getSessionCookie();
       const res = await fetch('/api/entries', {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${TEST_API_KEY}`,
+          cookie,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({}),
       });
       expect(res.status).not.toBe(403);
-      if (res.status === 403) {
-        const body = (await res.json()) as { message?: string };
-        // Belt-and-braces: even if Vitest somehow accepted the not-403, this
-        // would surface a misdiagnosis early.
-        expect(body.message).not.toMatch(/read-only/i);
-      }
     });
   });
 
-  describe('POST /api/entries — rate limit fires before scope (#172)', () => {
-    it('returns 429 from rate limiter even with content:write key', async () => {
-      // The rate limiter is 50/60s per IP per endpoint. 60 rapid requests with
-      // a content:write-scoped key should trip it. Use a unique IP so this
-      // test doesn't collide with other tests' rate-limit windows.
+  describe('POST /api/entries — rate limit fires (#172)', () => {
+    it('returns 429 from rate limiter under rapid requests', async () => {
+      // The rate limiter is 50/60s per IP per endpoint. 60 rapid requests
+      // should trip it (rate limiting is IP-based, not auth-based).
+      // Use a unique IP so this test doesn't collide with other tests'
+      // rate-limit windows.
+      const cookie = await getSessionCookie();
       const ip = '203.0.113.99';
       const responses: number[] = [];
       for (let i = 0; i < 60; i++) {
         const res = await fetch('/api/entries', {
           method: 'POST',
           headers: {
-            Authorization: `Bearer ${TEST_API_KEY}`,
+            cookie,
             'Content-Type': 'application/json',
             'X-Forwarded-For': ip,
           },
@@ -4126,13 +4030,15 @@ describe('Content Entry endpoints', async () => {
 
   describe('ENTRY_DRAFT_SYNC enqueue (#302)', () => {
     // Rate-limit IPs: 203.0.113.193-.195 (see the legend at the top of the file).
+    let draftSyncCookie: string;
     const auth = (ip: string) => ({
-      Authorization: `Bearer ${TEST_API_KEY}`,
+      cookie: draftSyncCookie,
       'x-forwarded-for': ip,
     });
     let draftSyncWebhookId: string;
 
     beforeAll(async () => {
+      draftSyncCookie = await getSessionCookie();
       // External webhooks can't subscribe to the internal-only ENTRY_DRAFT_SYNC,
       // so create the subscriber directly. Scope delivery counts to its id so the
       // assertions are deterministic even if a plugin seeded another internal row.

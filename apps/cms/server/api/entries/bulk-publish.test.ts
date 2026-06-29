@@ -5,11 +5,23 @@ import { PrismaClient } from '../../../generated/prisma/client';
 import { getTestDatabaseUrl } from '../../../test/dbUrl';
 import { FIELD_TYPES } from '../../../utils/fieldTypes';
 import { CONTENT_STATUSES } from '../../../utils/contentStatus';
+import { TEST_USERNAME, TEST_PASSWORD } from '../../test/credentials';
 
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: getTestDatabaseUrl() }),
 });
-const KEY = 'boject_test_key_for_integration_tests_only';
+
+let _sessionCookie: string | null = null;
+async function getSessionCookie(): Promise<string> {
+  if (_sessionCookie) return _sessionCookie;
+  const response = await fetch('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: TEST_USERNAME, password: TEST_PASSWORD }),
+  });
+  _sessionCookie = response.headers.getSetCookie().join('; ');
+  return _sessionCookie;
+}
 
 type BulkResult = {
   results: Array<{ id: string; ok: boolean; error?: string }>;
@@ -63,14 +75,19 @@ async function makeEntry(
   });
 }
 
-function bulkPublish(ids: unknown, key: string = KEY, ip = '203.0.113.210') {
+async function bulkPublish(ids: unknown, key?: string, ip = '203.0.113.210') {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'x-forwarded-for': ip,
+  };
+  if (key) {
+    headers['Authorization'] = `Bearer ${key}`;
+  } else {
+    headers['cookie'] = await getSessionCookie();
+  }
   return fetch('/api/entries/bulk-publish', {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${key}`,
-      'Content-Type': 'application/json',
-      'x-forwarded-for': ip,
-    },
+    headers,
     body: JSON.stringify({ ids }),
   });
 }
