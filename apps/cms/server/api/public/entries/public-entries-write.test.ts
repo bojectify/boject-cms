@@ -208,4 +208,36 @@ describe('/api/public/entries (write surface)', async () => {
     const res = await fetch(`/api/public/entries/${randomUUID()}`, { method: 'DELETE', headers: bearer });
     expect(res.status).toBe(404);
   });
+
+  it('rate-limits writes on a dedicated per-key counter (429)', async () => {
+    const { createHash } = await import('node:crypto');
+    const rawKey = `boject_test_pubwrite_${randomUUID().replace(/-/g, '')}`;
+    const keyHash = createHash('sha256').update(rawKey).digest('hex');
+    // seed a content:write key directly (avoids the per-IP read counter)
+    const { PrismaPg } = await import('@prisma/adapter-pg');
+    const { PrismaClient } = await import('../../../../generated/prisma/client');
+    const { getTestDatabaseUrl } = await import('../../../../test/dbUrl');
+    const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: getTestDatabaseUrl() }) });
+    const key = await prisma.apiKey.create({
+      data: { name: `pubwrite-flood-${sfx}`, keyHash, keyPrefix: rawKey.slice(0, 11), scopes: ['content:write'] },
+    });
+    try {
+      let limited: Response | undefined;
+      for (let i = 0; i < 130; i++) {
+        const res = await fetch('/api/public/entries', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${rawKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contentTypeId, data: { title: `Flood ${sfx}-${i}-${randomUUID().slice(0, 6)}` } }),
+        });
+        if (res.status === 429) { limited = res; break; }
+      }
+      expect(limited).toBeDefined();
+      const body = (await limited!.json()) as { data?: { error?: string } };
+      expect(body.data?.error).toBe('RATE_LIMITED');
+      expect(limited!.headers.get('retry-after')).toBeDefined();
+    } finally {
+      await prisma.apiKey.delete({ where: { id: key.id } });
+      await prisma.$disconnect();
+    }
+  });
 });
