@@ -1,19 +1,16 @@
-import type { Prisma } from '#prisma';
 import { assertUuid } from '../../utils/validation';
-import { withPrismaErrors } from '../../utils/prismaErrors';
 import { enforceMutationRateLimit } from '../../utils/rateLimitEndpoint';
 import { assertApiKeyScope } from '../../utils/assertApiKeyScope';
 import { validateAndEnrichEntryData } from '../../utils/validateAndEnrichEntryData';
-import { enqueueEntryDraftSync } from '../../utils/webhooks';
-import { publishEntry, type PublishableEntry } from '../../utils/publishEntry';
+import { publishEntry } from '../../utils/publishEntry';
 import {
   isCmsRequest,
-  getDraftVersion,
   getPublishedVersion,
   getVersionForContext,
   flattenEntryWithVersion,
 } from '../../utils/resolveVersion';
 import { CONTENT_STATUSES } from '../../../utils/contentStatus';
+import { upsertEntryDraft } from '../../utils/upsertEntryDraft';
 
 export default defineEventHandler(async (event) => {
   assertApiKeyScope(event, 'content:write');
@@ -35,22 +32,24 @@ export default defineEventHandler(async (event) => {
     });
   }
 
-  // Validate data if provided
-  let validatedData: Record<string, unknown> | null = null;
-  if (typeof body.data === 'object' && body.data !== null) {
-    validatedData = await validateAndEnrichEntryData(
-      entry.contentType,
-      body.data as Record<string, unknown>,
-      { excludeEntryId: entry.id }
-    );
-  }
-
+  // `entry` is loaded with `contentType: { include: { fields: true } }`,
+  // so it is structurally assignable to both DraftableEntry and PublishableEntry.
+  // Validate ONCE per path.
   const isPublish = body.status === CONTENT_STATUSES.PUBLISHED;
+  const rawData =
+    typeof body.data === 'object' && body.data !== null
+      ? (body.data as Record<string, unknown>)
+      : null;
 
   if (isPublish) {
-    await publishFlow(entry, validatedData);
+    const validatedData = rawData
+      ? await validateAndEnrichEntryData(entry.contentType, rawData, {
+          excludeEntryId: entry.id,
+        })
+      : null;
+    await publishEntry(entry, validatedData);
   } else {
-    await saveDraftFlow(entry, validatedData);
+    await upsertEntryDraft(entry, rawData);
   }
 
   // Re-fetch the updated entry with versions
@@ -83,85 +82,3 @@ export default defineEventHandler(async (event) => {
       : {}),
   });
 });
-
-/**
- * Save Draft Flow
- *
- * If a PUBLISHED version exists, upsert a CHANGED version.
- * If no PUBLISHED version exists, upsert a DRAFT version.
- * Update envelope slug/entryTitle if data changed.
- */
-async function saveDraftFlow(
-  entry: PublishableEntry,
-  validatedData: Record<string, unknown> | null
-): Promise<void> {
-  const publishedVersion = getPublishedVersion(entry.versions);
-  const draftVersion = getDraftVersion(entry.versions);
-  const targetStatus = publishedVersion
-    ? CONTENT_STATUSES.CHANGED
-    : CONTENT_STATUSES.DRAFT;
-
-  // Determine the data to save — use provided data or fall back to existing draft data
-  const dataToSave =
-    validatedData ?? (draftVersion?.data as Record<string, unknown> | null);
-  if (!dataToSave) {
-    throw createError({
-      statusCode: 400,
-      statusMessage: 'No data provided and no existing draft to update',
-    });
-  }
-
-  const entryTitle = extractEntryTitle(dataToSave, entry.contentType.fields);
-  const slug = extractSlug(dataToSave, entry.contentType.fields);
-
-  await withPrismaErrors(
-    () =>
-      prisma.$transaction(async (tx) => {
-        if (draftVersion) {
-          // Update existing draft/changed version
-          await tx.contentEntryVersion.update({
-            where: { id: draftVersion.id },
-            data: {
-              data: dataToSave as Prisma.InputJsonValue,
-              entryTitle,
-              status: targetStatus,
-            },
-          });
-        } else {
-          // Create a new draft/changed version
-          await tx.contentEntryVersion.create({
-            data: {
-              entryId: entry.id,
-              data: dataToSave as Prisma.InputJsonValue,
-              entryTitle,
-              status: targetStatus,
-            },
-          });
-        }
-
-        // Update envelope slug and entryTitle for uniqueness constraint enforcement
-        await tx.contentEntry.update({
-          where: { id: entry.id },
-          data: { slug, entryTitle },
-        });
-
-        // DRAFT-side save: the search index hears this only via the internal trigger.
-        await enqueueEntryDraftSync(tx, {
-          contentType: { id: entry.contentType.id },
-          entryId: entry.id,
-        });
-      }),
-    {
-      uniqueMessage:
-        'An entry with this slug or title already exists for this content type',
-    }
-  );
-}
-
-/** Publish via the shared util (the PUT path supplies the request's validated data). */
-async function publishFlow(
-  entry: PublishableEntry,
-  validatedData: Record<string, unknown> | null
-): Promise<void> {
-  await publishEntry(entry, validatedData);
-}
