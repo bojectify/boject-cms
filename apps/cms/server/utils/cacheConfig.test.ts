@@ -73,5 +73,8 @@ describe('resolveGraphqlCacheMaxBytes', () => {
     expect(resolveGraphqlCacheMaxBytes('-5')).toBe(
       DEFAULT_GRAPHQL_CACHE_MAX_BYTES
     );
+    expect(resolveGraphqlCacheMaxBytes('')).toBe(
+      DEFAULT_GRAPHQL_CACHE_MAX_BYTES
+    );
   });
 });

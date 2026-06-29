@@ -131,9 +131,14 @@ export function createGraphqlCachePlugin(
 
       return {
         async onExecuteDone({ result }) {
-          setResponseHeader(event, 'X-Cache', 'MISS');
-          // Don't cache streams or errored results.
+          // Don't cache streams or errored results. The MISS header is set only
+          // AFTER the stream guard: on a streamed result the response has
+          // already begun, so setResponseHeader would throw
+          // ERR_HTTP_HEADERS_SENT and escape onExecuteDone as a 500 (violating
+          // the never-a-correctness-dependency rule). Unreachable today (no
+          // streaming transport is registered) — defensive for when one is.
           if (isAsyncIterable(result)) return;
+          setResponseHeader(event, 'X-Cache', 'MISS');
           if (result.errors && result.errors.length > 0) return;
 
           let serialized: string;

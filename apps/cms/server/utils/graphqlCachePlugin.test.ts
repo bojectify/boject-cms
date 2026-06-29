@@ -51,20 +51,27 @@ describe('buildTags', () => {
     ['ct-author', 'Author'],
   ]);
 
-  it('emits content-type + entry tags per harvested pair, deduped', () => {
+  it('emits content-type + entry tags per pair, collapsing the content-type tag across same-type entries', () => {
     const collected = new Set<string>([
       'ct-article\0a1',
       'ct-author\0au1',
-      'ct-article\0a1',
+      // A second, DISTINCT Article entry — this is what exercises buildTags'
+      // inner-Set dedup of the shared `content-type:Article` tag (two different
+      // members can't collapse at Set construction, unlike a repeated member).
+      'ct-article\0a2',
     ]);
-    expect(buildTags(collected, map).sort()).toEqual(
+    const tags = buildTags(collected, map);
+    expect(tags.sort()).toEqual(
       [
         'content-type:Article',
         'content-type:Author',
         'entry:Article:a1',
+        'entry:Article:a2',
         'entry:Author:au1',
       ].sort()
     );
+    // The shared content-type tag must appear exactly once across both Articles.
+    expect(tags.filter((t) => t === 'content-type:Article')).toHaveLength(1);
   });
 
   it('skips pairs whose contentTypeId is not in the map', () => {
