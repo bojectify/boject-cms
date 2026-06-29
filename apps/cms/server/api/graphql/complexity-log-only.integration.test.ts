@@ -50,7 +50,14 @@ async function createComplexityTestCt(cookie: string): Promise<string> {
 describe('GraphQL complexity scoring (#122) — log-only', async () => {
   await setup({
     dev: true,
-    env: { BOJECT_GRAPHQL_COMPLEXITY_LOG_ONLY: 'true' },
+    env: {
+      BOJECT_GRAPHQL_COMPLEXITY_LOG_ONLY: 'true',
+      // Pin the cap (the documented default, 1000) so the over-cap query below
+      // genuinely exceeds it regardless of any raised cap in the developer's
+      // .env — otherwise this test would pass vacuously (a query sitting under
+      // an inflated cap is permitted for the wrong reason).
+      BOJECT_GRAPHQL_COMPLEXITY_MAX_COST: '1000',
+    },
   });
 
   let identifier: string;
