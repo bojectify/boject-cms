@@ -3,9 +3,8 @@ import { assertUuid } from '../../utils/validation';
 import { translatePrismaError } from '../../utils/prismaErrors';
 import { enforceMutationRateLimit } from '../../utils/rateLimitEndpoint';
 import { assertApiKeyScope } from '../../utils/assertApiKeyScope';
-import { assertUniqueFieldValues } from '../../utils/assertUniqueFieldValues';
 import { applyFieldDefaults } from '../../utils/applyFieldDefaults';
-import { enrichEntryDataWithEmbedIdentifiers } from '../../utils/enrichRichtextEmbeds';
+import { validateAndEnrichEntryData } from '../../utils/validateAndEnrichEntryData';
 import {
   enqueueWebhookDeliveries,
   enqueueEntryDraftSync,
@@ -48,27 +47,9 @@ export default defineEventHandler(async (event) => {
       : {};
 
   const dataWithDefaults = applyFieldDefaults(rawData, contentType.fields);
-  const validatedData = await validateEntryData(
-    dataWithDefaults,
-    contentType.fields
-  );
-  await assertUniqueFieldValues(
-    validatedData,
-    contentType.fields,
-    contentTypeId
-  );
-  const enrichedData = await enrichEntryDataWithEmbedIdentifiers(
-    validatedData,
-    contentType.fields,
-    {
-      loadIdentifiers: async (ids) => {
-        const types = await prisma.contentType.findMany({
-          where: { id: { in: ids } },
-          select: { id: true, identifier: true },
-        });
-        return new Map(types.map((t) => [t.id, t.identifier] as const));
-      },
-    }
+  const enrichedData = await validateAndEnrichEntryData(
+    contentType,
+    dataWithDefaults
   );
   const slug = extractSlug(enrichedData, contentType.fields);
   const entryTitle = extractEntryTitle(enrichedData, contentType.fields);

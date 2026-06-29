@@ -3,8 +3,7 @@ import { assertUuid } from '../../utils/validation';
 import { withPrismaErrors } from '../../utils/prismaErrors';
 import { enforceMutationRateLimit } from '../../utils/rateLimitEndpoint';
 import { assertApiKeyScope } from '../../utils/assertApiKeyScope';
-import { assertUniqueFieldValues } from '../../utils/assertUniqueFieldValues';
-import { enrichEntryDataWithEmbedIdentifiers } from '../../utils/enrichRichtextEmbeds';
+import { validateAndEnrichEntryData } from '../../utils/validateAndEnrichEntryData';
 import { enqueueEntryDraftSync } from '../../utils/webhooks';
 import { publishEntry, type PublishableEntry } from '../../utils/publishEntry';
 import {
@@ -39,28 +38,10 @@ export default defineEventHandler(async (event) => {
   // Validate data if provided
   let validatedData: Record<string, unknown> | null = null;
   if (typeof body.data === 'object' && body.data !== null) {
-    const rawValidated = await validateEntryData(
+    validatedData = await validateAndEnrichEntryData(
+      entry.contentType,
       body.data as Record<string, unknown>,
-      entry.contentType.fields
-    );
-    await assertUniqueFieldValues(
-      rawValidated,
-      entry.contentType.fields,
-      entry.contentTypeId,
-      entry.id
-    );
-    validatedData = await enrichEntryDataWithEmbedIdentifiers(
-      rawValidated,
-      entry.contentType.fields,
-      {
-        loadIdentifiers: async (ids) => {
-          const types = await prisma.contentType.findMany({
-            where: { id: { in: ids } },
-            select: { id: true, identifier: true },
-          });
-          return new Map(types.map((t) => [t.id, t.identifier] as const));
-        },
-      }
+      { excludeEntryId: entry.id }
     );
   }
 
