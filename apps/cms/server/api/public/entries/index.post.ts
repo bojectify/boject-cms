@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
   assertApiKeyScope(event, 'content:write');
   enforcePublicWriteRateLimit(event);
 
-  const body = await readBody<Record<string, unknown>>(event);
+  const body = (await readBody<Record<string, unknown>>(event)) ?? {};
   const contentTypeId = assertUuid(body.contentTypeId, 'contentTypeId');
 
   const contentType = await prisma.contentType.findUnique({

@@ -209,6 +209,12 @@ describe('/api/public/entries (write surface)', async () => {
     expect(res.status).toBe(404);
   });
 
+  it('returns 400 (not 500) for a POST with no body', async () => {
+    const res = await fetch('/api/public/entries', { method: 'POST', headers: bearer });
+    expect(res.status).toBe(400);
+    expect(res.status).not.toBe(500);
+  });
+
   it('rate-limits writes on a dedicated per-key counter (429)', async () => {
     const { createHash } = await import('node:crypto');
     const rawKey = `boject_test_pubwrite_${randomUUID().replace(/-/g, '')}`;

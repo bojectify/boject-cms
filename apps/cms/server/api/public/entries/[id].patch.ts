@@ -16,7 +16,7 @@ export default defineEventHandler(async (event) => {
   assertApiKeyScope(event, 'content:write');
   enforcePublicWriteRateLimit(event);
   const id = assertUuid(getRouterParam(event, 'id'), 'id');
-  const body = await readBody<Record<string, unknown>>(event);
+  const body = (await readBody<Record<string, unknown>>(event)) ?? {};
 
   const patch =
     typeof body.data === 'object' && body.data !== null

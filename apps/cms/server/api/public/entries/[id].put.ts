@@ -10,7 +10,7 @@ export default defineEventHandler(async (event) => {
   assertApiKeyScope(event, 'content:write');
   enforcePublicWriteRateLimit(event);
   const id = assertUuid(getRouterParam(event, 'id'), 'id');
-  const body = await readBody<Record<string, unknown>>(event);
+  const body = (await readBody<Record<string, unknown>>(event)) ?? {};
 
   const entry = await prisma.contentEntry.findUnique({
     where: { id },
