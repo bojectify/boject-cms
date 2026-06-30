@@ -92,9 +92,11 @@ describe('CSRF Origin check', async () => {
     expect(response.status).toBe(200);
   });
 
-  it('allows requests without an Origin header (server-to-server, e.g. API key)', async () => {
-    const response = await fetch('/api/content-types', {
-      method: 'GET',
+  it('allows a Bearer request without an Origin header (server-to-server, e.g. API key)', async () => {
+    // CSRF only guards mutations; a token-authed read with no browser Origin is
+    // served normally. Admin content is session-only since #257, so this probes
+    // the public read surface, where API keys are valid.
+    const response = await fetch('/api/public/entries?contentType=Anything', {
       headers: {
         Authorization: `Bearer boject_test_key_for_integration_tests_only`,
       },
@@ -102,12 +104,13 @@ describe('CSRF Origin check', async () => {
     expect(response.status).toBe(200);
   });
 
-  describe('Bearer auth bypass for /api/entries (#172)', () => {
-    it('skips Origin/Referer check on POST /api/entries with Bearer auth', async () => {
-      // CSRF middleware bypasses Origin/Referer check when the request carries
-      // a Bearer API key. Confirm this still applies after #172 added the path
-      // to API_KEY_WRITABLE_PATHS.
-      const res = await fetch('/api/entries', {
+  describe('Bearer auth bypass for public writes (#172/#257)', () => {
+    it('skips Origin/Referer check on POST /api/public/entries with Bearer auth', async () => {
+      // CSRF middleware bypasses the Origin/Referer check when the request
+      // carries a Bearer API key — the public write surface relies on this
+      // (machine consumers send no/foreign browser Origin). Admin /api/entries
+      // is session-only since #257, so this probes the token-valid public write.
+      const res = await fetch('/api/public/entries', {
         method: 'POST',
         headers: {
           Authorization: 'Bearer boject_test_key_for_integration_tests_only',
@@ -118,10 +121,10 @@ describe('CSRF Origin check', async () => {
         body: JSON.stringify({}),
       });
       // CSRF would have returned 403 with a clear "Origin mismatch" message.
-      // We assert (a) the status isn't 403, AND (b) if there IS an error
-      // body, it doesn't reference origin/referer/CSRF — that way the
-      // test won't false-positive if the test key ever loses content:write
-      // (which would yield its own 403 with a scope-related message).
+      // We assert (a) the status isn't 403, AND (b) if there IS an error body,
+      // it doesn't reference origin/referer/CSRF — a 400 for the empty body is
+      // expected and fine (it proves the request reached the handler, i.e. CSRF
+      // let it through).
       expect(res.status).not.toBe(403);
       if (res.status >= 400) {
         const body = (await res.json()) as {

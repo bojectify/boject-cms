@@ -286,11 +286,14 @@ describe('Content API filters', async () => {
     });
 
     it('ignores an unrecognised status value and returns the default listing', async () => {
-      // The handler silently ignores an invalid status (treated as no filter).
-      // Previously covered only by an API-key test; this session variant
-      // restores the coverage after the #257 token-strip migration.
-      const { items } = await getContent({ status: 'INVALID', perPage: 100 });
-      expect(items.length).toBeGreaterThan(0);
+      // The handler silently ignores an invalid status (treated as no filter),
+      // so it returns the same set as an unfiltered call. Comparing to a
+      // baseline keeps this robust to the shared test DB's row count (an
+      // absolute count is fragile across the full suite). Restores the coverage
+      // an API-key-only test held before the #257 token-strip migration.
+      const baseline = await getContent({ perPage: 100 });
+      const invalid = await getContent({ status: 'INVALID', perPage: 100 });
+      expect(invalid.items.length).toBe(baseline.items.length);
     });
   });
 
