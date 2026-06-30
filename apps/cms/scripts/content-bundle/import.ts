@@ -17,6 +17,7 @@ import {
   BundleImportValidationError,
   EntryImportReferenceError,
 } from './importErrors';
+import { enqueueContentBulkSync } from '../../server/utils/webhooks';
 
 export interface ImportOptions {
   mode: BundleMode;
@@ -71,6 +72,7 @@ export async function importBundle(
       const identifierToTypeId = new Map<string, string>();
       const typeIdentifierToKeyToEntry = new Map<string, Map<string, string>>();
       const fieldTypesByTypeId = new Map<string, Record<string, FieldType>>();
+      const affectedTypeIdentifiers = new Set<string>();
 
       const existingTypes = await tx.contentType.findMany({
         include: { fields: true },
@@ -298,6 +300,7 @@ export async function importBundle(
             entryId = created.id;
             versionIds = created.versions.map((v) => v.id);
             entriesCreated++;
+            affectedTypeIdentifiers.add(e.contentTypeIdentifier);
           } else {
             // update
             await tx.contentEntryVersion.deleteMany({
@@ -317,6 +320,7 @@ export async function importBundle(
             entryId = updated.id;
             versionIds = updated.versions.map((v) => v.id);
             entriesUpdated++;
+            affectedTypeIdentifiers.add(e.contentTypeIdentifier);
           }
 
           let map = typeIdentifierToKeyToEntry.get(e.contentTypeIdentifier);
@@ -369,6 +373,19 @@ export async function importBundle(
             fieldTypesByTypeId,
             identifierToTypeId
           );
+        }
+      }
+
+      // #393: one coalesced CONTENT_BULK_SYNC per type that received entry
+      // writes → search reindex + cache clear. Inside the tx, so a dryRun rolls
+      // these rows back. identifierToTypeId resolves the UUID (same map the
+      // entry pass used at typeId resolution).
+      for (const identifier of affectedTypeIdentifiers) {
+        const id = identifierToTypeId.get(identifier);
+        if (id) {
+          await enqueueContentBulkSync(tx, {
+            contentType: { id, identifier },
+          });
         }
       }
 
