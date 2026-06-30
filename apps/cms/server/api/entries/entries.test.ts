@@ -715,8 +715,8 @@ describe('Content Entry endpoints', async () => {
     });
   });
 
-  describe('POST /api/entries — content:write scope (#172)', () => {
-    it('allows API keys with content:write scope', async () => {
+  describe('POST /api/entries — session-only auth (#257)', () => {
+    it('allows a session caller to create an entry', async () => {
       // Use a distinct X-Forwarded-For so this test gets its own rate-limit
       // bucket — the in-memory store lives in the dev-server process and
       // is not cleared by `resetRateLimitStore()` (which only clears the
@@ -737,7 +737,7 @@ describe('Content Entry endpoints', async () => {
       expect(res.status).toBe(201);
     });
 
-    it('rejects API keys without content:write scope', async () => {
+    it('rejects a token on POST /api/entries → 401 (session-only, #257)', async () => {
       // Mint an inline key with content:read only.
       const rawKey = `boject_test_readonly_${Date.now()}`;
       const keyHash = createHash('sha256').update(rawKey).digest('hex');
@@ -810,8 +810,8 @@ describe('Content Entry endpoints', async () => {
     });
   });
 
-  describe('PUT /api/entries/[id] — content:write scope (#172)', () => {
-    it('allows API keys with content:write scope', async () => {
+  describe('PUT /api/entries/[id] — session-only auth (#257)', () => {
+    it('allows a session caller to update an entry via PUT', async () => {
       // Create an entry via session auth first
       const cookie = await getSessionCookie();
       const create = await fetch('/api/entries', {
@@ -843,7 +843,7 @@ describe('Content Entry endpoints', async () => {
       expect(res.status).toBe(200);
     });
 
-    it('rejects API keys without content:write scope', async () => {
+    it('rejects a token on PUT /api/entries/:id → 401 (session-only, #257)', async () => {
       const cookie = await getSessionCookie();
       const create = await fetch('/api/entries', {
         method: 'POST',
@@ -888,8 +888,8 @@ describe('Content Entry endpoints', async () => {
     });
   });
 
-  describe('DELETE /api/entries/[id] — content:write scope (#172)', () => {
-    it('allows API keys with content:write scope', async () => {
+  describe('DELETE /api/entries/[id] — session-only auth (#257)', () => {
+    it('allows a session caller to delete an entry', async () => {
       const cookie = await getSessionCookie();
       const create = await fetch('/api/entries', {
         method: 'POST',
@@ -915,7 +915,7 @@ describe('Content Entry endpoints', async () => {
       expect(res.status).toBe(200);
     });
 
-    it('rejects API keys without content:write scope', async () => {
+    it('rejects a token on DELETE /api/entries/:id → 401 (session-only, #257)', async () => {
       const cookie = await getSessionCookie();
       const create = await fetch('/api/entries', {
         method: 'POST',
@@ -958,7 +958,7 @@ describe('Content Entry endpoints', async () => {
     });
   });
 
-  describe('DELETE /api/entries/[id]/draft — content:write scope (#172)', () => {
+  describe('DELETE /api/entries/[id]/draft — session-only auth (#257)', () => {
     // Helper: create entry, publish it, then make a CHANGED draft.
     // discardDraft requires a PUBLISHED fallback to exist.
     async function createWithDraft(ip: string): Promise<string> {
@@ -1009,7 +1009,7 @@ describe('Content Entry endpoints', async () => {
       return created.id;
     }
 
-    it('allows API keys with content:write scope', async () => {
+    it('allows a session caller to discard a draft', async () => {
       const id = await createWithDraft('203.0.113.26');
       const cookie = await getSessionCookie();
       const res = await fetch(`/api/entries/${id}/draft`, {
@@ -1022,7 +1022,7 @@ describe('Content Entry endpoints', async () => {
       expect(res.status).toBe(200);
     });
 
-    it('rejects API keys without content:write scope', async () => {
+    it('rejects a token on DELETE /api/entries/:id/draft → 401 (session-only, #257)', async () => {
       const id = await createWithDraft('203.0.113.27');
       const rawKey = `boject_test_readonly_${Date.now()}`;
       const keyHash = createHash('sha256').update(rawKey).digest('hex');
@@ -1054,7 +1054,7 @@ describe('Content Entry endpoints', async () => {
     });
   });
 
-  describe('POST /api/entries/[id]/archive — content:write scope (#172)', () => {
+  describe('POST /api/entries/[id]/archive — session-only auth (#257)', () => {
     async function createPublished(ip: string): Promise<string> {
       const cookie = await getSessionCookie();
       const create = await fetch('/api/entries', {
@@ -1085,7 +1085,7 @@ describe('Content Entry endpoints', async () => {
       return created.id;
     }
 
-    it('allows API keys with content:write scope', async () => {
+    it('allows a session caller to archive an entry', async () => {
       const id = await createPublished('203.0.113.28');
       const cookie = await getSessionCookie();
       const res = await fetch(`/api/entries/${id}/archive`, {
@@ -1098,7 +1098,7 @@ describe('Content Entry endpoints', async () => {
       expect(res.status).toBe(200);
     });
 
-    it('rejects API keys without content:write scope', async () => {
+    it('rejects a token on POST /api/entries/:id/archive → 401 (session-only, #257)', async () => {
       const id = await createPublished('203.0.113.29');
       const rawKey = `boject_test_readonly_${Date.now()}`;
       const keyHash = createHash('sha256').update(rawKey).digest('hex');
@@ -1129,7 +1129,7 @@ describe('Content Entry endpoints', async () => {
     });
   });
 
-  describe('POST /api/entries/[id]/unarchive — content:write scope (#172)', () => {
+  describe('POST /api/entries/[id]/unarchive — session-only auth (#257)', () => {
     async function createArchived(ip: string): Promise<string> {
       const cookie = await getSessionCookie();
       const create = await fetch('/api/entries', {
@@ -1167,7 +1167,7 @@ describe('Content Entry endpoints', async () => {
       return created.id;
     }
 
-    it('allows API keys with content:write scope', async () => {
+    it('allows a session caller to unarchive an entry', async () => {
       const id = await createArchived('203.0.113.30');
       const cookie = await getSessionCookie();
       const res = await fetch(`/api/entries/${id}/unarchive`, {
@@ -1180,7 +1180,7 @@ describe('Content Entry endpoints', async () => {
       expect(res.status).toBe(200);
     });
 
-    it('rejects API keys without content:write scope', async () => {
+    it('rejects a token on POST /api/entries/:id/unarchive → 401 (session-only, #257)', async () => {
       const id = await createArchived('203.0.113.31');
       const rawKey = `boject_test_readonly_${Date.now()}`;
       const keyHash = createHash('sha256').update(rawKey).digest('hex');
@@ -1209,7 +1209,7 @@ describe('Content Entry endpoints', async () => {
     });
   });
 
-  describe('POST /api/entries/[id]/unpublish — content:write scope (#172)', () => {
+  describe('POST /api/entries/[id]/unpublish — session-only auth (#257)', () => {
     async function createPublished(ip: string): Promise<string> {
       const cookie = await getSessionCookie();
       const title = `Unpublish target ${Date.now()}-${Math.random()}`;
@@ -1241,7 +1241,7 @@ describe('Content Entry endpoints', async () => {
       return created.id;
     }
 
-    it('allows API keys with content:write scope', async () => {
+    it('allows a session caller to unpublish an entry', async () => {
       const id = await createPublished('203.0.113.32');
       const cookie = await getSessionCookie();
       const res = await fetch(`/api/entries/${id}/unpublish`, {
@@ -1254,7 +1254,7 @@ describe('Content Entry endpoints', async () => {
       expect(res.status).toBe(200);
     });
 
-    it('rejects API keys without content:write scope', async () => {
+    it('rejects a token on POST /api/entries/:id/unpublish → 401 (session-only, #257)', async () => {
       const id = await createPublished('203.0.113.33');
       const rawKey = `boject_test_readonly_${Date.now()}`;
       const keyHash = createHash('sha256').update(rawKey).digest('hex');
@@ -3403,7 +3403,7 @@ describe('Content Entry endpoints', async () => {
     });
   });
 
-  describe('POST /api/entries/[id]/republish — content:write scope (#172)', () => {
+  describe('POST /api/entries/[id]/republish — session-only auth (#257)', () => {
     async function createPublished(ip: string): Promise<string> {
       const cookie = await getSessionCookie();
       const title = `Republish target ${Date.now()}-${Math.random()}`;
@@ -3435,7 +3435,7 @@ describe('Content Entry endpoints', async () => {
       return created.id;
     }
 
-    it('allows API keys with content:write scope', async () => {
+    it('allows a session caller to republish an entry', async () => {
       const id = await createPublished('203.0.113.34');
       const cookie = await getSessionCookie();
       const res = await fetch(`/api/entries/${id}/republish`, {
@@ -3448,7 +3448,7 @@ describe('Content Entry endpoints', async () => {
       expect(res.status).toBe(200);
     });
 
-    it('rejects API keys without content:write scope', async () => {
+    it('rejects a token on POST /api/entries/:id/republish → 401 (session-only, #257)', async () => {
       const id = await createPublished('203.0.113.35');
       const rawKey = `boject_test_readonly_${Date.now()}`;
       const keyHash = createHash('sha256').update(rawKey).digest('hex');

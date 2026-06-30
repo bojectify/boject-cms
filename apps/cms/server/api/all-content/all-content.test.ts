@@ -284,6 +284,14 @@ describe('Content API filters', async () => {
         true
       );
     });
+
+    it('ignores an unrecognised status value and returns the default listing', async () => {
+      // The handler silently ignores an invalid status (treated as no filter).
+      // Previously covered only by an API-key test; this session variant
+      // restores the coverage after the #257 token-strip migration.
+      const { items } = await getContent({ status: 'INVALID', perPage: 100 });
+      expect(items.length).toBeGreaterThan(0);
+    });
   });
 
   // ── Combined filters ──────────────────────────────────────────
