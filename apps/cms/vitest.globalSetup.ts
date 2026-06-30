@@ -1,5 +1,7 @@
 import { execSync } from 'node:child_process';
+import { Redis } from 'ioredis';
 import { getTestDatabaseUrl } from './test/dbUrl';
+import { getTestRedisUrl } from './test/redisUrl';
 import { meili } from './server/utils/meili';
 import {
   ensureEntriesIndex,
@@ -58,5 +60,40 @@ export async function setup() {
       '[globalSetup] Meilisearch unavailable; skipping test index bootstrap. Search-backed tests will fail until it is reachable:',
       error instanceof Error ? error.message : error
     );
+  }
+
+  // Flush the test Redis logical DB (DB 1) so each suite run starts with a
+  // clean cache and cache state never leaks across files. NEVER FLUSHALL —
+  // that wipes DB 0, the dev cache (the same instance-isolation pg/meili use).
+  // Non-fatal if Redis is unreachable (mirrors the Meili branch): cache-backed
+  // tests fail loudly on their own; non-cache tests still run. A fresh client
+  // per attempt handles the docker-up race without ioredis reconnect-state
+  // pitfalls.
+  const redisUrl = getTestRedisUrl();
+  let flushed = false;
+  for (let attempt = 1; attempt <= 5 && !flushed; attempt++) {
+    const redis = new Redis(redisUrl, {
+      lazyConnect: true,
+      connectTimeout: 1000,
+      maxRetriesPerRequest: 1,
+      retryStrategy: () => null,
+    });
+    try {
+      await redis.connect();
+      await redis.flushdb();
+      await redis.quit();
+      flushed = true;
+      console.log('[globalSetup] Test Redis (DB 1) flushed.');
+    } catch (error) {
+      redis.disconnect();
+      if (attempt === 5) {
+        console.warn(
+          '[globalSetup] Redis unavailable; skipping cache flush. Cache-backed tests will fail until it is reachable:',
+          error instanceof Error ? error.message : error
+        );
+      } else {
+        await new Promise((resolve) => setTimeout(resolve, 300));
+      }
+    }
   }
 }
