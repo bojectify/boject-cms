@@ -206,16 +206,15 @@ describe('importBundle — reconcile (#393)', () => {
 
     // CONTENT_BULK_SYNC was enqueued once (coalesced — 2 entries, 1 type).
     // insertDeliveries creates one row per subscriber, so with 2 internal
-    // webhooks (search sync + cache invalidation) we get 2 rows total, NOT 1
-    // per entry (which would be 4 rows). The delivery count is > 0 and the
-    // ALL-SUCCESS check after the tick proves the right rows were written.
+    // webhooks (search sync + cache invalidation) we get exactly 2 rows.
     const deliveryCount = await prisma.webhookDelivery.count({
       where: {
         event: WEBHOOK_EVENTS.CONTENT_BULK_SYNC,
         contentTypeId,
       },
     });
-    expect(deliveryCount).toBeGreaterThan(0);
+    // 1 affected type × 2 internal subscribers = 2 (per-entry bug would be 2 entries × 2 = 4)
+    expect(deliveryCount).toBe(2);
 
     // Drive the worker. Both INTERNAL webhooks (search sync + cache invalidation)
     // subscribe to CONTENT_BULK_SYNC, so a single tick processes both.
@@ -352,7 +351,8 @@ describe('importBundle — reconcile (#393)', () => {
     // With 2 internal subscribers the row delta is 2 (not 3 × 2 = 6).
     // Assert delta > 0 (something was enqueued) and < 3 (not one per entry).
     const delta = countAfter - countBefore;
+    // 1 enqueue × 2 subscribers = 2 rows (coalesced); 3 entries × 2 = 6 if per-entry. delta in (0,3) proves coalesced.
     expect(delta).toBeGreaterThan(0);
-    expect(delta).toBeLessThan(3); // 3 entries imported; delta must be <3 to prove coalescing
+    expect(delta).toBeLessThan(3);
   });
 });
