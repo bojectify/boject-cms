@@ -1,5 +1,5 @@
 import { resolve } from 'node:path';
-import { buildStorageConfig } from './server/utils/storageConfig';
+import { buildStorageConfig } from './utils/storageConfig';
 
 export default defineNuxtConfig({
   ignore: ['**/storage/**'],

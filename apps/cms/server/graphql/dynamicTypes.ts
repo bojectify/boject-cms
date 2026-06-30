@@ -4,7 +4,7 @@ import { resolveOffsetConnection } from '@pothos/plugin-relay';
 import { prisma } from '../utils/prisma';
 import { parseFieldOptions } from '../../utils/fieldOptions';
 import { recordResolvedEntry } from '../utils/entryTagCollector';
-import { collectRichtextReferences } from '../utils/collectRichtextReferences';
+import { collectRichtextReferences } from '../../utils/collectRichtextReferences';
 import {
   registerDynamicFilterInputs,
   getFilterKeyForFieldType,

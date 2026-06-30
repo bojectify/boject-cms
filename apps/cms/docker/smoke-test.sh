@@ -14,6 +14,8 @@ set -euo pipefail
 # Dependency: jq (for in-place editing of the bundle JSON between restarts).
 
 PG_NAME="boject-cms-smoke-pg"
+REDIS_NAME="boject-cms-smoke-redis"
+MEILI_NAME="boject-cms-smoke-meili"
 APP_NAME="boject-cms-smoke-app"
 NETWORK_NAME="boject-cms-smoke-net"
 VOLUME_NAME="boject-cms-smoke-storage"
@@ -23,7 +25,7 @@ CONTENT_DIR="$(mktemp -d -t boject-cms-smoke-content-XXXXXX)"
 
 cleanup() {
   echo "[smoke-test] cleaning up"
-  docker rm -f "$APP_NAME" "$PG_NAME" >/dev/null 2>&1 || true
+  docker rm -f "$APP_NAME" "$PG_NAME" "$REDIS_NAME" "$MEILI_NAME" >/dev/null 2>&1 || true
   docker volume rm "$VOLUME_NAME" >/dev/null 2>&1 || true
   docker network rm "$NETWORK_NAME" >/dev/null 2>&1 || true
   rm -rf "$CONTENT_DIR" 2>/dev/null || true
@@ -53,6 +55,23 @@ for i in {1..30}; do
   sleep 1
 done
 
+echo "[smoke-test] starting redis"
+# Cold-by-design, mirroring the docker-compose redis sidecar. The production
+# cache-config-guard plugin throws at boot if REDIS_URL is unset, so the app
+# container needs a real Redis to boot.
+docker run -d --name "$REDIS_NAME" \
+  --network "$NETWORK_NAME" \
+  redis:7.4-alpine redis-server --save "" --appendonly no >/dev/null
+
+echo "[smoke-test] starting meilisearch"
+# The production meili client (resolveMeiliConfig) throws at boot if
+# MEILI_MASTER_KEY is unset, so the app needs a real Meilisearch + key to boot.
+MEILI_KEY="$(head -c 16 /dev/urandom | base64)"
+docker run -d --name "$MEILI_NAME" \
+  --network "$NETWORK_NAME" \
+  -e MEILI_MASTER_KEY="$MEILI_KEY" \
+  getmeili/meilisearch:v1.45.2 >/dev/null
+
 echo "[smoke-test] seeding content-types dir with the base starter"
 cp "$REPO_ROOT/starters/base.boject.json" "$CONTENT_DIR/schema.boject.json"
 
@@ -60,6 +79,9 @@ echo "[smoke-test] starting cms (first boot — expect admin seed + starter impo
 docker run -d --name "$APP_NAME" \
   --network "$NETWORK_NAME" \
   -e DATABASE_URL=postgresql://boject:boject@${PG_NAME}:5432/boject \
+  -e REDIS_URL=redis://${REDIS_NAME}:6379 \
+  -e MEILI_URL=http://${MEILI_NAME}:7700 \
+  -e MEILI_MASTER_KEY="$MEILI_KEY" \
   -e NUXT_SESSION_PASSWORD="$(head -c 32 /dev/urandom | base64)" \
   -e BOJECT_ADMIN_EMAIL=admin@smoke.test \
   -e BOJECT_ADMIN_PASSWORD="$(head -c 16 /dev/urandom | base64)" \

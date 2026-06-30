@@ -1,6 +1,6 @@
 import type { FieldType } from '#prisma';
 import { FIELD_TYPES } from '../../utils/fieldTypes';
-import { collectRichtextReferences } from '../../server/utils/collectRichtextReferences';
+import { collectRichtextReferences } from '../../utils/collectRichtextReferences';
 
 export interface CollectedEntryRef {
   contentTypeId: string;

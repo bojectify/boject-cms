@@ -1,5 +1,9 @@
 import type { PrismaClient, FieldType, ContentStatus } from '#prisma';
-import { Prisma } from '#prisma';
+// Value import (Prisma.DbNull) — must use the relative generated-client path,
+// NOT the `#prisma` alias: this module runs under tsx at docker boot (the
+// import-starter entrypoint), where `#prisma` (a Nuxt/tsconfig alias) doesn't
+// resolve. Type-only `#prisma` imports above are fine (erased by esbuild).
+import { Prisma } from '../../generated/prisma/client';
 import type {
   Bundle,
   BundleEntry,
