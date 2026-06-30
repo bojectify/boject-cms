@@ -10,7 +10,7 @@ import { createStorage, type Storage } from 'unstorage';
 import fsDriver from 'unstorage/drivers/fs';
 import s3Driver from 'unstorage/drivers/s3';
 import { FIELD_TYPES } from '../../utils/fieldTypes';
-import { buildStorageConfig } from '../../server/utils/storageConfig';
+import { buildStorageConfig } from '../../utils/storageConfig';
 import type { Bundle } from './types';
 
 /**
