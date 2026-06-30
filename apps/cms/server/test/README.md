@@ -48,3 +48,55 @@ beforeAll(async () => {
 ```
 
 See `meiliTestUtils.integration.test.ts` for a worked example.
+
+## Cache test harness (#262)
+
+Cache-backed integration tests run against the **real** Redis from
+`docker-compose.yml` (the `redis` service), on **logical DB 1**
+(`getTestRedisUrl()` → `redis://localhost:6379/1`) — never DB 0, the dev cache.
+This is the same instance-isolation Postgres (`boject_test`) and search
+(`entries_test`) use. `vitest.config.ts` sets `REDIS_URL` to the DB-1 URL, and
+the Nitro dev server that integration tests boot inherits it.
+
+`vitest.globalSetup.ts` runs **`FLUSHDB`** on DB 1 before the suite (non-fatal if
+Redis is down — cache tests fail loudly on their own; non-cache tests still run).
+**Never `FLUSHALL`** — that wipes DB 0 and destroys the developer's dev cache.
+
+### Same keyspace as the server (no base)
+
+The booted server writes via `useStorage('cache')`, but unstorage strips the
+`cache` mount prefix before the driver, so the actual Redis keys are
+**unprefixed** (e.g. `public:entries:Article:perPage=10:after=`). So
+`cacheAssertions.ts` builds its value handle with `redisDriver({ url })` and
+**no base**, and reads the raw `__tagindex:` / `__tagindex_p:` sets via a plain
+`ioredis` client.
+
+### Helpers (`cacheAssertions.ts`)
+
+| Helper                                                | Purpose                                                                                                                                              |
+| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `assertCached(key)` / `assertNotCached(key)`          | Assert a value is / isn't cached under `key`.                                                                                                        |
+| `assertTaggedWith(key, tag)`                          | Assert `key` is a member of `tag`'s reverse index (`__tagindex:` or `__tagindex_p:`).                                                                |
+| `expectInvalidationOnEvent(descriptor, expectedTags)` | Run the real #261 subscriber for `{ event, identifier, entryId? }`; assert it clears **exactly** those tags (seeds a control tag that must survive). |
+| `clearTestCache()`                                    | `FLUSHDB` — the per-file reset; call in `beforeEach`/`beforeAll`.                                                                                    |
+| `closeTestCache()`                                    | Close the Redis client; call in `afterAll`.                                                                                                          |
+
+### Required per-file pattern
+
+globalSetup flushes once before the whole suite. Each cache-backed file should
+reset + close its own client:
+
+```ts
+import { beforeAll, afterAll } from 'vitest';
+import { clearTestCache, closeTestCache } from '../test/cacheAssertions';
+
+beforeAll(async () => {
+  await clearTestCache();
+});
+afterAll(async () => {
+  await closeTestCache();
+});
+```
+
+See `cacheAssertions.integration.test.ts` for a worked example (GET
+`/api/public/entries` → assert cached + tagged → invalidate → assert gone).
