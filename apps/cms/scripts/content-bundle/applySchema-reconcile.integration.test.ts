@@ -165,6 +165,12 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await resetDb();
+  // Remove INTERNAL webhook rows seeded by ensureSearchSyncWebhook /
+  // ensureCacheInvalidationWebhook above — they are not seeded by the
+  // vitest globalSetup (the Nitro plugin is VITEST-skipped), so leaving
+  // them would leak into later integration files (e.g. webhooks.test.ts).
+  await prisma.webhookDelivery.deleteMany();
+  await prisma.webhook.deleteMany({ where: { kind: 'INTERNAL' } });
   await prisma.$disconnect();
   await redis.quit();
   await storage.dispose();

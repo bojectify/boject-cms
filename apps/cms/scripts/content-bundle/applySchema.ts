@@ -117,6 +117,7 @@ function collectFieldChangedTypes(
   }
   for (const op of [...plan.fields.update, ...plan.fields.remove]) {
     if (created.has(op.contentTypeIdentifier)) continue;
+    // already captured via fields.create for this type — its contentTypeId is authoritative from there
     if (affected.has(op.contentTypeIdentifier)) continue;
     const id = idByIdentifier.get(op.contentTypeIdentifier);
     if (id) {
