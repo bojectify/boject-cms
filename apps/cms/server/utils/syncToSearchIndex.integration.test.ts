@@ -310,6 +310,32 @@ describe('syncToSearchIndex — reconcile', () => {
     );
   });
 
+  it('CONTENT_BULK_SYNC reindexes per-version docs for every indexable entry of the type (same as schema-changed)', async () => {
+    const ctId = await createType('Article');
+    const a = await createEntry(ctId, 'a', [
+      {
+        status: CONTENT_STATUSES.PUBLISHED,
+        title: 'A',
+        body: 'aa',
+        publishedAt: new Date('2026-01-01T00:00:00.000Z'),
+      },
+      { status: CONTENT_STATUSES.CHANGED, title: 'A2', body: 'aaa' },
+    ]);
+    const b = await createEntry(ctId, 'b', [
+      { status: CONTENT_STATUSES.DRAFT, title: 'B', body: 'bb' },
+    ]);
+    await syncToSearchIndex(deps, {
+      event: 'CONTENT_BULK_SYNC',
+      deliveryId: 'd3',
+      contentTypeId: ctId,
+      contentTypeIdentifier: 'Article',
+      occurredAt: '2026-01-01T00:00:00.000Z',
+    });
+    expect(await ids()).toEqual(
+      [`${a.id}__CHANGED`, `${a.id}__PUBLISHED`, `${b.id}__DRAFT`].sort()
+    );
+  });
+
   it('ignores an unknown event (no-op)', async () => {
     await addTestDocuments([
       {

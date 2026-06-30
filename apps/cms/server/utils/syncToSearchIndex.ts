@@ -90,7 +90,8 @@ export async function syncToSearchIndex(
       return;
     }
 
-    case WEBHOOK_EVENTS.CONTENT_TYPE_SCHEMA_CHANGED: {
+    case WEBHOOK_EVENTS.CONTENT_TYPE_SCHEMA_CHANGED:
+    case WEBHOOK_EVENTS.CONTENT_BULK_SYNC: {
       const contentTypeId = readContentTypeId(payload);
       if (!contentTypeId) return;
       const entries = await prisma.contentEntry.findMany({

@@ -49,7 +49,8 @@ export async function syncToCacheInvalidation(
       return;
     }
 
-    case WEBHOOK_EVENTS.CONTENT_TYPE_SCHEMA_CHANGED: {
+    case WEBHOOK_EVENTS.CONTENT_TYPE_SCHEMA_CHANGED:
+    case WEBHOOK_EVENTS.CONTENT_BULK_SYNC: {
       const identifier = asString(p.contentTypeIdentifier);
       if (!identifier) {
         console.warn(

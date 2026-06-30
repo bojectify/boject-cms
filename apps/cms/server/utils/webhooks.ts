@@ -4,6 +4,7 @@ import {
   buildWebhookPayload,
   buildSchemaChangedPayload,
   buildDraftSyncPayload,
+  buildContentBulkSyncPayload,
 } from './webhookPayload';
 import type { WebhookEntrySnapshot } from './webhookPayload';
 import { WEBHOOK_EVENTS } from '../../utils/webhookEvents';
@@ -122,6 +123,29 @@ export async function enqueueContentTypeSchemaChanged(
     entryId: null,
     buildPayload: (deliveryId, now) =>
       buildSchemaChangedPayload({
+        deliveryId,
+        occurredAt: now,
+        contentType: args.contentType,
+      }),
+  });
+}
+
+/**
+ * Enqueue a coalesced per-type bulk-content sync (a bundle import wrote entries
+ * of this type). No entry → entryId null + a flat payload. Drives the internal
+ * search-sync + cache-invalidation subscribers (reindex type + clear
+ * content-type:<T>); externally subscribable. (#393)
+ */
+export async function enqueueContentBulkSync(
+  tx: Prisma.TransactionClient,
+  args: EnqueueSchemaChangedArgs
+): Promise<number> {
+  return insertDeliveries(tx, {
+    event: WEBHOOK_EVENTS.CONTENT_BULK_SYNC,
+    contentTypeId: args.contentType.id,
+    entryId: null,
+    buildPayload: (deliveryId, now) =>
+      buildContentBulkSyncPayload({
         deliveryId,
         occurredAt: now,
         contentType: args.contentType,

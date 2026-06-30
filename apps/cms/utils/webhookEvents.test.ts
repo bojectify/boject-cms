@@ -8,22 +8,24 @@ import {
 } from './webhookEvents';
 
 describe('webhookEvents registry', () => {
-  it('WEBHOOK_EVENT_NAMES includes the internal ENTRY_DRAFT_SYNC', () => {
+  it('WEBHOOK_EVENT_NAMES includes the internal ENTRY_DRAFT_SYNC and CONTENT_BULK_SYNC', () => {
     expect(WEBHOOK_EVENT_NAMES).toEqual([
       'ENTRY_PUBLISHED',
       'ENTRY_UNPUBLISHED',
       'ENTRY_DELETED',
       'CONTENT_TYPE_SCHEMA_CHANGED',
       'ENTRY_DRAFT_SYNC',
+      'CONTENT_BULK_SYNC',
     ]);
   });
 
-  it('EXTERNAL_WEBHOOK_EVENT_NAMES excludes ENTRY_DRAFT_SYNC', () => {
+  it('EXTERNAL_WEBHOOK_EVENT_NAMES excludes ENTRY_DRAFT_SYNC but includes CONTENT_BULK_SYNC', () => {
     expect(EXTERNAL_WEBHOOK_EVENT_NAMES).toEqual([
       'ENTRY_PUBLISHED',
       'ENTRY_UNPUBLISHED',
       'ENTRY_DELETED',
       'CONTENT_TYPE_SCHEMA_CHANGED',
+      'CONTENT_BULK_SYNC',
     ]);
   });
 
@@ -31,7 +33,7 @@ describe('webhookEvents registry', () => {
     expect([...WEBHOOK_EVENT_OPTIONS.map((o) => o.value)].sort()).toEqual(
       [...EXTERNAL_WEBHOOK_EVENT_NAMES].sort()
     );
-    expect(WEBHOOK_EVENT_OPTIONS).toHaveLength(4);
+    expect(WEBHOOK_EVENT_OPTIONS).toHaveLength(5);
   });
 
   it('isWebhookEventName accepts every enum value incl. ENTRY_DRAFT_SYNC', () => {
@@ -40,9 +42,22 @@ describe('webhookEvents registry', () => {
     expect(isWebhookEventName('NOT_AN_EVENT')).toBe(false);
   });
 
+  it('isWebhookEventName accepts CONTENT_BULK_SYNC', () => {
+    expect(isWebhookEventName('CONTENT_BULK_SYNC')).toBe(true);
+  });
+
   it('isExternalWebhookEventName rejects ENTRY_DRAFT_SYNC but accepts external ones', () => {
     expect(isExternalWebhookEventName('ENTRY_DRAFT_SYNC')).toBe(false);
     expect(isExternalWebhookEventName('ENTRY_PUBLISHED')).toBe(true);
     expect(isExternalWebhookEventName(42)).toBe(false);
+  });
+
+  it('isExternalWebhookEventName accepts CONTENT_BULK_SYNC', () => {
+    expect(isExternalWebhookEventName('CONTENT_BULK_SYNC')).toBe(true);
+  });
+
+  it('WEBHOOK_EVENT_OPTIONS includes CONTENT_BULK_SYNC', () => {
+    const values = WEBHOOK_EVENT_OPTIONS.map((o) => o.value);
+    expect(values).toContain('CONTENT_BULK_SYNC');
   });
 });
