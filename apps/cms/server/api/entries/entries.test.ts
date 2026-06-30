@@ -763,25 +763,22 @@ describe('Content Entry endpoints', async () => {
             data: { title: `Readonly attempt ${Date.now()}` },
           }),
         });
-        expect(res.status).toBe(403);
-        const body = (await res.json()) as { data?: { error?: string } };
-        expect(body.data?.error).toBe('INSUFFICIENT_SCOPE');
+        // /api/entries is session-only under the default-deny token allowlist
+        // (#257); tokens are rejected at the middleware (401) before scope
+        // is checked.
+        expect(res.status).toBe(401);
       } finally {
         await prisma.apiKey.delete({ where: { keyHash } });
       }
     });
 
-    it('POST /api/entries returns 403 INSUFFICIENT_SCOPE for content:read-only API keys before body validation', async () => {
-      // Pins the assertApiKeyScope-before-body-validation order. The
-      // @boject/cli probeContentWriteScope helper (#183) depends on
-      // this ordering to distinguish "missing scope" (403) from
-      // "scope OK but body invalid" (400/404). Sentinel body uses an
-      // all-zero UUID that won't match any real ContentType row; if
-      // the handler validated the body first, this would 404, not 403.
-      //
-      // Do NOT use the canonical perf key here — its scopes are
-      // widened in seed.ts for the e2e flow. Mint a fresh
-      // content:read-only key inline.
+    it('token on /api/entries is barred by the middleware (401) regardless of scope or body', async () => {
+      // Under the default-deny token allowlist (#257), /api/entries is
+      // session-only. Any token — including content:read-only — is rejected
+      // at the middleware with 401 before the handler runs.
+      // (The old "assertApiKeyScope-before-body-validation" ordering contract
+      // no longer applies here; the boject-cli probe path moved to
+      // /api/public/entries in #395.)
       const rawKey = `boject_test_probe_readonly_${Date.now()}`;
       const keyHash = createHash('sha256').update(rawKey).digest('hex');
       const keyPrefix = rawKey.slice(0, 11);
@@ -806,12 +803,7 @@ describe('Content Entry endpoints', async () => {
             data: {},
           }),
         });
-        expect(res.status).toBe(403);
-        const body = (await res.json()) as {
-          data?: { error?: string; required?: string };
-        };
-        expect(body.data?.error).toBe('INSUFFICIENT_SCOPE');
-        expect(body.data?.required).toBe('content:write');
+        expect(res.status).toBe(401);
       } finally {
         await prisma.apiKey.delete({ where: { keyHash } });
       }
@@ -888,9 +880,8 @@ describe('Content Entry endpoints', async () => {
           },
           body: JSON.stringify({ data: { title: 'Should be rejected' } }),
         });
-        expect(res.status).toBe(403);
-        const body = (await res.json()) as { data?: { error?: string } };
-        expect(body.data?.error).toBe('INSUFFICIENT_SCOPE');
+        // /api/entries is session-only under the default-deny allowlist (#257)
+        expect(res.status).toBe(401);
       } finally {
         await prisma.apiKey.delete({ where: { keyHash } });
       }
@@ -959,9 +950,8 @@ describe('Content Entry endpoints', async () => {
             'X-Forwarded-For': '203.0.113.25',
           },
         });
-        expect(res.status).toBe(403);
-        const body = (await res.json()) as { data?: { error?: string } };
-        expect(body.data?.error).toBe('INSUFFICIENT_SCOPE');
+        // /api/entries is session-only under the default-deny allowlist (#257)
+        expect(res.status).toBe(401);
       } finally {
         await prisma.apiKey.delete({ where: { keyHash } });
       }
@@ -1053,9 +1043,8 @@ describe('Content Entry endpoints', async () => {
             'X-Forwarded-For': '203.0.113.27',
           },
         });
-        expect(res.status).toBe(403);
-        const body = (await res.json()) as { data?: { error?: string } };
-        expect(body.data?.error).toBe('INSUFFICIENT_SCOPE');
+        // /api/entries is session-only under the default-deny allowlist (#257)
+        expect(res.status).toBe(401);
       } finally {
         await prisma.apiKey.delete({ where: { keyHash } });
         // Clean up the PUBLISHED+CHANGED entry so it doesn't pollute the
@@ -1130,9 +1119,8 @@ describe('Content Entry endpoints', async () => {
             'X-Forwarded-For': '203.0.113.29',
           },
         });
-        expect(res.status).toBe(403);
-        const body = (await res.json()) as { data?: { error?: string } };
-        expect(body.data?.error).toBe('INSUFFICIENT_SCOPE');
+        // /api/entries is session-only under the default-deny allowlist (#257)
+        expect(res.status).toBe(401);
       } finally {
         // Clean up: archived entries don't pollute the active-status default
         // filter, but the inline-minted key must be removed.
@@ -1213,9 +1201,8 @@ describe('Content Entry endpoints', async () => {
             'X-Forwarded-For': '203.0.113.31',
           },
         });
-        expect(res.status).toBe(403);
-        const body = (await res.json()) as { data?: { error?: string } };
-        expect(body.data?.error).toBe('INSUFFICIENT_SCOPE');
+        // /api/entries is session-only under the default-deny allowlist (#257)
+        expect(res.status).toBe(401);
       } finally {
         await prisma.apiKey.delete({ where: { keyHash } });
       }
@@ -1288,11 +1275,10 @@ describe('Content Entry endpoints', async () => {
             'X-Forwarded-For': '203.0.113.33',
           },
         });
-        expect(res.status).toBe(403);
-        const body = (await res.json()) as { data?: { error?: string } };
-        expect(body.data?.error).toBe('INSUFFICIENT_SCOPE');
+        // /api/entries is session-only under the default-deny allowlist (#257)
+        expect(res.status).toBe(401);
       } finally {
-        // The rejected unpublish leaves the entry as PUBLISHED — clean it up
+        // The rejected request leaves the entry as PUBLISHED — clean it up
         // so it doesn't pollute the active-status-default-filter test counts.
         await prisma.contentEntry.delete({ where: { id } });
         await prisma.apiKey.delete({ where: { keyHash } });
@@ -3483,11 +3469,10 @@ describe('Content Entry endpoints', async () => {
             'X-Forwarded-For': '203.0.113.35',
           },
         });
-        expect(res.status).toBe(403);
-        const body = (await res.json()) as { data?: { error?: string } };
-        expect(body.data?.error).toBe('INSUFFICIENT_SCOPE');
+        // /api/entries is session-only under the default-deny allowlist (#257)
+        expect(res.status).toBe(401);
       } finally {
-        // The rejected republish leaves the entry as PUBLISHED — clean up
+        // The rejected request leaves the entry as PUBLISHED — clean up
         // so it doesn't pollute downstream active-status-default-filter tests.
         await prisma.contentEntry.delete({ where: { id } });
         await prisma.apiKey.delete({ where: { keyHash } });

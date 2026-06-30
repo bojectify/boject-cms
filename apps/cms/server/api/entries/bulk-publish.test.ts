@@ -204,7 +204,7 @@ describe('POST /api/entries/bulk-publish', async () => {
     expect(body.results[0]?.error).toBe('NOTHING_TO_PUBLISH');
   });
 
-  it('403s without content:write scope', async () => {
+  it('401s for any API key (session-only path under default-deny allowlist, #257)', async () => {
     const raw = `boject_test_no_write_${Date.now()}`;
     const { createHash } = await import('node:crypto');
     const created = await prisma.apiKey.create({
@@ -220,7 +220,9 @@ describe('POST /api/entries/bulk-publish', async () => {
         ['11111111-1111-4111-8111-111111111111'],
         raw
       );
-      expect(res.status).toBe(403);
+      // /api/entries/bulk-publish is session-only; token is rejected at
+      // the middleware before the scope gate.
+      expect(res.status).toBe(401);
     } finally {
       await prisma.apiKey.delete({ where: { id: created.id } });
     }
