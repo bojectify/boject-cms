@@ -12,7 +12,7 @@
 
 import type { Prisma, PrismaClient } from '#prisma';
 import type { Bundle, BundleField } from './types';
-import type { SchemaPlan } from './schemaPlan.types';
+import type { CurrentSchemaSnapshot, SchemaPlan } from './schemaPlan.types';
 import { effectiveBundleUnique } from './schemaPlan.types';
 import { validateBundle } from './validate';
 import { checkFieldDefault } from '../../utils/fieldDefaults';
@@ -26,6 +26,7 @@ import {
 import { snapshotCurrentSchema } from './snapshotCurrentSchema';
 import { planSchema } from './planSchema';
 import { plansEqual } from './plansEqual';
+import { enqueueContentTypeSchemaChanged } from '../../server/utils/webhooks';
 // invalidateSchema is loaded lazily — the docker entrypoint runs this
 // applier from a tsx process where the apps/cms/server/ tree isn't on
 // disk (Nuxt hasn't booted, so there's no cached schema to clear anyway).
@@ -91,6 +92,42 @@ const ZERO_APPLIED: ApplySchemaResult['applied'] = {
   fieldsUpdated: 0,
   fieldsRemoved: 0,
 };
+
+/**
+ * #393: the EXISTING content types whose fields changed in this plan — those
+ * are the types whose entries' search docs + cached lists go stale. Excludes
+ * brand-new types (contentTypes.create — no entries) and name/description-only
+ * updates (not in the field-op set). Removals are out of scope (#404).
+ */
+function collectFieldChangedTypes(
+  plan: SchemaPlan,
+  snapshot: CurrentSchemaSnapshot
+): Array<{ id: string; identifier: string }> {
+  const created = new Set(plan.contentTypes.create.map((c) => c.identifier));
+  const idByIdentifier = new Map(
+    snapshot.contentTypes.map((c) => [c.identifier, c.id] as const)
+  );
+  const affected = new Map<string, { id: string; identifier: string }>();
+  for (const op of plan.fields.create) {
+    if (created.has(op.contentTypeIdentifier)) continue;
+    affected.set(op.contentTypeIdentifier, {
+      id: op.contentTypeId,
+      identifier: op.contentTypeIdentifier,
+    });
+  }
+  for (const op of [...plan.fields.update, ...plan.fields.remove]) {
+    if (created.has(op.contentTypeIdentifier)) continue;
+    if (affected.has(op.contentTypeIdentifier)) continue;
+    const id = idByIdentifier.get(op.contentTypeIdentifier);
+    if (id) {
+      affected.set(op.contentTypeIdentifier, {
+        id,
+        identifier: op.contentTypeIdentifier,
+      });
+    }
+  }
+  return [...affected.values()];
+}
 
 export async function applySchema(
   prisma: PrismaClient,
@@ -316,6 +353,12 @@ export async function applySchema(
         if (ownerWasRemoved) continue;
         await tx.contentTypeField.delete({ where: { id: removal.id } });
         applied.fieldsRemoved += 1;
+      }
+
+      // #393: reconcile derived stores (search + cache) for existing types whose
+      // fields changed. Inside the tx → rolled back on dryRun with everything else.
+      for (const contentType of collectFieldChangedTypes(plan, snapshot)) {
+        await enqueueContentTypeSchemaChanged(tx, { contentType });
       }
 
       const changed = isPlanNonEmpty(plan);
