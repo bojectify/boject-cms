@@ -5,8 +5,6 @@ import { resetRateLimitStore } from '../../utils/rateLimit';
 import { parseFieldOptions } from '../../../utils/fieldOptions';
 import { FIELD_TYPES } from '../../../utils/fieldTypes';
 
-const TEST_API_KEY = 'boject_test_key_for_integration_tests_only';
-
 let _sessionCookie: string | null = null;
 
 async function getSessionCookie(): Promise<string> {
@@ -356,10 +354,11 @@ describe('Content Type endpoints', async () => {
 
   describe('GET /api/content-types', () => {
     it('returns paginated content types', async () => {
+      const cookie = await getSessionCookie();
       const { items, total } = await $fetch<ListResponse>(
         '/api/content-types',
         {
-          headers: { Authorization: `Bearer ${TEST_API_KEY}` },
+          headers: { cookie },
         }
       );
       expect(total).toBeGreaterThanOrEqual(1);
@@ -390,7 +389,7 @@ describe('Content Type endpoints', async () => {
       const fetched = await $fetch<ContentTypeResponse>(
         `/api/content-types/${created.id}`,
         {
-          headers: { Authorization: `Bearer ${TEST_API_KEY}` },
+          headers: { cookie },
         }
       );
       expect(fetched.fields).toHaveLength(3);
@@ -400,10 +399,11 @@ describe('Content Type endpoints', async () => {
     });
 
     it('returns 404 for unknown id', async () => {
+      const cookie = await getSessionCookie();
       const res = await fetch(
         '/api/content-types/00000000-0000-0000-0000-000000000000',
         {
-          headers: { Authorization: `Bearer ${TEST_API_KEY}` },
+          headers: { cookie },
         }
       );
       expect(res.status).toBe(404);
@@ -2199,7 +2199,7 @@ describe('Content Type endpoints', async () => {
       const fetched = await $fetch<ContentTypeResponse>(
         `/api/content-types/${ct.id}`,
         {
-          headers: { Authorization: `Bearer ${TEST_API_KEY}` },
+          headers: { cookie },
         }
       );
       expect(fetched.fields[0]!.identifier).toBe('count');

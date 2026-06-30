@@ -3,8 +3,6 @@ import { setup, $fetch, fetch } from '@nuxt/test-utils/e2e';
 import { TEST_USERNAME, TEST_PASSWORD } from '../../test/credentials';
 import { FIELD_TYPES } from '../../../utils/fieldTypes';
 
-const TEST_API_KEY = 'boject_test_key_for_integration_tests_only';
-
 type QueryField = {
   identifier: string;
   name: string;
@@ -101,13 +99,5 @@ describe('GET /api/content-types/with-fields', async () => {
       { label: 'Draft', value: 'Draft' },
       { label: 'Active', value: 'Active' },
     ]);
-  });
-
-  it('rejects an API-key caller with 403', async () => {
-    await expect(
-      $fetch('/api/content-types/with-fields', {
-        headers: { authorization: `Bearer ${TEST_API_KEY}` },
-      })
-    ).rejects.toMatchObject({ statusCode: 403 });
   });
 });

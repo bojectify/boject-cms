@@ -11,8 +11,6 @@ const prismaUrl = getTestDatabaseUrl();
 const prismaAdapter = new PrismaPg({ connectionString: prismaUrl });
 const prisma = new PrismaClient({ adapter: prismaAdapter });
 
-const TEST_API_KEY = 'boject_test_key_for_integration_tests_only';
-
 type ContentItem = {
   id: string;
   entryTitle: string;
@@ -72,26 +70,16 @@ async function getSessionCookie(): Promise<string> {
   return _sessionCookie;
 }
 
-function getContent(
-  params: Record<string, string | number> = {},
-  auth: 'apikey' | 'session' = 'apikey'
-) {
+async function getContent(params: Record<string, string | number> = {}) {
+  const cookie = await getSessionCookie();
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
     search.append(key, String(value));
   }
   const qs = search.toString();
-  const headers: Record<string, string> =
-    auth === 'apikey' ? { Authorization: `Bearer ${TEST_API_KEY}` } : {};
-  return auth === 'session'
-    ? getSessionCookie().then((cookie) =>
-        $fetch<ContentResponse>(`/api/all-content${qs ? `?${qs}` : ''}`, {
-          headers: { cookie },
-        })
-      )
-    : $fetch<ContentResponse>(`/api/all-content${qs ? `?${qs}` : ''}`, {
-        headers,
-      });
+  return $fetch<ContentResponse>(`/api/all-content${qs ? `?${qs}` : ''}`, {
+    headers: { cookie },
+  });
 }
 
 let blogPostType: ContentTypeResponse;
@@ -213,13 +201,10 @@ describe('Content API filters', async () => {
   const UUID_RE =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-  it('returns all published content items (API key)', async () => {
-    // API key only sees entries with a PUBLISHED version (3 published: 2 blog + 1 news)
+  it('returns all content items including drafts', async () => {
+    // Session sees all entries (2 published blogs + 1 draft blog + 1 published news)
     const { items } = await getContent({ perPage: 50 });
-    expect(items.length).toBeGreaterThanOrEqual(3);
-    expect(items.every((i) => i.status === CONTENT_STATUSES.PUBLISHED)).toBe(
-      true
-    );
+    expect(items.length).toBeGreaterThanOrEqual(4);
     expect(items[0]).toHaveProperty('contentType');
     expect(items[0]).toHaveProperty('contentTypeId');
     expect(items[0]).toHaveProperty('entryTitle');
@@ -227,14 +212,6 @@ describe('Content API filters', async () => {
     expect(typeof items[0]!.contentType).toBe('string');
     expect(typeof items[0]!.contentTypeId).toBe('string');
     expect(items[0]!.contentTypeId).toMatch(UUID_RE);
-  });
-
-  it('returns all content items including drafts (session)', async () => {
-    // Session sees all entries (2 published blogs + 1 draft blog + 1 published news)
-    const { items } = await getContent({ perPage: 50 }, 'session');
-    expect(items.length).toBeGreaterThanOrEqual(4);
-    expect(items[0]).toHaveProperty('contentType');
-    expect(items[0]).toHaveProperty('entryTitle');
   });
 
   it('cursor-paginates with pageInfo and no total', async () => {
@@ -256,26 +233,11 @@ describe('Content API filters', async () => {
   // ── contentType filter ────────────────────────────────────────
 
   describe('contentType filter', () => {
-    it('filters by dynamic identifier (API key sees only published)', async () => {
+    it('filters by dynamic identifier (session sees all)', async () => {
       const { items } = await getContent({
         contentType: blogPostType.identifier,
         perPage: 50,
       });
-      // API key only sees the 2 published blog entries (not the draft)
-      expect(items.length).toBeGreaterThanOrEqual(2);
-      expect(items.every((i) => i.contentType === blogPostType.name)).toBe(
-        true
-      );
-      expect(items.every((i) => i.status === CONTENT_STATUSES.PUBLISHED)).toBe(
-        true
-      );
-    });
-
-    it('filters by dynamic identifier (session sees all)', async () => {
-      const { items } = await getContent(
-        { contentType: blogPostType.identifier, perPage: 50 },
-        'session'
-      );
       // Session sees all 3 blog entries (2 published + 1 draft)
       expect(items.length).toBeGreaterThanOrEqual(3);
       expect(items.every((i) => i.contentType === blogPostType.name)).toBe(
@@ -295,7 +257,7 @@ describe('Content API filters', async () => {
   // ── status filter ─────────────────────────────────────────────
 
   describe('status filter', () => {
-    it('filters by status=PUBLISHED and all items have a string contentType', async () => {
+    it('filters by status=PUBLISHED (all items have a string contentType)', async () => {
       const { items } = await getContent({
         status: CONTENT_STATUSES.PUBLISHED,
         perPage: 100,
@@ -312,28 +274,26 @@ describe('Content API filters', async () => {
       ).toBe(true);
     });
 
-    it('filters by status=DRAFT (session auth required)', async () => {
-      // API key only sees PUBLISHED, so DRAFT filter via API key returns empty.
-      // Use session auth to verify DRAFT filter works.
-      const { items } = await getContent(
-        { status: CONTENT_STATUSES.DRAFT, perPage: 100 },
-        'session'
-      );
+    it('filters by status=DRAFT', async () => {
+      const { items } = await getContent({
+        status: CONTENT_STATUSES.DRAFT,
+        perPage: 100,
+      });
       expect(items.length).toBeGreaterThanOrEqual(1);
       expect(items.every((i) => i.status === CONTENT_STATUSES.DRAFT)).toBe(
         true
       );
     });
 
-    it('API key ignores invalid status values and returns only published', async () => {
-      const { items } = await getContent({
-        status: 'INVALID',
-        perPage: 50,
-      });
-      // API key sees only published entries; invalid status is ignored
-      expect(items.every((i) => i.status === CONTENT_STATUSES.PUBLISHED)).toBe(
-        true
-      );
+    it('ignores an unrecognised status value and returns the default listing', async () => {
+      // The handler silently ignores an invalid status (treated as no filter),
+      // so it returns the same set as an unfiltered call. Comparing to a
+      // baseline keeps this robust to the shared test DB's row count (an
+      // absolute count is fragile across the full suite). Restores the coverage
+      // an API-key-only test held before the #257 token-strip migration.
+      const baseline = await getContent({ perPage: 100 });
+      const invalid = await getContent({ status: 'INVALID', perPage: 100 });
+      expect(invalid.items.length).toBe(baseline.items.length);
     });
   });
 
@@ -355,15 +315,11 @@ describe('Content API filters', async () => {
       ).toBe(true);
     });
 
-    it('contentType + status=DRAFT (session auth)', async () => {
-      // Use session auth — API key cannot see DRAFT entries
-      const { items } = await getContent(
-        {
-          contentType: blogPostType.identifier,
-          status: CONTENT_STATUSES.DRAFT,
-        },
-        'session'
-      );
+    it('contentType + status=DRAFT', async () => {
+      const { items } = await getContent({
+        contentType: blogPostType.identifier,
+        status: CONTENT_STATUSES.DRAFT,
+      });
       expect(
         items.every(
           (i) =>
@@ -444,14 +400,11 @@ describe('Content API filters', async () => {
       // versions (the default 'active' filter excludes any entry with an
       // archived version at the WHERE level). draft-priority then picks the
       // CHANGED version over PUBLISHED.
-      const { items } = await getContent(
-        {
-          contentType: manyVersionType.identifier,
-          perPage: 50,
-          archiveFilter: 'all',
-        },
-        'session'
-      );
+      const { items } = await getContent({
+        contentType: manyVersionType.identifier,
+        perPage: 50,
+        archiveFilter: 'all',
+      });
 
       const found = items.find((i) => i.id === entry.id);
       expect(found).toBeDefined();

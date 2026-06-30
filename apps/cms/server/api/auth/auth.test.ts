@@ -128,12 +128,16 @@ describe('Authentication', async () => {
       });
     });
 
-    it('allows REST API requests with a valid API key', async () => {
+    it('allows REST API requests with a valid session', async () => {
+      const loginRes = await fetch('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email: TEST_USERNAME, password: TEST_PASSWORD }),
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const cookie = loginRes.headers.getSetCookie().join('; ');
       const response = await $fetch<{ items: unknown[]; total: number }>(
         '/api/content-types',
-        {
-          headers: { Authorization: `Bearer ${TEST_API_KEY}` },
-        }
+        { headers: { cookie } }
       );
       expect(response).toHaveProperty('items');
       expect(response).toHaveProperty('total');
@@ -228,5 +232,72 @@ describe('Authentication', async () => {
       const res = await fetch('/api/content-types', { headers: { cookie } });
       expect(res.status).toBe(401);
     });
+  });
+
+  // ── API-key path partition (#257): tokens valid only on public + management;
+  //    admin content is session-only (token → 401) ─────────────────────────
+  describe('API-key path partition (#257)', () => {
+    const bearer = { Authorization: `Bearer ${TEST_API_KEY}` };
+
+    async function sessionCookie(): Promise<string> {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: TEST_USERNAME, password: TEST_PASSWORD }),
+      });
+      return res.headers.getSetCookie().join('; ');
+    }
+
+    it.each([
+      '/api/entries?contentType=Anything',
+      '/api/all-content',
+      '/api/content-types',
+    ])('token GET %s → 401 (admin content is session-only)', async (p) => {
+      const res = await fetch(p, { headers: bearer });
+      expect(res.status).toBe(401);
+    });
+
+    it('token write to /api/entries → 401', async () => {
+      const res = await fetch('/api/entries', {
+        method: 'POST',
+        headers: { ...bearer, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contentTypeId: '00000000-0000-0000-0000-000000000000',
+          data: {},
+        }),
+      });
+      expect(res.status).toBe(401);
+    });
+
+    it('SESSION GET /api/content-types → 200 (session still works)', async () => {
+      const res = await fetch('/api/content-types', {
+        headers: { cookie: await sessionCookie() },
+      });
+      expect(res.status).toBe(200);
+    });
+
+    it('token GET /api/public/entries → not 401 (content:read; reaches handler)', async () => {
+      const res = await fetch('/api/public/entries?contentType=Anything', {
+        headers: bearer,
+      });
+      expect(res.status).not.toBe(401);
+    });
+
+    it.each([
+      '/api/search?q=x',
+      '/api/schema/export',
+      '/api/content-bundle/export',
+      '/api/apikeys',
+    ])(
+      'token on token-permitted path %s is NOT barred by the partition',
+      async (p) => {
+        // The test key has content:read + content:write only, so management
+        // endpoints return 403 INSUFFICIENT_SCOPE and search returns 200 (or 503
+        // if Meili is down). Any of those proves the partition let the token
+        // THROUGH to the handler — the one outcome that must never happen is 401.
+        const res = await fetch(p, { headers: bearer });
+        expect(res.status).not.toBe(401);
+      }
+    );
   });
 });

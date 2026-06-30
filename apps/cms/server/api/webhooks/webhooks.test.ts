@@ -109,7 +109,7 @@ describe('Webhooks REST', async () => {
           events: ['ENTRY_PUBLISHED'],
         }),
       });
-      expect(res.status).toBe(403);
+      expect(res.status).toBe(401);
     });
   });
 
@@ -202,7 +202,7 @@ describe('Webhooks REST', async () => {
           body: JSON.stringify({ name: 'blocked' }),
         }
       );
-      expect(res.status).toBe(403);
+      expect(res.status).toBe(401);
     });
   });
 
@@ -275,7 +275,7 @@ describe('Webhooks REST', async () => {
           headers: { Authorization: `Bearer ${TEST_API_KEY}` },
         }
       );
-      expect(res.status).toBe(403);
+      expect(res.status).toBe(401);
     });
   });
 
@@ -326,7 +326,7 @@ describe('Webhooks REST', async () => {
           headers: { Authorization: `Bearer ${TEST_API_KEY}` },
         }
       );
-      expect(res.status).toBe(403);
+      expect(res.status).toBe(401);
     });
   });
 
@@ -393,7 +393,7 @@ describe('Webhooks REST', async () => {
           headers: { Authorization: `Bearer ${TEST_API_KEY}` },
         }
       );
-      expect(res.status).toBe(403);
+      expect(res.status).toBe(401);
     });
   });
 
@@ -438,7 +438,7 @@ describe('Webhooks REST', async () => {
           headers: { Authorization: `Bearer ${TEST_API_KEY}` },
         }
       );
-      expect(res.status).toBe(403);
+      expect(res.status).toBe(401);
     });
   });
 
@@ -505,7 +505,7 @@ describe('Webhooks REST', async () => {
           headers: { Authorization: `Bearer ${TEST_API_KEY}` },
         }
       );
-      expect(res.status).toBe(403);
+      expect(res.status).toBe(401);
     });
   });
 
@@ -607,7 +607,7 @@ describe('Webhooks REST', async () => {
           headers: { Authorization: `Bearer ${TEST_API_KEY}` },
         }
       );
-      expect(res.status).toBe(403);
+      expect(res.status).toBe(401);
     });
   });
 

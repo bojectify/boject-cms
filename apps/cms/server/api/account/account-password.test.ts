@@ -163,7 +163,7 @@ describe('POST /api/account/password', () => {
     expect(res.status).toBe(401);
   });
 
-  it('returns 403 with an API-key Bearer token (read-only enforcement)', async () => {
+  it('rejects an API-key Bearer token with 401 (account is session-only, #257)', async () => {
     const res = await fetch('/api/account/password', {
       method: 'POST',
       body: JSON.stringify({
@@ -175,7 +175,10 @@ describe('POST /api/account/password', () => {
         authorization: 'Bearer boject_test_key_for_integration_tests_only',
       },
     });
-    expect(res.status).toBe(403);
+    // /api/account is not on the token allowlist (#257) — the API-key branch is
+    // skipped and the request falls through to no-session → 401 (not the old
+    // read-only 403, which only fires for a token that reaches a handler).
+    expect(res.status).toBe(401);
   });
 
   it('rate-limits after 5 attempts in 60s', async () => {
