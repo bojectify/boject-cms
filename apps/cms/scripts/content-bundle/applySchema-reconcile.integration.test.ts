@@ -259,9 +259,34 @@ describe('applySchema — reconcile (#393)', () => {
     const result = await applySchema(prisma, fieldAddBundle);
     expect(result.applied.fieldsCreated).toBe(1);
 
-    // Drive the worker. Both INTERNAL webhooks (search sync + cache invalidation)
-    // subscribe to CONTENT_TYPE_SCHEMA_CHANGED, so a single tick processes both.
-    await tick();
+    // Drive the worker with a bounded drain loop. Both INTERNAL webhooks (search
+    // sync + cache invalidation) subscribe to CONTENT_TYPE_SCHEMA_CHANGED.
+    // Under full-suite load a delivery can take a retry (transient FAILED →
+    // backoff ~1 s → SUCCESS); a single tick() would race that. Loop until all
+    // of this test's deliveries reach SUCCESS, or up to 20 iterations (max
+    // ~24 s — hit only if every attempt fails, which would surface as a loud
+    // assertion failure below).
+    {
+      const MAX_DRAIN_ITERS = 20;
+      for (let i = 0; i < MAX_DRAIN_ITERS; i++) {
+        await tick();
+        const pending = await prisma.webhookDelivery.findMany({
+          where: {
+            event: WEBHOOK_EVENTS.CONTENT_TYPE_SCHEMA_CHANGED,
+            contentTypeId,
+          },
+        });
+        if (
+          pending.length > 0 &&
+          pending.every((d) => d.status === 'SUCCESS')
+        ) {
+          break;
+        }
+        // Backoff for attempt 1 is 1 s; wait long enough for the retry row to
+        // become eligible before the next tick picks it up.
+        await new Promise((r) => setTimeout(r, 1200));
+      }
+    }
     await waitForIndexing();
 
     // Cache cleared: the cache-invalidation subscriber fired invalidateByTag on
