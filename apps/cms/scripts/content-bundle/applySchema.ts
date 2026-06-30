@@ -26,7 +26,6 @@ import {
 import { snapshotCurrentSchema } from './snapshotCurrentSchema';
 import { planSchema } from './planSchema';
 import { plansEqual } from './plansEqual';
-import { enqueueContentTypeSchemaChanged } from '../../server/utils/webhooks';
 // invalidateSchema is loaded lazily — the docker entrypoint runs this
 // applier from a tsx process where the apps/cms/server/ tree isn't on
 // disk (Nuxt hasn't booted, so there's no cached schema to clear anyway).
@@ -39,6 +38,35 @@ async function invalidateSchemaIfAvailable(): Promise<void> {
     const mod = await import('../../server/graphql/schema');
     mod.invalidateSchema();
   } catch (err) {
+    if (
+      typeof err === 'object' &&
+      err !== null &&
+      (err as { code?: string }).code === 'ERR_MODULE_NOT_FOUND'
+    ) {
+      return;
+    }
+    throw err;
+  }
+}
+
+// enqueueContentTypeSchemaChanged is loaded lazily for the same reason as
+// invalidateSchemaIfAvailable above — the docker entrypoint runs applySchema
+// under tsx where apps/cms/server/ isn't on disk. The lazy import resolves
+// normally in Nuxt context so existing test spies still intercept the call.
+async function enqueueSchemaChangedIfAvailable(
+  tx: Prisma.TransactionClient,
+  contentTypes: Array<{ id: string; identifier: string }>
+): Promise<void> {
+  if (contentTypes.length === 0) return;
+  try {
+    const mod = await import('../../server/utils/webhooks');
+    for (const contentType of contentTypes) {
+      await mod.enqueueContentTypeSchemaChanged(tx, { contentType });
+    }
+  } catch (err) {
+    // Docker boot runs this applier under tsx where apps/cms/server/ isn't on
+    // disk — degrade to no-op (same as invalidateSchemaIfAvailable). The cache
+    // is cold at boot and `search:reindex` + the TTL are the backstops.
     if (
       typeof err === 'object' &&
       err !== null &&
@@ -358,9 +386,10 @@ export async function applySchema(
 
       // #393: reconcile derived stores (search + cache) for existing types whose
       // fields changed. Inside the tx → rolled back on dryRun with everything else.
-      for (const contentType of collectFieldChangedTypes(plan, snapshot)) {
-        await enqueueContentTypeSchemaChanged(tx, { contentType });
-      }
+      await enqueueSchemaChangedIfAvailable(
+        tx,
+        collectFieldChangedTypes(plan, snapshot)
+      );
 
       const changed = isPlanNonEmpty(plan);
       const result: ApplySchemaResult = { changed, plan, applied };

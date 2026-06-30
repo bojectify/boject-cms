@@ -17,7 +17,35 @@ import {
   BundleImportValidationError,
   EntryImportReferenceError,
 } from './importErrors';
-import { enqueueContentBulkSync } from '../../server/utils/webhooks';
+// enqueueContentBulkSync is loaded lazily — the docker entrypoint runs
+// import-starter.ts under tsx where apps/cms/server/ isn't on disk (Nuxt
+// hasn't booted, so there's no cache/search state to sync anyway). In the
+// Nuxt-context POST /api/content-bundle/import path the dynamic import
+// resolves to the same module record as a static import would.
+async function enqueueContentBulkSyncIfAvailable(
+  tx: Prisma.TransactionClient,
+  contentTypes: Array<{ id: string; identifier: string }>
+): Promise<void> {
+  if (contentTypes.length === 0) return;
+  try {
+    const mod = await import('../../server/utils/webhooks');
+    for (const contentType of contentTypes) {
+      await mod.enqueueContentBulkSync(tx, { contentType });
+    }
+  } catch (err) {
+    // Docker boot runs import-starter under tsx where apps/cms/server/ isn't
+    // on disk — degrade to no-op (same as invalidateSchemaIfAvailable in
+    // applySchema.ts). The cache is cold at boot and the TTL is the backstop.
+    if (
+      typeof err === 'object' &&
+      err !== null &&
+      (err as { code?: string }).code === 'ERR_MODULE_NOT_FOUND'
+    ) {
+      return;
+    }
+    throw err;
+  }
+}
 
 export interface ImportOptions {
   mode: BundleMode;
@@ -380,14 +408,12 @@ export async function importBundle(
       // writes → search reindex + cache clear. Inside the tx, so a dryRun rolls
       // these rows back. identifierToTypeId resolves the UUID (same map the
       // entry pass used at typeId resolution).
+      const affectedTypes: Array<{ id: string; identifier: string }> = [];
       for (const identifier of affectedTypeIdentifiers) {
         const id = identifierToTypeId.get(identifier);
-        if (id) {
-          await enqueueContentBulkSync(tx, {
-            contentType: { id, identifier },
-          });
-        }
+        if (id) affectedTypes.push({ id, identifier });
       }
+      await enqueueContentBulkSyncIfAvailable(tx, affectedTypes);
 
       captured = {
         contentTypesCreated,
