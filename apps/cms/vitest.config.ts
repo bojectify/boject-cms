@@ -64,6 +64,18 @@ export default defineConfig({
         extends: true,
         test: {
           name: 'integration',
+          // Per-file DB reset (#406): full list (not just the extra file) so the
+          // worker chdir runs regardless of how vitest merges project vs root
+          // setupFiles. integrationSetup registers an afterAll that restores
+          // boject_test to the seeded baseline after every file, so files run
+          // independently (reorder / .skip / .only / --filter safe). Only the
+          // integration project gets it — unit + storybook have no DB.
+          setupFiles: [
+            fileURLToPath(new URL('./vitest.workerSetup.ts', import.meta.url)),
+            fileURLToPath(
+              new URL('./vitest.integrationSetup.ts', import.meta.url)
+            ),
+          ],
           // Scoped here (not root) so only this project runs serially. Each
           // integration file boots a Nuxt dev server via setup({ dev: true })
           // and shares the boject_test database, so parallel files would
