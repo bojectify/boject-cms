@@ -12,10 +12,13 @@ Workspace-wide tooling:
 - **Node.js 24** — runtime (containerised; see [Containerised dev environment](#containerised-dev-environment))
 - **PostgreSQL 17** — database (local via Docker)
 - **Meilisearch** — full-text search engine, run as a docker-compose sidecar (see [`apps/cms/README.md`](apps/cms/README.md#search))
+- **Redis** — response cache backend for the public read + GraphQL APIs, run as a docker-compose sidecar (`REDIS_URL`, default `redis://localhost:6379`; cold-by-design — no volume)
 - **Docker** + [OrbStack](https://orbstack.dev/) on macOS — container runtime
 - **TypeScript** — ESM-only (`"type": "module"`)
 
 App-specific stacks (Nuxt 4, Prisma v7, GraphQL Yoga, Pothos, Tiptap, Sharp, etc.) are documented in each app's README.
+
+The CMS serves a token-authed external API — `/api/public/*` (REST read + write, response-cached via Redis) and `/api/graphql` (GraphQL read) — detailed in [`apps/cms/CLAUDE.md`](apps/cms/CLAUDE.md).
 
 ## Prerequisites
 
@@ -163,7 +166,7 @@ Everything else in this README applies unchanged — just ignore the host-shim a
 ## Getting Started
 
 ```bash
-# Start local PostgreSQL
+# Start local services (Postgres + Meilisearch + Redis)
 docker compose up -d
 
 # Install dependencies (auto-runs nuxt prepare + prisma generate)
