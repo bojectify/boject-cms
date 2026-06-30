@@ -12,7 +12,7 @@
 
 import type { Prisma, PrismaClient } from '#prisma';
 import type { Bundle, BundleField } from './types';
-import type { SchemaPlan } from './schemaPlan.types';
+import type { CurrentSchemaSnapshot, SchemaPlan } from './schemaPlan.types';
 import { effectiveBundleUnique } from './schemaPlan.types';
 import { validateBundle } from './validate';
 import { checkFieldDefault } from '../../utils/fieldDefaults';
@@ -38,6 +38,35 @@ async function invalidateSchemaIfAvailable(): Promise<void> {
     const mod = await import('../../server/graphql/schema');
     mod.invalidateSchema();
   } catch (err) {
+    if (
+      typeof err === 'object' &&
+      err !== null &&
+      (err as { code?: string }).code === 'ERR_MODULE_NOT_FOUND'
+    ) {
+      return;
+    }
+    throw err;
+  }
+}
+
+// enqueueContentTypeSchemaChanged is loaded lazily for the same reason as
+// invalidateSchemaIfAvailable above — the docker entrypoint runs applySchema
+// under tsx where apps/cms/server/ isn't on disk. The lazy import resolves
+// normally in Nuxt context so existing test spies still intercept the call.
+async function enqueueSchemaChangedIfAvailable(
+  tx: Prisma.TransactionClient,
+  contentTypes: Array<{ id: string; identifier: string }>
+): Promise<void> {
+  if (contentTypes.length === 0) return;
+  try {
+    const mod = await import('../../server/utils/webhooks');
+    for (const contentType of contentTypes) {
+      await mod.enqueueContentTypeSchemaChanged(tx, { contentType });
+    }
+  } catch (err) {
+    // Docker boot runs this applier under tsx where apps/cms/server/ isn't on
+    // disk — degrade to no-op (same as invalidateSchemaIfAvailable). The cache
+    // is cold at boot and `search:reindex` + the TTL are the backstops.
     if (
       typeof err === 'object' &&
       err !== null &&
@@ -91,6 +120,43 @@ const ZERO_APPLIED: ApplySchemaResult['applied'] = {
   fieldsUpdated: 0,
   fieldsRemoved: 0,
 };
+
+/**
+ * #393: the EXISTING content types whose fields changed in this plan — those
+ * are the types whose entries' search docs + cached lists go stale. Excludes
+ * brand-new types (contentTypes.create — no entries) and name/description-only
+ * updates (not in the field-op set). Removals are out of scope (#404).
+ */
+function collectFieldChangedTypes(
+  plan: SchemaPlan,
+  snapshot: CurrentSchemaSnapshot
+): Array<{ id: string; identifier: string }> {
+  const created = new Set(plan.contentTypes.create.map((c) => c.identifier));
+  const idByIdentifier = new Map(
+    snapshot.contentTypes.map((c) => [c.identifier, c.id] as const)
+  );
+  const affected = new Map<string, { id: string; identifier: string }>();
+  for (const op of plan.fields.create) {
+    if (created.has(op.contentTypeIdentifier)) continue;
+    affected.set(op.contentTypeIdentifier, {
+      id: op.contentTypeId,
+      identifier: op.contentTypeIdentifier,
+    });
+  }
+  for (const op of [...plan.fields.update, ...plan.fields.remove]) {
+    if (created.has(op.contentTypeIdentifier)) continue;
+    // already captured via fields.create for this type — its contentTypeId is authoritative from there
+    if (affected.has(op.contentTypeIdentifier)) continue;
+    const id = idByIdentifier.get(op.contentTypeIdentifier);
+    if (id) {
+      affected.set(op.contentTypeIdentifier, {
+        id,
+        identifier: op.contentTypeIdentifier,
+      });
+    }
+  }
+  return [...affected.values()];
+}
 
 export async function applySchema(
   prisma: PrismaClient,
@@ -317,6 +383,13 @@ export async function applySchema(
         await tx.contentTypeField.delete({ where: { id: removal.id } });
         applied.fieldsRemoved += 1;
       }
+
+      // #393: reconcile derived stores (search + cache) for existing types whose
+      // fields changed. Inside the tx → rolled back on dryRun with everything else.
+      await enqueueSchemaChangedIfAvailable(
+        tx,
+        collectFieldChangedTypes(plan, snapshot)
+      );
 
       const changed = isPlanNonEmpty(plan);
       const result: ApplySchemaResult = { changed, plan, applied };

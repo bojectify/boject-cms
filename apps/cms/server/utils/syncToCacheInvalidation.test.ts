@@ -43,6 +43,16 @@ describe('syncToCacheInvalidation', () => {
     expect(calls).toEqual(['content-type:Article']);
   });
 
+  it('CONTENT_BULK_SYNC clears the content-type tag only (same as schema-changed)', async () => {
+    const { calls, deps } = makeFakeCache();
+    await syncToCacheInvalidation(deps, {
+      event: 'CONTENT_BULK_SYNC',
+      contentTypeId: 'ct1',
+      contentTypeIdentifier: 'Article',
+    });
+    expect(calls).toEqual(['content-type:Article']);
+  });
+
   it('does not clear the per-entry tag when the entry id is absent', async () => {
     const { calls, deps } = makeFakeCache();
     await syncToCacheInvalidation(deps, {

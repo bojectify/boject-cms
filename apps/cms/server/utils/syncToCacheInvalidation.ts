@@ -49,20 +49,19 @@ export async function syncToCacheInvalidation(
       return;
     }
 
-    case WEBHOOK_EVENTS.CONTENT_TYPE_SCHEMA_CHANGED: {
+    case WEBHOOK_EVENTS.CONTENT_TYPE_SCHEMA_CHANGED:
+    case WEBHOOK_EVENTS.CONTENT_BULK_SYNC: {
       const identifier = asString(p.contentTypeIdentifier);
       if (!identifier) {
         console.warn(
-          '[cache-invalidation] schema event missing contentTypeIdentifier'
+          '[cache-invalidation] schema event missing contentTypeIdentifier',
+          String(p.event)
         );
         return;
       }
       const tag = `content-type:${identifier}`;
       await cache.invalidateByTag(tag);
-      console.log(
-        '[cache-invalidation] CONTENT_TYPE_SCHEMA_CHANGED cleared tag',
-        tag
-      );
+      console.log(`[cache-invalidation] ${String(p.event)} cleared tag`, tag);
       return;
     }
 

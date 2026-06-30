@@ -17,6 +17,35 @@ import {
   BundleImportValidationError,
   EntryImportReferenceError,
 } from './importErrors';
+// enqueueContentBulkSync is loaded lazily — the docker entrypoint runs
+// import-starter.ts under tsx where apps/cms/server/ isn't on disk (Nuxt
+// hasn't booted, so there's no cache/search state to sync anyway). In the
+// Nuxt-context POST /api/content-bundle/import path the dynamic import
+// resolves to the same module record as a static import would.
+async function enqueueContentBulkSyncIfAvailable(
+  tx: Prisma.TransactionClient,
+  contentTypes: Array<{ id: string; identifier: string }>
+): Promise<void> {
+  if (contentTypes.length === 0) return;
+  try {
+    const mod = await import('../../server/utils/webhooks');
+    for (const contentType of contentTypes) {
+      await mod.enqueueContentBulkSync(tx, { contentType });
+    }
+  } catch (err) {
+    // Docker boot runs import-starter under tsx where apps/cms/server/ isn't
+    // on disk — degrade to no-op (same as invalidateSchemaIfAvailable in
+    // applySchema.ts). The cache is cold at boot and the TTL is the backstop.
+    if (
+      typeof err === 'object' &&
+      err !== null &&
+      (err as { code?: string }).code === 'ERR_MODULE_NOT_FOUND'
+    ) {
+      return;
+    }
+    throw err;
+  }
+}
 
 export interface ImportOptions {
   mode: BundleMode;
@@ -71,6 +100,7 @@ export async function importBundle(
       const identifierToTypeId = new Map<string, string>();
       const typeIdentifierToKeyToEntry = new Map<string, Map<string, string>>();
       const fieldTypesByTypeId = new Map<string, Record<string, FieldType>>();
+      const affectedTypeIdentifiers = new Set<string>();
 
       const existingTypes = await tx.contentType.findMany({
         include: { fields: true },
@@ -298,6 +328,7 @@ export async function importBundle(
             entryId = created.id;
             versionIds = created.versions.map((v) => v.id);
             entriesCreated++;
+            affectedTypeIdentifiers.add(e.contentTypeIdentifier);
           } else {
             // update
             await tx.contentEntryVersion.deleteMany({
@@ -317,6 +348,7 @@ export async function importBundle(
             entryId = updated.id;
             versionIds = updated.versions.map((v) => v.id);
             entriesUpdated++;
+            affectedTypeIdentifiers.add(e.contentTypeIdentifier);
           }
 
           let map = typeIdentifierToKeyToEntry.get(e.contentTypeIdentifier);
@@ -371,6 +403,17 @@ export async function importBundle(
           );
         }
       }
+
+      // #393: one coalesced CONTENT_BULK_SYNC per type that received entry
+      // writes → search reindex + cache clear. Inside the tx, so a dryRun rolls
+      // these rows back. identifierToTypeId resolves the UUID (same map the
+      // entry pass used at typeId resolution).
+      const affectedTypes: Array<{ id: string; identifier: string }> = [];
+      for (const identifier of affectedTypeIdentifiers) {
+        const id = identifierToTypeId.get(identifier);
+        if (id) affectedTypes.push({ id, identifier });
+      }
+      await enqueueContentBulkSyncIfAvailable(tx, affectedTypes);
 
       captured = {
         contentTypesCreated,

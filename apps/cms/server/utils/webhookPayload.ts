@@ -81,6 +81,28 @@ export function buildSchemaChangedPayload(input: {
   };
 }
 
+export interface ContentBulkSyncPayload {
+  event: 'CONTENT_BULK_SYNC';
+  deliveryId: string;
+  contentTypeId: string;
+  contentTypeIdentifier: string;
+  occurredAt: string;
+}
+
+export function buildContentBulkSyncPayload(input: {
+  deliveryId: string;
+  occurredAt: Date;
+  contentType: { id: string; identifier: string };
+}): ContentBulkSyncPayload {
+  return {
+    event: WEBHOOK_EVENTS.CONTENT_BULK_SYNC,
+    deliveryId: input.deliveryId,
+    contentTypeId: input.contentType.id,
+    contentTypeIdentifier: input.contentType.identifier,
+    occurredAt: input.occurredAt.toISOString(),
+  };
+}
+
 export interface DraftSyncPayload {
   event: 'ENTRY_DRAFT_SYNC';
   deliveryId: string;

@@ -12,6 +12,7 @@ export const WEBHOOK_EVENTS = {
   // WEBHOOK_EVENT_OPTIONS + isExternalWebhookEventName so external webhooks can't
   // receive draft-activity signals.
   ENTRY_DRAFT_SYNC: 'ENTRY_DRAFT_SYNC',
+  CONTENT_BULK_SYNC: 'CONTENT_BULK_SYNC',
 } as const;
 
 export type WebhookEventName =
@@ -39,6 +40,7 @@ export const EXTERNAL_WEBHOOK_EVENT_NAMES: WebhookEventName[] = [
   WEBHOOK_EVENTS.ENTRY_UNPUBLISHED,
   WEBHOOK_EVENTS.ENTRY_DELETED,
   WEBHOOK_EVENTS.CONTENT_TYPE_SCHEMA_CHANGED,
+  WEBHOOK_EVENTS.CONTENT_BULK_SYNC,
 ];
 
 const EXTERNAL_WEBHOOK_EVENT_NAMES_SET: ReadonlySet<WebhookEventName> = new Set(
@@ -86,5 +88,11 @@ export const WEBHOOK_EVENT_OPTIONS: WebhookEventOption[] = [
     label: 'Content type schema changed',
     description:
       "Fires when a content type's fields are added, updated, deleted, or reordered.",
+  },
+  {
+    value: WEBHOOK_EVENTS.CONTENT_BULK_SYNC,
+    label: 'Content bulk-synced',
+    description:
+      "Fires once per content type after a bulk import of that type's entries.",
   },
 ];
