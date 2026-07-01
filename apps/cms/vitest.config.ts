@@ -85,6 +85,13 @@ export default defineConfig({
           // `process.env` and would cross-contaminate workers.
           pool: 'forks',
           maxWorkers: resolveMaxTestWorkers(),
+          // #409: integration carries a project-specific maxWorkers, so it must
+          // run in its own sequence group — Vitest requires every project sharing
+          // a `groupOrder` to share `maxWorkers`, else `pnpm test` (all projects
+          // at once) throws "different 'maxWorkers' but same 'sequence.groupOrder'".
+          // A dedicated group also keeps the 4 heavy Nuxt dev servers from running
+          // concurrently with the browser-mode storybook project (VM memory).
+          sequence: { groupOrder: 1 },
           include: [
             'server/api/**/*.test.ts',
             'server/middleware/**/*.test.ts',
