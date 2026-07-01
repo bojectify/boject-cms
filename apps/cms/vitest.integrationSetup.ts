@@ -13,7 +13,19 @@
 // file itself declares. A dedicated client is used because setupFiles run in
 // the test process, separate from the booted Nuxt server's Prisma client.
 import { afterAll } from 'vitest';
+import { getTestDatabaseUrl } from './test/dbUrl';
+import { getTestRedisUrl } from './test/redisUrl';
+import { resolveTestMeiliIndex } from './test/workerScope';
 import { createTestPrismaClient, resetTestDb } from './test/testDb';
+
+// #409: scope this worker's DB / Redis DB / Meili index by VITEST_POOL_ID BEFORE
+// any setup({ dev: true }) runs. The booted Nuxt server inherits these via
+// `...process.env` at spawn, and the direct test-process resolvers read them too,
+// so the whole file — server + direct pg/meili/redis access — is isolated to this
+// worker's resources. Idempotent: each value is suffixed from a STABLE base.
+process.env.DATABASE_URL = getTestDatabaseUrl();
+process.env.REDIS_URL = getTestRedisUrl();
+process.env.MEILI_INDEX = resolveTestMeiliIndex();
 
 const prisma = createTestPrismaClient();
 

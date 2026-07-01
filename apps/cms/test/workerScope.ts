@@ -55,3 +55,8 @@ export function suffixMeiliIndex(baseName: string, id: number | null): string {
  *  (that would double-suffix on a reused worker). */
 export const TEST_MEILI_INDEX_BASE =
   process.env.INTEGRATION_TEST_MEILI_INDEX || 'entries_test';
+
+/** The worker-scoped test Meili index (base when not in a worker). */
+export function resolveTestMeiliIndex(): string {
+  return suffixMeiliIndex(TEST_MEILI_INDEX_BASE, resolveWorkerId());
+}

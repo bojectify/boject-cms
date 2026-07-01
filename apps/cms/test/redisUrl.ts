@@ -14,8 +14,11 @@
  * catches null/undefined and would return the empty string; `||` falls back on
  * the empty-string case too. Mirrors `test/dbUrl.ts`.
  */
+import { resolveWorkerId, suffixRedisUrl } from './workerScope';
+
 export const DEFAULT_TEST_REDIS_URL = 'redis://localhost:6379/1';
 
 export function getTestRedisUrl(): string {
-  return process.env.INTEGRATION_TEST_REDIS_URL || DEFAULT_TEST_REDIS_URL;
+  const base = process.env.INTEGRATION_TEST_REDIS_URL || DEFAULT_TEST_REDIS_URL;
+  return suffixRedisUrl(base, resolveWorkerId());
 }
