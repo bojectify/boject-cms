@@ -49,8 +49,14 @@ async function provisionWorkerDatabases(baseUrl: string, workerCount: number) {
   }
 }
 
-/** Flush one Redis logical DB with the same tolerant retry the base flush uses. */
-async function flushRedisDb(url: string): Promise<boolean> {
+/**
+ * Flush one Redis logical DB with the same tolerant retry the base flush uses.
+ * Returns `true` on success; on exhaustion, returns the last error (instead of
+ * swallowing it) so the caller can log what actually went wrong (Redis down vs
+ * auth vs wrong URL) rather than a generic "unavailable" warning.
+ */
+async function flushRedisDb(url: string): Promise<true | unknown> {
+  let lastError: unknown;
   for (let attempt = 1; attempt <= 5; attempt++) {
     const redis = new Redis(url, {
       lazyConnect: true,
@@ -63,12 +69,13 @@ async function flushRedisDb(url: string): Promise<boolean> {
       await redis.flushdb();
       await redis.quit();
       return true;
-    } catch {
+    } catch (error) {
+      lastError = error;
       redis.disconnect();
       if (attempt < 5) await new Promise((r) => setTimeout(r, 300));
     }
   }
-  return false;
+  return lastError;
 }
 
 /**
@@ -142,11 +149,15 @@ export async function setup() {
   // per attempt handles the docker-up race without ioredis reconnect-state
   // pitfalls.
   const redisUrl = getTestRedisUrl();
-  if (await flushRedisDb(redisUrl)) {
+  const baseFlushResult = await flushRedisDb(redisUrl);
+  if (baseFlushResult === true) {
     console.log('[globalSetup] Test Redis (DB 1) flushed.');
   } else {
     console.warn(
-      '[globalSetup] Redis unavailable; skipping cache flush. Cache-backed tests will fail until it is reachable.'
+      '[globalSetup] Redis unavailable; skipping cache flush. Cache-backed tests will fail until it is reachable:',
+      baseFlushResult instanceof Error
+        ? baseFlushResult.message
+        : baseFlushResult
     );
   }
   for (let id = 1; id <= workerCount; id++) {

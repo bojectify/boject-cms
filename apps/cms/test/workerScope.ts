@@ -13,8 +13,9 @@ import os from 'node:os';
 /** Redis has 16 logical DBs (0-15); DB 0 = dev, DB 1 = base test. Workers use
  *  `1 + id`, so the worker count must keep `1 + N <= 15`. */
 const MAX_WORKERS_HARD_CAP = 14;
-/** Memory-aware default for the shared ~16.8GB Docker Desktop VM (all compose
- *  services share it) — a handful of parallel Nuxt dev servers, not cores-2. */
+/** Memory-aware ceiling applied ON TOP of the cores-2 default below — caps a
+ *  handful of parallel Nuxt dev servers at 4 for the shared ~16.8GB Docker
+ *  Desktop VM (all compose services share it), even on higher-core-count hosts. */
 const DEFAULT_WORKER_CAP = 4;
 
 export function resolveWorkerId(): number | null {
@@ -40,6 +41,11 @@ export function suffixDatabaseUrl(baseUrl: string, id: number | null): string {
   return url.toString();
 }
 
+/** Deliberately asymmetric vs. `suffixDatabaseUrl`: workers ALWAYS land on
+ *  logical DB `1 + id`, ignoring any db index in an `INTEGRATION_TEST_REDIS_URL`
+ *  override (unlike `suffixDatabaseUrl`, which suffixes the override's db
+ *  name). This is safe because `globalSetup` flushes those same `1 + id` DBs
+ *  regardless of the override, so resolver and flush stay consistent. */
 export function suffixRedisUrl(baseUrl: string, id: number | null): string {
   if (id === null) return baseUrl;
   const url = new URL(baseUrl);

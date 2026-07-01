@@ -79,6 +79,16 @@ export default defineNuxtConfig({
       // WebSocket port (24678). Disable HMR entirely — tests don't need it.
       ...(process.env.VITEST ? { hmr: false, ws: false } : {}),
     },
+
+    // #409: isolate the Vite dep-optimizer cache per vitest worker too — Vite
+    // anchors it to rootDir (not buildDir), so parallel dev servers otherwise
+    // race on the shared node_modules/.cache/vite (ENOTEMPTY). Non-pooled
+    // contexts keep the default cache dir.
+    ...(process.env.VITEST_POOL_ID
+      ? {
+          cacheDir: `node_modules/.cache/vite-test-${process.env.VITEST_POOL_ID}`,
+        }
+      : {}),
   },
 
   nitro: {
