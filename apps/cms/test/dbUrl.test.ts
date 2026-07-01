@@ -2,18 +2,20 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { DEFAULT_TEST_DATABASE_URL, getTestDatabaseUrl } from './dbUrl';
 
 describe('getTestDatabaseUrl', () => {
-  const original = process.env.INTEGRATION_TEST_DATABASE_URL;
+  const originalUrl = process.env.INTEGRATION_TEST_DATABASE_URL;
+  const originalPool = process.env.VITEST_POOL_ID;
 
   beforeEach(() => {
     delete process.env.INTEGRATION_TEST_DATABASE_URL;
+    delete process.env.VITEST_POOL_ID; // base assertions need "no worker"
   });
 
   afterEach(() => {
-    if (original === undefined) {
+    if (originalUrl === undefined)
       delete process.env.INTEGRATION_TEST_DATABASE_URL;
-    } else {
-      process.env.INTEGRATION_TEST_DATABASE_URL = original;
-    }
+    else process.env.INTEGRATION_TEST_DATABASE_URL = originalUrl;
+    if (originalPool === undefined) delete process.env.VITEST_POOL_ID;
+    else process.env.VITEST_POOL_ID = originalPool;
   });
 
   it('returns the local-dev fallback when the env var is unset', () => {
@@ -21,9 +23,6 @@ describe('getTestDatabaseUrl', () => {
   });
 
   it('returns the local-dev fallback when the env var is the empty string', () => {
-    // docker-compose's `${VAR:-}` passthrough sets the var to '' inside the
-    // container when the host has it unset. The helper must treat that as
-    // "no override provided", not as a valid URL.
     process.env.INTEGRATION_TEST_DATABASE_URL = '';
     expect(getTestDatabaseUrl()).toBe(DEFAULT_TEST_DATABASE_URL);
   });
@@ -34,5 +33,10 @@ describe('getTestDatabaseUrl', () => {
     expect(getTestDatabaseUrl()).toBe(
       'postgresql://ci:ci@db.example.com:6543/ci_test'
     );
+  });
+
+  it('suffixes the database name with the worker id when in a worker', () => {
+    process.env.VITEST_POOL_ID = '2';
+    expect(getTestDatabaseUrl()).toBe(`${DEFAULT_TEST_DATABASE_URL}_2`);
   });
 });

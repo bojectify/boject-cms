@@ -58,7 +58,11 @@ apps/cms/storage/
 
 # Nuxt
 apps/cms/.nuxt/
+apps/cms/.nuxt-test-*
 apps/cms/.output/
+
+# Vite dep-optimizer cache, isolated per vitest worker (#409)
+apps/cms/node_modules/.cache/vite-test-*
 
 # Storybook / Nuxt UI Vite plugin generated types
 apps/cms/auto-imports.d.ts

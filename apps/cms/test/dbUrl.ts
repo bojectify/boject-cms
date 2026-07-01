@@ -18,9 +18,13 @@
  * Mirrors the env-var-with-fallback pattern used by
  * `apps/cms/server/test/credentials.ts`.
  */
+import { resolveWorkerId, suffixDatabaseUrl } from './workerScope';
+
 export const DEFAULT_TEST_DATABASE_URL =
   'postgresql://boject:boject@localhost:5432/boject_test';
 
 export function getTestDatabaseUrl(): string {
-  return process.env.INTEGRATION_TEST_DATABASE_URL || DEFAULT_TEST_DATABASE_URL;
+  const base =
+    process.env.INTEGRATION_TEST_DATABASE_URL || DEFAULT_TEST_DATABASE_URL;
+  return suffixDatabaseUrl(base, resolveWorkerId());
 }
