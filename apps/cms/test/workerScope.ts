@@ -66,3 +66,25 @@ export const TEST_MEILI_INDEX_BASE =
 export function resolveTestMeiliIndex(): string {
   return suffixMeiliIndex(TEST_MEILI_INDEX_BASE, resolveWorkerId());
 }
+
+/**
+ * Given a list of resource names using a `${prefix}${id}` scheme (prefix e.g.
+ * `boject_test_`, `entries_test_`, or the hyphen-form `.nuxt-test-`), return
+ * those whose numeric id exceeds `keep` — the orphans a shrunk worker count
+ * left behind (globalSetup only (re)provisions ids 1..keep each run, so a prior
+ * run with a larger count leaves higher-numbered DBs/indexes/dirs lingering).
+ * The unsuffixed base and any non-numeric suffix never match, so it's safe to
+ * feed a raw `SELECT datname FROM pg_database` / `getIndexes` / `readdir`
+ * listing. #412.
+ */
+export function staleWorkerNames(
+  names: string[],
+  prefix: string,
+  keep: number
+): string[] {
+  return names.filter((name) => {
+    if (!name.startsWith(prefix)) return false;
+    const rest = name.slice(prefix.length);
+    return /^\d+$/.test(rest) && Number(rest) > keep;
+  });
+}

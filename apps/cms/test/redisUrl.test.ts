@@ -36,4 +36,10 @@ describe('getTestRedisUrl', () => {
     process.env.VITEST_POOL_ID = '3';
     expect(getTestRedisUrl()).toBe('redis://localhost:6379/4');
   });
+
+  it('keeps an override host/port but still forces the logical DB to 1 + id (CI + parallel)', () => {
+    process.env.INTEGRATION_TEST_REDIS_URL = 'redis://example:6380/2';
+    process.env.VITEST_POOL_ID = '3';
+    expect(getTestRedisUrl()).toBe('redis://example:6380/4');
+  });
 });
