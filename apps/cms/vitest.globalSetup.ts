@@ -1,4 +1,7 @@
 import { execSync } from 'node:child_process';
+import { readdir, rm } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Redis } from 'ioredis';
 import { Client } from 'pg';
 import { getTestDatabaseUrl } from './test/dbUrl';
@@ -14,6 +17,7 @@ import {
   suffixRedisUrl,
   suffixMeiliIndex,
   TEST_MEILI_INDEX_BASE,
+  staleWorkerNames,
 } from './test/workerScope';
 
 const TEST_DATABASE_URL = getTestDatabaseUrl();
@@ -41,8 +45,25 @@ async function provisionWorkerDatabases(baseUrl: string, workerCount: number) {
         `CREATE DATABASE "${dbName}" TEMPLATE "${templateName}"`
       );
     }
+    // Sweep orphaned worker DBs from a prior run with a larger worker count —
+    // only 1..workerCount are (re)created above, so higher-numbered clones would
+    // otherwise linger and accumulate. #412.
+    const { rows } = await client.query<{ datname: string }>(
+      'SELECT datname FROM pg_database'
+    );
+    const orphans = staleWorkerNames(
+      rows.map((r) => r.datname),
+      `${templateName}_`,
+      workerCount
+    );
+    for (const dbName of orphans) {
+      await client.query(`DROP DATABASE IF EXISTS "${dbName}" WITH (FORCE)`);
+    }
     console.log(
-      `[globalSetup] Provisioned ${workerCount} worker database(s) from ${templateName}.`
+      `[globalSetup] Provisioned ${workerCount} worker database(s) from ${templateName}` +
+        (orphans.length
+          ? `; swept ${orphans.length} orphaned (${orphans.join(', ')}).`
+          : '.')
     );
   } finally {
     await client.end();
@@ -76,6 +97,31 @@ async function flushRedisDb(url: string): Promise<true | unknown> {
     }
   }
   return lastError;
+}
+
+/**
+ * Remove orphaned per-worker on-disk dirs (the Nuxt buildDir `.nuxt-test-<id>`
+ * and the Vite dep-cache `vite-test-<id>`) left by a prior run with a larger
+ * worker count. Non-fatal — these are gitignored scratch. #412.
+ */
+async function sweepStaleDirs(dir: string, prefix: string, keep: number) {
+  let entries: string[];
+  try {
+    entries = await readdir(dir);
+  } catch {
+    return; // dir absent yet — nothing to sweep
+  }
+  const orphans = staleWorkerNames(entries, prefix, keep);
+  await Promise.all(
+    orphans.map((name) =>
+      rm(resolve(dir, name), { recursive: true, force: true })
+    )
+  );
+  if (orphans.length) {
+    console.log(
+      `[globalSetup] Swept ${orphans.length} orphaned ${prefix}* dir(s).`
+    );
+  }
 }
 
 /**
@@ -126,17 +172,41 @@ export async function setup() {
     );
     await ensureEntriesIndex(meili, searchIndex);
     console.log('[globalSetup] Test search index ready.');
+  } catch (error) {
+    console.warn(
+      '[globalSetup] Meilisearch unavailable; skipping base test index bootstrap. Search-backed tests will fail until it is reachable:',
+      error instanceof Error ? error.message : error
+    );
+  }
 
+  // Per-worker indexes + sweep of orphaned ones — a SEPARATE try/catch from the
+  // base bootstrap above so a partial worker-index failure doesn't mislabel the
+  // base index as un-bootstrapped in the log. #412.
+  try {
     for (let id = 1; id <= workerCount; id++) {
       await ensureEntriesIndex(
         meili,
         suffixMeiliIndex(TEST_MEILI_INDEX_BASE, id)
       );
     }
-    console.log(`[globalSetup] Bootstrapped ${workerCount} worker index(es).`);
+    const { results } = await meili.getIndexes({ limit: 1000 });
+    const orphanIndexes = staleWorkerNames(
+      results.map((index) => index.uid),
+      `${TEST_MEILI_INDEX_BASE}_`,
+      workerCount
+    );
+    for (const uid of orphanIndexes) {
+      await meili.deleteIndex(uid);
+    }
+    console.log(
+      `[globalSetup] Bootstrapped ${workerCount} worker index(es)` +
+        (orphanIndexes.length
+          ? `; swept ${orphanIndexes.length} orphaned.`
+          : '.')
+    );
   } catch (error) {
     console.warn(
-      '[globalSetup] Meilisearch unavailable; skipping test index bootstrap. Search-backed tests will fail until it is reachable:',
+      '[globalSetup] Meilisearch unavailable; skipping worker index bootstrap. Search-backed tests will fail until it is reachable:',
       error instanceof Error ? error.message : error
     );
   }
@@ -163,4 +233,13 @@ export async function setup() {
   for (let id = 1; id <= workerCount; id++) {
     await flushRedisDb(suffixRedisUrl(redisUrl, id));
   }
+
+  // Sweep orphaned per-worker build/cache dirs from a prior larger-N run. #412.
+  const cmsDir = fileURLToPath(new URL('.', import.meta.url));
+  await sweepStaleDirs(cmsDir, '.nuxt-test-', workerCount);
+  await sweepStaleDirs(
+    resolve(cmsDir, 'node_modules/.cache'),
+    'vite-test-',
+    workerCount
+  );
 }
