@@ -39,4 +39,13 @@ describe('getTestDatabaseUrl', () => {
     process.env.VITEST_POOL_ID = '2';
     expect(getTestDatabaseUrl()).toBe(`${DEFAULT_TEST_DATABASE_URL}_2`);
   });
+
+  it('worker-suffixes an INTEGRATION_TEST_DATABASE_URL override too (CI + parallel)', () => {
+    process.env.INTEGRATION_TEST_DATABASE_URL =
+      'postgresql://ci:ci@db.example.com:6543/ci_test';
+    process.env.VITEST_POOL_ID = '3';
+    expect(getTestDatabaseUrl()).toBe(
+      'postgresql://ci:ci@db.example.com:6543/ci_test_3'
+    );
+  });
 });
