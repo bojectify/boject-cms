@@ -58,6 +58,7 @@ apps/cms/storage/
 
 # Nuxt
 apps/cms/.nuxt/
+apps/cms/.nuxt-test-*
 apps/cms/.output/
 
 # Storybook / Nuxt UI Vite plugin generated types
