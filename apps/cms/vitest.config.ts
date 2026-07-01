@@ -4,6 +4,7 @@ import { storybookTest } from '@storybook/addon-vitest/vitest-plugin';
 import { playwright } from '@vitest/browser-playwright';
 import { getTestDatabaseUrl } from './test/dbUrl';
 import { getTestRedisUrl } from './test/redisUrl';
+import { resolveMaxTestWorkers } from './test/workerScope';
 
 // Tests use a separate database so dev data is never touched.
 process.env.DATABASE_URL = getTestDatabaseUrl();
@@ -76,12 +77,14 @@ export default defineConfig({
               new URL('./vitest.integrationSetup.ts', import.meta.url)
             ),
           ],
-          // Scoped here (not root) so only this project runs serially. Each
-          // integration file boots a Nuxt dev server via setup({ dev: true })
-          // and shares the boject_test database, so parallel files would
-          // collide on ports and DB state. The unit and storybook projects
-          // have no such shared state and run with default file parallelism.
-          fileParallelism: false,
+          // #409: each worker owns an isolated DB / Meili index / Redis logical
+          // DB (scoped in vitest.integrationSetup.ts by VITEST_POOL_ID, provisioned
+          // in vitest.globalSetup.ts), so files run in parallel. `pool: 'forks'` is
+          // REQUIRED, not cosmetic: the per-worker `process.env` mutation only
+          // isolates under process-per-worker; the `threads` pool shares
+          // `process.env` and would cross-contaminate workers.
+          pool: 'forks',
+          maxWorkers: resolveMaxTestWorkers(),
           include: [
             'server/api/**/*.test.ts',
             'server/middleware/**/*.test.ts',
