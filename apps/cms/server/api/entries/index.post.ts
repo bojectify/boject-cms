@@ -5,7 +5,6 @@ import { createEntry } from '../../utils/createEntry';
 import {
   flattenEntryWithVersion,
   getPublishedVersion,
-  isCmsRequest,
 } from '../../utils/resolveVersion';
 import {
   CONTENT_STATUSES,
@@ -47,15 +46,13 @@ export default defineEventHandler(async (event) => {
 
   setResponseStatus(event, 201);
 
-  const isCms = isCmsRequest(event);
+  // Admin content writes are session-only after #257 (the auth middleware bars
+  // API-key tokens from /api/entries), so the CMS-only response extras are
+  // always present. Public token writes live at /api/public/entries (#376).
   const publishedVersion = getPublishedVersion(created.versions);
 
   return flattenEntryWithVersion(created, created.versions[0]!, {
-    ...(isCms
-      ? {
-          hasPublishedVersion: publishedVersion !== null,
-          publishedVersionPublishedAt: publishedVersion?.publishedAt ?? null,
-        }
-      : {}),
+    hasPublishedVersion: publishedVersion !== null,
+    publishedVersionPublishedAt: publishedVersion?.publishedAt ?? null,
   });
 });
