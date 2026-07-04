@@ -16,9 +16,11 @@ import {
 import { getTestRedisUrl } from '../../test/redisUrl';
 
 /**
- * Cache test harness for the cms integration suite. Reads the SAME Redis logical
- * DB 1 the booted Nitro server writes (vitest.config sets REDIS_URL). NO base:
- * the server's useStorage('cache') mount stores UNPREFIXED redis keys (unstorage
+ * Cache test harness for the cms integration suite. Reads the SAME per-worker
+ * test Redis DB the booted Nitro server writes — DB `1 + VITEST_POOL_ID` (DB 1
+ * as the single-worker/globalSetup fallback), resolved via getTestRedisUrl(),
+ * which vitest.config sets as REDIS_URL so the server inherits it. NO base: the
+ * server's useStorage('cache') mount stores UNPREFIXED redis keys (unstorage
  * strips the mount prefix before the driver), so getItem(key) reads the raw
  * `<key>` the server wrote; the __tagindex:/__tagindex_p: sets are raw too, read
  * via the plain ioredis client. NEVER targets DB 0.
@@ -36,6 +38,18 @@ function handles(): { storage: Storage; redis: Redis; cache: TaggedCache } {
     _cache = createTaggedCache({ storage: _storage, redis: _redis });
   }
   return { storage: _storage, redis: _redis!, cache: _cache! };
+}
+
+/** The shared, memoised per-worker test handle the assert helpers use. Lets
+ *  callers act on cache (set / get / invalidateByTag) and read the raw
+ *  tag-index sets without standing up their own ioredis/unstorage connection.
+ *  Pair with closeTestCache() in afterAll. */
+export function getTestCache(): {
+  storage: Storage;
+  redis: Redis;
+  cache: TaggedCache;
+} {
+  return handles();
 }
 
 /** Assert the server cached a value under `key`. */
@@ -86,13 +100,20 @@ const sentinelKey = (tag: string) => `__test_sentinel:${tag}`;
  * clears EXACTLY `expectedTagsCleared`. Seeds a sentinel under each expected tag
  * plus an unrelated control tag, runs the real syncToCacheInvalidation, then
  * asserts every expected sentinel is gone and the control survives (non-vacuous).
+ * An optional `expectedTagsSurviving` list seeds a sentinel under each named tag
+ * too and asserts it (like the control) is still present after the subscriber
+ * runs — for asserting tags that must NOT be cleared by this event.
  */
 export async function expectInvalidationOnEvent(
   descriptor: CacheEventDescriptor,
-  expectedTagsCleared: string[]
+  expectedTagsCleared: string[],
+  expectedTagsSurviving: string[] = []
 ): Promise<void> {
   const { cache } = handles();
   for (const tag of expectedTagsCleared) {
+    await cache.set(sentinelKey(tag), '1', { tags: [tag] });
+  }
+  for (const tag of expectedTagsSurviving) {
     await cache.set(sentinelKey(tag), '1', { tags: [tag] });
   }
   await cache.set(sentinelKey(CONTROL_TAG), '1', { tags: [CONTROL_TAG] });
@@ -114,10 +135,13 @@ export async function expectInvalidationOnEvent(
   for (const tag of expectedTagsCleared) {
     await assertNotCached(sentinelKey(tag));
   }
+  for (const tag of expectedTagsSurviving) {
+    await assertCached(sentinelKey(tag));
+  }
   await assertCached(sentinelKey(CONTROL_TAG));
 }
 
-/** Per-file reset — flush DB 1. Call in beforeEach/beforeAll. */
+/** Per-file reset — flush the per-worker test Redis DB. Call in beforeEach/beforeAll. */
 export async function clearTestCache(): Promise<void> {
   const { redis } = handles();
   await redis.flushdb();

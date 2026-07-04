@@ -1,4 +1,4 @@
-import { describe, it, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import { setup, fetch } from '@nuxt/test-utils/e2e';
 import { prisma } from '../utils/prisma';
@@ -9,6 +9,7 @@ import {
   expectInvalidationOnEvent,
   clearTestCache,
   closeTestCache,
+  getTestCache,
 } from './cacheAssertions';
 
 const TEST_API_KEY = 'boject_test_key_for_integration_tests_only';
@@ -91,5 +92,37 @@ describe('cache test harness (#262)', async () => {
     );
 
     await assertNotCached(key);
+  });
+
+  it('getTestCache() exposes the shared handle the asserts read', async () => {
+    const { cache, redis, storage } = getTestCache();
+    await cache.set('__test_gtc_key', 'v', { tags: ['__test_gtc_tag'] });
+    await assertCached('__test_gtc_key'); // internal-handle read sees the exposed-handle write
+    expect(await storage.getItem('__test_gtc_key')).not.toBeNull();
+    expect(
+      await redis.sismember('__tagindex_p:__test_gtc_tag', '__test_gtc_key')
+    ).toBe(1);
+  });
+
+  it('expectInvalidationOnEvent verifies a genuinely-surviving tag', async () => {
+    // CONTENT_TYPE_SCHEMA_CHANGED clears content-type:<id> but NOT entry:<id>:*.
+    await expectInvalidationOnEvent(
+      { event: 'CONTENT_TYPE_SCHEMA_CHANGED', identifier: IDENT },
+      [`content-type:${IDENT}`],
+      [`entry:${IDENT}:e1`]
+    );
+  });
+
+  it('expectInvalidationOnEvent throws if a "surviving" tag was actually cleared', async () => {
+    // Non-vacuous proof of the survivors arg: content-type:<id> IS cleared by the
+    // schema event, so claiming it survives must throw. Fails on a pre-param impl
+    // that ignores the third argument (it would resolve without asserting).
+    await expect(
+      expectInvalidationOnEvent(
+        { event: 'CONTENT_TYPE_SCHEMA_CHANGED', identifier: IDENT },
+        [],
+        [`content-type:${IDENT}`]
+      )
+    ).rejects.toThrow();
   });
 });
