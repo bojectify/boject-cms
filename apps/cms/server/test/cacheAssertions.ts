@@ -100,6 +100,9 @@ const sentinelKey = (tag: string) => `__test_sentinel:${tag}`;
  * clears EXACTLY `expectedTagsCleared`. Seeds a sentinel under each expected tag
  * plus an unrelated control tag, runs the real syncToCacheInvalidation, then
  * asserts every expected sentinel is gone and the control survives (non-vacuous).
+ * An optional `expectedTagsSurviving` list seeds a sentinel under each named tag
+ * too and asserts it (like the control) is still present after the subscriber
+ * runs — for asserting tags that must NOT be cleared by this event.
  */
 export async function expectInvalidationOnEvent(
   descriptor: CacheEventDescriptor,
@@ -138,7 +141,7 @@ export async function expectInvalidationOnEvent(
   await assertCached(sentinelKey(CONTROL_TAG));
 }
 
-/** Per-file reset — flush DB 1. Call in beforeEach/beforeAll. */
+/** Per-file reset — flush the per-worker test Redis DB. Call in beforeEach/beforeAll. */
 export async function clearTestCache(): Promise<void> {
   const { redis } = handles();
   await redis.flushdb();
