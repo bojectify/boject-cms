@@ -1,14 +1,10 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { setup, fetch } from '@nuxt/test-utils/e2e';
-import { createStorage } from 'unstorage';
-import redisDriver from 'unstorage/drivers/redis';
-import Redis from 'ioredis';
 import { TEST_USERNAME, TEST_PASSWORD } from '../../test/credentials';
-import { getTestRedisUrl } from '../../../test/redisUrl';
 import { FIELD_TYPES } from '../../../utils/fieldTypes';
 import { CONTENT_STATUSES } from '../../../utils/contentStatus';
-import { createTaggedCache } from '../../utils/taggedCache';
 import { syncToCacheInvalidation } from '../../utils/syncToCacheInvalidation';
+import { getTestCache, closeTestCache } from '../../test/cacheAssertions';
 
 // End-to-end acceptance for the #260 GraphQL response cache. A real Nuxt server
 // (booted by @nuxt/test-utils in a SEPARATE process) proves HIT/MISS, that an
@@ -16,13 +12,14 @@ import { syncToCacheInvalidation } from '../../utils/syncToCacheInvalidation';
 // closing the loop with #261 — that updating an Author invalidates a cached
 // query that traversed `article { author { name } }`.
 //
-// The booted server caches into the test Redis (DB 1, set by vitest.config.ts).
-// We CANNOT import the server's taggedCache singleton (it resolves Nitro deps
-// absent in this process), so the invalidation test builds its OWN
-// createTaggedCache over the SAME REDIS_URL to simulate the #261 subscriber.
-// The server's `cache:` unstorage mount strips its prefix before the driver, so
-// a root-mounted driver here lands on the same physical Redis key — a layout
-// mismatch would surface loudly as a still-HIT on the final assertion.
+// The booted server caches into the per-worker test Redis DB it inherits via
+// REDIS_URL. We CANNOT import the server's taggedCache singleton (it resolves
+// Nitro deps absent in this process), so the invalidation test simulates the
+// #261 subscriber via the shared #262 cache harness's getTestCache() handle,
+// which is wired to that SAME per-worker Redis DB. The server's `cache:`
+// unstorage mount strips its prefix before the driver, so the root-mounted
+// harness handle lands on the same physical Redis key — a layout mismatch would
+// surface loudly as a still-HIT on the final assertion.
 
 const TEST_API_KEY = 'boject_test_key_for_integration_tests_only';
 const bearer = { Authorization: `Bearer ${TEST_API_KEY}` };
@@ -144,6 +141,10 @@ describe('GraphQL response cache (#260)', async () => {
     });
   });
 
+  afterAll(async () => {
+    await closeTestCache();
+  });
+
   it('serves the second identical query from cache (MISS then HIT)', async () => {
     const query = `{ ${camel(ARTICLE)}List { edges { node { id } } } }`;
 
@@ -200,23 +201,15 @@ describe('GraphQL response cache (#260)', async () => {
     // Simulate the #261 subscriber against the same Redis the server cached
     // into: an ENTRY_PUBLISHED for the Author clears content-type:Author<sfx>
     // AND entry:Author<sfx>:<authorId>, both of which tag the cached response.
-    const url = getTestRedisUrl();
-    const storage = createStorage({ driver: redisDriver({ url }) });
-    const redis = new Redis(url);
-    try {
-      const cache = createTaggedCache({ storage, redis });
-      await syncToCacheInvalidation(
-        { cache },
-        {
-          event: 'ENTRY_PUBLISHED',
-          contentType: { identifier: AUTHOR },
-          entry: { id: authorId },
-        }
-      );
-    } finally {
-      await redis.quit();
-      await storage.dispose();
-    }
+    const { cache } = getTestCache();
+    await syncToCacheInvalidation(
+      { cache },
+      {
+        event: 'ENTRY_PUBLISHED',
+        contentType: { identifier: AUTHOR },
+        entry: { id: authorId },
+      }
+    );
 
     expect((await gqlRaw(query)).cache).toBe('MISS'); // evicted
   });
