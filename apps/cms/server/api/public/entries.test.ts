@@ -7,6 +7,12 @@ import { TEST_USERNAME, TEST_PASSWORD } from '../../test/credentials';
 import { getTestDatabaseUrl } from '../../../test/dbUrl';
 import { resetRateLimitStore } from '../../utils/rateLimit';
 import type { RateLimitedBody } from '../../utils/rateLimitEndpoint';
+import {
+  clearTestCache,
+  closeTestCache,
+  assertNotCached,
+  getTestCache,
+} from '../../test/cacheAssertions';
 
 const TEST_API_KEY = 'boject_test_key_for_integration_tests_only';
 
@@ -394,36 +400,17 @@ describe('/api/public/entries', async () => {
   });
 
   describe('response caching', () => {
-    // Standalone DB-1 cache handle (same logical DB the booted Nitro server's
-    // useStorage('cache') targets — vitest.config sets REDIS_URL to DB 1 and the
-    // dev server inherits it). A base-less unstorage redis handle reads/writes
-    // the same raw keys the server's `cache` mount does, because Nitro strips
-    // the mount prefix before the driver. Mirrors taggedCache.integration.test.ts.
-    let cacheStorage: import('unstorage').Storage;
-    let cacheRedis: import('ioredis').Redis;
-    let cache: import('../../utils/taggedCache').TaggedCache;
-
-    beforeAll(async () => {
-      const { Redis } = await import('ioredis');
-      const { createStorage } = await import('unstorage');
-      const redisDriver = (await import('unstorage/drivers/redis')).default;
-      const { getTestRedisUrl } = await import('../../../test/redisUrl');
-      const { createTaggedCache } = await import('../../utils/taggedCache');
-      const url = getTestRedisUrl();
-      cacheStorage = createStorage({ driver: redisDriver({ url }) });
-      cacheRedis = new Redis(url);
-      cache = createTaggedCache({ storage: cacheStorage, redis: cacheRedis });
+    // Cache observed via the shared #262 harness on the per-worker test Redis DB
+    // (1 + VITEST_POOL_ID; DB 1 as the single-worker fallback) — the same DB the
+    // booted Nitro server writes to. The integration project runs parallel across
+    // forks (#409), so this flush is race-free because each worker owns its OWN
+    // Redis DB, not because files run serially.
+    beforeEach(async () => {
+      await clearTestCache();
     });
 
     afterAll(async () => {
-      await cacheRedis.quit();
-      await cacheStorage.dispose();
-    });
-
-    // Serial integration project (fileParallelism:false) — no other file races
-    // this flush. Start every cache test from an empty DB 1.
-    beforeEach(async () => {
-      await cacheRedis.flushdb();
+      await closeTestCache();
     });
 
     const authed = (path: string) =>
@@ -449,7 +436,9 @@ describe('/api/public/entries', async () => {
       await authed(url); // MISS — warms the cache
       expect((await authed(url)).headers.get('x-cache')).toBe('HIT');
 
-      await cache.invalidateByTag(`content-type:${PUB_IDENTIFIER}`);
+      await getTestCache().cache.invalidateByTag(
+        `content-type:${PUB_IDENTIFIER}`
+      );
 
       expect((await authed(url)).headers.get('x-cache')).toBe('MISS');
     });
@@ -463,7 +452,9 @@ describe('/api/public/entries', async () => {
       expect((await authed(articleUrl)).headers.get('x-cache')).toBe('HIT');
       expect((await authed(otherUrl)).headers.get('x-cache')).toBe('HIT');
 
-      await cache.invalidateByTag(`content-type:${PUB_IDENTIFIER}`);
+      await getTestCache().cache.invalidateByTag(
+        `content-type:${PUB_IDENTIFIER}`
+      );
 
       expect((await authed(articleUrl)).headers.get('x-cache')).toBe('MISS'); // cleared
       expect((await authed(otherUrl)).headers.get('x-cache')).toBe('HIT'); // survived
@@ -486,11 +477,13 @@ describe('/api/public/entries', async () => {
       expect(body.items).toEqual([]);
 
       // No cache value and no tag-index set was minted for the bogus identifier.
+      await assertNotCached(
+        'public:entries:NoSuchTypeXYZ:perPage=100:after='
+      );
       expect(
-        await cache.get('public:entries:NoSuchTypeXYZ:perPage=100:after=')
-      ).toBeNull();
-      expect(
-        await cacheRedis.smembers('__tagindex:content-type:NoSuchTypeXYZ')
+        await getTestCache().redis.smembers(
+          '__tagindex:content-type:NoSuchTypeXYZ'
+        )
       ).toEqual([]);
     });
 
