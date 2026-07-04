@@ -4,7 +4,6 @@ import { assertApiKeyScope } from '../../utils/assertApiKeyScope';
 import { validateAndEnrichEntryData } from '../../utils/validateAndEnrichEntryData';
 import { publishEntry } from '../../utils/publishEntry';
 import {
-  isCmsRequest,
   getPublishedVersion,
   getVersionForContext,
   flattenEntryWithVersion,
@@ -61,8 +60,11 @@ export default defineEventHandler(async (event) => {
     },
   });
 
-  const isCms = isCmsRequest(event);
-  const version = getVersionForContext(updated.versions, isCms);
+  // Admin content writes are session-only after #257 (the auth middleware bars
+  // API-key tokens from /api/entries/:id), so version resolution is the
+  // draft-priority CMS path and the CMS-only response extras are always present.
+  // Public token writes live at /api/public/entries (#376).
+  const version = getVersionForContext(updated.versions, true);
   if (!version) {
     throw createError({
       statusCode: 404,
@@ -74,11 +76,7 @@ export default defineEventHandler(async (event) => {
 
   return flattenEntryWithVersion(updated, version, {
     contentType: updated.contentType,
-    ...(isCms
-      ? {
-          hasPublishedVersion: publishedVersion !== null,
-          publishedVersionPublishedAt: publishedVersion?.publishedAt ?? null,
-        }
-      : {}),
+    hasPublishedVersion: publishedVersion !== null,
+    publishedVersionPublishedAt: publishedVersion?.publishedAt ?? null,
   });
 });
