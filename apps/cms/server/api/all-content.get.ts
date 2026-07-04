@@ -1,6 +1,5 @@
 import type { ContentStatusName } from '../../utils/contentStatus';
 import { CONTENT_STATUSES_SET } from '../../utils/contentStatus';
-import { isCmsRequest } from '../utils/resolveVersion';
 import {
   buildEntryListWhere,
   fetchDisplayVersions,
@@ -27,7 +26,6 @@ export default defineEventHandler(async (event) => {
   const after = typeof query.after === 'string' ? query.after : null;
   const before = typeof query.before === 'string' ? query.before : null;
 
-  const isCms = isCmsRequest(event);
   const archiveFilter = parseArchiveFilter(query.archiveFilter);
 
   let contentTypeId: string | null = null;
@@ -46,8 +44,12 @@ export default defineEventHandler(async (event) => {
       ? (query.status as ContentStatusName)
       : null;
 
+  // Admin content reads are session-only after #257 (the auth middleware bars
+  // API-key tokens from /api/all-content), so version resolution is
+  // unconditionally the draft-priority CMS path — isCms is always true here. The
+  // PUBLISHED-only (isCms: false) branch lives on with /api/public/entries.
   const where = buildEntryListWhere({
-    isCms,
+    isCms: true,
     archiveFilter,
     status,
     contentTypeId,
@@ -86,7 +88,7 @@ export default defineEventHandler(async (event) => {
   const items = page.rows
     .map((r) => {
       const version = resolveDisplayVersion(versionsByEntry.get(r.id) ?? [], {
-        isCms,
+        isCms: true,
         archiveFilter,
       });
       if (!version) return null;

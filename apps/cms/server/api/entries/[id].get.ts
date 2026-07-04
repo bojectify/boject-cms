@@ -1,5 +1,4 @@
 import {
-  isCmsRequest,
   getVersionForContext,
   getPublishedVersion,
   flattenEntryWithVersion,
@@ -24,8 +23,12 @@ export default defineEventHandler(async (event) => {
     });
   }
 
-  const isCms = isCmsRequest(event);
-  const version = getVersionForContext(entry.versions, isCms);
+  // Admin content reads are session-only after #257 (the auth middleware bars
+  // API-key tokens from /api/entries/:id), so version resolution is
+  // unconditionally the draft-priority CMS path and the CMS-only response extras
+  // are always present. The PUBLISHED-only path lives on for API-key consumers
+  // at /api/public/entries.
+  const version = getVersionForContext(entry.versions, true);
   if (!version) {
     throw createError({
       statusCode: 404,
@@ -40,12 +43,8 @@ export default defineEventHandler(async (event) => {
 
   return flattenEntryWithVersion(entry, version, {
     contentType: entry.contentType,
-    ...(isCms
-      ? {
-          hasPublishedVersion: publishedVersion !== null,
-          publishedVersionPublishedAt: publishedVersion?.publishedAt ?? null,
-          hasArchivedVersion,
-        }
-      : {}),
+    hasPublishedVersion: publishedVersion !== null,
+    publishedVersionPublishedAt: publishedVersion?.publishedAt ?? null,
+    hasArchivedVersion,
   });
 });

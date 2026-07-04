@@ -1,4 +1,3 @@
-import { isCmsRequest } from '../utils/resolveVersion';
 import {
   CONTENT_STATUS_NAMES,
   type ContentStatusName,
@@ -40,15 +39,18 @@ export default defineEventHandler(async (event) => {
   const after = typeof query.after === 'string' ? query.after : null;
   const before = typeof query.before === 'string' ? query.before : null;
 
-  const isCms = isCmsRequest(event);
   const archiveFilter = parseArchiveFilter(query.archiveFilter);
   const status =
     typeof query.status === 'string' && VALID_STATUSES.has(query.status)
       ? (query.status as ContentStatusName)
       : null;
 
+  // Admin content reads are session-only after #257 (the auth middleware bars
+  // API-key tokens from /api/entries), so version resolution is unconditionally
+  // the draft-priority CMS path — isCms is always true here. The PUBLISHED-only
+  // (isCms: false) branch lives on with the public read at /api/public/entries.
   const where = buildEntryListWhere({
-    isCms,
+    isCms: true,
     archiveFilter,
     status,
     contentTypeId,
@@ -70,7 +72,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const items = await resolveAndFlattenEntries(prisma, page.rows, {
-    isCms,
+    isCms: true,
     archiveFilter,
     columns,
     fieldTypes,
