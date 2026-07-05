@@ -69,7 +69,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Install Playwright browser (Storybook)
-        run: pnpm exec playwright install --with-deps chromium-headless-shell
+        run: pnpm --filter cms exec playwright install --with-deps chromium
         timeout-minutes: 8
 
       - name: Wait for Meilisearch
