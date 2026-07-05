@@ -1,6 +1,7 @@
 {
   "name": "boject-cms-workspace",
   "version": "0.0.1-rc.1",
+  "license": "BUSL-1.1",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@11.1.2",

@@ -334,3 +334,12 @@ curl http://localhost:4873/-/ping     # → {}
 ```
 
 Both registries answer with an empty JSON object on success — that's the ping protocol in both cases.
+
+## License
+
+boject-cms is **source-available** under the [Business Source License 1.1](LICENSE).
+Each published version converts to the Apache License, Version 2.0 four years
+after its release. BSL is **not** an OSI-approved open-source license: you may use
+boject-cms for any purpose — including production — except offering it to third
+parties as a hosted, managed, or embedded product or service that competes with
+boject. See [`LICENSE`](LICENSE) for the full terms.
