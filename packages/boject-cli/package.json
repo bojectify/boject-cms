@@ -5,6 +5,22 @@
   "private": false,
   "type": "module",
   "description": "Boject CMS maintenance CLI.",
+  "author": "Boject Ltd",
+  "homepage": "https://github.com/bojectify/boject-cms/tree/main/packages/boject-cli#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bojectify/boject-cms.git",
+    "directory": "packages/boject-cli"
+  },
+  "bugs": "https://github.com/bojectify/boject-cms/issues",
+  "keywords": [
+    "boject",
+    "cms",
+    "headless-cms",
+    "cli",
+    "content-management",
+    "graphql"
+  ],
   "bin": {
     "boject": "./dist/index.js"
   },
@@ -29,7 +45,6 @@
     "node": ">=24"
   },
   "publishConfig": {
-    "registry": "http://localhost:4873",
     "access": "public"
   },
   "scripts": {

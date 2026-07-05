@@ -16,7 +16,7 @@
     "dev:registries:down": "docker compose -f docker-compose.dev.yml down",
     "dev:publish:image": "pnpm dev:publish:image:as 0.0.1-rc.1",
     "dev:publish:image:as": "tsx scripts/dev-publish-image.ts",
-    "dev:publish": "pnpm dev:publish:image && pnpm --filter create-boject-cms build && pnpm --filter @boject/cli build && (npm unpublish --registry http://localhost:4873 create-boject-cms@0.0.1-rc.1 --force 2>/dev/null || true) && (npm unpublish --registry http://localhost:4873 @boject/cli@0.0.1-rc.1 --force 2>/dev/null || true) && pnpm --filter create-boject-cms publish --no-git-checks && pnpm --filter @boject/cli publish --no-git-checks",
+    "dev:publish": "pnpm dev:publish:image && pnpm --filter create-boject-cms build && pnpm --filter @boject/cli build && (npm unpublish --registry http://localhost:4873 create-boject-cms@0.0.1-rc.1 --force 2>/dev/null || true) && (npm unpublish --registry http://localhost:4873 @boject/cli@0.0.1-rc.1 --force 2>/dev/null || true) && pnpm --filter create-boject-cms publish --registry http://localhost:4873 --no-git-checks && pnpm --filter @boject/cli publish --registry http://localhost:4873 --no-git-checks",
     "dev:scaffold": "tsx scripts/dev-scaffold.ts",
     "dev:verify": "tsx scripts/dev-verify.ts",
     "lint": "pnpm -r --if-present lint",

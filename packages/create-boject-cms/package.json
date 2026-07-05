@@ -3,11 +3,25 @@
   "version": "0.0.1-rc.1",
   "license": "BUSL-1.1",
   "private": false,
-  "publishConfig": {
-    "registry": "http://localhost:4873"
-  },
   "type": "module",
   "description": "Scaffold a new boject-cms project.",
+  "author": "Boject Ltd",
+  "homepage": "https://github.com/bojectify/boject-cms/tree/main/packages/create-boject-cms#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bojectify/boject-cms.git",
+    "directory": "packages/create-boject-cms"
+  },
+  "bugs": "https://github.com/bojectify/boject-cms/issues",
+  "keywords": [
+    "boject",
+    "cms",
+    "headless-cms",
+    "create",
+    "scaffold",
+    "starter",
+    "nuxt"
+  ],
   "bin": {
     "create-boject-cms": "./dist/index.js"
   },
