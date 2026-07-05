@@ -134,7 +134,11 @@ export default defineConfig({
           }),
         ],
         optimizeDeps: {
-          include: ['storybook/test'],
+          // Pre-bundle deps the stories pull in transitively (e.g. ofetch via
+          // component $fetch) so a cold Vite cache doesn't optimize them
+          // mid-run and trigger "[vitest] Vite unexpectedly reloaded a test"
+          // — a flakiness source that surfaces in CI (always cold-cache).
+          include: ['storybook/test', 'ofetch'],
         },
         test: {
           name: 'storybook',
