@@ -3,9 +3,6 @@
   "version": "0.0.1-rc.1",
   "license": "BUSL-1.1",
   "private": false,
-  "publishConfig": {
-    "registry": "http://localhost:4873"
-  },
   "type": "module",
   "description": "Scaffold a new boject-cms project.",
   "bin": {
