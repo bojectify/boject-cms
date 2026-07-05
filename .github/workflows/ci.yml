@@ -68,6 +68,9 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - name: Build publishable packages (dist consumed by perf typecheck + package tests)
+        run: pnpm --filter @boject/cli build && pnpm --filter create-boject-cms build
+
       - name: Install Playwright browser (Storybook)
         run: pnpm --filter cms exec playwright install --with-deps chromium
         timeout-minutes: 8
