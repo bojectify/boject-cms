@@ -175,11 +175,14 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       },
     });
   } catch (err) {
-    // Per-file blocker / error details were already logged by
-    // applySchemaIfConfigured. Just exit non-zero so the shell
-    // entrypoint halts and the container restarts (or the deploy
-    // pipeline rolls back).
-    if (!(err instanceof Error)) console.error(String(err));
+    // Always surface the failure before exiting non-zero so the shell
+    // entrypoint halts (or the deploy pipeline rolls back). Per-file blocker
+    // details are also logged inside applySchemaIfConfigured, but errors thrown
+    // outside that loop — readdir/readFile/JSON.parse, e.g. an unreadable
+    // BOJECT_SCHEMA_DIR mount — only reach here, and must never die silently.
+    console.error(
+      `[apply-schema] aborted: ${err instanceof Error ? err.message : String(err)}`
+    );
     process.exit(1);
   } finally {
     await prisma.$disconnect();
