@@ -84,6 +84,13 @@ docker run -d --name "$MEILI_NAME" \
 
 echo "[smoke-test] seeding content-types dir with the base starter"
 cp "$REPO_ROOT/starters/base.boject.json" "$CONTENT_DIR/schema.boject.json"
+# The container runs as the non-root `cms` user (uid 100). On a Linux runner a
+# bind mount keeps host ownership, and `mktemp -d` is mode 700 — so `cms` gets
+# EACCES reading /app/content-types and apply-schema (step 5) dies. Make the dir
+# traversable + the bundle world-readable. (Docker Desktop on macOS remaps mount
+# ownership to the container user, which is why this only bites in CI.)
+chmod 755 "$CONTENT_DIR"
+chmod 644 "$CONTENT_DIR/schema.boject.json"
 
 echo "[smoke-test] starting cms (first boot — expect admin seed + starter import)"
 docker run -d --name "$APP_NAME" \
@@ -192,6 +199,7 @@ jq '.contentTypes[0].fields += [{
       "options": null
     }]' "$CONTENT_DIR/schema.boject.json" > "$tmp_bundle"
 mv "$tmp_bundle" "$CONTENT_DIR/schema.boject.json"
+chmod 644 "$CONTENT_DIR/schema.boject.json" # mktemp file is 600; keep it readable by the container's cms user
 
 docker restart "$APP_NAME" >/dev/null
 for i in $(seq 1 "$HEALTH_WAIT_TRIES"); do
@@ -214,6 +222,7 @@ echo "[smoke-test] mutating bundle to remove the first content type, restarting 
 # (SiteSettings), so removal will be blocked.
 jq '.contentTypes = []' "$CONTENT_DIR/schema.boject.json" > "$tmp_bundle"
 mv "$tmp_bundle" "$CONTENT_DIR/schema.boject.json"
+chmod 644 "$CONTENT_DIR/schema.boject.json" # mktemp file is 600; keep it readable by the container's cms user
 
 # Restart will exit non-zero because the apply-schema script throws and
 # entrypoint.sh has `set -e`. Docker should mark the container as exited.
