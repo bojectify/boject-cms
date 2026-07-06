@@ -48,4 +48,12 @@ describe('stampLicense', () => {
       stampLicense('no tokens here', { version: '1.0.0', date: '2030-01-01' })
     ).toThrow(/%%VERSION%%/);
   });
+  it('throws if only the change-date token is missing', () => {
+    expect(() =>
+      stampLicense('Licensed Work: boject-cms %%VERSION%%\n', {
+        version: '1.0.0',
+        date: '2030-01-01',
+      })
+    ).toThrow(/%%CHANGE_DATE%%/);
+  });
 });
