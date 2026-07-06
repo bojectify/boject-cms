@@ -6,10 +6,11 @@ node_modules/
 # find ~/.local/share/pnpm/store or similar).
 .pnpm-store/
 
-# Environment variables (scoped to apps/cms now)
-apps/cms/.env
-apps/cms/.env.local
-apps/cms/.env.*.local
+# Environment variables — global ignore so a stray .env at any level
+# (e.g. a root .env) can never be committed. Templates stay tracked.
+.env
+.env.*
+!.env.example
 
 # Build output
 dist/
