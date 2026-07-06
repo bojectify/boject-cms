@@ -40,6 +40,19 @@ jobs:
 
       - uses: actions/checkout@v6
 
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Stamp LICENSE
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            V="${GITHUB_REF_NAME#v}"
+          else
+            V="0.0.0-dev"
+          fi
+          npx --yes tsx scripts/stamp-license.ts LICENSE --version "$V"
+
       - uses: docker/setup-buildx-action@v3
 
       - name: Docker meta (labels)
