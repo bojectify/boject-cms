@@ -23,6 +23,12 @@ IMAGE_TAG="${SMOKE_IMAGE:-boject/cms:dev}"
 REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 CONTENT_DIR="$(mktemp -d -t boject-cms-smoke-content-XXXXXX)"
 
+# Iterations (≈seconds) to wait for the CMS to answer HTTP after a (re)start.
+# First boot runs migrations + admin seed + starter import + apply-schema +
+# Nitro cold-start, which on a CPU-contended CI runner (this script stands up
+# its own pg+redis+meili+app) exceeds the old 60s. Env-overridable.
+HEALTH_WAIT_TRIES="${HEALTH_WAIT_TRIES:-180}"
+
 cleanup() {
   echo "[smoke-test] cleaning up"
   docker rm -f "$APP_NAME" "$PG_NAME" "$REDIS_NAME" "$MEILI_NAME" >/dev/null 2>&1 || true
@@ -99,7 +105,7 @@ docker run -d --name "$APP_NAME" \
 
 # Wait for Nuxt to respond
 echo "[smoke-test] waiting for cms to respond"
-for i in {1..60}; do
+for i in $(seq 1 "$HEALTH_WAIT_TRIES"); do
   code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:4010/ 2>/dev/null || echo "000")
   if [[ "$code" == "200" || "$code" == "302" ]]; then
     break
@@ -146,7 +152,7 @@ echo "[smoke-test] first-boot OK. Restarting to verify idempotency."
 docker restart "$APP_NAME" >/dev/null
 
 # Wait again
-for i in {1..60}; do
+for i in $(seq 1 "$HEALTH_WAIT_TRIES"); do
   code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:4010/ 2>/dev/null || echo "000")
   if [[ "$code" == "200" || "$code" == "302" ]]; then
     break
@@ -188,7 +194,7 @@ jq '.contentTypes[0].fields += [{
 mv "$tmp_bundle" "$CONTENT_DIR/schema.boject.json"
 
 docker restart "$APP_NAME" >/dev/null
-for i in {1..60}; do
+for i in $(seq 1 "$HEALTH_WAIT_TRIES"); do
   code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:4010/ 2>/dev/null || echo "000")
   if [[ "$code" == "200" || "$code" == "302" ]]; then
     break
