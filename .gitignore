@@ -78,6 +78,7 @@ apps/cms/public/mockServiceWorker.js
 .claude/*.lock
 .claude/settings.local.json
 .claude/worktrees/
+.claude/agent-memory/
 CLAUDE.local.md
 
 # Git worktrees

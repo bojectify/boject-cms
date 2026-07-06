@@ -56,7 +56,10 @@ type ListResponse = {
 };
 
 describe('Content Type endpoints', async () => {
-  await setup({ dev: true });
+  // BOJECT_TRUSTED_PROXY_HOPS trusts X-Forwarded-For so tests can simulate
+  // distinct client IPs and bucket the mutation rate limit separately (#341:
+  // getClientIp defaults to the socket peer, ignoring XFF, unless pinned).
+  await setup({ dev: true, env: { BOJECT_TRUSTED_PROXY_HOPS: '1' } });
 
   beforeEach(() => {
     resetRateLimitStore();

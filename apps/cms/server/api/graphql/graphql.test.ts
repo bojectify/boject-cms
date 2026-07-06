@@ -59,7 +59,9 @@ type Connection<T> = {
 };
 
 describe('GraphQL API', async () => {
-  await setup({ dev: true });
+  // #341: trust X-Forwarded-For (getClientIp defaults to socket peer) so
+  // per-IP-bucketing tests keep working.
+  await setup({ dev: true, env: { BOJECT_TRUSTED_PROXY_HOPS: '1' } });
 
   let blogTypeId: string;
   const blogEntryIds: string[] = [];

@@ -93,7 +93,9 @@ async function bulkPublish(ids: unknown, key?: string, ip = '203.0.113.210') {
 }
 
 describe('POST /api/entries/bulk-publish', async () => {
-  await setup({ dev: true });
+  // #341: trust X-Forwarded-For (getClientIp defaults to socket peer) so
+  // per-IP-bucketing tests keep working.
+  await setup({ dev: true, env: { BOJECT_TRUSTED_PROXY_HOPS: '1' } });
 
   it('publishes every draft id and reports the count', async () => {
     const ct = await makeType(`BulkPubA_${Date.now()}`);

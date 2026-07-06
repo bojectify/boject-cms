@@ -7,7 +7,10 @@ import type { RateLimitedBody } from '../../utils/rateLimitEndpoint';
 const TEST_API_KEY = 'boject_test_key_for_integration_tests_only';
 
 describe('Authentication', async () => {
-  await setup({ dev: true });
+  // BOJECT_TRUSTED_PROXY_HOPS trusts the X-Forwarded-For header so the
+  // per-test spoofed IP below (rate-limit bucket isolation) keeps working —
+  // getClientIp ignores XFF by default (#341).
+  await setup({ dev: true, env: { BOJECT_TRUSTED_PROXY_HOPS: '1' } });
 
   // Reset passwordVersion after each test in case a test bumps it.
   afterEach(async () => {

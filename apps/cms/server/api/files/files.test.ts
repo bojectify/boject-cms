@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { setup, $fetch, fetch } from '@nuxt/test-utils/e2e';
+import sharp from 'sharp';
 import { TEST_USERNAME, TEST_PASSWORD } from '../../test/credentials';
 import type { RateLimitedBody } from '../../utils/rateLimitEndpoint';
 
@@ -52,7 +53,10 @@ type UploadResponse = {
 };
 
 describe('Files Upload & Transform API', async () => {
-  await setup({ dev: true });
+  // BOJECT_TRUSTED_PROXY_HOPS trusts the X-Forwarded-For header so the
+  // per-test spoofed IPs below (rate-limit bucket isolation) keep working —
+  // getClientIp ignores XFF by default (#341).
+  await setup({ dev: true, env: { BOJECT_TRUSTED_PROXY_HOPS: '1' } });
 
   let uploadedStorageKey: string;
 
@@ -228,6 +232,70 @@ describe('Files Upload & Transform API', async () => {
         `/api/files/${uploadedStorageKey}/transform`
       );
       expect(response.status).toBe(200);
+    });
+
+    it('rounds fpx/fpy to 2 decimals so the cache key is bounded (#341)', async () => {
+      // A 200x50 image split red|blue at x=100 makes the extracted crop
+      // sensitive to sub-percent shifts in the focal point — if fpx were NOT
+      // rounded before use, 0.501 vs 0.5049 would each extract a
+      // differently-positioned crop window (left=75 vs left=76 for these
+      // exact inputs, by hand-calculation of the focal-crop math) and decode
+      // to different bytes. Rounding both to 0.50 collapses them onto the
+      // same cache key AND the same transform output.
+      const wideImage = await sharp({
+        create: {
+          width: 200,
+          height: 50,
+          channels: 3,
+          background: { r: 255, g: 0, b: 0 },
+        },
+      })
+        .composite([
+          {
+            input: await sharp({
+              create: {
+                width: 100,
+                height: 50,
+                channels: 3,
+                background: { r: 0, g: 0, b: 255 },
+              },
+            })
+              .png()
+              .toBuffer(),
+            left: 100,
+            top: 0,
+          },
+        ])
+        .png()
+        .toBuffer();
+
+      const { body, contentType } = createFormData(
+        wideImage,
+        'wide.png',
+        'image/png'
+      );
+      const uploaded = await $fetch<UploadResponse>('/api/files/upload', {
+        method: 'POST',
+        headers: {
+          'Content-Type': contentType,
+          Cookie: await getSessionCookie(),
+        },
+        body,
+      });
+
+      const req = (fpx: number) =>
+        fetch(
+          `/api/files/${uploaded.storageKey}/transform?w=50&h=50&fpx=${fpx}&fpy=0.5&f=png`
+        );
+
+      const resA = await req(0.501);
+      const resB = await req(0.5049);
+      expect(resA.status).toBe(200);
+      expect(resB.status).toBe(200);
+
+      const bufA = Buffer.from(await resA.arrayBuffer());
+      const bufB = Buffer.from(await resB.arrayBuffer());
+      expect(bufA.equals(bufB)).toBe(true);
     });
 
     it('returns 429 when transform rate-limited', async () => {

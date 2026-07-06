@@ -80,7 +80,10 @@ async function getSessionCookie(): Promise<string> {
 }
 
 describe('GET /api/search', async () => {
-  await setup({ dev: true });
+  // BOJECT_TRUSTED_PROXY_HOPS trusts the X-Forwarded-For header so the
+  // per-test spoofed IPs below (rate-limit bucket isolation) keep working —
+  // getClientIp ignores XFF by default (#341).
+  await setup({ dev: true, env: { BOJECT_TRUSTED_PROXY_HOPS: '1' } });
 
   // Typed-operator filters (NUMBER gt, SELECT in, the 400-for-wrong-type case)
   // require the scoped content type's field types to be resolvable from
