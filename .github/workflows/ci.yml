@@ -1,0 +1,98 @@
+name: CI
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: boject
+          POSTGRES_PASSWORD: boject
+          POSTGRES_DB: boject
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U boject"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      meilisearch:
+        image: getmeili/meilisearch:v1.45.2
+        env:
+          MEILI_MASTER_KEY: masterKeyForTestingOnly
+          MEILI_NO_ANALYTICS: 'true'
+          MEILI_ENV: development
+        ports:
+          - 7700:7700
+      redis:
+        image: redis:7.4-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://boject:boject@localhost:5432/boject
+      MEILI_URL: http://localhost:7700
+      MEILI_MASTER_KEY: masterKeyForTestingOnly
+      REDIS_URL: redis://localhost:6379
+      NUXT_SESSION_PASSWORD: ci-test-session-password-not-a-secret-000
+      TEST_MAX_WORKERS: '2'
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install canvas build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build publishable packages (dist consumed by perf typecheck + package tests)
+        run: pnpm --filter @boject/cli build && pnpm --filter create-boject-cms build
+
+      - name: Install Playwright browser (Storybook)
+        run: pnpm --filter cms exec playwright install --with-deps chromium
+        timeout-minutes: 8
+
+      - name: Wait for Meilisearch
+        run: |
+          attempts=0
+          until curl -fsS http://localhost:7700/health >/dev/null 2>&1; do
+            attempts=$((attempts + 1))
+            if [ "$attempts" -ge 30 ]; then
+              echo "Meilisearch did not become ready" >&2; exit 1
+            fi
+            sleep 2
+          done
+          echo "Meilisearch ready"
+
+      - run: pnpm prisma:generate
+
+      - run: pnpm lint
+
+      - run: pnpm format
+
+      - run: pnpm typecheck
+
+      - run: pnpm test
