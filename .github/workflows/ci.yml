@@ -50,7 +50,12 @@ jobs:
       MEILI_MASTER_KEY: masterKeyForTestingOnly
       REDIS_URL: redis://localhost:6379
       NUXT_SESSION_PASSWORD: ci-test-session-password-not-a-secret-000
-      TEST_MAX_WORKERS: '2'
+      # Public repos get a 4-vCPU / 16 GB `ubuntu-latest`. resolveMaxTestWorkers()
+      # defaults to min(cores-2, 4) = 2 there, so we override to use all 4 cores —
+      # the integration suite is I/O-bound (each worker awaits DB + a booted Nuxt
+      # server), so oversubscribing cuts wall-clock. Dial to '3' if it flakes on
+      # timeouts under contention.
+      TEST_MAX_WORKERS: '4'
     steps:
       - uses: actions/checkout@v6
 
