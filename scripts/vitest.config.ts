@@ -13,5 +13,6 @@ export default defineConfig({
     root: fileURLToPath(new URL('.', import.meta.url)),
     include: ['*.test.ts'],
     environment: 'node',
+    passWithNoTests: true,
   },
 });
