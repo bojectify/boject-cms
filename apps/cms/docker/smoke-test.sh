@@ -19,7 +19,7 @@ MEILI_NAME="boject-cms-smoke-meili"
 APP_NAME="boject-cms-smoke-app"
 NETWORK_NAME="boject-cms-smoke-net"
 VOLUME_NAME="boject-cms-smoke-storage"
-IMAGE_TAG="boject/cms:dev"
+IMAGE_TAG="${SMOKE_IMAGE:-boject/cms:dev}"
 REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 CONTENT_DIR="$(mktemp -d -t boject-cms-smoke-content-XXXXXX)"
 
@@ -32,8 +32,12 @@ cleanup() {
 }
 trap cleanup EXIT
 
-echo "[smoke-test] building image"
-(cd "$REPO_ROOT" && docker build -f apps/cms/Dockerfile -t "$IMAGE_TAG" .)
+if [[ -n "${SMOKE_IMAGE:-}" ]]; then
+  echo "[smoke-test] using pre-built image $IMAGE_TAG (skipping build)"
+else
+  echo "[smoke-test] building image"
+  (cd "$REPO_ROOT" && docker build -f apps/cms/Dockerfile -t "$IMAGE_TAG" .)
+fi
 
 echo "[smoke-test] creating network + volume"
 docker network create "$NETWORK_NAME" >/dev/null
@@ -130,6 +134,12 @@ if ! grep -q "\\[apply-schema\\] done — 1 file applied, 0 total changes" <<<"$
   echo "[smoke-test] --- last 80 lines of full log ---"
   echo "$logs" | tail -80
   exit 1
+fi
+
+if [[ -n "${BOOT_ONLY:-}" ]]; then
+  echo "[smoke-test] BOOT_ONLY: first boot OK — skipping restart assertions"
+  echo "[smoke-test] PASS"
+  exit 0
 fi
 
 echo "[smoke-test] first-boot OK. Restarting to verify idempotency."

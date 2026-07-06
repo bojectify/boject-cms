@@ -128,7 +128,7 @@ describe('create-boject-cms E2E', () => {
 
     const compose = await readFile(join(target, 'docker-compose.yml'), 'utf8');
     expect(compose).toContain('image: localhost:5555/boject/cms:dev');
-    expect(compose).not.toContain('ghcr.io/bojectify/cms:latest');
+    expect(compose).not.toContain('ghcr.io/bojectify/boject-cms:latest');
 
     await rm(target, { recursive: true, force: true });
   }, 30_000);

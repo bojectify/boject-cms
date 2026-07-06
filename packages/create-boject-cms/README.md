@@ -23,7 +23,7 @@ Non-interactive use:
 
 ```bash
 pnpm create boject-cms my-site --starter base
-pnpm create boject-cms my-site --starter base --image ghcr.io/bojectify/cms:1.4.2
+pnpm create boject-cms my-site --starter base --image ghcr.io/bojectify/boject-cms:1.4.2
 pnpm create boject-cms my-site --force            # scaffold into a non-empty directory
 ```
 
