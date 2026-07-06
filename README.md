@@ -342,12 +342,13 @@ The CMS image is published to `ghcr.io/bojectify/cms` as a multi-arch (`linux/am
 
 **Tags**
 
-| Tag                              | When                 | Notes                                     |
-| -------------------------------- | -------------------- | ----------------------------------------- |
-| `X.Y.Z` (e.g. `1.4.2`)           | every stable release | the semver tag `boject upgrade` selects   |
-| `X.Y.Z-rc.N` (e.g. `0.0.1-rc.1`) | every prerelease     | selected only among prereleases           |
-| `X.Y`, `X`, `latest`             | stable releases only | moving pointers; not moved by prereleases |
-| `rc`                             | prereleases only     | floating pointer to the newest prerelease |
+| Tag                              | When                                   | Notes                                                   |
+| -------------------------------- | -------------------------------------- | ------------------------------------------------------- |
+| `X.Y.Z` (e.g. `1.4.2`)           | every stable release                   | the semver tag `boject upgrade` selects                 |
+| `X.Y.Z-rc.N` (e.g. `0.0.1-rc.1`) | every prerelease                       | selected only among prereleases                         |
+| `X.Y`, `X`, `latest`             | stable releases only                   | moving pointers; not moved by prereleases               |
+| `rc`                             | prereleases only                       | floating pointer to the newest prerelease               |
+| `dev`                            | manual `workflow_dispatch` pushes only | maintainer test builds; not part of the release channel |
 
 `boject upgrade` reads the registry's tag list and picks the highest **valid-semver** tag, so
 the moving pointers (`latest` / `X.Y` / `X` / `rc`) are convenience only.
