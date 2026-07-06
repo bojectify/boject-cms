@@ -46,7 +46,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/bojectify/cms
+          images: ghcr.io/bojectify/boject-cms
           labels: |
             org.opencontainers.image.licenses=BUSL-1.1
             org.opencontainers.image.title=boject-cms
@@ -93,7 +93,7 @@ jobs:
           file: apps/cms/Dockerfile
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
-          outputs: type=image,name=ghcr.io/bojectify/cms,push-by-digest=true,name-canonical=true,push=true
+          outputs: type=image,name=ghcr.io/bojectify/boject-cms,push-by-digest=true,name-canonical=true,push=true
           provenance: true
           sbom: true
           cache-from: type=gha,scope=${{ env.PLATFORM_PAIR }}
@@ -135,7 +135,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/bojectify/cms
+          images: ghcr.io/bojectify/boject-cms
           flavor: latest=false
           tags: |
             type=semver,pattern={{version}}
@@ -161,10 +161,10 @@ jobs:
           # shellcheck disable=SC2046
           docker buildx imagetools create \
             $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf 'ghcr.io/bojectify/cms@sha256:%s ' *)
+            $(printf 'ghcr.io/bojectify/boject-cms@sha256:%s ' *)
 
       - name: Inspect
-        run: docker buildx imagetools inspect ghcr.io/bojectify/cms:${{ steps.meta.outputs.version }}
+        run: docker buildx imagetools inspect ghcr.io/bojectify/boject-cms:${{ steps.meta.outputs.version }}
 
   verify:
     runs-on: ${{ matrix.runner }}
@@ -191,7 +191,7 @@ jobs:
 
       - name: Pull and boot the published image
         env:
-          SMOKE_IMAGE: ghcr.io/bojectify/cms:${{ needs.merge.outputs.version }}
+          SMOKE_IMAGE: ghcr.io/bojectify/boject-cms:${{ needs.merge.outputs.version }}
           BOOT_ONLY: '1'
         run: |
           docker pull "$SMOKE_IMAGE"

@@ -7,9 +7,9 @@ import {
 
 describe('parseImageRef', () => {
   it('parses registry/repo:tag form', () => {
-    expect(parseImageRef('ghcr.io/bojectify/cms:1.2.3')).toEqual({
+    expect(parseImageRef('ghcr.io/bojectify/boject-cms:1.2.3')).toEqual({
       registry: 'ghcr.io',
-      repository: 'bojectify/cms',
+      repository: 'bojectify/boject-cms',
       tag: '1.2.3',
     });
   });
@@ -31,7 +31,7 @@ describe('parseImageRef', () => {
   });
 
   it('throws on missing tag', () => {
-    expect(() => parseImageRef('ghcr.io/bojectify/cms')).toThrow(/tag/);
+    expect(() => parseImageRef('ghcr.io/bojectify/boject-cms')).toThrow(/tag/);
   });
 
   it('throws on missing registry', () => {

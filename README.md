@@ -337,7 +337,7 @@ Both registries answer with an empty JSON object on success — that's the ping 
 
 ### CMS image (GHCR)
 
-The CMS image is published to `ghcr.io/bojectify/cms` as a multi-arch (`linux/amd64` +
+The CMS image is published to `ghcr.io/bojectify/boject-cms` as a multi-arch (`linux/amd64` +
 `linux/arm64`) manifest on every `v*` git tag, by `.github/workflows/publish-cms-image.yml`.
 
 **Tags**
@@ -355,11 +355,11 @@ the moving pointers (`latest` / `X.Y` / `X` / `rc`) are convenience only.
 
 **Pre-1.0 caveat:** until the first stable release exists, no `latest` tag is published (the first
 releases are `-rc` prereleases, and `latest` follows stable). New projects scaffolded with
-`create-boject-cms` pin `ghcr.io/bojectify/cms:latest`; before a stable exists, either pin an
+`create-boject-cms` pin `ghcr.io/bojectify/boject-cms:latest`; before a stable exists, either pin an
 explicit `-rc` tag or manually point `latest` at the current rc
-(`docker buildx imagetools create -t ghcr.io/bojectify/cms:latest ghcr.io/bojectify/cms:<rc-tag>`).
+(`docker buildx imagetools create -t ghcr.io/bojectify/boject-cms:latest ghcr.io/bojectify/boject-cms:<rc-tag>`).
 
-**One-time setup (maintainer):** after the first push, set the `ghcr.io/bojectify/cms` package to
+**One-time setup (maintainer):** after the first push, set the `ghcr.io/bojectify/boject-cms` package to
 **public** and link it to the repository in the GHCR package settings, so anonymous
 `boject upgrade` can enumerate tags.
 
