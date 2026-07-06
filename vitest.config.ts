@@ -7,6 +7,7 @@ export default defineConfig({
       './packages/boject-cli/vitest.config.ts',
       './packages/create-boject-cms/vitest.config.ts',
       './perf/vitest.config.ts',
+      './scripts/vitest.config.ts',
     ],
   },
 });
