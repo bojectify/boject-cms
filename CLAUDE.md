@@ -60,6 +60,8 @@ pnpm content:validate <path>                                                  # 
 pnpm starters:build           # Build sport.boject.json / rugby.boject.json from overlays in starters/src/
 pnpm starters:check           # Verify committed starter outputs are up to date (CI)
 pnpm nuke:packages            # Wipe every node_modules in the workspace and reinstall — recovery for "Could not resolve <pkg>" / orphaned symlink errors after dep churn
+bash scripts/release-prepare.sh <ver>   # Release: bump all artifacts to one version + open a PR (HOST-only — git writes; not `pnpm release:*`, the shim mounts .git read-only)
+bash scripts/release-tag.sh             # Release: after the PR merges, tag vX.Y.Z + create the GitHub Release (HOST-only)
 ```
 
 Note: commands run from the repo root forward to `apps/cms` via `pnpm --filter cms`. The Nuxt app source, Prisma schema, and tests all live under `apps/cms/`. Starter bundle JSONs stay at the repo root's `starters/` directory (shared data, consumed by multiple packages).

@@ -67,6 +67,9 @@ COPY --from=build --chown=cms:cms /workspace/apps/cms/scripts ./apps/cms/scripts
 COPY --from=build --chown=cms:cms /workspace/apps/cms/utils ./apps/cms/utils
 COPY --from=build --chown=cms:cms /workspace/apps/cms/docker ./apps/cms/docker
 
+# Ship the (stamped at publish time) BSL license with the distributed image.
+COPY --chown=cms:cms LICENSE /app/LICENSE
+
 # Trigger engine download as root (cms user can't write to /app/node_modules),
 # then hand ownership of node_modules + apps to the cms user.
 RUN cd apps/cms \

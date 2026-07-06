@@ -363,6 +363,23 @@ explicit `-rc` tag or manually point `latest` at the current rc
 **public** and link it to the repository in the GHCR package settings, so anonymous
 `boject upgrade` can enumerate tags.
 
+### Releasing
+
+All three artifacts (the `ghcr.io/bojectify/boject-cms` image, `@boject/cli`,
+`create-boject-cms`) ship together at **one unified version** on a `vX.Y.Z` tag.
+
+> Run these on the **host**, not via `pnpm` — the dev-container shim mounts
+> `.git` read-only, so git writes must happen on the host.
+
+1. `bash scripts/release-prepare.sh <X.Y.Z | X.Y.Z-rc.N>` — bumps all 4
+   `package.json` + both `version.ts` on a `release/*` branch and opens a PR.
+2. Review + merge the PR (its required `ci` check is the test gate).
+3. `bash scripts/release-tag.sh` — tags `vX.Y.Z` on the merged commit and
+   creates the GitHub Release (auto-generated notes). The tag triggers the
+   publish workflows, which stamp the per-version BSL `LICENSE` and publish.
+
+The first public release is `v0.0.1-rc.1`.
+
 ## License
 
 boject-cms is **source-available** under the [Business Source License 1.1](LICENSE).
