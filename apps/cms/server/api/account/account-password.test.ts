@@ -6,9 +6,13 @@ import { TEST_USER_EMAIL, TEST_USER_PASSWORD } from '../../test/credentials';
 import type { RateLimitedBody } from '../../utils/rateLimitEndpoint';
 import { resetRateLimitStore } from '../../utils/rateLimit';
 
+// BOJECT_TRUSTED_PROXY_HOPS trusts the X-Forwarded-For header so the
+// per-test spoofed IPs below (rate-limit bucket isolation) keep working —
+// getClientIp ignores XFF by default (#341).
 await setup({
   rootDir: fileURLToPath(new URL('../../..', import.meta.url)),
   dev: true,
+  env: { BOJECT_TRUSTED_PROXY_HOPS: '1' },
 });
 
 async function login(email = TEST_USER_EMAIL, password = TEST_USER_PASSWORD) {

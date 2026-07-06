@@ -1,6 +1,7 @@
 import type { H3Event } from 'h3';
 import { rateLimit } from './rateLimit';
 import { throwRateLimited } from './rateLimitEndpoint';
+import { getClientIp } from './clientIp';
 
 const WINDOW_MS = 60_000;
 
@@ -12,10 +13,7 @@ const WINDOW_MS = 60_000;
  */
 export function enforcePublicWriteRateLimit(event: H3Event): void {
   const apiKeyId = event.context.apiKeyId as string | undefined;
-  const ip =
-    getRequestHeader(event, 'x-forwarded-for')?.split(',')[0]?.trim() ||
-    getRequestIP(event) ||
-    'unknown';
+  const ip = getClientIp(event);
   const key = apiKeyId
     ? `public:write:key:${apiKeyId}`
     : `public:write:ip:${ip}`;

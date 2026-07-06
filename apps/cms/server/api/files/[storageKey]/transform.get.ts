@@ -5,14 +5,18 @@ import {
   transformImage,
 } from '../../../utils/imageProcessing';
 import { rateLimit } from '../../../utils/rateLimit';
+import { getClientIp } from '../../../utils/clientIp';
 
 const STORAGE_KEY_PATTERN = /^[A-Za-z0-9-]+\.(jpeg|jpg|png|webp|gif|avif)$/;
 
+// Bounds the fpx/fpy cache-key space to <=101 values each (0.00-1.00) — an
+// unrounded float in [0,1] would let one storageKey mint unbounded cache
+// entries. Rounded once at parse time and reused everywhere (validation,
+// cache key, transformImage) so a single value is authoritative.
+const roundFocal = (n: number) => Math.round(n * 100) / 100;
+
 export default defineEventHandler(async (event) => {
-  const ip =
-    getRequestHeader(event, 'x-forwarded-for')?.split(',')[0]?.trim() ||
-    getRequestIP(event) ||
-    'unknown';
+  const ip = getClientIp(event);
   const { allowed, retryAfterMs } = rateLimit(`transform:${ip}`);
   if (!allowed) {
     throwRateLimited(event, 'transform', retryAfterMs);
@@ -29,8 +33,8 @@ export default defineEventHandler(async (event) => {
   const f = query.f ? String(query.f) : undefined;
   const q = query.q ? Number(query.q) : undefined;
   const fit = query.fit ? String(query.fit) : undefined;
-  const fpx = query.fpx ? Number(query.fpx) : undefined;
-  const fpy = query.fpy ? Number(query.fpy) : undefined;
+  const fpx = query.fpx ? roundFocal(Number(query.fpx)) : undefined;
+  const fpy = query.fpy ? roundFocal(Number(query.fpy)) : undefined;
 
   if (w !== undefined && (isNaN(w) || w <= 0 || w > 4000)) {
     throw createError({ statusCode: 400, message: 'Invalid width parameter' });

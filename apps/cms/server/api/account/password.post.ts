@@ -1,11 +1,9 @@
 import { validatePassword } from '../../../utils/validatePassword';
+import { getClientIp } from '../../utils/clientIp';
 
 export default defineEventHandler(async (event) => {
   // 1. Per-IP rate limit (tighter than login because change-password is more sensitive)
-  const ip =
-    getRequestHeader(event, 'x-forwarded-for')?.split(',')[0]?.trim() ||
-    getRequestIP(event) ||
-    'unknown';
+  const ip = getClientIp(event);
   const { allowed, retryAfterMs } = rateLimit(
     `password-change:${ip}`,
     5,

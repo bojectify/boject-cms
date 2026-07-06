@@ -1,9 +1,8 @@
+import { getClientIp } from '../../utils/clientIp';
+
 export default defineEventHandler(async (event) => {
   // Rate limit login attempts by IP
-  const ip =
-    getRequestHeader(event, 'x-forwarded-for')?.split(',')[0]?.trim() ||
-    getRequestIP(event) ||
-    'unknown';
+  const ip = getClientIp(event);
   const { allowed, retryAfterMs } = rateLimit(`login:${ip}`, 10, 60_000);
   if (!allowed) {
     throwRateLimited(event, 'login', retryAfterMs);

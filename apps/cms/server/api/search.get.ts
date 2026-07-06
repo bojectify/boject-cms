@@ -22,6 +22,7 @@ import {
   filterColumnableColumns,
 } from '../../utils/searchColumns';
 import { hydrateRelationColumns } from '../utils/hydrateRelationColumns';
+import { getClientIp } from '../utils/clientIp';
 
 const DEFAULT_PER_PAGE = 15;
 const MAX_PER_PAGE = 100;
@@ -80,13 +81,10 @@ export default defineEventHandler(async (event) => {
   assertApiKeyScope(event, 'content:read');
 
   // Rate-limit per api key id when present, falling back to the request IP
-  // for session-authed callers. Mirrors the repo's IP-resolution convention
-  // (x-forwarded-for header first, then getRequestIP).
+  // for session-authed callers (getClientIp — socket peer, XFF ignored by
+  // default; see BOJECT_TRUSTED_PROXY_HOPS).
   const apiKeyId = event.context.apiKeyId as string | undefined;
-  const ip =
-    getRequestHeader(event, 'x-forwarded-for')?.split(',')[0]?.trim() ||
-    getRequestIP(event) ||
-    'unknown';
+  const ip = getClientIp(event);
   const rateKey = apiKeyId ? `search:key:${apiKeyId}` : `search:ip:${ip}`;
   const snapshot = rateLimit(rateKey, RATE_MAX, RATE_WINDOW_MS);
   if (!snapshot.allowed) {

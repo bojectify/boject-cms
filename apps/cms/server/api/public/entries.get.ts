@@ -11,6 +11,7 @@ import {
 import type { ContentEntry } from '#prisma';
 import { withTaggedCache } from '../../utils/withTaggedCache';
 import { resolvePublicCacheTtl } from '../../utils/cacheConfig';
+import { getClientIp } from '../../utils/clientIp';
 
 const RATE_WINDOW_MS = 60_000;
 const RATE_MAX = Number(process.env.BOJECT_PUBLIC_RATE_LIMIT_RPM) || 120;
@@ -20,10 +21,7 @@ export default defineEventHandler(async (event) => {
   assertApiKeyScope(event, 'content:read');
 
   const apiKeyId = event.context.apiKeyId as string | undefined;
-  const ip =
-    getRequestHeader(event, 'x-forwarded-for')?.split(',')[0]?.trim() ||
-    getRequestIP(event) ||
-    'unknown';
+  const ip = getClientIp(event);
   const rateKey = apiKeyId ? `public:key:${apiKeyId}` : `public:ip:${ip}`;
   const snapshot = rateLimit(rateKey, RATE_MAX, RATE_WINDOW_MS);
   if (!snapshot.allowed)

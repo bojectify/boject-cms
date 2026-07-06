@@ -137,7 +137,10 @@ let testContentType: ContentTypeResponse;
  *     (in /10-increments) and update this legend
  */
 describe('Content Entry endpoints', async () => {
-  await setup({ dev: true });
+  // BOJECT_TRUSTED_PROXY_HOPS trusts the X-Forwarded-For header so the
+  // per-test spoofed IPs above (rate-limit bucket isolation legend) keep
+  // working — getClientIp ignores XFF by default (#341).
+  await setup({ dev: true, env: { BOJECT_TRUSTED_PROXY_HOPS: '1' } });
 
   beforeEach(() => {
     resetRateLimitStore();

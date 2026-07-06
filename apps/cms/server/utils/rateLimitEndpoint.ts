@@ -1,11 +1,7 @@
 import type { H3Event } from 'h3';
-import {
-  setResponseHeader,
-  createError,
-  getRequestHeader,
-  getRequestIP,
-} from 'h3';
+import { setResponseHeader, createError } from 'h3';
 import { rateLimit, type RateLimitSnapshot } from './rateLimit';
+import { getClientIp } from './clientIp';
 
 const MUTATION_MAX = 50;
 const MUTATION_WINDOW_MS = 60_000;
@@ -18,10 +14,7 @@ const GRAPHQL_WINDOW_MS = 1_000;
  * limit is exceeded.
  */
 export function enforceMutationRateLimit(event: H3Event, endpoint: string) {
-  const ip =
-    getRequestHeader(event, 'x-forwarded-for')?.split(',')[0]?.trim() ||
-    getRequestIP(event) ||
-    'unknown';
+  const ip = getClientIp(event);
   const key = `mut:${endpoint}:${ip}`;
   const { allowed, retryAfterMs } = rateLimit(
     key,
