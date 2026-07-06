@@ -33,6 +33,9 @@ jobs:
 
       - run: pnpm --filter @boject/cli build
 
+      - name: Stamp LICENSE
+        run: pnpm exec tsx scripts/stamp-license.ts packages/boject-cli/LICENSE --version "${GITHUB_REF_NAME#v}"
+
       - name: Skip if this version is already published
         id: published
         working-directory: packages/boject-cli
