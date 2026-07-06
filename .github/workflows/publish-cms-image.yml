@@ -1,0 +1,115 @@
+name: Publish CMS image
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      push:
+        description: 'Push to GHCR (false = build + smoke-test only, no publish)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+  attestations: write
+
+concurrency:
+  group: publish-cms-image-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Prepare platform pair
+        run: |
+          platform=${{ matrix.platform }}
+          echo "PLATFORM_PAIR=${platform//\//-}" >> "$GITHUB_ENV"
+
+      - uses: actions/checkout@v6
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Docker meta (labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/bojectify/cms
+          labels: |
+            org.opencontainers.image.licenses=BUSL-1.1
+            org.opencontainers.image.title=boject-cms
+            org.opencontainers.image.description=boject-cms — general-purpose TypeScript headless CMS
+
+      - name: Log in to GHCR
+        if: ${{ github.event_name == 'push' || inputs.push }}
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build for gate (load)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/cms/Dockerfile
+          platforms: ${{ matrix.platform }}
+          load: true
+          tags: boject/cms:gate
+          cache-from: type=gha,scope=${{ env.PLATFORM_PAIR }}
+          cache-to: type=gha,scope=${{ env.PLATFORM_PAIR }},mode=max
+
+      - name: Gate — full smoke test (amd64)
+        if: ${{ matrix.platform == 'linux/amd64' }}
+        env:
+          SMOKE_IMAGE: boject/cms:gate
+        run: apps/cms/docker/smoke-test.sh
+
+      - name: Gate — boot check (arm64)
+        if: ${{ matrix.platform == 'linux/arm64' }}
+        env:
+          SMOKE_IMAGE: boject/cms:gate
+          BOOT_ONLY: '1'
+        run: apps/cms/docker/smoke-test.sh
+
+      - name: Build and push by digest
+        id: build
+        if: ${{ github.event_name == 'push' || inputs.push }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/cms/Dockerfile
+          platforms: ${{ matrix.platform }}
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=image,name=ghcr.io/bojectify/cms,push-by-digest=true,name-canonical=true,push=true
+          provenance: true
+          sbom: true
+          cache-from: type=gha,scope=${{ env.PLATFORM_PAIR }}
+          cache-to: type=gha,scope=${{ env.PLATFORM_PAIR }},mode=max
+
+      - name: Export digest
+        if: ${{ github.event_name == 'push' || inputs.push }}
+        run: |
+          mkdir -p "${{ runner.temp }}/digests"
+          digest="${{ steps.build.outputs.digest }}"
+          touch "${{ runner.temp }}/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        if: ${{ github.event_name == 'push' || inputs.push }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ env.PLATFORM_PAIR }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
