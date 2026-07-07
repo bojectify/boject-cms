@@ -4,6 +4,7 @@ import { renderEnvFile } from '../../src/templates/envFile.js';
 const baseParams = {
   sessionPassword: 'session-password-value',
   adminPassword: 'admin-password-value',
+  hostPort: 4000,
 };
 
 describe('renderEnvFile', () => {
@@ -69,6 +70,7 @@ describe('renderEnvFile', () => {
         sessionPassword: 'pw1',
         adminPassword: 'pw2',
         starter,
+        hostPort: 4000,
       });
       expect(out).toContain('BOJECT_SCHEMA_DIR=/app/content-types');
     }
@@ -79,6 +81,7 @@ describe('renderEnvFile', () => {
       sessionPassword: 'pw1',
       adminPassword: 'pw2',
       starter: 'base',
+      hostPort: 4000,
     });
     expect(out).toContain('# BOJECT_ALLOW_DESTRUCTIVE_SCHEMA=true');
     // The comment block above the line should explain when to enable it.
@@ -94,5 +97,14 @@ describe('renderEnvFile', () => {
   it('does not enable BOJECT_API_KEY by default', () => {
     const env = renderEnvFile({ ...baseParams, starter: 'base' });
     expect(env).not.toMatch(/^BOJECT_API_KEY=/m);
+  });
+
+  it('includes BOJECT_HOST_PORT from the hostPort parameter', () => {
+    const env = renderEnvFile({
+      ...baseParams,
+      starter: 'base',
+      hostPort: 4100,
+    });
+    expect(env).toMatch(/^BOJECT_HOST_PORT=4100$/m);
   });
 });

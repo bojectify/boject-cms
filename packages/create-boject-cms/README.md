@@ -27,8 +27,13 @@ Non-interactive use:
 ```bash
 pnpm create boject-cms my-site --starter base
 pnpm create boject-cms my-site --starter base --image ghcr.io/bojectify/boject-cms:1.4.2
+pnpm create boject-cms my-site --starter base --port 4100   # host port (default 4000)
 pnpm create boject-cms my-site --force            # scaffold into a non-empty directory
 ```
+
+The CMS is published on host port **4000** by default. Pass `--port <n>` at
+scaffold time (or edit `BOJECT_HOST_PORT` in the generated `.env` afterwards) to
+run several projects on one machine, or to avoid a clash with another service.
 
 ## What gets scaffolded
 
@@ -73,6 +78,7 @@ Once the container is healthy, log in at http://localhost:4000/login. The admin 
 | `BOJECT_ADMIN_EMAIL`                     | Initial admin (`admin@local`).                                                                                   |
 | `BOJECT_ADMIN_PASSWORD`                  | 16-byte random initial admin password.                                                                           |
 | `STORAGE_DRIVER`                         | `local` (default), `s3`, or `r2`.                                                                                |
+| `BOJECT_HOST_PORT`                       | Host port the CMS is published on (default 4000; Compose maps it to container port 3000).                        |
 | `BOJECT_SCHEMA_DIR`                      | `/app/content-types` — the entrypoint applies any `*.boject.json` here on every boot.                            |
 | `BOJECT_INITIAL_STARTER`                 | First-boot starter path (`/starters/<starter>.boject.json`).                                                     |
 | `# BOJECT_SCHEMA_READONLY=true`          | Commented. Set on production / staging to disable schema editing in the UI.                                      |

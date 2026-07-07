@@ -18,9 +18,9 @@ describe('renderDockerCompose', () => {
     expect(yml).toContain('POSTGRES_DB: boject');
   });
 
-  it('exposes cms on host port 4000 → container 3000', () => {
+  it('maps the CMS via BOJECT_HOST_PORT (default 4000) → container 3000', () => {
     const yml = renderDockerCompose({ imageTag: 'x', starter: 'base' });
-    expect(yml).toContain("'4000:3000'");
+    expect(yml).toContain("'${BOJECT_HOST_PORT:-4000}:3000'");
   });
 
   it('declares pgdata and storage named volumes', () => {

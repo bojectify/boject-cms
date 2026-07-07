@@ -19,6 +19,7 @@ export interface WriteProjectParams {
   imageTag: string;
   force: boolean;
   startersSourceDir: string;
+  hostPort: number;
 }
 
 export interface WriteProjectResult {
@@ -32,6 +33,7 @@ export async function writeProject({
   imageTag,
   force,
   startersSourceDir,
+  hostPort,
 }: WriteProjectParams): Promise<WriteProjectResult> {
   await mkdir(targetDir, { recursive: true });
   const existing = await readdir(targetDir);
@@ -52,7 +54,7 @@ export async function writeProject({
   );
   await writeFile(
     join(targetDir, '.env'),
-    renderEnvFile({ sessionPassword, adminPassword, starter })
+    renderEnvFile({ sessionPassword, adminPassword, starter, hostPort })
   );
   await writeFile(
     join(targetDir, 'package.json'),
@@ -61,7 +63,7 @@ export async function writeProject({
   await writeFile(join(targetDir, '.gitignore'), GITIGNORE);
   await writeFile(
     join(targetDir, 'README.md'),
-    renderReadme({ starter, adminEmail })
+    renderReadme({ starter, adminEmail, hostPort })
   );
 
   if (starter !== 'none') {

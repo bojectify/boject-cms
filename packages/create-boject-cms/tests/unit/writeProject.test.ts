@@ -21,6 +21,7 @@ afterEach(async () => {
 const baseArgs = {
   imageTag: 'ghcr.io/bojectify/boject-cms:latest',
   startersSourceDir: FIXTURES,
+  hostPort: 4000,
 };
 
 describe('writeProject', () => {
@@ -103,6 +104,23 @@ describe('writeProject', () => {
 
     const compose = await readFile(join(target, 'docker-compose.yml'), 'utf8');
     expect(compose).toContain('image: localhost:5555/boject/cms:dev');
+  });
+
+  it('writes BOJECT_HOST_PORT into .env; compose reads it via interpolation', async () => {
+    const target = join(workDir, 'site');
+    await writeProject({
+      ...baseArgs,
+      targetDir: target,
+      starter: 'base',
+      force: false,
+      hostPort: 4100,
+    });
+
+    const env = await readFile(join(target, '.env'), 'utf8');
+    expect(env).toMatch(/^BOJECT_HOST_PORT=4100$/m);
+
+    const compose = await readFile(join(target, 'docker-compose.yml'), 'utf8');
+    expect(compose).toContain("'${BOJECT_HOST_PORT:-4000}:3000'");
   });
 
   it('throws when the starter bundle is missing from the source directory', async () => {
