@@ -25,13 +25,20 @@ jobs:
         uses: contributor-assistant/github-action@v2.6.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Fine-grained PAT with Contents: read/write scoped to ONLY the private
+          # bojectify/boject-cms-cla repo. Minimal scope matters: this workflow
+          # runs on pull_request_target, so secrets are reachable from fork PRs.
+          PERSONAL_ACCESS_TOKEN: ${{ secrets.CLA_SIGNATURES_PAT }}
         with:
-          # Signatures are stored in this repo on a dedicated, unprotected branch
-          # (no third-party service). The maintainer creates `cla-signatures`
-          # once; the action appends each signature to the JSON file below.
+          # Signatures are stored in a separate PRIVATE repo, so contributor
+          # identities stay off the public repo. `branch` is the branch WITHIN
+          # that repo. Maintainer setup: create bojectify/boject-cms-cla (empty
+          # is fine) + add the CLA_SIGNATURES_PAT secret before requiring the check.
           path-to-signatures: signatures/version1/cla.json
           path-to-document: https://github.com/bojectify/boject-cms/blob/main/CLA.md
-          branch: cla-signatures
+          branch: main
+          remote-organization-name: bojectify
+          remote-repository-name: boject-cms-cla
           # Maintainers (contributing under Boject Ltd) and bots are exempt.
           # Add other org-member logins here as the team grows.
           allowlist: ness-EE,*[bot]
