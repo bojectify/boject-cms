@@ -24,7 +24,7 @@ FROM node:24-slim
 # node's cache is empty and corepack prompts to re-download pnpm on first use.
 ENV COREPACK_HOME=/opt/corepack
 
-ARG PNPM_VERSION=11.1.2
+ARG PNPM_VERSION=11.10.0
 RUN mkdir -p /opt/corepack \
  && corepack enable \
  && corepack prepare pnpm@${PNPM_VERSION} --activate \
