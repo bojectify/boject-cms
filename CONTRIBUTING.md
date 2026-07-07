@@ -28,13 +28,18 @@ private vulnerability reporting, or [security@boject.com](mailto:security@boject
 
 Because boject-cms is source-available with a potential commercial-licensing
 path, contributors must grant Boject Ltd the rights to use and relicense their
-contributions. **Before an external pull request can be merged, you'll be asked
-to sign our Contributor License Agreement (CLA).** A DCO sign-off alone is not
-sufficient — it certifies provenance but doesn't grant relicensing rights.
+contributions. **Before an external pull request can be merged, you must sign our
+[Contributor License Agreement](CLA.md).** A DCO sign-off alone is not sufficient
+— it certifies provenance but doesn't grant relicensing rights.
 
-The signing mechanism is being finalised (tracked in
-[#342](https://github.com/bojectify/boject-cms/issues/342)); until it's live,
-external PRs are held pending the CLA.
+Signing is automated. When you open your first pull request, the CLA Assistant
+bot comments with a link to the [CLA](CLA.md) and asks you to sign. Reply to that
+comment with exactly:
+
+> I have read the CLA Document and I hereby sign the CLA
+
+You only sign once — it covers all your future contributions. Maintainers and
+bots are exempt.
 
 ## Ways to contribute
 

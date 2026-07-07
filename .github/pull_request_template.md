@@ -25,4 +25,4 @@ Closes #
 - [ ] `pnpm test`, `pnpm lint`, and `pnpm typecheck` pass locally (or CI is green).
 - [ ] I've added or updated tests where it makes sense.
 - [ ] I've updated docs (`README.md`, `apps/cms/README.md`, package READMEs, or `CLAUDE.md`) if behaviour or setup changed.
-- [ ] I've read the [Contributing guide](../CONTRIBUTING.md) and will sign the [CLA](../CONTRIBUTING.md#contributor-license-agreement) when prompted.
+- [ ] I've read the [Contributing guide](../CONTRIBUTING.md) and will sign the [CLA](../CLA.md) when the bot prompts me (maintainers and bots are exempt).
