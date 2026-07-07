@@ -60,6 +60,7 @@ pnpm content:validate <path>                                                  # 
 pnpm starters:build           # Build sport.boject.json / rugby.boject.json from overlays in starters/src/
 pnpm starters:check           # Verify committed starter outputs are up to date (CI)
 pnpm nuke:packages            # Wipe every node_modules in the workspace and reinstall — recovery for "Could not resolve <pkg>" / orphaned symlink errors after dep churn
+bash packages/create-boject-cms/scripts/smoke-test.sh   # Manual boot smoke gate: scaffold a project with create-boject-cms and `docker compose up` the GENERATED stack (cms + db + meilisearch + redis), asserting the cms container boots and answers HTTP 200/302. Mirrors apps/cms/docker/smoke-test.sh (bash, manual, not in `pnpm test`). SMOKE_IMAGE reuses a pre-built cms image (skips the build); SMOKE_PORT (default 4020) overrides the host port. Requires Docker + host Node + curl.
 bash scripts/release-prepare.sh <ver>   # Release: bump all artifacts to one version + open a PR (HOST-only — git writes; not `pnpm release:*`, the shim mounts .git read-only)
 bash scripts/release-tag.sh             # Release: after the PR merges, tag vX.Y.Z + create the GitHub Release (HOST-only)
 ```
