@@ -63,9 +63,10 @@ describe('renderDockerCompose', () => {
 
   it('defines a meilisearch service pinned to v1.45.2 in production mode', () => {
     const yml = renderDockerCompose({ imageTag: 'x', starter: 'base' });
-    expect(yml).toContain('meilisearch:');
+    expect(yml).toMatch(/^ {2}meilisearch:$/m);
     expect(yml).toContain('image: getmeili/meilisearch:v1.45.2');
     expect(yml).toContain('MEILI_ENV: production');
+    expect(yml).toContain("MEILI_NO_ANALYTICS: 'true'");
     // Master key is interpolated from .env, never baked into the compose file.
     expect(yml).toContain('MEILI_MASTER_KEY: ${MEILI_MASTER_KEY}');
   });
@@ -78,7 +79,7 @@ describe('renderDockerCompose', () => {
 
   it('defines a redis service pinned to 7.4-alpine with no persistence', () => {
     const yml = renderDockerCompose({ imageTag: 'x', starter: 'base' });
-    expect(yml).toContain('redis:');
+    expect(yml).toMatch(/^ {2}redis:$/m);
     expect(yml).toContain('image: redis:7.4-alpine');
     expect(yml).toContain('command: redis-server --save "" --appendonly no');
   });
