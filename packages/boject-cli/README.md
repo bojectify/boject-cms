@@ -1,5 +1,8 @@
 # @boject/cli
 
+[![npm](https://img.shields.io/npm/v/@boject/cli)](https://www.npmjs.com/package/@boject/cli)
+[![License: BUSL-1.1](https://img.shields.io/badge/license-BUSL--1.1-blue.svg)](./LICENSE)
+
 Maintenance and schema-as-code CLI for [boject-cms](https://github.com/bojectify/boject-cms) projects.
 
 ## Install
@@ -343,3 +346,7 @@ Three Vitest projects, run via `pnpm test` (all) or individually:
 
 - The CMS itself: [`boject-cms`](https://github.com/bojectify/boject-cms)
 - Project scaffolder: [`create-boject-cms`](https://www.npmjs.com/package/create-boject-cms)
+
+## License
+
+Source-available under the [Business Source License 1.1](./LICENSE); each published version converts to Apache-2.0 four years after its release. See the [repository README](https://github.com/bojectify/boject-cms#license) for the plain-language summary.
