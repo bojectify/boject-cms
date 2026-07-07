@@ -75,4 +75,14 @@ describe('renderReadme', () => {
     expect(out).toContain('http://localhost:4100/login');
     expect(out).toContain('BOJECT_HOST_PORT');
   });
+
+  it('mentions the Meilisearch and Redis sidecars', () => {
+    const md = renderReadme({
+      starter: 'base',
+      adminEmail: 'admin@local',
+      hostPort: 4000,
+    });
+    expect(md).toContain('Meilisearch');
+    expect(md).toContain('Redis');
+  });
 });

@@ -26,6 +26,9 @@ A new boject-cms project scaffolded by \`create-boject-cms\`.
 docker compose up -d
 \`\`\`
 
+This starts four services: the CMS, PostgreSQL, Meilisearch (search), and Redis
+(response cache).
+
 ${starterLine}Once the container is healthy, log in at http://localhost:${hostPort}/login with:
 
 - Email: \`${adminEmail}\`
