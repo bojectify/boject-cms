@@ -42,5 +42,14 @@ export default defineConfig({
     // Mirror contentStatus.ts the same way so consumers can import
     // @boject/cli/vendor/contentStatus.
     await cp('src/vendor/contentStatus.ts', 'dist/vendor/contentStatus.ts');
+    // Copy the repo-root starter bundles so `boject mcp` can serve them as
+    // example resources (resolved from dist/ at runtime).
+    await mkdir('dist/starters', { recursive: true });
+    for (const name of ['base', 'sport', 'rugby']) {
+      await cp(
+        `../../starters/${name}.boject.json`,
+        `dist/starters/${name}.boject.json`
+      );
+    }
   },
 });

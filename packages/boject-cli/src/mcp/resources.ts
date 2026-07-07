@@ -4,6 +4,7 @@ import {
   FIELD_TYPES_DOC,
   IDENTIFIER_RULES_DOC,
 } from './resourceContent.js';
+import { STARTER_NAMES, readStarter } from './starters.js';
 
 function registerDoc(
   server: McpServer,
@@ -25,7 +26,7 @@ function registerDoc(
 
 export function registerResources(
   server: McpServer,
-  _startersDir: string
+  startersDir: string
 ): void {
   registerDoc(
     server,
@@ -51,5 +52,24 @@ export function registerResources(
     'Naming rules for content-type and field identifiers.',
     IDENTIFIER_RULES_DOC
   );
-  // Starter example resources are registered in Task 4.
+  for (const name of STARTER_NAMES) {
+    server.registerResource(
+      `starter-${name}`,
+      `boject://starters/${name}`,
+      {
+        title: `Starter: ${name}`,
+        description: `The ${name} starter as a worked example schema bundle.`,
+        mimeType: 'application/json',
+      },
+      async (u) => ({
+        contents: [
+          {
+            uri: u.href,
+            mimeType: 'application/json',
+            text: await readStarter(startersDir, name),
+          },
+        ],
+      })
+    );
+  }
 }
