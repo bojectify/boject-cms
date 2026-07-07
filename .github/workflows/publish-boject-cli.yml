@@ -21,10 +21,13 @@ jobs:
 
       - uses: pnpm/action-setup@v6
 
+      # No registry-url on purpose: setup-node's registry-url injects a
+      # placeholder NODE_AUTH_TOKEN into .npmrc, so npm authenticates the
+      # registry with that dummy token instead of OIDC trusted publishing
+      # (→ E401). npm defaults to registry.npmjs.org for publish anyway.
       - uses: actions/setup-node@v6
         with:
           node-version: 24
-          registry-url: https://registry.npmjs.org
 
       - run: npm install -g npm@latest
 
@@ -57,17 +60,14 @@ jobs:
         if: steps.published.outputs.already == 'false'
         working-directory: packages/boject-cli
         run: |
-          NAME=$(node -p "require('./package.json').name")
           VERSION=$(node -p "require('./package.json').version")
           if [[ "$VERSION" == *-* ]]; then
-            # npm refuses to default a prerelease to `latest`, so publish under `rc`.
+            # Prerelease → publish under the `rc` dist-tag only. `latest` is NOT
+            # moved here: OIDC trusted publishing covers `npm publish` but not
+            # `npm dist-tag`, so a maintainer moves `latest` by hand (2FA) if a
+            # prerelease should front the no-version quickstart. Stable releases
+            # (below) default to `latest` via OIDC automatically.
             npm publish --provenance --access public --tag rc
-            # Pre-1.0: keep `latest` on the newest release so the no-version
-            # quickstart resolves — but never move a stable `latest`.
-            CURRENT_LATEST=$(npm view "$NAME" dist-tags.latest 2>/dev/null || true)
-            if [[ -z "$CURRENT_LATEST" || "$CURRENT_LATEST" == *-* ]]; then
-              npm dist-tag add "$NAME@$VERSION" latest
-            fi
           else
             npm publish --provenance --access public
           fi
