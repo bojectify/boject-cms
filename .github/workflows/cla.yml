@@ -14,6 +14,10 @@ permissions:
 
 jobs:
   cla:
+    # Job name = the check-run name shown in branch protection. Add THIS check
+    # ("CLA Assistant") as a required status check on `main`. The action fails
+    # this job when the CLA is unsigned and re-runs it (→ pass) once signed.
+    name: CLA Assistant
     runs-on: ubuntu-latest
     steps:
       - name: CLA Assistant
