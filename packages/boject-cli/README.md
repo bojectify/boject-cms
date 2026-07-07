@@ -281,6 +281,32 @@ Every run writes to `<out>/<timestamp>/`:
 
 API keys are never logged to stdout/stderr or written to any output file. URLs with embedded credentials (`https://user:pass@host`) are stripped before logging. The k6 stderr log file is sanitised text (not a byte mirror) — defence in depth in case k6 ever echoes a Bearer header.
 
+## `boject mcp`
+
+Starts a stdio [MCP](https://modelcontextprotocol.io) server that helps an AI
+client author a content schema. No CMS or database connection is required.
+
+It exposes:
+
+- **Resources** — the bundle format, field-type catalog, identifier rules, and
+  the `base`/`sport`/`rugby` starters as worked examples.
+- **Tool** — `validate_schema`, which validates a candidate schema bundle and
+  returns structured issues.
+- **Prompt** — `model_content`, which starts a guided modelling session.
+
+Wire it into an MCP client via a project `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "boject": { "command": "npx", "args": ["-y", "@boject/cli", "mcp"] }
+  }
+}
+```
+
+Then ask the client to "create my first content type"; it writes the result to
+`content-types/schema.boject.json`.
+
 ## API key scopes
 
 CMS API keys carry one or more scopes:
