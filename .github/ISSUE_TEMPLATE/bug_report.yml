@@ -1,0 +1,67 @@
+name: Bug report
+description: Report a defect in boject-cms
+title: '[Bug]: '
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug. **Do not use this form for security
+        vulnerabilities** — see our [security policy](../SECURITY.md) for the private
+        disclosure process.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug and what you expected to happen instead.
+      placeholder: When I …, I expected …, but instead …
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps that reproduce the behaviour.
+      placeholder: |
+        1. …
+        2. …
+        3. …
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: boject-cms image tag / package version, or commit SHA.
+      placeholder: '0.0.1-rc.1'
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which part of boject-cms is affected?
+      options:
+        - CMS server / API
+        - Admin UI
+        - '@boject/cli'
+        - create-boject-cms (scaffolder)
+        - Docker image / deployment
+        - Other / not sure
+    validations:
+      required: false
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Docker/OrbStack version, Node version (if running natively), database.
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs or output
+      description: Paste any relevant logs. This is rendered as code, so no backticks needed.
+      render: shell
+    validations:
+      required: false
