@@ -3,6 +3,7 @@ export type StarterChoice = 'base' | 'sport' | 'rugby' | 'none';
 export interface EnvFileParams {
   sessionPassword: string;
   adminPassword: string;
+  meiliMasterKey: string;
   starter: StarterChoice;
   hostPort: number;
 }
@@ -10,11 +11,16 @@ export interface EnvFileParams {
 export function renderEnvFile({
   sessionPassword,
   adminPassword,
+  meiliMasterKey,
   starter,
   hostPort,
 }: EnvFileParams): string {
   const lines = [
     'DATABASE_URL=postgresql://boject:boject@db:5432/boject',
+    '# Search (Meilisearch) + cache (Redis) sidecars — see docker-compose.yml.',
+    'MEILI_URL=http://meilisearch:7700',
+    `MEILI_MASTER_KEY=${meiliMasterKey}`,
+    'REDIS_URL=redis://redis:6379',
     `NUXT_SESSION_PASSWORD=${sessionPassword}`,
     'BOJECT_ADMIN_EMAIL=admin@local',
     `BOJECT_ADMIN_PASSWORD=${adminPassword}`,

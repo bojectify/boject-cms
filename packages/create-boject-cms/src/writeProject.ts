@@ -11,7 +11,11 @@ import {
   type StarterChoice,
 } from './render.js';
 import { sanitiseProjectName } from './projectName.js';
-import { generateAdminPassword, generateSessionPassword } from './secrets.js';
+import {
+  generateAdminPassword,
+  generateMeiliMasterKey,
+  generateSessionPassword,
+} from './secrets.js';
 
 export interface WriteProjectParams {
   targetDir: string;
@@ -45,6 +49,7 @@ export async function writeProject({
 
   const sessionPassword = generateSessionPassword();
   const adminPassword = generateAdminPassword();
+  const meiliMasterKey = generateMeiliMasterKey();
   const adminEmail = 'admin@local';
   const projectName = sanitiseProjectName(basename(targetDir));
 
@@ -54,7 +59,13 @@ export async function writeProject({
   );
   await writeFile(
     join(targetDir, '.env'),
-    renderEnvFile({ sessionPassword, adminPassword, starter, hostPort })
+    renderEnvFile({
+      sessionPassword,
+      adminPassword,
+      meiliMasterKey,
+      starter,
+      hostPort,
+    })
   );
   await writeFile(
     join(targetDir, 'package.json'),
