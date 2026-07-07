@@ -14,6 +14,7 @@ import {
   expect,
   it,
 } from 'vitest';
+import { CLI_VERSION } from '../../src/version.js';
 
 const run = promisify(execFile);
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -112,6 +113,6 @@ describe('boject upgrade E2E (mock registry)', () => {
 
   it('--version prints CLI_VERSION', async () => {
     const { stdout } = await run(process.execPath, [CLI_PATH, '--version']);
-    expect(stdout.trim()).toBe('0.0.1-rc.1');
+    expect(stdout.trim()).toBe(CLI_VERSION);
   });
 });
