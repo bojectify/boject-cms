@@ -61,6 +61,11 @@ describe('create-boject-cms E2E', () => {
     // Admin password: 16 bytes → 22 base64 chars + 2 '=' padding
     expect(env).toMatch(/^BOJECT_ADMIN_PASSWORD=[A-Za-z0-9+/]{22}==$/m);
 
+    // Search + cache infra wired for a bootable production stack.
+    expect(env).toMatch(/^MEILI_URL=http:\/\/meilisearch:7700$/m);
+    expect(env).toMatch(/^MEILI_MASTER_KEY=[A-Za-z0-9+/]{43}=$/m);
+    expect(env).toMatch(/^REDIS_URL=redis:\/\/redis:6379$/m);
+
     const starterBundle = await readFile(
       join(target, 'starters', 'base.boject.json'),
       'utf8'
@@ -70,6 +75,12 @@ describe('create-boject-cms E2E', () => {
       'utf8'
     );
     expect(starterBundle).toBe(canonical);
+
+    const compose = await readFile(join(target, 'docker-compose.yml'), 'utf8');
+    expect(compose).toContain('image: getmeili/meilisearch:v1.45.2');
+    expect(compose).toContain('image: redis:7.4-alpine');
+    expect(compose).toContain('MEILI_MASTER_KEY: ${MEILI_MASTER_KEY}');
+    expect(compose).toContain('- meilidata:/meili_data');
 
     await rm(target, { recursive: true, force: true });
   }, 30_000);
