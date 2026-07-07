@@ -1,5 +1,8 @@
 # create-boject-cms
 
+[![npm](https://img.shields.io/npm/v/create-boject-cms)](https://www.npmjs.com/package/create-boject-cms)
+[![License: BUSL-1.1](https://img.shields.io/badge/license-BUSL--1.1-blue.svg)](./LICENSE)
+
 Scaffold a new [boject-cms](https://github.com/bojectify/boject-cms) project — a Docker Compose project pinned to a specific CMS image, with a starter content schema, scaffolded `.env`, and the `.boject.config.json` for the [@boject/cli](https://www.npmjs.com/package/@boject/cli) commands.
 
 ## Usage
@@ -118,3 +121,7 @@ pnpm exec boject upgrade --to 1.4.2    # specific version
 - The CMS itself: [`boject-cms`](https://github.com/bojectify/boject-cms)
 - The CLI: [`@boject/cli`](https://www.npmjs.com/package/@boject/cli)
 - Starter bundles: [`starters/`](https://github.com/bojectify/boject-cms/tree/main/starters)
+
+## License
+
+Source-available under the [Business Source License 1.1](./LICENSE); each published version converts to Apache-2.0 four years after its release. See the [repository README](https://github.com/bojectify/boject-cms#license) for the plain-language summary.

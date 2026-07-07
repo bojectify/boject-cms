@@ -1,8 +1,72 @@
 # boject-cms
 
-A general-purpose TypeScript headless CMS built with Nuxt 4 and Prisma v7 on PostgreSQL. Content is modelled entirely through user-defined ContentTypes — there are no hardcoded domain models.
+[![CI](https://github.com/bojectify/boject-cms/actions/workflows/ci.yml/badge.svg)](https://github.com/bojectify/boject-cms/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/bojectify/boject-cms?include_prereleases&sort=semver)](https://github.com/bojectify/boject-cms/releases)
+[![License: BUSL-1.1](https://img.shields.io/badge/license-BUSL--1.1-blue.svg)](LICENSE)
 
-This is the workspace root. Most documentation lives next to the code it describes — see [Apps and packages](#apps-and-packages) below.
+**boject-cms** is a self-hosted, source-available headless CMS. You model your content as **ContentTypes** — there are no hardcoded domain models — and consume it over a token-authed **REST + GraphQL** API from any frontend, native app, or service.
+
+It ships as a single Docker image you run next to PostgreSQL, with a **schema-as-code** workflow (`boject schema pull` → commit → deploy) that keeps your content model in version control. Built-in full-text search (Meilisearch), response caching (Redis), and image transforms (Sharp) come standard. Built with Nuxt 4, Prisma 7, and TypeScript.
+
+## Features
+
+- **Dynamic content modelling** — define ContentTypes and fields in the admin UI or as code; no hardcoded models, no redeploy to add a field.
+- **REST + GraphQL API** — token-authed `/api/public/*` (REST read + write) and `/api/graphql` (read), ready for any frontend, native app, or service.
+- **Schema-as-code** — pull your content model to a committed JSON bundle; the container converges the schema on every deploy.
+- **Full-text search** — built-in Meilisearch indexing across your entries.
+- **Response caching** — Redis-backed caching on the public read and GraphQL APIs.
+- **Images & assets** — Sharp-powered on-the-fly transforms, with local / S3 / R2 storage drivers.
+- **Self-hosted** — one multi-arch Docker image plus PostgreSQL; you own the data.
+- **Source-available** — BSL 1.1, converting to Apache-2.0 four years after each release.
+
+## Quickstart
+
+Scaffold a project, then bring it up with Docker Compose:
+
+```bash
+pnpm create boject-cms my-site
+cd my-site
+docker compose up -d
+```
+
+`create-boject-cms` generates a `docker-compose.yml` (CMS image + PostgreSQL, pinned to a release tag), a starter content schema, and a `.env` with generated secrets and an initial admin login. Once the stack is healthy, open the admin UI at **http://localhost:4000/login** and sign in with the admin credentials from the generated `.env`.
+
+Prefer npm? `npm create boject-cms@latest my-site` works too.
+
+From there, edit content types in the UI and adopt the [schema-as-code workflow](packages/boject-cli/README.md) to keep your model in version control.
+
+## Published artefacts
+
+Every release ships three coordinated artefacts at one version:
+
+| Artefact                       | What it is                                                         | Where                                                                     |
+| ------------------------------ | ------------------------------------------------------------------ | ------------------------------------------------------------------------- |
+| `create-boject-cms`            | Project scaffolder (`pnpm create boject-cms`)                      | [npm](https://www.npmjs.com/package/create-boject-cms)                    |
+| `ghcr.io/bojectify/boject-cms` | The CMS server image (multi-arch; pinned in the generated compose) | [GHCR](https://github.com/bojectify/boject-cms/pkgs/container/boject-cms) |
+| `@boject/cli`                  | Maintenance + schema-as-code CLI (`boject …`)                      | [npm](https://www.npmjs.com/package/@boject/cli)                          |
+
+## Documentation
+
+- [`apps/cms/README.md`](apps/cms/README.md) — the CMS in depth: architecture, API surface, API keys, schema-as-code, storage, backups, env vars.
+- [`@boject/cli`](packages/boject-cli/README.md) — the `boject` CLI: `schema pull/apply/check`, `upgrade`, `perf`.
+- [`create-boject-cms`](packages/create-boject-cms/README.md) — the scaffolder and what it generates.
+
+Most other documentation lives next to the code it describes — start from [Apps and packages](#apps-and-packages) below.
+
+## License
+
+boject-cms is **source-available** under the [Business Source License 1.1](LICENSE).
+Each published version converts to the Apache License, Version 2.0 four years
+after its release. BSL is **not** an OSI-approved open-source license: you may use
+boject-cms for any purpose — including production — except offering it to third
+parties as a hosted, managed, or embedded product or service that competes with
+boject. See [`LICENSE`](LICENSE) for the full terms.
+
+---
+
+## Development
+
+The rest of this README is for contributors and maintainers working on boject-cms itself. If you only want to run the CMS, the [Quickstart](#quickstart) above is all you need.
 
 ## Tech Stack
 
@@ -379,12 +443,3 @@ All three artifacts (the `ghcr.io/bojectify/boject-cms` image, `@boject/cli`,
    publish workflows, which stamp the per-version BSL `LICENSE` and publish.
 
 The first public release is `v0.0.1-rc.1`.
-
-## License
-
-boject-cms is **source-available** under the [Business Source License 1.1](LICENSE).
-Each published version converts to the Apache License, Version 2.0 four years
-after its release. BSL is **not** an OSI-approved open-source license: you may use
-boject-cms for any purpose — including production — except offering it to third
-parties as a hosted, managed, or embedded product or service that competes with
-boject. See [`LICENSE`](LICENSE) for the full terms.
