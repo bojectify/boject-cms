@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CLI_VERSION } from '../version.js';
 import { registerResources } from './resources.js';
+import { registerTools } from './tools.js';
 
 export interface BuildMcpServerOptions {
   startersDir?: string;
@@ -21,5 +22,6 @@ export function buildMcpServer(options: BuildMcpServerOptions = {}): McpServer {
   const server = new McpServer({ name: 'boject', version: CLI_VERSION });
   const startersDir = options.startersDir ?? defaultStartersDir();
   registerResources(server, startersDir);
+  registerTools(server);
   return server;
 }
