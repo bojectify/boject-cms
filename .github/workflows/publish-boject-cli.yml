@@ -12,6 +12,10 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    # apps/cms's postinstall (`nuxt prepare`) runs during the workspace install
+    # and throws its production guard without this. Dummy value, not a secret.
+    env:
+      NUXT_SESSION_PASSWORD: ci-publish-session-password-not-a-secret-000
     steps:
       - uses: actions/checkout@v6
 
@@ -52,4 +56,18 @@ jobs:
       - name: Publish
         if: steps.published.outputs.already == 'false'
         working-directory: packages/boject-cli
-        run: npm publish --provenance --access public
+        run: |
+          NAME=$(node -p "require('./package.json').name")
+          VERSION=$(node -p "require('./package.json').version")
+          if [[ "$VERSION" == *-* ]]; then
+            # npm refuses to default a prerelease to `latest`, so publish under `rc`.
+            npm publish --provenance --access public --tag rc
+            # Pre-1.0: keep `latest` on the newest release so the no-version
+            # quickstart resolves — but never move a stable `latest`.
+            CURRENT_LATEST=$(npm view "$NAME" dist-tags.latest 2>/dev/null || true)
+            if [[ -z "$CURRENT_LATEST" || "$CURRENT_LATEST" == *-* ]]; then
+              npm dist-tag add "$NAME@$VERSION" latest
+            fi
+          else
+            npm publish --provenance --access public
+          fi

@@ -23,6 +23,10 @@ fi
 git tag -d "$TAG" >/dev/null 2>&1 || true
 git tag -a "$TAG" "$RELEASE_SHA" -m "$TAG"
 git push origin "refs/tags/${TAG}"
-gh release create "$TAG" --verify-tag --generate-notes --title "$TAG"
+if [[ "$VERSION" == *-* ]]; then
+  gh release create "$TAG" --verify-tag --generate-notes --title "$TAG" --prerelease
+else
+  gh release create "$TAG" --verify-tag --generate-notes --title "$TAG"
+fi
 
 echo "✓ Pushed $TAG + created the GitHub Release. Publish workflows are running."
