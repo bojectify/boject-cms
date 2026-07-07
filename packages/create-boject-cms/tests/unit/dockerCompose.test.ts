@@ -60,4 +60,37 @@ describe('renderDockerCompose', () => {
       expect(out).toContain('./content-types:/app/content-types:ro');
     }
   });
+
+  it('defines a meilisearch service pinned to v1.45.2 in production mode', () => {
+    const yml = renderDockerCompose({ imageTag: 'x', starter: 'base' });
+    expect(yml).toMatch(/^ {2}meilisearch:$/m);
+    expect(yml).toContain('image: getmeili/meilisearch:v1.45.2');
+    expect(yml).toContain('MEILI_ENV: production');
+    expect(yml).toContain("MEILI_NO_ANALYTICS: 'true'");
+    // Master key is interpolated from .env, never baked into the compose file.
+    expect(yml).toContain('MEILI_MASTER_KEY: ${MEILI_MASTER_KEY}');
+  });
+
+  it('gives meilisearch a persistent meilidata volume', () => {
+    const yml = renderDockerCompose({ imageTag: 'x', starter: 'base' });
+    expect(yml).toContain('- meilidata:/meili_data');
+    expect(yml).toMatch(/^ {2}meilidata:$/m);
+  });
+
+  it('defines a redis service pinned to 7.4-alpine with no persistence', () => {
+    const yml = renderDockerCompose({ imageTag: 'x', starter: 'base' });
+    expect(yml).toMatch(/^ {2}redis:$/m);
+    expect(yml).toContain('image: redis:7.4-alpine');
+    expect(yml).toContain('command: redis-server --save "" --appendonly no');
+  });
+
+  it('does not give redis a volume (cold-on-restart cache)', () => {
+    const yml = renderDockerCompose({ imageTag: 'x', starter: 'base' });
+    expect(yml).not.toContain('redisdata');
+  });
+
+  it('makes cms depend on db, meilisearch, and redis', () => {
+    const yml = renderDockerCompose({ imageTag: 'x', starter: 'base' });
+    expect(yml).toMatch(/depends_on:\n\s+- db\n\s+- meilisearch\n\s+- redis/);
+  });
 });

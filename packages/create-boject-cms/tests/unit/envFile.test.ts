@@ -4,6 +4,7 @@ import { renderEnvFile } from '../../src/templates/envFile.js';
 const baseParams = {
   sessionPassword: 'session-password-value',
   adminPassword: 'admin-password-value',
+  meiliMasterKey: 'meili-master-key-value',
   hostPort: 4000,
 };
 
@@ -69,6 +70,7 @@ describe('renderEnvFile', () => {
       const out = renderEnvFile({
         sessionPassword: 'pw1',
         adminPassword: 'pw2',
+        meiliMasterKey: 'pw3',
         starter,
         hostPort: 4000,
       });
@@ -80,6 +82,7 @@ describe('renderEnvFile', () => {
     const out = renderEnvFile({
       sessionPassword: 'pw1',
       adminPassword: 'pw2',
+      meiliMasterKey: 'pw3',
       starter: 'base',
       hostPort: 4000,
     });
@@ -106,5 +109,20 @@ describe('renderEnvFile', () => {
       hostPort: 4100,
     });
     expect(env).toMatch(/^BOJECT_HOST_PORT=4100$/m);
+  });
+
+  it('includes MEILI_URL pointed at the compose meilisearch service', () => {
+    const env = renderEnvFile({ ...baseParams, starter: 'base' });
+    expect(env).toMatch(/^MEILI_URL=http:\/\/meilisearch:7700$/m);
+  });
+
+  it('includes MEILI_MASTER_KEY from parameter', () => {
+    const env = renderEnvFile({ ...baseParams, starter: 'base' });
+    expect(env).toMatch(/^MEILI_MASTER_KEY=meili-master-key-value$/m);
+  });
+
+  it('includes REDIS_URL pointed at the compose redis service', () => {
+    const env = renderEnvFile({ ...baseParams, starter: 'base' });
+    expect(env).toMatch(/^REDIS_URL=redis:\/\/redis:6379$/m);
   });
 });

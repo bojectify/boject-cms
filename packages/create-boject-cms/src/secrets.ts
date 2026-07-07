@@ -7,3 +7,7 @@ export function generateSessionPassword(): string {
 export function generateAdminPassword(): string {
   return randomBytes(16).toString('base64');
 }
+
+export function generateMeiliMasterKey(): string {
+  return randomBytes(32).toString('base64');
+}
