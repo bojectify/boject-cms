@@ -1,0 +1,48 @@
+version: 2
+updates:
+  # JavaScript / pnpm workspace — the root pnpm-lock.yaml covers every package
+  # (apps/*, packages/*, perf). Security updates are enabled separately in the
+  # repo settings and are intentionally left ungrouped so they stay individually
+  # visible and fast to merge; the grouping below applies only to version updates.
+  - package-ecosystem: npm
+    directory: '/'
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    cooldown:
+      # Mirror the pnpm-workspace.yaml `minimumReleaseAge: 4320` (3 days) supply-chain
+      # guard so Dependabot never proposes a release the hour it's published.
+      default-days: 3
+    groups:
+      production-dependencies:
+        dependency-type: production
+        update-types:
+          - minor
+          - patch
+      development-dependencies:
+        dependency-type: development
+    commit-message:
+      prefix: 'chore(deps)'
+      prefix-development: 'chore(deps-dev)'
+
+  # GitHub Actions — keep the pinned action versions in .github/workflows patched.
+  - package-ecosystem: github-actions
+    directory: '/'
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns:
+          - '*'
+    commit-message:
+      prefix: 'ci'
+
+  # Docker base image — apps/cms/Dockerfile (node:24-alpine). Every proposed bump
+  # still passes the `ci` check and the image smoke test before it can merge.
+  - package-ecosystem: docker
+    directory: '/apps/cms'
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: 'chore(docker)'
