@@ -4,12 +4,14 @@ export interface EnvFileParams {
   sessionPassword: string;
   adminPassword: string;
   starter: StarterChoice;
+  hostPort: number;
 }
 
 export function renderEnvFile({
   sessionPassword,
   adminPassword,
   starter,
+  hostPort,
 }: EnvFileParams): string {
   const lines = [
     'DATABASE_URL=postgresql://boject:boject@db:5432/boject',
@@ -23,6 +25,10 @@ export function renderEnvFile({
     lines.push(`BOJECT_INITIAL_STARTER=/starters/${starter}.boject.json`);
   }
   lines.push(
+    '',
+    '# Host port the CMS is published on (mapped to the container port 3000).',
+    '# Change it to run several projects side by side, or to avoid a port clash.',
+    `BOJECT_HOST_PORT=${hostPort}`,
     '',
     '# Set to "true" on production / staging to disable schema editing in the UI.',
     '# Schema changes should flow from git on locked environments.',

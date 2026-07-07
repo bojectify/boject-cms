@@ -3,9 +3,14 @@ import type { StarterChoice } from './envFile.js';
 export interface ReadmeParams {
   starter: StarterChoice;
   adminEmail: string;
+  hostPort: number;
 }
 
-export function renderReadme({ starter, adminEmail }: ReadmeParams): string {
+export function renderReadme({
+  starter,
+  adminEmail,
+  hostPort,
+}: ReadmeParams): string {
   const starterLine =
     starter === 'none'
       ? ''
@@ -21,10 +26,13 @@ A new boject-cms project scaffolded by \`create-boject-cms\`.
 docker compose up -d
 \`\`\`
 
-${starterLine}Once the container is healthy, log in at http://localhost:4000/login with:
+${starterLine}Once the container is healthy, log in at http://localhost:${hostPort}/login with:
 
 - Email: \`${adminEmail}\`
 - Password: see \`BOJECT_ADMIN_PASSWORD\` in \`.env\`
+
+The CMS is published on host port \`${hostPort}\` — change \`BOJECT_HOST_PORT\` in
+\`.env\` to run several projects side by side or to avoid a port clash.
 
 ## Content types
 

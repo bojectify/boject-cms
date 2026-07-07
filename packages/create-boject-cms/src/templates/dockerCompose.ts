@@ -17,7 +17,9 @@ export function renderDockerCompose({
     image: ${imageTag}
     restart: unless-stopped
     ports:
-      - '4000:3000'
+      # Host port comes from BOJECT_HOST_PORT in .env (default 4000). Change it
+      # there to run several projects side by side or dodge a port clash.
+      - '\${BOJECT_HOST_PORT:-4000}:3000'
     env_file:
       - .env
     depends_on:
