@@ -1,8 +1,6 @@
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import { resolveAiAssist, resolveStarter } from '../../src/prompts.js';
-import { starterNames } from '../../src/starters.js';
+import { STARTERS } from './repoStarters.js';
 
 vi.mock('@clack/prompts', () => ({
   select: vi.fn(),
@@ -11,16 +9,6 @@ vi.mock('@clack/prompts', () => ({
 }));
 
 import * as clack from '@clack/prompts';
-
-const REPO_STARTERS = resolve(
-  dirname(fileURLToPath(import.meta.url)),
-  '..',
-  '..',
-  '..',
-  '..',
-  'starters'
-);
-const STARTERS = starterNames(REPO_STARTERS);
 
 describe('resolveStarter', () => {
   it('returns the flag value without calling the prompt when a valid flag is supplied', async () => {
