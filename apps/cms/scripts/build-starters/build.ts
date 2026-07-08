@@ -1,13 +1,13 @@
 // scripts/build-starters/build.ts
-import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import prettier from 'prettier';
 import type { Bundle } from '../content-bundle/types';
 import { validateBundle } from '../content-bundle/validate';
-import { mergeOverlay } from './merge';
-import type { Overlay } from './types';
+import { mergeOverlay, composeParents } from './merge';
+import type { FieldPartial, Overlay } from './types';
 import { normalizeExtends } from './types';
-import { validateOverlay } from './validate';
+import { validateOverlay, validateFieldPartial } from './validate';
 
 export interface BuildOptions {
   now?: string;
@@ -49,17 +49,20 @@ export async function buildAll(
     overlays.set(overlay.name, overlay);
   }
 
+  const fieldPartials = loadFieldPartials(srcDir);
+
   const ordered = topoSort(overlays);
   const results: BuildResult[] = [];
 
   for (const overlay of ordered) {
-    const extendsList = normalizeExtends(overlay.extends);
-    if (extendsList.length === 0) {
-      throw new Error(`Overlay "${overlay.name}" must have an extends value`);
-    }
-    const parentName = extendsList[0]!;
-    const parent = loadParent(root, parentName, overlays, results);
-    const merged = mergeOverlay(parent, overlay);
+    const parents = normalizeExtends(overlay.extends).map((name) =>
+      loadParent(root, name, results)
+    );
+    const merged = mergeOverlay(
+      composeParents(parents),
+      overlay,
+      fieldPartials
+    );
     if (opts.now) {
       merged.exportedAt = opts.now;
     }
@@ -84,33 +87,50 @@ export async function buildAll(
   return results;
 }
 
+function loadFieldPartials(srcDir: string): Map<string, FieldPartial> {
+  const dir = join(srcDir, 'partials');
+  const map = new Map<string, FieldPartial>();
+  for (const file of safeReaddir(dir).filter((f) => f.endsWith('.json'))) {
+    const partial = JSON.parse(
+      readFileSync(join(dir, file), 'utf8')
+    ) as FieldPartial;
+    const result = validateFieldPartial(partial);
+    if (!result.ok) {
+      throw new Error(
+        `Invalid field-partial ${file}:\n${formatErrors(result.errors)}`
+      );
+    }
+    const expected = file.replace(/\.json$/, '');
+    if (partial.name !== expected) {
+      throw new Error(
+        `Field-partial ${file} declares name "${partial.name}"; expected "${expected}"`
+      );
+    }
+    if (map.has(partial.name))
+      throw new Error(`Duplicate field-partial name "${partial.name}"`);
+    map.set(partial.name, partial);
+  }
+  return map;
+}
+
 function loadParent(
   root: string,
   parentName: string,
-  overlays: Map<string, Overlay>,
   built: BuildResult[]
 ): Bundle {
   const builtParent = built.find((r) => r.name === parentName);
-  if (builtParent) {
+  if (builtParent)
     return JSON.parse(readFileSync(builtParent.path, 'utf8')) as Bundle;
+  for (const candidate of [
+    join(root, `${parentName}.boject.json`),
+    join(root, 'modules', `${parentName}.boject.json`),
+  ]) {
+    if (existsSync(candidate))
+      return JSON.parse(readFileSync(candidate, 'utf8')) as Bundle;
   }
-  const rootPath = join(root, `${parentName}.boject.json`);
-  let raw: string;
-  try {
-    raw = readFileSync(rootPath, 'utf8');
-  } catch (err) {
-    if (
-      err instanceof Error &&
-      'code' in err &&
-      (err as { code?: string }).code === 'ENOENT'
-    ) {
-      throw new Error(
-        `unknown parent bundle "${parentName}" (expected ${rootPath} or a built overlay)`
-      );
-    }
-    throw err;
-  }
-  return JSON.parse(raw) as Bundle;
+  throw new Error(
+    `unknown parent bundle "${parentName}" (expected ${join(root, `${parentName}.boject.json`)}, ${join(root, 'modules', `${parentName}.boject.json`)}, or a built overlay)`
+  );
 }
 
 function topoSort(overlays: Map<string, Overlay>): Overlay[] {
@@ -128,10 +148,8 @@ function topoSort(overlays: Map<string, Overlay>): Overlay[] {
     visiting.add(name);
     const overlay = overlays.get(name);
     if (!overlay) return;
-    const extendsList = normalizeExtends(overlay.extends);
-    const parentName = extendsList[0];
-    if (parentName && overlays.has(parentName)) {
-      visit(parentName, [...stack, name]);
+    for (const parent of normalizeExtends(overlay.extends)) {
+      if (overlays.has(parent)) visit(parent, [...stack, name]);
     }
     visiting.delete(name);
     visited.add(name);

@@ -266,4 +266,128 @@ describe('buildAll', () => {
       /sport\.overlay\.json declares name "football"/
     );
   });
+
+  it('composes a module parent + a field-partial via array extends', async () => {
+    // root bundle: web-base with Image
+    writeFileSync(
+      join(root, 'web-base.boject.json'),
+      JSON.stringify({
+        version: 2,
+        exportedAt: '2026-01-01T00:00:00.000Z',
+        portable: true,
+        contentTypes: [
+          {
+            id: null,
+            identifier: 'Image',
+            name: 'Image',
+            description: null,
+            fields: [
+              {
+                id: null,
+                identifier: 'name',
+                name: 'Name',
+                type: FIELD_TYPES.ENTRY_TITLE,
+                required: true,
+                order: 0,
+                options: null,
+              },
+            ],
+          },
+        ],
+        entries: [],
+      })
+    );
+    // module: taxonomy with Tag
+    mkdirSync(join(root, 'modules'));
+    writeFileSync(
+      join(root, 'modules', 'taxonomy.boject.json'),
+      JSON.stringify({
+        version: 2,
+        exportedAt: '2026-01-01T00:00:00.000Z',
+        portable: true,
+        contentTypes: [
+          {
+            id: null,
+            identifier: 'Tag',
+            name: 'Tag',
+            description: null,
+            fields: [
+              {
+                id: null,
+                identifier: 'name',
+                name: 'Name',
+                type: FIELD_TYPES.ENTRY_TITLE,
+                required: true,
+                order: 0,
+                options: null,
+              },
+            ],
+          },
+        ],
+        entries: [],
+      })
+    );
+    // field-partial: web-metadata
+    mkdirSync(join(root, 'src', 'partials'));
+    writeFileSync(
+      join(root, 'src', 'partials', 'web-metadata.json'),
+      JSON.stringify({
+        name: 'web-metadata',
+        fields: [
+          {
+            id: null,
+            identifier: 'metaTitle',
+            name: 'Meta Title',
+            type: FIELD_TYPES.TEXT,
+            required: false,
+            order: 0,
+            options: null,
+          },
+        ],
+      })
+    );
+    // overlay: articles extends [web-base, taxonomy]; Article extends [web-metadata]
+    writeFileSync(
+      join(root, 'src', 'articles.overlay.json'),
+      JSON.stringify({
+        version: 1,
+        name: 'articles',
+        extends: ['web-base', 'taxonomy'],
+        contentTypes: [
+          {
+            identifier: 'Article',
+            mode: 'create',
+            name: 'Article',
+            extends: ['web-metadata'],
+            fields: [
+              {
+                id: null,
+                identifier: 'title',
+                name: 'Title',
+                type: FIELD_TYPES.ENTRY_TITLE,
+                required: true,
+                order: 0,
+                options: null,
+              },
+            ],
+          },
+        ],
+      })
+    );
+
+    await buildAll(root, { now: '2026-01-01T00:00:00.000Z' });
+    const out = JSON.parse(
+      readFileSync(join(root, 'articles.boject.json'), 'utf8')
+    );
+    const ids = out.contentTypes.map(
+      (c: { identifier: string }) => c.identifier
+    );
+    expect(ids).toEqual(['Image', 'Tag', 'Article']); // web-base + taxonomy + created
+    const article = out.contentTypes.find(
+      (c: { identifier: string }) => c.identifier === 'Article'
+    );
+    expect(
+      article.fields.map((f: { identifier: string }) => f.identifier)
+    ).toEqual(['title', 'metaTitle']);
+  });
 });
