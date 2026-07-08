@@ -7,7 +7,7 @@ const PACKAGE_ROOT = resolve(HERE, '..');
 const REPO_STARTERS = resolve(PACKAGE_ROOT, '..', '..', 'starters');
 const DIST_STARTERS = join(PACKAGE_ROOT, 'dist', 'starters');
 
-const EXPECTED = ['base', 'sport', 'rugby'] as const;
+const EXPECTED = ['web-base', 'articles', 'sport', 'rugby'] as const;
 
 async function main(): Promise<void> {
   await mkdir(DIST_STARTERS, { recursive: true });

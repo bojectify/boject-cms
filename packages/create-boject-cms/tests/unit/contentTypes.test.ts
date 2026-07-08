@@ -15,7 +15,7 @@ describe('renderContentTypesBundle', () => {
   });
 
   it('returns a copy directive for non-none starters', () => {
-    for (const starter of ['base', 'sport', 'rugby'] as const) {
+    for (const starter of ['web-base', 'articles', 'sport', 'rugby'] as const) {
       const out = renderContentTypesBundle({ starter });
       expect(out).toEqual({
         kind: 'copy',

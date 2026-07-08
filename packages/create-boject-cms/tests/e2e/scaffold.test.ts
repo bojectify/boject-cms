@@ -34,9 +34,9 @@ afterAll(async () => {
 });
 
 describe('create-boject-cms E2E', () => {
-  it('scaffolds the full file set with --starter base', async () => {
+  it('scaffolds the full file set with --starter web-base', async () => {
     const target = join(workDir, 'site');
-    const { stdout } = await runCli([target, '--starter', 'base']);
+    const { stdout } = await runCli([target, '--starter', 'web-base']);
 
     expect(stdout).toContain('Scaffolded boject-cms project');
     expect(stdout).toContain('admin@local');
@@ -67,11 +67,11 @@ describe('create-boject-cms E2E', () => {
     expect(env).toMatch(/^REDIS_URL=redis:\/\/redis:6379$/m);
 
     const starterBundle = await readFile(
-      join(target, 'starters', 'base.boject.json'),
+      join(target, 'starters', 'web-base.boject.json'),
       'utf8'
     );
     const canonical = await readFile(
-      resolve(PACKAGE_ROOT, '..', '..', 'starters', 'base.boject.json'),
+      resolve(PACKAGE_ROOT, '..', '..', 'starters', 'web-base.boject.json'),
       'utf8'
     );
     expect(starterBundle).toBe(canonical);
@@ -81,6 +81,28 @@ describe('create-boject-cms E2E', () => {
     expect(compose).toContain('image: redis:7.4-alpine');
     expect(compose).toContain('MEILI_MASTER_KEY: ${MEILI_MASTER_KEY}');
     expect(compose).toContain('- meilidata:/meili_data');
+
+    await rm(target, { recursive: true, force: true });
+  }, 30_000);
+
+  it('scaffolds Article/Tag/Category content types with --starter articles', async () => {
+    const target = join(workDir, 'site');
+    await runCli([target, '--starter', 'articles']);
+
+    const files = await readdir(target);
+    expect(files).not.toContain('.mcp.json');
+
+    const schema = await readFile(
+      join(target, 'content-types', 'schema.boject.json'),
+      'utf8'
+    );
+    const parsed = JSON.parse(schema) as {
+      contentTypes: { identifier: string }[];
+    };
+    const identifiers = parsed.contentTypes.map((ct) => ct.identifier);
+    expect(identifiers).toContain('Article');
+    expect(identifiers).toContain('Tag');
+    expect(identifiers).toContain('Category');
 
     await rm(target, { recursive: true, force: true });
   }, 30_000);
@@ -102,7 +124,9 @@ describe('create-boject-cms E2E', () => {
     const target = workDir; // the tempdir itself has at least `.` / `..`; we'll put a marker
     await writeFile(join(target, 'marker.txt'), 'hi');
 
-    await expect(runCli([target, '--starter', 'base'])).rejects.toMatchObject({
+    await expect(
+      runCli([target, '--starter', 'web-base'])
+    ).rejects.toMatchObject({
       code: 1,
     });
 
@@ -115,7 +139,12 @@ describe('create-boject-cms E2E', () => {
     const target = workDir;
     await writeFile(join(target, 'marker.txt'), 'hi');
 
-    const { stdout } = await runCli([target, '--starter', 'base', '--force']);
+    const { stdout } = await runCli([
+      target,
+      '--starter',
+      'web-base',
+      '--force',
+    ]);
     expect(stdout).toContain('Scaffolded');
 
     const files = await readdir(target);
@@ -132,7 +161,7 @@ describe('create-boject-cms E2E', () => {
     await runCli([
       target,
       '--starter',
-      'base',
+      'web-base',
       '--image',
       'localhost:5555/boject/cms:dev',
     ]);

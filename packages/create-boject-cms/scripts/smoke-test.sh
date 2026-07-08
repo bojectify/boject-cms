@@ -46,7 +46,7 @@ echo "[scaffold-smoke] building create-boject-cms dist"
 echo "[scaffold-smoke] scaffolding a project into $SITE_DIR"
 node "$REPO_ROOT/packages/create-boject-cms/dist/index.js" \
   "$SITE_DIR" \
-  --starter base \
+  --starter web-base \
   --image "$IMAGE_TAG" \
   --port "$HOST_PORT"
 

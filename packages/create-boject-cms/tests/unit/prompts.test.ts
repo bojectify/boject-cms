@@ -29,9 +29,9 @@ describe('resolveStarter', () => {
   });
 
   it('prompts via @clack/prompts when TTY and no flag', async () => {
-    vi.mocked(clack.select).mockResolvedValueOnce('base');
+    vi.mocked(clack.select).mockResolvedValueOnce('web-base');
     const result = await resolveStarter({ flag: undefined, isTTY: true });
-    expect(result).toBe('base');
+    expect(result).toBe('web-base');
     expect(clack.select).toHaveBeenCalledOnce();
   });
 
