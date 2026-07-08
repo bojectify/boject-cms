@@ -6,6 +6,7 @@ import {
 } from '../../utils/fieldTypes';
 import { isObject } from '../../utils/isObject';
 import type {
+  FieldPartial,
   Overlay,
   OverlayContentType,
   OverlayField,
@@ -39,11 +40,22 @@ export function validateOverlay(input: unknown): OverlayValidationResult {
     errors.push({ path: 'name', message: 'must be a non-empty string' });
   }
 
-  if (o.extends !== null && typeof o.extends !== 'string') {
-    errors.push({
-      path: 'extends',
-      message: 'must be a string (parent bundle name) or null',
-    });
+  if (o.extends != null) {
+    if (Array.isArray(o.extends)) {
+      o.extends.forEach((e, i) => {
+        if (typeof e !== 'string' || e.length === 0) {
+          errors.push({
+            path: `extends[${i}]`,
+            message: 'must be a non-empty string',
+          });
+        }
+      });
+    } else if (typeof o.extends !== 'string') {
+      errors.push({
+        path: 'extends',
+        message: 'must be a string, an array of strings, or null',
+      });
+    }
   }
 
   if (o.contentTypes !== undefined) {
@@ -82,6 +94,30 @@ function validateContentType(
       path: `${path}.identifier`,
       message: 'must be a non-empty string',
     });
+  }
+  if (c.extends !== undefined) {
+    if (!Array.isArray(c.extends)) {
+      errors.push({
+        path: `${path}.extends`,
+        message: 'must be an array of field-partial names',
+      });
+    } else {
+      c.extends.forEach((e, i) => {
+        if (typeof e !== 'string' || e.length === 0) {
+          errors.push({
+            path: `${path}.extends[${i}]`,
+            message: 'must be a non-empty string',
+          });
+        }
+      });
+      if (mode !== 'create' && c.extends.length > 0) {
+        errors.push({
+          path: `${path}.extends`,
+          message:
+            'extends (field-partials) is only supported on create-mode content types',
+        });
+      }
+    }
   }
   if (mode === 'create') {
     if (typeof c.name !== 'string' || c.name.length === 0) {
@@ -167,4 +203,24 @@ function validateField(
       });
     }
   }
+}
+
+export function validateFieldPartial(input: unknown): OverlayValidationResult {
+  const errors: OverlayValidationError[] = [];
+  if (!isObject(input)) {
+    return {
+      ok: false,
+      errors: [{ path: '', message: 'field-partial must be an object' }],
+    };
+  }
+  const p = input as Partial<FieldPartial>;
+  if (typeof p.name !== 'string' || p.name.length === 0) {
+    errors.push({ path: 'name', message: 'must be a non-empty string' });
+  }
+  if (!Array.isArray(p.fields)) {
+    errors.push({ path: 'fields', message: 'must be an array' });
+    return { ok: errors.length === 0, errors };
+  }
+  p.fields.forEach((f, i) => validateField(f, `fields[${i}]`, 'patch', errors));
+  return { ok: errors.length === 0, errors };
 }

@@ -4,9 +4,13 @@ import type {
   BundleContentType,
   BundleField,
 } from '../content-bundle/types';
-import type { Overlay, OverlayContentType } from './types';
+import type { Overlay, OverlayContentType, FieldPartial } from './types';
 
-export function mergeOverlay(parent: Bundle, overlay: Overlay): Bundle {
+export function mergeOverlay(
+  parent: Bundle,
+  overlay: Overlay,
+  fieldPartials: Map<string, FieldPartial> = new Map()
+): Bundle {
   const out: Bundle = {
     version: parent.version,
     exportedAt: new Date().toISOString(),
@@ -18,7 +22,7 @@ export function mergeOverlay(parent: Bundle, overlay: Overlay): Bundle {
   for (const overlayCt of overlay.contentTypes ?? []) {
     const mode = overlayCt.mode ?? 'create';
     if (mode === 'create') {
-      applyCreate(out, overlayCt);
+      applyCreate(out, overlayCt, fieldPartials);
     } else {
       applyPatch(out, overlayCt);
     }
@@ -31,7 +35,11 @@ export function mergeOverlay(parent: Bundle, overlay: Overlay): Bundle {
   return out;
 }
 
-function applyCreate(bundle: Bundle, overlayCt: OverlayContentType): void {
+function applyCreate(
+  bundle: Bundle,
+  overlayCt: OverlayContentType,
+  fieldPartials: Map<string, FieldPartial>
+): void {
   const existing = bundle.contentTypes!.find(
     (c) => c.identifier === overlayCt.identifier
   );
@@ -45,8 +53,32 @@ function applyCreate(bundle: Bundle, overlayCt: OverlayContentType): void {
     identifier: overlayCt.identifier,
     name: overlayCt.name!,
     description: overlayCt.description ?? null,
-    fields: overlayCt.fields.map(cloneField),
+    fields: expandFields(overlayCt, fieldPartials),
   });
+}
+
+function expandFields(
+  overlayCt: OverlayContentType,
+  fieldPartials: Map<string, FieldPartial>
+): BundleField[] {
+  const fields = overlayCt.fields.map(cloneField);
+  const partialNames = overlayCt.extends ?? [];
+  if (partialNames.length === 0) return fields;
+  let nextOrder = fields.reduce((max, f) => Math.max(max, f.order), -1) + 1;
+  for (const name of partialNames) {
+    const partial = fieldPartials.get(name);
+    if (!partial) {
+      throw new Error(
+        `Content type "${overlayCt.identifier}" extends unknown field-partial "${name}"`
+      );
+    }
+    for (const f of partial.fields) {
+      const cloned = cloneField(f);
+      cloned.order = nextOrder++;
+      fields.push(cloned);
+    }
+  }
+  return fields;
 }
 
 function applyPatch(bundle: Bundle, overlayCt: OverlayContentType): void {
@@ -68,6 +100,33 @@ function applyPatch(bundle: Bundle, overlayCt: OverlayContentType): void {
     }
     target.fields[existingIndex] = cloneField(field);
   }
+}
+
+export function composeParents(parents: Bundle[]): Bundle {
+  const first = parents[0];
+  const out: Bundle = {
+    version: first?.version ?? 2,
+    exportedAt: new Date().toISOString(),
+    portable: first?.portable ?? true,
+    contentTypes: [],
+    entries: [],
+  };
+  const seen = new Set<string>();
+  for (const parent of parents) {
+    for (const ct of parent.contentTypes ?? []) {
+      if (seen.has(ct.identifier)) {
+        throw new Error(
+          `Duplicate content type "${ct.identifier}" across extended bundles`
+        );
+      }
+      seen.add(ct.identifier);
+      out.contentTypes!.push(cloneContentType(ct));
+    }
+    for (const entry of parent.entries ?? []) {
+      out.entries!.push({ ...entry });
+    }
+  }
+  return out;
 }
 
 function cloneContentType(ct: BundleContentType): BundleContentType {

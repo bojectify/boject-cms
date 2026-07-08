@@ -1,8 +1,8 @@
 // scripts/build-starters/merge.test.ts
 import { describe, expect, it } from 'vitest';
 import type { Bundle } from '../content-bundle/types';
-import type { Overlay } from './types';
-import { mergeOverlay } from './merge';
+import type { Overlay, FieldPartial } from './types';
+import { mergeOverlay, composeParents } from './merge';
 import { FIELD_TYPES } from '../../utils/fieldTypes';
 
 const parent: Bundle = {
@@ -225,5 +225,143 @@ describe('mergeOverlay', () => {
     const before = new Date().toISOString();
     const out = mergeOverlay(parent, overlay);
     expect(out.exportedAt >= before).toBe(true);
+  });
+});
+
+describe('mergeOverlay — content-type extends (field-partials)', () => {
+  const emptyParent: Bundle = {
+    version: 2,
+    exportedAt: 'x',
+    portable: true,
+    contentTypes: [],
+    entries: [],
+  };
+  const webMetadata: FieldPartial = {
+    name: 'web-metadata',
+    fields: [
+      {
+        id: null,
+        identifier: 'metaTitle',
+        name: 'Meta Title',
+        type: FIELD_TYPES.TEXT,
+        required: false,
+        order: 0,
+        options: null,
+      },
+      {
+        id: null,
+        identifier: 'noIndex',
+        name: 'No Index',
+        type: FIELD_TYPES.BOOLEAN,
+        required: false,
+        order: 1,
+        options: { default: false },
+      },
+    ],
+  };
+  const overlay: Overlay = {
+    version: 1,
+    name: 'x',
+    extends: null,
+    contentTypes: [
+      {
+        identifier: 'Page',
+        mode: 'create',
+        name: 'Page',
+        extends: ['web-metadata'],
+        fields: [
+          {
+            id: null,
+            identifier: 'title',
+            name: 'Title',
+            type: FIELD_TYPES.ENTRY_TITLE,
+            required: true,
+            order: 0,
+            options: null,
+          },
+        ],
+      },
+    ],
+  };
+
+  it('appends the partial fields after the type own fields, order continuing', () => {
+    const out = mergeOverlay(
+      emptyParent,
+      overlay,
+      new Map([['web-metadata', webMetadata]])
+    );
+    const page = out.contentTypes!.find((c) => c.identifier === 'Page')!;
+    expect(page.fields.map((f) => f.identifier)).toEqual([
+      'title',
+      'metaTitle',
+      'noIndex',
+    ]);
+    expect(page.fields.map((f) => f.order)).toEqual([0, 1, 2]);
+  });
+  it('throws on an unknown field-partial', () => {
+    expect(() => mergeOverlay(emptyParent, overlay, new Map())).toThrow(
+      /unknown field-partial "web-metadata"/
+    );
+  });
+  it('is unchanged when a content type has no extends', () => {
+    const plain: Overlay = {
+      ...overlay,
+      contentTypes: [{ ...overlay.contentTypes![0]!, extends: undefined }],
+    };
+    const out = mergeOverlay(emptyParent, plain);
+    expect(out.contentTypes![0]!.fields.map((f) => f.identifier)).toEqual([
+      'title',
+    ]);
+  });
+});
+
+describe('composeParents', () => {
+  const a: Bundle = {
+    version: 2,
+    exportedAt: 'x',
+    portable: true,
+    contentTypes: [
+      {
+        id: null,
+        identifier: 'Image',
+        name: 'Image',
+        description: null,
+        fields: [],
+      },
+    ],
+    entries: [],
+  };
+  const b: Bundle = {
+    version: 2,
+    exportedAt: 'x',
+    portable: true,
+    contentTypes: [
+      {
+        id: null,
+        identifier: 'Tag',
+        name: 'Tag',
+        description: null,
+        fields: [],
+      },
+    ],
+    entries: [],
+  };
+
+  it('unions content types from all parents', () => {
+    const out = composeParents([a, b]);
+    expect(out.contentTypes!.map((c) => c.identifier)).toEqual([
+      'Image',
+      'Tag',
+    ]);
+  });
+  it('throws on a duplicate identifier across parents', () => {
+    expect(() => composeParents([a, a])).toThrow(
+      /Duplicate content type "Image"/
+    );
+  });
+  it('returns an empty v2 bundle for no parents', () => {
+    const out = composeParents([]);
+    expect(out.contentTypes).toEqual([]);
+    expect(out.version).toBe(2);
   });
 });
