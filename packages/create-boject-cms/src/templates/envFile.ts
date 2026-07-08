@@ -1,9 +1,8 @@
-export type StarterChoice =
-  | 'web-base'
-  | 'articles'
-  | 'sport'
-  | 'rugby'
-  | 'none';
+// A runtime-derived starter set can't be a compile-time union — the set of
+// valid names comes from the filesystem (see src/starters.ts). `none` stays
+// a runtime sentinel meaning "no starter". Invalid names are now caught at
+// runtime (wizard validation, copyStarters ENOENT, tests) rather than by tsc.
+export type StarterChoice = string;
 
 export interface EnvFileParams {
   sessionPassword: string;

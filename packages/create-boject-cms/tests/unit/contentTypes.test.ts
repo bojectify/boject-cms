@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { renderContentTypesBundle } from '../../src/templates/contentTypes.js';
+import { STARTERS } from './repoStarters.js';
 
 describe('renderContentTypesBundle', () => {
   it('returns the empty bundle stub for the "none" starter', () => {
@@ -15,7 +16,7 @@ describe('renderContentTypesBundle', () => {
   });
 
   it('returns a copy directive for non-none starters', () => {
-    for (const starter of ['web-base', 'articles', 'sport', 'rugby'] as const) {
+    for (const starter of STARTERS) {
       const out = renderContentTypesBundle({ starter });
       expect(out).toEqual({
         kind: 'copy',

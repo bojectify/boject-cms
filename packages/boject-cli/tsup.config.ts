@@ -1,5 +1,5 @@
 import { defineConfig } from 'tsup';
-import { cp, mkdir, rm } from 'node:fs/promises';
+import { cp, mkdir, readdir, rm } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 
 export default defineConfig({
@@ -43,14 +43,13 @@ export default defineConfig({
     // @boject/cli/vendor/contentStatus.
     await cp('src/vendor/contentStatus.ts', 'dist/vendor/contentStatus.ts');
     // Copy the repo-root starter bundles so `boject mcp` can serve them as
-    // example resources (resolved from dist/ at runtime).
+    // example resources (resolved from dist/ at runtime). Derived from the
+    // filesystem — no hardcoded list.
     await mkdir('dist/starters', { recursive: true });
-    // Keep this list in sync with STARTER_NAMES in src/mcp/starters.ts.
-    for (const name of ['web-base', 'articles', 'sport', 'rugby']) {
-      await cp(
-        `../../starters/${name}.boject.json`,
-        `dist/starters/${name}.boject.json`
-      );
+    for (const file of (await readdir('../../starters')).filter((f) =>
+      f.endsWith('.boject.json')
+    )) {
+      await cp(`../../starters/${file}`, `dist/starters/${file}`);
     }
   },
 });

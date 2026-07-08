@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { resolveAiAssist, resolveStarter } from '../../src/prompts.js';
+import { STARTERS } from './repoStarters.js';
 
 vi.mock('@clack/prompts', () => ({
   select: vi.fn(),
@@ -11,28 +12,59 @@ import * as clack from '@clack/prompts';
 
 describe('resolveStarter', () => {
   it('returns the flag value without calling the prompt when a valid flag is supplied', async () => {
-    const result = await resolveStarter({ flag: 'sport', isTTY: true });
+    const result = await resolveStarter({
+      flag: 'sport',
+      isTTY: true,
+      starters: STARTERS,
+    });
     expect(result).toBe('sport');
     expect(clack.select).not.toHaveBeenCalled();
   });
 
   it('throws on an invalid flag value', async () => {
     await expect(
-      resolveStarter({ flag: 'invalid', isTTY: true })
+      resolveStarter({ flag: 'invalid', isTTY: true, starters: STARTERS })
     ).rejects.toThrow(/must be one of/);
   });
 
   it('throws when non-TTY and no flag is provided', async () => {
     await expect(
-      resolveStarter({ flag: undefined, isTTY: false })
+      resolveStarter({ flag: undefined, isTTY: false, starters: STARTERS })
     ).rejects.toThrow(/non-interactive/i);
   });
 
   it('prompts via @clack/prompts when TTY and no flag', async () => {
     vi.mocked(clack.select).mockResolvedValueOnce('web-base');
-    const result = await resolveStarter({ flag: undefined, isTTY: true });
+    const result = await resolveStarter({
+      flag: undefined,
+      isTTY: true,
+      starters: STARTERS,
+    });
     expect(result).toBe('web-base');
     expect(clack.select).toHaveBeenCalledOnce();
+  });
+
+  it('orders prompt options by dependency chain (not alphabetically) and defaults to web-base', async () => {
+    vi.mocked(clack.select).mockResolvedValueOnce('web-base');
+    await resolveStarter({
+      flag: undefined,
+      isTTY: true,
+      starters: STARTERS,
+    });
+
+    const call = vi.mocked(clack.select).mock.calls[0][0] as {
+      options: Array<{ value: string }>;
+      initialValue: string;
+    };
+
+    expect(call.options.map((o) => o.value)).toEqual([
+      'web-base',
+      'articles',
+      'sport',
+      'rugby',
+      'none',
+    ]);
+    expect(call.initialValue).toBe('web-base');
   });
 
   it('throws if the user cancels the prompt', async () => {
@@ -43,7 +75,7 @@ describe('resolveStarter', () => {
     );
     vi.mocked(clack.isCancel).mockReturnValueOnce(true);
     await expect(
-      resolveStarter({ flag: undefined, isTTY: true })
+      resolveStarter({ flag: undefined, isTTY: true, starters: STARTERS })
     ).rejects.toThrow(/cancelled/i);
   });
 });

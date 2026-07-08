@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { renderDockerCompose } from '../../src/templates/dockerCompose.js';
+import { STARTERS } from './repoStarters.js';
 
 describe('renderDockerCompose', () => {
   it('pins cms.image to the supplied tag', () => {
@@ -52,13 +53,7 @@ describe('renderDockerCompose', () => {
   });
 
   it('always includes the content-types bind mount', () => {
-    for (const starter of [
-      'web-base',
-      'articles',
-      'sport',
-      'rugby',
-      'none',
-    ] as const) {
+    for (const starter of [...STARTERS, 'none']) {
       const out = renderDockerCompose({
         imageTag: 'boject/cms:dev',
         starter,

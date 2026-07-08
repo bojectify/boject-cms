@@ -5,6 +5,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { buildMcpServer } from './server.js';
 import { validateSchemaBundle } from '../validateSchemaBundle.js';
+import { listStarterNames } from './starters.js';
 
 const REPO_STARTERS = join(
   dirname(fileURLToPath(import.meta.url)),
@@ -24,14 +25,17 @@ async function connect() {
 }
 
 describe('starter resources', () => {
-  it('exposes web-base/articles/sport/rugby starter resources', async () => {
+  it('exposes a starter resource for every starter on disk', async () => {
     const { client, server } = await connect();
     const { resources } = await client.listResources();
-    const uris = resources.map((r) => r.uri);
-    expect(uris).toContain('boject://starters/web-base');
-    expect(uris).toContain('boject://starters/articles');
-    expect(uris).toContain('boject://starters/sport');
-    expect(uris).toContain('boject://starters/rugby');
+    const uris = resources
+      .map((r) => r.uri)
+      .filter((u) => u.startsWith('boject://starters/'))
+      .sort();
+    const expected = listStarterNames(REPO_STARTERS)
+      .map((n) => `boject://starters/${n}`)
+      .sort();
+    expect(uris).toEqual(expected);
     await client.close();
     await server.close();
   });
