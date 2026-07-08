@@ -26,7 +26,7 @@ const emit = defineEmits<{
     </button>
     <div
       v-else
-      class="flex items-center h-14 rounded-lg border border-default bg-elevated hover:bg-accented transition-colors focus-within:ring-2 focus-within:ring-primary-500"
+      class="flex items-center h-14 rounded-lg border border-default bg-elevated hover:bg-elevated/50 transition-colors focus-within:ring-2 focus-within:ring-primary-500"
     >
       <button
         type="button"
