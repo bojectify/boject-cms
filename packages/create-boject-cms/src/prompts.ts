@@ -1,4 +1,4 @@
-import { isCancel, select } from '@clack/prompts';
+import { confirm, isCancel, select } from '@clack/prompts';
 import type { StarterChoice } from './render.js';
 
 const CHOICES: StarterChoice[] = ['base', 'sport', 'rugby', 'none'];
@@ -48,4 +48,29 @@ export async function resolveStarter({
   }
 
   return response as StarterChoice;
+}
+
+export interface ResolveAiAssistParams {
+  flag: boolean | undefined;
+  isTTY: boolean;
+}
+
+export async function resolveAiAssist({
+  flag,
+  isTTY,
+}: ResolveAiAssistParams): Promise<boolean> {
+  if (flag !== undefined) return flag;
+  if (!isTTY) return false;
+
+  const response = await confirm({
+    message:
+      'Set up AI-assisted content modelling? (adds a Claude Code MCP config)',
+    initialValue: false,
+  });
+
+  if (isCancel(response)) {
+    throw new Error('Scaffold cancelled by user.');
+  }
+
+  return response === true;
 }
