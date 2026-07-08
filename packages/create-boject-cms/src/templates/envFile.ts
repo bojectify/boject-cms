@@ -1,4 +1,9 @@
-export type StarterChoice = 'base' | 'sport' | 'rugby' | 'none';
+export type StarterChoice =
+  | 'web-base'
+  | 'articles'
+  | 'sport'
+  | 'rugby'
+  | 'none';
 
 export interface EnvFileParams {
   sessionPassword: string;

@@ -1,0 +1,53 @@
+{
+  "name": "web-metadata",
+  "fields": [
+    {
+      "id": null,
+      "identifier": "metaTitle",
+      "name": "Meta title",
+      "type": "TEXT",
+      "required": false,
+      "order": 0,
+      "options": null
+    },
+    {
+      "id": null,
+      "identifier": "metaDescription",
+      "name": "Meta description",
+      "type": "TEXTAREA",
+      "required": false,
+      "order": 1,
+      "options": null
+    },
+    {
+      "id": null,
+      "identifier": "metaImage",
+      "name": "Meta image",
+      "type": "RELATION",
+      "required": false,
+      "order": 2,
+      "options": {
+        "targetContentTypeIds": [null],
+        "targetContentTypeIdentifiers": ["Image"]
+      }
+    },
+    {
+      "id": null,
+      "identifier": "canonicalUrl",
+      "name": "Canonical URL",
+      "type": "TEXT",
+      "required": false,
+      "order": 3,
+      "options": null
+    },
+    {
+      "id": null,
+      "identifier": "noIndex",
+      "name": "No index",
+      "type": "BOOLEAN",
+      "required": false,
+      "order": 4,
+      "options": { "default": false }
+    }
+  ]
+}

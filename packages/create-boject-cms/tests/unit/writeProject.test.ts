@@ -26,12 +26,12 @@ const baseArgs = {
 };
 
 describe('writeProject', () => {
-  it('creates the target directory and writes the expected files for starter=base', async () => {
+  it('creates the target directory and writes the expected files for starter=web-base', async () => {
     const target = join(workDir, 'site');
     const result = await writeProject({
       ...baseArgs,
       targetDir: target,
-      starter: 'base',
+      starter: 'web-base',
       force: false,
     });
 
@@ -50,7 +50,7 @@ describe('writeProject', () => {
     );
 
     const starterFiles = await readdir(join(target, 'starters'));
-    expect(starterFiles).toEqual(['base.boject.json']);
+    expect(starterFiles).toEqual(['web-base.boject.json']);
 
     expect(result.adminEmail).toBe('admin@local');
     expect(result.adminPassword.length).toBeGreaterThan(0);
@@ -76,7 +76,7 @@ describe('writeProject', () => {
       writeProject({
         ...baseArgs,
         targetDir: workDir,
-        starter: 'base',
+        starter: 'web-base',
         force: false,
       })
     ).rejects.toThrow(/not empty/);
@@ -87,7 +87,7 @@ describe('writeProject', () => {
     const result = await writeProject({
       ...baseArgs,
       targetDir: workDir,
-      starter: 'base',
+      starter: 'web-base',
       force: true,
     });
     expect(result.adminPassword.length).toBeGreaterThan(0);
@@ -98,7 +98,7 @@ describe('writeProject', () => {
     await writeProject({
       ...baseArgs,
       targetDir: target,
-      starter: 'base',
+      starter: 'web-base',
       force: false,
       imageTag: 'localhost:5555/boject/cms:dev',
     });
@@ -112,7 +112,7 @@ describe('writeProject', () => {
     await writeProject({
       ...baseArgs,
       targetDir: target,
-      starter: 'base',
+      starter: 'web-base',
       force: false,
       hostPort: 4100,
     });
@@ -141,14 +141,17 @@ describe('writeProject', () => {
     await writeProject({
       ...baseArgs,
       targetDir: target,
-      starter: 'base',
+      starter: 'web-base',
       force: false,
     });
     const written = await readFile(
       join(target, 'content-types', 'schema.boject.json'),
       'utf8'
     );
-    const expected = await readFile(join(FIXTURES, 'base.boject.json'), 'utf8');
+    const expected = await readFile(
+      join(FIXTURES, 'web-base.boject.json'),
+      'utf8'
+    );
     expect(written).toBe(expected);
   });
 

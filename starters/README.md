@@ -2,32 +2,116 @@
 
 Production-ready content type bundles for `pnpm content:import`. Apply these to a fresh CMS instance to get a working baseline without hand-configuring content types.
 
+## Vocabulary
+
+- **Starter** — a selectable bundle. What `create-boject-cms` prompts for and what you point `pnpm content:import` at directly. Starters form a chain: each one extends the previous, adding content types on top.
+- **Module** — a non-selectable, reusable bundle of content types shared by multiple starters via `extends`. Modules live under `starters/modules/` and are never offered as a top-level choice — they only exist to be extended.
+- **Field-partial** — a reusable named group of fields, shared by multiple content types (in the same or different starters) via a content-type-level `extends`. Field-partials live under `starters/src/partials/` and contribute fields, not whole content types.
+
+All three compose through an `extends` array: a starter overlay's top-level `extends` names parent starters/modules; a content type's own `extends` names field-partials.
+
 ## Available starters
 
-### `base.boject.json`
+Applying a starter gives you its content types **plus everything the starters/modules before it in the chain contribute** — each is not a standalone tier, it's the sum of the chain up to that point.
+
+### `web-base.boject.json`
 
 The minimum set any content-driven website needs:
 
 - **Image** — uploaded image with `alt`, `credit`, `caption` (file metadata auto-populated by the IMAGE field)
-- **Tag** — `name` + `slug`
-- **Author** — `name`, `slug`, `bio`, `headshot`
-- **Article** — `title`, `slug`, `summary`, `body` (richtext), `author`, `tags`, `featuredImage`, plus SEO fields (`metaTitle`, `metaDescription`, `metaImage`, `canonicalUrl`, `noIndex`)
-- **Page** — `title`, `slug`, `body` (richtext), plus the same SEO fields
 - **SiteSettings** — `siteName`, `logo`, `defaultOgImage`, `footerCopy` (singleton by convention)
-- **Navigation** — `name` + `items` (flat list of `NavigationItem`)
-- **NavigationItem** — `label`, `url`, `internalLink` (to Article or Page), `openInNewTab`
+- **Link** — `label`, `url`, `openInNewTab` — a reusable link, usable anywhere in the site
+- **NavigationItem** — `label`, a single `link` (RELATION → Link) and/or a `links` list (MULTIRELATION → Link)
+- **Navigation** — `name` + `items` (MULTIRELATION → NavigationItem)
 
 Plus one seed entry: a single `SiteSettings` instance with placeholder values.
+
+This is the base of the chain — every other starter extends it (directly or transitively).
+
+### `articles.boject.json`
+
+Web Base + the **Taxonomy** module + editorial content types:
+
+- Everything from Web Base
+- **Tag** — `name` + `slug` (from the `taxonomy` module)
+- **Category** — `name`, `slug`, `description` (from the `taxonomy` module)
+- **Author** — `name`, `slug`, `bio`, `headshot`
+- **Page** — `title`, `slug`, `body` (richtext), plus the `web-metadata` field-partial (SEO fields)
+- **Article** — `title`, `slug`, `summary`, `body` (richtext), `author`, `tags`, `category`, `featuredImage`, plus `web-metadata`
+- **Link** is patched to add `internalLink` (RELATION → Article or Page), so nav items and links can point at editorial content
+
+`extends: ["web-base", "taxonomy"]`.
+
+### `sport.boject.json`
+
+Articles + sport/club structure:
+
+- Everything from Articles (and transitively Web Base)
+- **Team** — `name`, `slug`, `description`, plus `web-metadata` (an internal club squad, e.g. 1st XV)
+- **Club** — `name`, `slug`, `crest` (an external opponent club)
+- **Season** — `name`, `startDate`, `endDate`
+- **Competition** — `name`, `slug`, `season`, `teams`
+- **Fixture** — `matchup`, `team`, `opponent`, `competition`, `season`, `kickoff`, `isHome`, plus `web-metadata`
+- **Player** — `name`, `slug`, `bio`, `headshot`, `team`, plus `web-metadata`
+
+`extends: ["articles"]`.
+
+### `rugby.boject.json`
+
+Sport + rugby-specific structure:
+
+- Everything from Sport (and transitively Articles, Web Base)
+- **Position** — `name`, `slug`, `abbreviation` (e.g. Fly-half, Hooker)
+- **Player** is patched to add `position` (RELATION → Position)
+
+`extends: ["sport"]`.
+
+## Modules
+
+Modules are reusable content-type bundles that are never selected directly — they exist only to be `extends`-ed by starters.
+
+### `modules/taxonomy.boject.json`
+
+- **Tag** — `name` + `slug`
+- **Category** — `name`, `slug`, `description`
+
+Extended by Articles (and therefore Sport and Rugby).
+
+## Field-partials
+
+Field-partials are reusable field groups referenced by a content type's own `extends` array (distinct from an overlay's top-level `extends`, which names parent starters/modules). Their fields are appended after the content type's own fields.
+
+### `src/partials/web-metadata.json`
+
+The standard SEO/metadata field group:
+
+- `metaTitle` (TEXT)
+- `metaDescription` (TEXTAREA)
+- `metaImage` (RELATION → Image)
+- `canonicalUrl` (TEXT)
+- `noIndex` (BOOLEAN, default `false`)
+
+Used by `Page`, `Article` (Articles), `Team`, `Fixture`, `Player` (Sport, and inherited by Rugby).
+
+## Navigation structure
+
+`Navigation` holds an ordered `items` list of `NavigationItem`s. Each `NavigationItem` carries a `label` plus a single `link` and/or a `links` list, each pointing at a `Link` — a small reusable content type with its own `url` and `openInNewTab`. Once Articles (or a starter built on it) is applied, `Link` gains an `internalLink` field so links can target an `Article` or `Page` instead of (or as well as) an external URL.
+
+Nesting is flat by design: `NavigationItem` has no self-referencing `children` field. Nested navigation would require self-referencing RELATION targets, which the current bundle-import path doesn't support. Users who need a tree can add a `children: MULTIRELATION → NavigationItem` field in the CMS after import.
 
 ## Applying a starter
 
 From a fresh CMS instance (no existing content types with matching identifiers):
 
 ```bash
-pnpm content:import ./starters/base.boject.json
+pnpm content:import ./starters/web-base.boject.json
+# or, further along the chain:
+pnpm content:import ./starters/articles.boject.json
+pnpm content:import ./starters/sport.boject.json
+pnpm content:import ./starters/rugby.boject.json
 ```
 
-The CLI fails fast if any identifier, slug, or entry title collides with existing data — apply to an empty instance.
+The CLI fails fast if any identifier, slug, or entry title collides with existing data — apply to an empty instance. Each built starter already contains everything its parents contribute, so you only ever import **one** file — never chain `content:import` calls across starters.
 
 ## Use as schema-as-code source
 
@@ -40,47 +124,39 @@ becomes the source of truth for the project's schema going forward.
 
 - **SiteSettings is a singleton.** The starter creates exactly one entry. Consumers should query `siteSettings(first: 1) { edges { node { ... } } }` and use the first result. Do not create additional `SiteSettings` entries.
 - **`{{year}}` in `footerCopy` is literal text.** The starter does not interpolate it. Edit the entry in the CMS after import to replace it with the current year (or a dynamic year in your frontend renderer).
-- **Navigation is flat.** `NavigationItem` has no `children` field. Nested navigation would require self-referencing RELATION targets, which the current bundle-import path doesn't support. Users who need a tree can add a `children: MULTIRELATION → NavigationItem` field in the CMS after import.
-- **`NavigationItem` allows both `url` and `internalLink` to be empty** because the dynamic content type system doesn't support cross-field conditional validation. Items with neither set render as plain labels at the frontend.
+- **Navigation is flat.** See "Navigation structure" above.
+- **`NavigationItem` allows `link` and `links` to both be empty** because the dynamic content type system doesn't support cross-field conditional validation. Items with neither set render as plain labels at the frontend.
 
 ## Extending
 
-Two ways to extend the base:
+Two ways to extend a starter:
 
-1. **Edit the JSON before import** — add fields, change defaults, drop types you don't need. Re-run `pnpm content:validate ./starters/base.boject.json` before importing to catch shape errors.
-2. **Import and edit in the CMS** — import the base, then add/remove fields via the content-types UI.
-
-## Tiered starters (future)
-
-The base starter is the first tier in a planned layered model:
-
-- **base** (this starter) — any content-driven website
-- **sport-base** — base + `Team`, `Club`, `Competition`, `Season`, `Fixture`, `Player`, etc.
-- **sport-{rugby,football,etc.}** — sport-base + sport-specific enums
-
-Later tiers assume prior tiers are already imported. Apply them in order.
+1. **Edit the JSON before import** — add fields, change defaults, drop types you don't need. Re-run `pnpm content:validate ./starters/<name>.boject.json` before importing to catch shape errors.
+2. **Import and edit in the CMS** — import the starter, then add/remove fields via the content-types UI.
 
 ## Testing
 
-`apps/cms/scripts/build-starters/starters-shape.test.ts` runs every `*.boject.json` under this directory through `validateBundle` from `apps/cms/scripts/content-bundle/validate.ts`. This catches shape drift as the bundle format evolves. Run it via `pnpm --filter cms test:unit`.
+`apps/cms/scripts/build-starters/starters-shape.test.ts` runs every `*.boject.json` under this directory (including `modules/`) through `validateBundle` from `apps/cms/scripts/content-bundle/validate.ts`. This catches shape drift as the bundle format evolves. Run it via `pnpm --filter cms test:unit`.
 
 ## Overlay system
 
-`base.boject.json` is authored directly. `sport.boject.json` and `rugby.boject.json` are **built** from small overlay files under `starters/src/` — they should not be edited by hand.
+`web-base.boject.json` and `modules/taxonomy.boject.json` are authored directly. `articles.boject.json`, `sport.boject.json`, and `rugby.boject.json` are **built** from small overlay files under `starters/src/` — they should not be edited by hand.
 
-An overlay declares a parent bundle via `extends` and a list of content-type changes. Each change has a `mode`:
+An overlay declares one or more parent bundles via `extends` (a starter or module name, or an array of names) and a list of content-type changes. Each change has a `mode`:
 
-- `create` — add a brand-new content type. Fails if the identifier already exists in the parent chain. Requires `name` and exactly one `ENTRY_TITLE` field.
+- `create` — add a brand-new content type. Fails if the identifier already exists in the parent chain. Requires `name` and exactly one `ENTRY_TITLE` field. May itself carry a content-type-level `extends` array naming field-partials, whose fields are appended after the content type's own fields.
 - `patch` — modify an existing content type. Fields are matched by `identifier`; matching fields are replaced wholesale (including their `type`); new fields are appended. New `ENTRY_TITLE`/`SLUG` fields cannot be introduced via patch.
+
+When an overlay's `extends` array names more than one parent (e.g. Articles extends both `web-base` and `taxonomy`), the parents are composed left-to-right before the overlay's own content-type changes are applied; a content type identifier appearing in more than one parent is a build-time error.
 
 ### Build
 
 ```bash
-pnpm starters:build   # read src/*.overlay.json, write *.boject.json outputs
+pnpm starters:build   # read src/*.overlay.json + src/partials/*.json, write *.boject.json outputs
 pnpm starters:check   # rebuild in memory and diff against committed outputs (CI)
 ```
 
-Overlays resolve their parent recursively. `rugby` extends `sport`, which extends `base`. Cycles and unknown parents are build-time errors. Every built output is validated with `validateBundle` before being written. `starters:check` ignores the `exportedAt` field when comparing.
+Overlays resolve their parents recursively — a named parent is looked up first among the other overlays being built (already-built starters), then as `starters/<name>.boject.json`, then as `starters/modules/<name>.boject.json`. Cycles and unknown parents are build-time errors. Every built output is validated with `validateBundle` before being written. `starters:check` ignores the `exportedAt` field when comparing.
 
 Build outputs are committed so `pnpm content:import starters/sport.boject.json` works without a prior build step.
 
@@ -88,12 +164,18 @@ Build outputs are committed so `pnpm content:import starters/sport.boject.json` 
 
 ```
 starters/
-  base.boject.json           # authored directly
-  sport.boject.json          # built
-  rugby.boject.json          # built
+  web-base.boject.json       # authored directly (the root starter)
+  articles.boject.json       # built (extends web-base + taxonomy)
+  sport.boject.json          # built (extends articles)
+  rugby.boject.json          # built (extends sport)
+  modules/
+    taxonomy.boject.json     # authored directly (non-selectable module)
   src/
+    articles.overlay.json
     sport.overlay.json
     rugby.overlay.json
+    partials/
+      web-metadata.json      # field-partial
 ```
 
 ### Overlay shape
@@ -101,25 +183,39 @@ starters/
 ```json
 {
   "version": 1,
-  "name": "sport",
-  "extends": "base",
+  "name": "articles",
+  "extends": ["web-base", "taxonomy"],
   "contentTypes": [
     {
-      "identifier": "Team",
+      "identifier": "Article",
       "mode": "create",
-      "name": "Team",
+      "name": "Article",
       "description": null,
+      "extends": ["web-metadata"],
       "fields": [
         /* BundleField[] */
       ]
     },
     {
-      "identifier": "Player",
+      "identifier": "Link",
       "mode": "patch",
       "fields": [
         /* fields to add or replace */
       ]
     }
+  ]
+}
+```
+
+### Field-partial shape
+
+```json
+{
+  "name": "web-metadata",
+  "fields": [
+    /* BundleField[], appended (with re-numbered `order`) after
+       the content type's own fields when referenced via a
+       content-type's `extends` array */
   ]
 }
 ```

@@ -16,7 +16,7 @@ describe('boject mcp (built)', () => {
     });
   }, 120_000);
 
-  it('serves the base starter over stdio', async () => {
+  it('serves the web-base starter over stdio', async () => {
     const transport = new StdioClientTransport({
       command: 'node',
       args: [join(PKG, 'dist', 'index.js'), 'mcp'],
@@ -25,7 +25,7 @@ describe('boject mcp (built)', () => {
     await client.connect(transport);
     try {
       const res = await client.readResource({
-        uri: 'boject://starters/base',
+        uri: 'boject://starters/web-base',
       });
       const content = res.contents[0];
       if (!content || !('text' in content)) {

@@ -4,8 +4,23 @@ import { join } from 'node:path';
 import { validateBundle } from '../content-bundle/validate';
 
 const here = new URL('../../../../starters/', import.meta.url).pathname;
+const modulesDir = join(here, 'modules');
 
-const bundleFiles = readdirSync(here).filter((f) => f.endsWith('.boject.json'));
+const topLevelBundleFiles = readdirSync(here).filter((f) =>
+  f.endsWith('.boject.json')
+);
+const moduleBundleFiles = safeReaddir(modulesDir)
+  .filter((f) => f.endsWith('.boject.json'))
+  .map((f) => join('modules', f));
+const bundleFiles = [...topLevelBundleFiles, ...moduleBundleFiles];
+
+function safeReaddir(path: string): string[] {
+  try {
+    return readdirSync(path);
+  } catch {
+    return [];
+  }
+}
 
 describe('starters', () => {
   it('finds at least one starter bundle', () => {

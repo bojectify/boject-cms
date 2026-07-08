@@ -82,8 +82,8 @@ docker run -d --name "$MEILI_NAME" \
   -e MEILI_MASTER_KEY="$MEILI_KEY" \
   getmeili/meilisearch:v1.45.2 >/dev/null
 
-echo "[smoke-test] seeding content-types dir with the base starter"
-cp "$REPO_ROOT/starters/base.boject.json" "$CONTENT_DIR/schema.boject.json"
+echo "[smoke-test] seeding content-types dir with the web-base starter"
+cp "$REPO_ROOT/starters/web-base.boject.json" "$CONTENT_DIR/schema.boject.json"
 # The container runs as the non-root `cms` user (uid 100). On a Linux runner a
 # bind mount keeps host ownership, and `mktemp -d` is mode 700 — so `cms` gets
 # EACCES reading /app/content-types and apply-schema (step 5) dies. Make the dir
@@ -102,7 +102,7 @@ docker run -d --name "$APP_NAME" \
   -e NUXT_SESSION_PASSWORD="$(head -c 32 /dev/urandom | base64)" \
   -e BOJECT_ADMIN_EMAIL=admin@smoke.test \
   -e BOJECT_ADMIN_PASSWORD="$(head -c 16 /dev/urandom | base64)" \
-  -e BOJECT_INITIAL_STARTER=/starters/base.boject.json \
+  -e BOJECT_INITIAL_STARTER=/starters/web-base.boject.json \
   -e BOJECT_SCHEMA_DIR=/app/content-types \
   -v "${VOLUME_NAME}:/app/storage" \
   -v "${REPO_ROOT}/starters:/starters:ro" \

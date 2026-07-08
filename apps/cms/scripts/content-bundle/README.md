@@ -39,7 +39,7 @@ pnpm content:export --portable
 pnpm content:export --all --out ./tmp/full-dump.json
 
 # Import a bundle, auto-detecting mode from its shape
-pnpm content:import ./starters/base.boject.json
+pnpm content:import ./starters/web-base.boject.json
 
 # Import entries only and attribute them to an author
 pnpm content:import ./generated/content-bundle-entries.json --entries --author admin

@@ -127,9 +127,11 @@ packages/
   create-boject-cms/           # Scaffolder (`pnpm create boject-cms`)
   boject-cli/                  # Maintenance + schema-as-code CLI (`boject`)
 starters/                      # Shared starter bundles (data, consumed by apps + packages)
-  base.boject.json, sport.boject.json, rugby.boject.json
+  web-base.boject.json, articles.boject.json, sport.boject.json, rugby.boject.json
+  modules/                     # Non-selectable composable modules (e.g. taxonomy.boject.json)
   README.md
-  src/                         # Overlay sources authored directly (sport/rugby derive via build)
+  src/                         # Overlay sources authored directly (articles/sport/rugby derive via build)
+    partials/                  # Field-partials (e.g. web-metadata.json) composed onto content types
 perf/                          # Performance harness + reports
 scripts/
   host-shims/                  # pnpm + pnpx shims that route into the dev container

@@ -1,7 +1,13 @@
 import { confirm, isCancel, select } from '@clack/prompts';
 import type { StarterChoice } from './render.js';
 
-const CHOICES: StarterChoice[] = ['base', 'sport', 'rugby', 'none'];
+const CHOICES: StarterChoice[] = [
+  'web-base',
+  'articles',
+  'sport',
+  'rugby',
+  'none',
+];
 
 function isValidChoice(value: string): value is StarterChoice {
   return (CHOICES as string[]).includes(value);
@@ -25,22 +31,31 @@ export async function resolveStarter({
 
   if (!isTTY) {
     throw new Error(
-      'Non-interactive shell detected. Pass --starter <base|sport|rugby|none>.'
+      'Non-interactive shell detected. Pass --starter <web-base|articles|sport|rugby|none>.'
     );
   }
 
   const response = await select({
     message: 'Which starter?',
     options: [
-      { value: 'base', label: 'Base (8 universal content types)' },
+      {
+        value: 'web-base',
+        label:
+          'Web Base (Image, SiteSettings, Navigation, NavigationItem, Link)',
+      },
+      {
+        value: 'articles',
+        label: 'Articles (Web Base + Author, Page, Article, Tag, Category)',
+      },
       {
         value: 'sport',
-        label: 'Sport (base + team/club/competition/fixture/player)',
+        label:
+          'Sport (Articles + Team, Club, Season, Competition, Fixture, Player)',
       },
-      { value: 'rugby', label: 'Rugby (sport + Position + patched Player)' },
+      { value: 'rugby', label: 'Rugby (Sport + Position, patched Player)' },
       { value: 'none', label: 'None (empty database)' },
     ],
-    initialValue: 'base',
+    initialValue: 'web-base',
   });
 
   if (isCancel(response)) {

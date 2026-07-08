@@ -15,19 +15,20 @@ npx create-boject-cms my-site
 
 You'll be prompted to pick a starter:
 
-| Starter   | What it ships                                                                                                                             |
-| --------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| **base**  | 8 universal content types (Image, Tag, Author, Article, Page, SiteSettings, Navigation, NavigationItem) plus one SiteSettings seed entry. |
-| **sport** | base + Team, Club, Competition, Season, Fixture, Player.                                                                                  |
-| **rugby** | sport + Position + a patched Player.                                                                                                      |
-| **none**  | No starter — empty `content-types/schema.boject.json`.                                                                                    |
+| Starter      | What it ships                                                |
+| ------------ | ------------------------------------------------------------ |
+| **web-base** | Image, SiteSettings, Navigation, NavigationItem, Link.       |
+| **articles** | Web Base + Author, Page, Article, Tag, Category.             |
+| **sport**    | Articles + Team, Club, Season, Competition, Fixture, Player. |
+| **rugby**    | Sport + Position, patched Player.                            |
+| **none**     | No starter — empty `content-types/schema.boject.json`.       |
 
 Non-interactive use:
 
 ```bash
-pnpm create boject-cms my-site --starter base
-pnpm create boject-cms my-site --starter base --image ghcr.io/bojectify/boject-cms:1.4.2
-pnpm create boject-cms my-site --starter base --port 4100   # host port (default 4000)
+pnpm create boject-cms my-site --starter web-base
+pnpm create boject-cms my-site --starter web-base --image ghcr.io/bojectify/boject-cms:1.4.2
+pnpm create boject-cms my-site --starter web-base --port 4100   # host port (default 4000)
 pnpm create boject-cms my-site --force            # scaffold into a non-empty directory
 ```
 

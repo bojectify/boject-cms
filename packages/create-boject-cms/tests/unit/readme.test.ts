@@ -4,7 +4,7 @@ import { renderReadme } from '../../src/templates/readme.js';
 describe('renderReadme', () => {
   it('includes the docker compose up command', () => {
     const md = renderReadme({
-      starter: 'base',
+      starter: 'web-base',
       adminEmail: 'admin@local',
       hostPort: 4000,
       aiAssist: false,
@@ -14,7 +14,7 @@ describe('renderReadme', () => {
 
   it('references the login URL (http://localhost:4000/login)', () => {
     const md = renderReadme({
-      starter: 'base',
+      starter: 'web-base',
       adminEmail: 'admin@local',
       hostPort: 4000,
       aiAssist: false,
@@ -24,7 +24,7 @@ describe('renderReadme', () => {
 
   it('mentions the admin email', () => {
     const md = renderReadme({
-      starter: 'base',
+      starter: 'web-base',
       adminEmail: 'admin@local',
       hostPort: 4000,
       aiAssist: false,
@@ -34,7 +34,7 @@ describe('renderReadme', () => {
 
   it('tells the user the admin password lives in .env', () => {
     const md = renderReadme({
-      starter: 'base',
+      starter: 'web-base',
       adminEmail: 'admin@local',
       hostPort: 4000,
       aiAssist: false,
@@ -64,7 +64,7 @@ describe('renderReadme', () => {
 
   it('includes a Content types section explaining schema-as-code', () => {
     const out = renderReadme({
-      starter: 'base',
+      starter: 'web-base',
       adminEmail: 'admin@local',
       hostPort: 4000,
       aiAssist: false,
@@ -75,7 +75,7 @@ describe('renderReadme', () => {
 
   it('uses the hostPort in the login URL and mentions BOJECT_HOST_PORT', () => {
     const out = renderReadme({
-      starter: 'base',
+      starter: 'web-base',
       adminEmail: 'admin@local',
       hostPort: 4100,
       aiAssist: false,
@@ -86,7 +86,7 @@ describe('renderReadme', () => {
 
   it('mentions the Meilisearch and Redis sidecars', () => {
     const md = renderReadme({
-      starter: 'base',
+      starter: 'web-base',
       adminEmail: 'admin@local',
       hostPort: 4000,
       aiAssist: false,

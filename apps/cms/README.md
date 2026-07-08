@@ -18,7 +18,7 @@ CMS pages → Nuxt server routes → Prisma → PostgreSQL
 - **Generated types** live in `apps/cms/generated/` (gitignored). Run `pnpm prisma:generate` after any schema change.
 - **Primitive file pipeline** — `POST /api/files/upload` accepts multipart uploads (5MB limit, JPEG/PNG/WebP/GIF/AVIF), processes originals via Sharp (auto-orient, max 4000px), writes them to `useStorage('images:originals')`, and returns `{ storageKey, mimeType, width, height, fileSize, originalName }` without creating a DB row. `GET /api/files/:storageKey/transform` serves variants with on-the-fly resize/format conversion (publicly accessible, cached, rate limited). Used by the `IMAGE` field type on dynamic content types. Production storage can be swapped to S3/R2 via Nitro storage config.
 - **Content bundle CLI** — `apps/cms/scripts/content-bundle/` exports and imports dynamic content types and entries as JSON bundles. Portable mode (`--portable`) rewrites UUID references to `identifier`/`slug` keys for cross-instance migration; import does the reverse lookup in a transactional two-pass resolve. Functions are importable so a future scaffolder (e.g. `create-boject-cms`) can invoke them directly.
-- **Starters** — [`starters/base.boject.json`](../../starters/base.boject.json) defines the 8 content types every content-driven site needs (Image, Tag, Author, Article, Page, SiteSettings, Navigation, NavigationItem) plus one SiteSettings seed entry. `sport.boject.json` and `rugby.boject.json` are built from overlay sources in [`starters/src/`](../../starters/src/) via `pnpm starters:build`.
+- **Starters** — [`starters/web-base.boject.json`](../../starters/web-base.boject.json) is the hand-authored root: Image, SiteSettings, Navigation, NavigationItem, and Link (`Navigation → NavigationItem → Link`). `articles.boject.json` (Author, Page, Article, plus the `taxonomy` module's Tag/Category), `sport.boject.json`, and `rugby.boject.json` are overlays built from sources in [`starters/src/`](../../starters/src/) via `pnpm starters:build`.
 
 ## GraphQL API
 
@@ -307,7 +307,7 @@ The server starts on port 3000 inside the container (mapped to 4000 above). Log 
 
 ```bash
 docker run ... \
-  -e BOJECT_INITIAL_STARTER=/starters/base.boject.json \
+  -e BOJECT_INITIAL_STARTER=/starters/web-base.boject.json \
   -v "$(pwd)/starters:/starters:ro" \
   boject/cms:dev
 ```
