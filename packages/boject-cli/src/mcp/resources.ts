@@ -4,7 +4,7 @@ import {
   FIELD_TYPES_DOC,
   IDENTIFIER_RULES_DOC,
 } from './resourceContent.js';
-import { STARTER_NAMES, readStarter } from './starters.js';
+import { listStarterNames, readStarter } from './starters.js';
 
 function registerDoc(
   server: McpServer,
@@ -52,7 +52,7 @@ export function registerResources(
     'Naming rules for content-type and field identifiers.',
     IDENTIFIER_RULES_DOC
   );
-  for (const name of STARTER_NAMES) {
+  for (const name of listStarterNames(startersDir)) {
     server.registerResource(
       `starter-${name}`,
       `boject://starters/${name}`,
