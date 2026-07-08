@@ -15,4 +15,10 @@ describe('normalizeExtends', () => {
       'taxonomy',
     ]);
   });
+  it('returns a copy, not the same array reference', () => {
+    const input = ['a'];
+    const out = normalizeExtends(input);
+    out.push('b');
+    expect(input).toEqual(['a']);
+  });
 });

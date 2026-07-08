@@ -178,6 +178,40 @@ describe('validateOverlay — array extends & content-type extends', () => {
     expect(r.ok).toBe(false);
     expect(r.errors.some((e) => e.path.endsWith('.extends'))).toBe(true);
   });
+  it('rejects extends on a patch-mode content type', () => {
+    const r = validateOverlay({
+      ...baseOverlay,
+      contentTypes: [
+        {
+          identifier: 'Player',
+          mode: 'patch',
+          extends: ['web-metadata'],
+          fields: [
+            {
+              id: null,
+              identifier: 'position',
+              name: 'Position',
+              type: FIELD_TYPES.TEXT,
+              required: false,
+              order: 5,
+              options: null,
+            },
+          ],
+        },
+      ],
+    });
+    expect(r.ok).toBe(false);
+    expect(r.errors.some((e) => e.path.endsWith('.extends'))).toBe(true);
+  });
+  it('accepts extends on a create-mode content type', () => {
+    const r = validateOverlay({
+      ...baseOverlay,
+      contentTypes: [
+        { ...baseOverlay.contentTypes[0], extends: ['web-metadata'] },
+      ],
+    });
+    expect(r.ok).toBe(true);
+  });
 });
 
 describe('validateFieldPartial', () => {

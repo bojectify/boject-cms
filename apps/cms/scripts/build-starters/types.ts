@@ -35,7 +35,7 @@ export function normalizeExtends(
   ext: string | string[] | null | undefined
 ): string[] {
   if (ext == null) return [];
-  return Array.isArray(ext) ? ext : [ext];
+  return Array.isArray(ext) ? [...ext] : [ext];
 }
 
 export interface OverlayValidationError {

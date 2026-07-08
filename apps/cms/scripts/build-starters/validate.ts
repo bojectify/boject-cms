@@ -110,6 +110,13 @@ function validateContentType(
           });
         }
       });
+      if (mode !== 'create' && c.extends.length > 0) {
+        errors.push({
+          path: `${path}.extends`,
+          message:
+            'extends (field-partials) is only supported on create-mode content types',
+        });
+      }
     }
   }
   if (mode === 'create') {
