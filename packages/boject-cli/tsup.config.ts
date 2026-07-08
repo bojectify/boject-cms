@@ -45,6 +45,7 @@ export default defineConfig({
     // Copy the repo-root starter bundles so `boject mcp` can serve them as
     // example resources (resolved from dist/ at runtime).
     await mkdir('dist/starters', { recursive: true });
+    // Keep this list in sync with STARTER_NAMES in src/mcp/starters.ts.
     for (const name of ['base', 'sport', 'rugby']) {
       await cp(
         `../../starters/${name}.boject.json`,

@@ -308,6 +308,13 @@ const ENTRIES_VALIDATE_USAGE = `Usage: boject entries validate <path>
 Validates an entries bundle's shape. No network.
 `;
 
+const MCP_USAGE = `Usage: boject mcp
+
+Start the stdio MCP server that helps an AI client author a content schema.
+Takes no flags — it is launched by an MCP client over stdio (e.g. Claude Code
+via a project .mcp.json). No CMS or database connection is required.
+`;
+
 const nodeRunner: CommandRunner = {
   run(cmd, args, opts) {
     return new Promise((resolve) => {
@@ -1013,6 +1020,10 @@ async function main(): Promise<void> {
   }
 
   if (command === 'mcp') {
+    if (rest.includes('--help') || rest.includes('-h')) {
+      process.stdout.write(MCP_USAGE);
+      return;
+    }
     // Do NOT process.exit — the stdio transport keeps the process alive
     // until stdin closes.
     await runMcp({ stderr });

@@ -7,8 +7,9 @@ export interface RunMcpParams {
 
 /**
  * Start the boject MCP server over stdio. Never writes to stdout (reserved
- * for JSON-RPC). Resolves only when the transport closes; the caller must
- * NOT process.exit() — the transport keeps the process alive on stdin.
+ * for JSON-RPC). Resolves once the transport is connected; the process then
+ * stays alive via the transport's stdin listener, so the caller must NOT
+ * process.exit().
  */
 export async function runMcp(params: RunMcpParams): Promise<void> {
   const server = buildMcpServer();

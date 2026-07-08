@@ -23,12 +23,26 @@ describe('boject mcp (built)', () => {
     });
     const client = new Client({ name: 'e2e', version: '0.0.0' });
     await client.connect(transport);
-    const res = await client.readResource({ uri: 'boject://starters/base' });
-    const content = res.contents[0];
-    if (!content || !('text' in content)) {
-      throw new Error('expected a text resource content');
+    try {
+      const res = await client.readResource({
+        uri: 'boject://starters/base',
+      });
+      const content = res.contents[0];
+      if (!content || !('text' in content)) {
+        throw new Error('expected a text resource content');
+      }
+      expect(JSON.parse(content.text).version).toBe(2);
+    } finally {
+      await client.close();
     }
-    expect(JSON.parse(content.text).version).toBe(2);
-    await client.close();
+  });
+
+  it('--help prints usage and exits without starting the server', async () => {
+    const { stdout } = await execFileP('node', [
+      join(PKG, 'dist', 'index.js'),
+      'mcp',
+      '--help',
+    ]);
+    expect(stdout).toContain('Usage: boject mcp');
   });
 });
