@@ -1,7 +1,7 @@
 {
   "version": 1,
   "name": "rugby",
-  "extends": "sport",
+  "extends": ["sport"],
   "contentTypes": [
     {
       "identifier": "Position",

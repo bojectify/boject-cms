@@ -19,7 +19,7 @@ describe('starter outputs are up to date', () => {
 
     await buildAll(tmp);
 
-    for (const name of ['sport', 'rugby']) {
+    for (const name of ['articles', 'sport', 'rugby']) {
       const committed = readFileSync(
         join(starters, `${name}.boject.json`),
         'utf8'

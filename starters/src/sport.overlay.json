@@ -1,13 +1,14 @@
 {
   "version": 1,
   "name": "sport",
-  "extends": "base",
+  "extends": ["articles"],
   "contentTypes": [
     {
       "identifier": "Team",
       "mode": "create",
       "name": "Team",
       "description": "An internal club squad (e.g. 1st XV, Veterans).",
+      "extends": ["web-metadata"],
       "fields": [
         {
           "id": null,
@@ -166,6 +167,7 @@
       "mode": "create",
       "name": "Fixture",
       "description": "A scheduled or completed match.",
+      "extends": ["web-metadata"],
       "fields": [
         {
           "id": null,
@@ -249,6 +251,7 @@
       "mode": "create",
       "name": "Player",
       "description": "An individual player profile.",
+      "extends": ["web-metadata"],
       "fields": [
         {
           "id": null,
