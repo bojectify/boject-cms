@@ -26,3 +26,15 @@ export function starterLabel(name: string): string {
       .join(' ')
   );
 }
+
+/**
+ * Order starter names for wizard display: curated dependency-chain order
+ * (STARTER_LABELS key order) first, then any unknown/future names appended
+ * alphabetically.
+ */
+export function orderedStarterNames(names: string[]): string[] {
+  const known = Object.keys(STARTER_LABELS);
+  const inMap = known.filter((n) => names.includes(n));
+  const rest = names.filter((n) => !known.includes(n)).sort();
+  return [...inMap, ...rest];
+}

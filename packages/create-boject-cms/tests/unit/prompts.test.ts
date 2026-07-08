@@ -56,6 +56,29 @@ describe('resolveStarter', () => {
     expect(clack.select).toHaveBeenCalledOnce();
   });
 
+  it('orders prompt options by dependency chain (not alphabetically) and defaults to web-base', async () => {
+    vi.mocked(clack.select).mockResolvedValueOnce('web-base');
+    await resolveStarter({
+      flag: undefined,
+      isTTY: true,
+      starters: STARTERS,
+    });
+
+    const call = vi.mocked(clack.select).mock.calls[0][0] as {
+      options: Array<{ value: string }>;
+      initialValue: string;
+    };
+
+    expect(call.options.map((o) => o.value)).toEqual([
+      'web-base',
+      'articles',
+      'sport',
+      'rugby',
+      'none',
+    ]);
+    expect(call.initialValue).toBe('web-base');
+  });
+
   it('throws if the user cancels the prompt', async () => {
     const cancelSymbol = Symbol('cancel');
     vi.mocked(clack.select).mockResolvedValueOnce(

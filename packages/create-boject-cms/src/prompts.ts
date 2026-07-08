@@ -1,5 +1,5 @@
 import { confirm, isCancel, select } from '@clack/prompts';
-import { starterLabel } from './starters.js';
+import { orderedStarterNames, starterLabel } from './starters.js';
 import type { StarterChoice } from './render.js';
 
 export interface ResolveStarterParams {
@@ -28,13 +28,15 @@ export async function resolveStarter({
     );
   }
 
+  const ordered = orderedStarterNames(starters);
+
   const response = await select({
     message: 'Which starter?',
     options: [
-      ...starters.map((name) => ({ value: name, label: starterLabel(name) })),
+      ...ordered.map((name) => ({ value: name, label: starterLabel(name) })),
       { value: 'none', label: 'None (empty database)' },
     ],
-    initialValue: starters[0] ?? 'none',
+    initialValue: ordered[0] ?? 'none',
   });
 
   if (isCancel(response)) {
