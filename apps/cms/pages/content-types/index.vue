@@ -40,6 +40,17 @@ const tableData = computed(() =>
     updatedAt: item.updatedAt,
   }))
 );
+
+// Whole-row click → the content-type editor, mirroring ContentTable's rows.
+// Binding onSelect makes UTable tag each <tr> role="button" + data-selectable
+// (free hover:bg-elevated/50, light + dark); the name <a> is auto-excluded from
+// the row click by UTable's guard, so it keeps its cmd-click / new-tab powers.
+function openContentType(
+  _event: Event,
+  row: { original: Record<string, unknown> }
+) {
+  navigateTo(`/content-types/${row.original.id as string}`);
+}
 </script>
 
 <template>
@@ -66,6 +77,8 @@ const tableData = computed(() =>
       :data="tableData"
       :columns="columns"
       :loading="status === 'pending'"
+      :ui="{ tr: 'cursor-pointer' }"
+      @select="openContentType"
     >
       <template #name-cell="{ row }">
         <NuxtLink
