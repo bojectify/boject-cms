@@ -25,6 +25,9 @@ describe('model_content prompt', () => {
     expect(text).toContain('validate_schema');
     expect(text).toContain('content-types/schema.boject.json');
     expect(text).toContain('a recipe site');
+    // Leads with understanding the project, not a pick-list of content types.
+    expect(text).toContain('Understand the project first');
+    expect(text).toContain('Do not open with a');
     await client.close();
     await server.close();
   });
