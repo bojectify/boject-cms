@@ -216,8 +216,8 @@ BOJECT_ADMIN_EMAIL=admin@example.com \
   BOJECT_ADMIN_PASSWORD='choose-a-strong-dev-password' \
   pnpm dev:bootstrap-admin
 
-# Optionally apply the base starter bundle (8 content types + a SiteSettings entry)
-pnpm content:import ./starters/base.boject.json
+# Optionally apply the web-base starter bundle (Image, SiteSettings, Navigation, NavigationItem, Link + a SiteSettings entry)
+pnpm content:import ./starters/web-base.boject.json
 
 # Start the dev server
 pnpm dev

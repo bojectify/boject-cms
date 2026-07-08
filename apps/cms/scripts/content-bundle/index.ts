@@ -87,7 +87,7 @@ Examples:
   pnpm content:import ./my-bundle.tar.gz               # auto-detected, restores bytes
   pnpm content:import ./generated/content-bundle-all.json --all
   pnpm content:import ./my-bundle/                    # restores entries + bytes
-  pnpm content:validate ./starters/base.boject.json
+  pnpm content:validate ./starters/web-base.boject.json
 `;
 
 function parseMode(

@@ -30,7 +30,7 @@ describe('importStarterIfEmpty', () => {
     const result = await importStarterIfEmpty(
       // eslint-disable-next-line no-restricted-syntax -- PrismaClient surface is wide; mock only has contentType.count
       prisma as unknown as Parameters<typeof importStarterIfEmpty>[0],
-      { bundlePath: '/starters/base.boject.json', importBundle, readBundle }
+      { bundlePath: '/starters/web-base.boject.json', importBundle, readBundle }
     );
 
     expect(result).toEqual({
@@ -38,7 +38,7 @@ describe('importStarterIfEmpty', () => {
       reason: 'imported',
       stats: { contentTypesCreated: 0, entriesCreated: 0 },
     });
-    expect(readBundle).toHaveBeenCalledWith('/starters/base.boject.json');
+    expect(readBundle).toHaveBeenCalledWith('/starters/web-base.boject.json');
     expect(importBundle).toHaveBeenCalledOnce();
   });
 
@@ -50,7 +50,7 @@ describe('importStarterIfEmpty', () => {
     const result = await importStarterIfEmpty(
       // eslint-disable-next-line no-restricted-syntax -- PrismaClient surface is wide; mock only has contentType.count
       prisma as unknown as Parameters<typeof importStarterIfEmpty>[0],
-      { bundlePath: '/starters/base.boject.json', importBundle, readBundle }
+      { bundlePath: '/starters/web-base.boject.json', importBundle, readBundle }
     );
 
     expect(result).toEqual({
