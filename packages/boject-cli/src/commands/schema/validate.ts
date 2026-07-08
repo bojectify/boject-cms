@@ -1,10 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import { resolve, dirname, isAbsolute } from 'node:path';
 import { loadProjectConfig } from '../../config.js';
-import { validateBundle } from '../../vendor/validateBundle.js';
-import { planSchema } from '../../vendor/planSchema.js';
+import { validateSchemaBundle } from '../../validateSchemaBundle.js';
 import type { Bundle } from '../../vendor/contentBundleTypes.js';
-import type { CurrentSchemaSnapshot } from '../../vendor/schemaPlan.types.js';
 
 export interface SchemaValidateParams {
   cwd?: string;
@@ -16,11 +14,6 @@ export interface SchemaValidateParams {
 export interface SchemaValidateResult {
   exitCode: 0 | 1;
 }
-
-const EMPTY_SNAPSHOT: CurrentSchemaSnapshot = {
-  contentTypes: [],
-  fieldUsage: new Map(),
-};
 
 export async function runSchemaValidate(
   params: SchemaValidateParams
@@ -60,20 +53,15 @@ export async function runSchemaValidate(
     return { exitCode: 1 };
   }
 
-  const v = validateBundle(parsed as Bundle);
-  if (!v.ok) {
+  const result = validateSchemaBundle(parsed);
+  if (!result.ok) {
     params.stderr('✗ Bundle invalid');
-    for (const e of v.errors) {
-      params.stderr(`  - ${e.path}: ${e.message}`);
-    }
-    return { exitCode: 1 };
-  }
-
-  const plan = planSchema(parsed as Bundle, EMPTY_SNAPSHOT, {});
-  if (plan.blockers.length > 0) {
-    params.stderr('✗ Bundle invalid');
-    for (const b of plan.blockers) {
-      params.stderr(`  - ${b.code} at ${b.path}: ${b.message}`);
+    for (const issue of result.issues) {
+      params.stderr(
+        issue.kind === 'plan'
+          ? `  - ${issue.code} at ${issue.path}: ${issue.message}`
+          : `  - ${issue.path}: ${issue.message}`
+      );
     }
     return { exitCode: 1 };
   }

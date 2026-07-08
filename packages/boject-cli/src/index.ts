@@ -17,6 +17,7 @@ import { runBundleMigrate } from './commands/bundle/migrate.js';
 import { runEntriesExport } from './commands/entries/export.js';
 import { runEntriesImport } from './commands/entries/import.js';
 import { runEntriesValidate } from './commands/entries/validate.js';
+import { runMcp } from './commands/mcp/serve.js';
 import { spawn } from 'node:child_process';
 import { CLI_VERSION } from './version.js';
 
@@ -37,6 +38,7 @@ Commands:
   entries export     Export entries from a CMS to a bundle file.
   entries import     Push a local entries bundle to a CMS.
   entries validate   Validate an entries bundle (no network).
+  mcp                Start the stdio MCP server (schema authoring assistant).
 
 Run \`boject <command> --help\` for command-specific flags.
 `;
@@ -304,6 +306,13 @@ Flags:
 const ENTRIES_VALIDATE_USAGE = `Usage: boject entries validate <path>
 
 Validates an entries bundle's shape. No network.
+`;
+
+const MCP_USAGE = `Usage: boject mcp
+
+Start the stdio MCP server that helps an AI client author a content schema.
+Takes no flags — it is launched by an MCP client over stdio (e.g. Claude Code
+via a project .mcp.json). No CMS or database connection is required.
 `;
 
 const nodeRunner: CommandRunner = {
@@ -1008,6 +1017,17 @@ async function main(): Promise<void> {
   if (command === 'entries') {
     const code = await dispatchEntries(rest);
     process.exit(code);
+  }
+
+  if (command === 'mcp') {
+    if (rest.includes('--help') || rest.includes('-h')) {
+      process.stdout.write(MCP_USAGE);
+      return;
+    }
+    // Do NOT process.exit — the stdio transport keeps the process alive
+    // until stdin closes.
+    await runMcp({ stderr });
+    return;
   }
 
   if (command === 'upgrade') {
