@@ -40,7 +40,7 @@ const draggableItems = computed({
       >
         <template #item="{ element: item, index: idx }">
           <div
-            class="flex items-center h-14 pl-2 rounded-lg border border-default bg-elevated focus-within:ring-2 focus-within:ring-primary-500"
+            class="flex items-center h-14 pl-2 rounded-lg border border-default bg-elevated hover:bg-elevated/50 transition-colors focus-within:ring-2 focus-within:ring-primary-500"
           >
             <UIcon
               name="i-lucide-grip-vertical"
