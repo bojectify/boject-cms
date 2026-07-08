@@ -74,7 +74,9 @@ export async function writeProject({
   await writeFile(join(targetDir, '.gitignore'), GITIGNORE);
   await writeFile(
     join(targetDir, 'README.md'),
-    renderReadme({ starter, adminEmail, hostPort })
+    // aiAssist is hardcoded false pending Task 4 (thread aiAssist through
+    // writeProject), which will plumb a real WriteProjectParams field here.
+    renderReadme({ starter, adminEmail, hostPort, aiAssist: false })
   );
 
   if (starter !== 'none') {
