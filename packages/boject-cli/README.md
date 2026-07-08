@@ -285,11 +285,16 @@ API keys are never logged to stdout/stderr or written to any output file. URLs w
 
 CMS API keys carry one or more scopes:
 
-| Scope          | Grants                                                                              |
-| -------------- | ----------------------------------------------------------------------------------- |
-| `content:read` | Read content via the GraphQL endpoint (`/api/graphql`). Required for `boject perf`. |
-| `schema:read`  | Pull the schema bundle (`GET /api/schema/export`).                                  |
-| `schema:write` | Push schema (`POST /api/schema/apply`).                                             |
+| Scope            | Grants                                                                                        |
+| ---------------- | --------------------------------------------------------------------------------------------- |
+| `content:read`   | Read content via the GraphQL endpoint (`/api/graphql`). Required for `boject perf`.           |
+| `content:write`  | Create, update, delete, and transition content entries (`/api/entries`).                      |
+| `content:export` | Export content entries as a portable bundle (`GET /api/content-bundle/export`), incl. drafts. |
+| `content:import` | Import content entry bundles (`POST /api/content-bundle/import`).                             |
+| `schema:read`    | Pull the schema bundle (`GET /api/schema/export`).                                            |
+| `schema:write`   | Push schema (`POST /api/schema/apply`).                                                       |
+| `apikey:read`    | List API keys.                                                                                |
+| `apikey:write`   | Create and revoke API keys.                                                                   |
 
 A key created with `--scopes schema:read` cannot read content via GraphQL. A key created with `--scopes content:read,schema:read` can do both. Issue narrow keys for narrow automation.
 

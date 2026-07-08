@@ -74,6 +74,9 @@ Once the container is healthy, log in at http://localhost:4000/login. The admin 
 | Variable                                 | Purpose                                                                                                          |
 | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | `DATABASE_URL`                           | PostgreSQL connection string (points at the `db` service).                                                       |
+| `MEILI_URL`                              | Meilisearch endpoint (points at the `meilisearch` service).                                                      |
+| `MEILI_MASTER_KEY`                       | 32-byte random Meilisearch master key.                                                                           |
+| `REDIS_URL`                              | Redis connection string (points at the `redis` service).                                                         |
 | `NUXT_SESSION_PASSWORD`                  | 32-byte random session encryption key.                                                                           |
 | `BOJECT_ADMIN_EMAIL`                     | Initial admin (`admin@local`).                                                                                   |
 | `BOJECT_ADMIN_PASSWORD`                  | 16-byte random initial admin password.                                                                           |
