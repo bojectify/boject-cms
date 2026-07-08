@@ -70,6 +70,33 @@ function applyPatch(bundle: Bundle, overlayCt: OverlayContentType): void {
   }
 }
 
+export function composeParents(parents: Bundle[]): Bundle {
+  const first = parents[0];
+  const out: Bundle = {
+    version: first?.version ?? 2,
+    exportedAt: new Date().toISOString(),
+    portable: first?.portable ?? true,
+    contentTypes: [],
+    entries: [],
+  };
+  const seen = new Set<string>();
+  for (const parent of parents) {
+    for (const ct of parent.contentTypes ?? []) {
+      if (seen.has(ct.identifier)) {
+        throw new Error(
+          `Duplicate content type "${ct.identifier}" across extended bundles`
+        );
+      }
+      seen.add(ct.identifier);
+      out.contentTypes!.push(cloneContentType(ct));
+    }
+    for (const entry of parent.entries ?? []) {
+      out.entries!.push({ ...entry });
+    }
+  }
+  return out;
+}
+
 function cloneContentType(ct: BundleContentType): BundleContentType {
   return {
     id: ct.id,

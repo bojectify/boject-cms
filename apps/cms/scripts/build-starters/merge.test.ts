@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Bundle } from '../content-bundle/types';
 import type { Overlay } from './types';
-import { mergeOverlay } from './merge';
+import { mergeOverlay, composeParents } from './merge';
 import { FIELD_TYPES } from '../../utils/fieldTypes';
 
 const parent: Bundle = {
@@ -225,5 +225,56 @@ describe('mergeOverlay', () => {
     const before = new Date().toISOString();
     const out = mergeOverlay(parent, overlay);
     expect(out.exportedAt >= before).toBe(true);
+  });
+});
+
+describe('composeParents', () => {
+  const a: Bundle = {
+    version: 2,
+    exportedAt: 'x',
+    portable: true,
+    contentTypes: [
+      {
+        id: null,
+        identifier: 'Image',
+        name: 'Image',
+        description: null,
+        fields: [],
+      },
+    ],
+    entries: [],
+  };
+  const b: Bundle = {
+    version: 2,
+    exportedAt: 'x',
+    portable: true,
+    contentTypes: [
+      {
+        id: null,
+        identifier: 'Tag',
+        name: 'Tag',
+        description: null,
+        fields: [],
+      },
+    ],
+    entries: [],
+  };
+
+  it('unions content types from all parents', () => {
+    const out = composeParents([a, b]);
+    expect(out.contentTypes!.map((c) => c.identifier)).toEqual([
+      'Image',
+      'Tag',
+    ]);
+  });
+  it('throws on a duplicate identifier across parents', () => {
+    expect(() => composeParents([a, a])).toThrow(
+      /Duplicate content type "Image"/
+    );
+  });
+  it('returns an empty v2 bundle for no parents', () => {
+    const out = composeParents([]);
+    expect(out.contentTypes).toEqual([]);
+    expect(out.version).toBe(2);
   });
 });
