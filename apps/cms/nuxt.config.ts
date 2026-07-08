@@ -80,6 +80,33 @@ export default defineNuxtConfig({
       ...(process.env.VITEST ? { hmr: false, ws: false } : {}),
     },
 
+    // Pre-bundle deps Vite would otherwise discover lazily at runtime — each
+    // discovery forces a re-optimize + full page reload mid-session. These are
+    // the CJS / deep-import deps surfaced across the CMS's heavier routes
+    // (rich-text editor, query builder, content table). Keep in sync with what
+    // the dev server reports as "New dependencies found".
+    // https://vite.dev/guide/dep-pre-bundling.html
+    optimizeDeps: {
+      include: [
+        '@internationalized/date',
+        'dayjs',
+        'dayjs/plugin/relativeTime',
+        'lodash/kebabCase',
+        'lowlight',
+        'vuedraggable',
+        'zod',
+        '@tiptap/core',
+        '@tiptap/vue-3',
+        '@tiptap/starter-kit',
+        '@tiptap/extension-image',
+        '@tiptap/extension-table',
+        '@tiptap/extension-table-row',
+        '@tiptap/extension-table-cell',
+        '@tiptap/extension-table-header',
+        '@tiptap/extension-code-block-lowlight',
+      ],
+    },
+
     // #409: isolate the Vite dep-optimizer cache per vitest worker too — Vite
     // anchors it to rootDir (not buildDir), so parallel dev servers otherwise
     // race on the shared node_modules/.cache/vite (ENOTEMPTY). Non-pooled
