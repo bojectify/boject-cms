@@ -6,6 +6,7 @@ import {
   renderContentTypesBundle,
   renderDockerCompose,
   renderEnvFile,
+  renderMcpConfig,
   renderPackageJson,
   renderReadme,
   type StarterChoice,
@@ -24,6 +25,7 @@ export interface WriteProjectParams {
   force: boolean;
   startersSourceDir: string;
   hostPort: number;
+  aiAssist: boolean;
 }
 
 export interface WriteProjectResult {
@@ -38,6 +40,7 @@ export async function writeProject({
   force,
   startersSourceDir,
   hostPort,
+  aiAssist,
 }: WriteProjectParams): Promise<WriteProjectResult> {
   await mkdir(targetDir, { recursive: true });
   const existing = await readdir(targetDir);
@@ -74,10 +77,11 @@ export async function writeProject({
   await writeFile(join(targetDir, '.gitignore'), GITIGNORE);
   await writeFile(
     join(targetDir, 'README.md'),
-    // aiAssist is hardcoded false pending Task 4 (thread aiAssist through
-    // writeProject), which will plumb a real WriteProjectParams field here.
-    renderReadme({ starter, adminEmail, hostPort, aiAssist: false })
+    renderReadme({ starter, adminEmail, hostPort, aiAssist })
   );
+  if (aiAssist) {
+    await writeFile(join(targetDir, '.mcp.json'), renderMcpConfig());
+  }
 
   if (starter !== 'none') {
     const startersTarget = join(targetDir, 'starters');

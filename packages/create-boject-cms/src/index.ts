@@ -68,6 +68,9 @@ async function main(): Promise<void> {
     force,
     startersSourceDir: resolveStartersSourceDir(),
     hostPort,
+    // aiAssist is hardcoded false pending Task 5 (wire --ai into the CLI),
+    // which will plumb resolveAiAssist's real result here.
+    aiAssist: false,
   });
 
   process.stdout.write(`

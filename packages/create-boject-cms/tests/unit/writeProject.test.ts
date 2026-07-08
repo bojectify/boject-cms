@@ -22,6 +22,7 @@ const baseArgs = {
   imageTag: 'ghcr.io/bojectify/boject-cms:latest',
   startersSourceDir: FIXTURES,
   hostPort: 4000,
+  aiAssist: false,
 };
 
 describe('writeProject', () => {
@@ -166,5 +167,35 @@ describe('writeProject', () => {
     const parsed = JSON.parse(written);
     expect(parsed.version).toBe(2);
     expect(parsed.contentTypes).toEqual([]);
+  });
+
+  it('writes .mcp.json when aiAssist is true', async () => {
+    const target = join(workDir, 'ai-site');
+    await writeProject({
+      ...baseArgs,
+      aiAssist: true,
+      targetDir: target,
+      starter: 'none',
+      force: false,
+    });
+    const files = await readdir(target);
+    expect(files).toContain('.mcp.json');
+    const mcp = JSON.parse(await readFile(join(target, '.mcp.json'), 'utf8'));
+    expect(mcp.mcpServers.boject.args).toContain('mcp');
+    const readme = await readFile(join(target, 'README.md'), 'utf8');
+    expect(readme).toContain('/mcp__boject__model_content');
+  });
+
+  it('omits .mcp.json when aiAssist is false', async () => {
+    const target = join(workDir, 'plain-site');
+    await writeProject({
+      ...baseArgs,
+      aiAssist: false,
+      targetDir: target,
+      starter: 'none',
+      force: false,
+    });
+    const files = await readdir(target);
+    expect(files).not.toContain('.mcp.json');
   });
 });
