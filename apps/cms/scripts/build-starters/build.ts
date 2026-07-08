@@ -6,6 +6,7 @@ import type { Bundle } from '../content-bundle/types';
 import { validateBundle } from '../content-bundle/validate';
 import { mergeOverlay } from './merge';
 import type { Overlay } from './types';
+import { normalizeExtends } from './types';
 import { validateOverlay } from './validate';
 
 export interface BuildOptions {
@@ -52,7 +53,12 @@ export async function buildAll(
   const results: BuildResult[] = [];
 
   for (const overlay of ordered) {
-    const parent = loadParent(root, overlay.extends!, overlays, results);
+    const extendsList = normalizeExtends(overlay.extends);
+    if (extendsList.length === 0) {
+      throw new Error(`Overlay "${overlay.name}" must have an extends value`);
+    }
+    const parentName = extendsList[0]!;
+    const parent = loadParent(root, parentName, overlays, results);
     const merged = mergeOverlay(parent, overlay);
     if (opts.now) {
       merged.exportedAt = opts.now;
@@ -122,8 +128,10 @@ function topoSort(overlays: Map<string, Overlay>): Overlay[] {
     visiting.add(name);
     const overlay = overlays.get(name);
     if (!overlay) return;
-    if (overlay.extends && overlays.has(overlay.extends)) {
-      visit(overlay.extends, [...stack, name]);
+    const extendsList = normalizeExtends(overlay.extends);
+    const parentName = extendsList[0];
+    if (parentName && overlays.has(parentName)) {
+      visit(parentName, [...stack, name]);
     }
     visiting.delete(name);
     visited.add(name);

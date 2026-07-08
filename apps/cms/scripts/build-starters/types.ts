@@ -12,15 +12,30 @@ export interface OverlayContentType {
   mode?: ContentTypeMode;
   name?: string;
   description?: string | null;
+  /** Field-partial names whose fields are appended to this content type. */
+  extends?: string[];
   fields: OverlayField[];
 }
 
 export interface Overlay {
   version: number;
   name: string;
-  extends: string | null;
+  extends: string | string[] | null;
   contentTypes?: OverlayContentType[];
   entries?: Bundle['entries'];
+}
+
+export interface FieldPartial {
+  name: string;
+  fields: OverlayField[];
+}
+
+/** Normalise an overlay/content-type `extends` value to a name array. */
+export function normalizeExtends(
+  ext: string | string[] | null | undefined
+): string[] {
+  if (ext == null) return [];
+  return Array.isArray(ext) ? ext : [ext];
 }
 
 export interface OverlayValidationError {
