@@ -143,4 +143,31 @@ describe('create-boject-cms E2E', () => {
 
     await rm(target, { recursive: true, force: true });
   }, 30_000);
+
+  it('writes .mcp.json + README AI section + AI next-steps with --ai', async () => {
+    const target = join(workDir, 'ai-site');
+    const { stdout } = await runCli([target, '--starter', 'none', '--ai']);
+
+    const files = await readdir(target);
+    expect(files).toContain('.mcp.json');
+
+    const mcp = JSON.parse(await readFile(join(target, '.mcp.json'), 'utf8'));
+    expect(mcp.mcpServers.boject).toEqual({
+      command: 'npx',
+      args: ['-y', '@boject/cli', 'mcp'],
+    });
+
+    const readme = await readFile(join(target, 'README.md'), 'utf8');
+    expect(readme).toContain('## AI-assisted content modelling');
+
+    expect(stdout).toContain('/mcp__boject__model_content');
+  });
+
+  it('omits AI wiring without --ai', async () => {
+    const target = join(workDir, 'plain-site');
+    const { stdout } = await runCli([target, '--starter', 'none']);
+    const files = await readdir(target);
+    expect(files).not.toContain('.mcp.json');
+    expect(stdout).not.toContain('/mcp__boject__');
+  });
 });
