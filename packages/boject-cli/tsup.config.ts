@@ -46,7 +46,7 @@ export default defineConfig({
     // example resources (resolved from dist/ at runtime).
     await mkdir('dist/starters', { recursive: true });
     // Keep this list in sync with STARTER_NAMES in src/mcp/starters.ts.
-    for (const name of ['base', 'sport', 'rugby']) {
+    for (const name of ['web-base', 'articles', 'sport', 'rugby']) {
       await cp(
         `../../starters/${name}.boject.json`,
         `dist/starters/${name}.boject.json`

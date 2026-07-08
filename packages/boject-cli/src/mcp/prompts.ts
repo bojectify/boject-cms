@@ -25,7 +25,7 @@ export function registerPrompts(server: McpServer): void {
         '   - boject://schema/bundle-format',
         '   - boject://schema/field-types',
         '   - boject://schema/identifier-rules',
-        '   - boject://starters/base (an example to draw on, NOT a menu to pick from)',
+        '   - boject://starters/articles (an example to draw on, NOT a menu to pick from)',
         '2. Understand the project first. Ask, one question at a time and in plain',
         '   language: what are they building and who is it for, then what kinds of',
         '   content it will hold. Do not propose content types until you understand',

@@ -24,20 +24,23 @@ async function connect() {
 }
 
 describe('starter resources', () => {
-  it('exposes base/sport/rugby starter resources', async () => {
+  it('exposes web-base/articles/sport/rugby starter resources', async () => {
     const { client, server } = await connect();
     const { resources } = await client.listResources();
     const uris = resources.map((r) => r.uri);
-    expect(uris).toContain('boject://starters/base');
+    expect(uris).toContain('boject://starters/web-base');
+    expect(uris).toContain('boject://starters/articles');
     expect(uris).toContain('boject://starters/sport');
     expect(uris).toContain('boject://starters/rugby');
     await client.close();
     await server.close();
   });
 
-  it('base starter resource is a valid schema bundle', async () => {
+  it('web-base starter resource is a valid schema bundle', async () => {
     const { client, server } = await connect();
-    const res = await client.readResource({ uri: 'boject://starters/base' });
+    const res = await client.readResource({
+      uri: 'boject://starters/web-base',
+    });
     const parsed = JSON.parse((res.contents[0] as { text: string }).text);
     expect(validateSchemaBundle(parsed).ok).toBe(true);
     await client.close();
