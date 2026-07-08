@@ -74,6 +74,41 @@ export const Selectable: Story = {
   },
 };
 
+// Clickable rows (option A): when `rowLink` is set, the whole row navigates.
+// Binding UTable's `@select` tags each <tr> role="button" + data-selectable, so
+// the themed hover:bg-elevated/50 (light + dark) comes for free and we only add
+// cursor-pointer. The entry title stays a real <a> (cmd-click / new-tab /
+// keyboard), and UTable's guard auto-excludes the checkbox (<button>) and the
+// link (<a>) from the row click. navigateTo is a no-op shim in Storybook, so
+// this verifies the wiring — a clickable row plus a preserved title link — not
+// the navigation itself.
+export const ClickableRows: Story = {
+  args: {
+    title: 'Authors',
+    data: [
+      { id: 'a', entryTitle: 'Mampi Swift' },
+      { id: 'b', entryTitle: 'DJ Rap' },
+    ],
+    columns: [{ accessorKey: 'entryTitle', header: 'Entry Title' }],
+    rowLink: (row: Record<string, unknown>) => `/entries/${row.id}`,
+  },
+  play: async ({ canvasElement }: PlayContext) => {
+    const rows = canvasElement.querySelectorAll('tbody tr');
+    expect(rows).toHaveLength(2);
+    for (const row of rows) {
+      // @select wiring: UTable makes the row a keyboard-activatable button...
+      expect(row.getAttribute('role')).toBe('button');
+      // ...and we add the pointer cursor on top of the free themed hover.
+      expect(row.className).toContain('cursor-pointer');
+    }
+    // The title stays a real link (cmd-click / new-tab / keyboard preserved).
+    const href = within(rows[0] as HTMLElement)
+      .getByRole('link')
+      .getAttribute('href');
+    expect(href).toContain('/entries/a');
+  },
+};
+
 // Cursor (prev/next) mode: when `pageInfo` is set, ContentTable renders the
 // prev/next block instead of the offset UPagination. Asserts disabled states
 // driven by hasPreviousPage/hasNextPage and that clicking Next emits `next`.

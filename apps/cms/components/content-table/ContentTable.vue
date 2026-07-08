@@ -50,6 +50,25 @@ const allColumns = computed<TableColumn<Record<string, unknown>>[]>(() => {
       ]
     : base;
 });
+
+// Option A: whole-row click navigates. Binding UTable's `onSelect` also tags
+// each <tr> role="button" + data-selectable, which pulls in the themed
+// hover:bg-elevated/50 (light + dark) for free — so the only style we add is
+// cursor-pointer. UTable's own row-click guard skips clicks whose target is a
+// <button> (the UCheckbox) or an <a> (the title link), so shift-range
+// selection and the real title link keep working untouched. When there's no
+// rowLink the row is inert (no handler, no hover, no pointer).
+const onRowSelect = computed(() => {
+  const link = props.rowLink;
+  if (!link) return undefined;
+  return (_event: Event, row: { original: Record<string, unknown> }) => {
+    navigateTo(link(row.original));
+  };
+});
+
+const tableUi = computed(() =>
+  props.rowLink ? { tr: 'cursor-pointer' } : undefined
+);
 </script>
 
 <template>
@@ -66,7 +85,13 @@ const allColumns = computed<TableColumn<Record<string, unknown>>[]>(() => {
     <div v-if="$slots.toolbar" class="mb-4">
       <slot name="toolbar" />
     </div>
-    <UTable :data="data" :columns="allColumns" :loading="loading">
+    <UTable
+      :data="data"
+      :columns="allColumns"
+      :loading="loading"
+      :on-select="onRowSelect"
+      :ui="tableUi"
+    >
       <template v-if="selectable" #select-header>
         <!--
           Nuxt UI's UCheckbox has no boolean `indeterminate` prop — the partial
