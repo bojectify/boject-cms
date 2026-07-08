@@ -1,0 +1,594 @@
+{
+  "version": 2,
+  "exportedAt": "2026-07-08T21:19:17.091Z",
+  "portable": true,
+  "contentTypes": [
+    {
+      "id": null,
+      "identifier": "Image",
+      "name": "Image",
+      "description": "A reusable image asset with editorial metadata.",
+      "fields": [
+        {
+          "id": null,
+          "identifier": "name",
+          "name": "Name",
+          "type": "ENTRY_TITLE",
+          "required": true,
+          "order": 0,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "file",
+          "name": "File",
+          "type": "IMAGE",
+          "required": true,
+          "order": 1,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "alt",
+          "name": "Alt text",
+          "type": "TEXT",
+          "required": false,
+          "order": 2,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "credit",
+          "name": "Credit",
+          "type": "TEXT",
+          "required": false,
+          "order": 3,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "caption",
+          "name": "Caption",
+          "type": "TEXTAREA",
+          "required": false,
+          "order": 4,
+          "options": null
+        }
+      ]
+    },
+    {
+      "id": null,
+      "identifier": "SiteSettings",
+      "name": "Site Settings",
+      "description": "Site-wide configuration. Singleton by convention — only one entry.",
+      "fields": [
+        {
+          "id": null,
+          "identifier": "name",
+          "name": "Name",
+          "type": "ENTRY_TITLE",
+          "required": true,
+          "order": 0,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "siteName",
+          "name": "Site name",
+          "type": "TEXT",
+          "required": true,
+          "order": 1,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "logo",
+          "name": "Logo",
+          "type": "RELATION",
+          "required": false,
+          "order": 2,
+          "options": {
+            "targetContentTypeIds": [null],
+            "targetContentTypeIdentifiers": ["Image"]
+          }
+        },
+        {
+          "id": null,
+          "identifier": "defaultOgImage",
+          "name": "Default OG image",
+          "type": "RELATION",
+          "required": false,
+          "order": 3,
+          "options": {
+            "targetContentTypeIds": [null],
+            "targetContentTypeIdentifiers": ["Image"]
+          }
+        },
+        {
+          "id": null,
+          "identifier": "footerCopy",
+          "name": "Footer copy",
+          "type": "TEXTAREA",
+          "required": false,
+          "order": 4,
+          "options": null
+        }
+      ]
+    },
+    {
+      "id": null,
+      "identifier": "Link",
+      "name": "Link",
+      "description": "A reusable link — external URL or internal reference. Usable anywhere in the site.",
+      "fields": [
+        {
+          "id": null,
+          "identifier": "label",
+          "name": "Label",
+          "type": "ENTRY_TITLE",
+          "required": true,
+          "order": 0,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "url",
+          "name": "URL",
+          "type": "TEXT",
+          "required": false,
+          "order": 1,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "openInNewTab",
+          "name": "Open in new tab",
+          "type": "BOOLEAN",
+          "required": false,
+          "order": 2,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "internalLink",
+          "name": "Internal link",
+          "type": "RELATION",
+          "required": false,
+          "order": 3,
+          "options": {
+            "targetContentTypeIds": [null, null],
+            "targetContentTypeIdentifiers": ["Article", "Page"]
+          }
+        }
+      ]
+    },
+    {
+      "id": null,
+      "identifier": "NavigationItem",
+      "name": "Navigation item",
+      "description": "A navigation entry: a primary link plus optional child links.",
+      "fields": [
+        {
+          "id": null,
+          "identifier": "label",
+          "name": "Label",
+          "type": "ENTRY_TITLE",
+          "required": true,
+          "order": 0,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "link",
+          "name": "Link",
+          "type": "RELATION",
+          "required": false,
+          "order": 1,
+          "options": {
+            "targetContentTypeIds": [null],
+            "targetContentTypeIdentifiers": ["Link"]
+          }
+        },
+        {
+          "id": null,
+          "identifier": "links",
+          "name": "Links",
+          "type": "MULTIRELATION",
+          "required": false,
+          "order": 2,
+          "options": {
+            "targetContentTypeIds": [null],
+            "targetContentTypeIdentifiers": ["Link"]
+          }
+        }
+      ]
+    },
+    {
+      "id": null,
+      "identifier": "Navigation",
+      "name": "Navigation",
+      "description": "A named navigation tree (e.g. Main, Footer).",
+      "fields": [
+        {
+          "id": null,
+          "identifier": "name",
+          "name": "Name",
+          "type": "ENTRY_TITLE",
+          "required": true,
+          "order": 0,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "items",
+          "name": "Items",
+          "type": "MULTIRELATION",
+          "required": false,
+          "order": 1,
+          "options": {
+            "targetContentTypeIds": [null],
+            "targetContentTypeIdentifiers": ["NavigationItem"]
+          }
+        }
+      ]
+    },
+    {
+      "id": null,
+      "identifier": "Tag",
+      "name": "Tag",
+      "description": "A categorisation tag used by content entries.",
+      "fields": [
+        {
+          "id": null,
+          "identifier": "name",
+          "name": "Name",
+          "type": "ENTRY_TITLE",
+          "required": true,
+          "order": 0,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "slug",
+          "name": "Slug",
+          "type": "SLUG",
+          "required": false,
+          "order": 1,
+          "options": null
+        }
+      ]
+    },
+    {
+      "id": null,
+      "identifier": "Category",
+      "name": "Category",
+      "description": "A content category.",
+      "fields": [
+        {
+          "id": null,
+          "identifier": "name",
+          "name": "Name",
+          "type": "ENTRY_TITLE",
+          "required": true,
+          "order": 0,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "slug",
+          "name": "Slug",
+          "type": "SLUG",
+          "required": false,
+          "order": 1,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "description",
+          "name": "Description",
+          "type": "TEXTAREA",
+          "required": false,
+          "order": 2,
+          "options": null
+        }
+      ]
+    },
+    {
+      "id": null,
+      "identifier": "Author",
+      "name": "Author",
+      "description": "A content author with bio and headshot.",
+      "fields": [
+        {
+          "id": null,
+          "identifier": "name",
+          "name": "Name",
+          "type": "ENTRY_TITLE",
+          "required": true,
+          "order": 0,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "slug",
+          "name": "Slug",
+          "type": "SLUG",
+          "required": false,
+          "order": 1,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "bio",
+          "name": "Bio",
+          "type": "TEXTAREA",
+          "required": false,
+          "order": 2,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "headshot",
+          "name": "Headshot",
+          "type": "RELATION",
+          "required": false,
+          "order": 3,
+          "options": {
+            "targetContentTypeIds": [null],
+            "targetContentTypeIdentifiers": ["Image"]
+          }
+        }
+      ]
+    },
+    {
+      "id": null,
+      "identifier": "Page",
+      "name": "Page",
+      "description": "A standalone page with rich text body and SEO metadata.",
+      "fields": [
+        {
+          "id": null,
+          "identifier": "title",
+          "name": "Title",
+          "type": "ENTRY_TITLE",
+          "required": true,
+          "order": 0,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "slug",
+          "name": "Slug",
+          "type": "SLUG",
+          "required": false,
+          "order": 1,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "body",
+          "name": "Body",
+          "type": "RICHTEXT",
+          "required": false,
+          "order": 2,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "metaTitle",
+          "name": "Meta title",
+          "type": "TEXT",
+          "required": false,
+          "order": 3,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "metaDescription",
+          "name": "Meta description",
+          "type": "TEXTAREA",
+          "required": false,
+          "order": 4,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "metaImage",
+          "name": "Meta image",
+          "type": "RELATION",
+          "required": false,
+          "order": 5,
+          "options": {
+            "targetContentTypeIds": [null],
+            "targetContentTypeIdentifiers": ["Image"]
+          }
+        },
+        {
+          "id": null,
+          "identifier": "canonicalUrl",
+          "name": "Canonical URL",
+          "type": "TEXT",
+          "required": false,
+          "order": 6,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "noIndex",
+          "name": "No index",
+          "type": "BOOLEAN",
+          "required": false,
+          "order": 7,
+          "options": {
+            "default": false
+          }
+        }
+      ]
+    },
+    {
+      "id": null,
+      "identifier": "Article",
+      "name": "Article",
+      "description": "An editorial article with rich text body, author, taxonomy, and SEO metadata.",
+      "fields": [
+        {
+          "id": null,
+          "identifier": "title",
+          "name": "Title",
+          "type": "ENTRY_TITLE",
+          "required": true,
+          "order": 0,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "slug",
+          "name": "Slug",
+          "type": "SLUG",
+          "required": false,
+          "order": 1,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "summary",
+          "name": "Summary",
+          "type": "TEXTAREA",
+          "required": false,
+          "order": 2,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "body",
+          "name": "Body",
+          "type": "RICHTEXT",
+          "required": false,
+          "order": 3,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "author",
+          "name": "Author",
+          "type": "RELATION",
+          "required": false,
+          "order": 4,
+          "options": {
+            "targetContentTypeIds": [null],
+            "targetContentTypeIdentifiers": ["Author"]
+          }
+        },
+        {
+          "id": null,
+          "identifier": "tags",
+          "name": "Tags",
+          "type": "MULTIRELATION",
+          "required": false,
+          "order": 5,
+          "options": {
+            "targetContentTypeIds": [null],
+            "targetContentTypeIdentifiers": ["Tag"]
+          }
+        },
+        {
+          "id": null,
+          "identifier": "category",
+          "name": "Category",
+          "type": "RELATION",
+          "required": false,
+          "order": 6,
+          "options": {
+            "targetContentTypeIds": [null],
+            "targetContentTypeIdentifiers": ["Category"]
+          }
+        },
+        {
+          "id": null,
+          "identifier": "featuredImage",
+          "name": "Featured image",
+          "type": "RELATION",
+          "required": false,
+          "order": 7,
+          "options": {
+            "targetContentTypeIds": [null],
+            "targetContentTypeIdentifiers": ["Image"]
+          }
+        },
+        {
+          "id": null,
+          "identifier": "metaTitle",
+          "name": "Meta title",
+          "type": "TEXT",
+          "required": false,
+          "order": 8,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "metaDescription",
+          "name": "Meta description",
+          "type": "TEXTAREA",
+          "required": false,
+          "order": 9,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "metaImage",
+          "name": "Meta image",
+          "type": "RELATION",
+          "required": false,
+          "order": 10,
+          "options": {
+            "targetContentTypeIds": [null],
+            "targetContentTypeIdentifiers": ["Image"]
+          }
+        },
+        {
+          "id": null,
+          "identifier": "canonicalUrl",
+          "name": "Canonical URL",
+          "type": "TEXT",
+          "required": false,
+          "order": 11,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "noIndex",
+          "name": "No index",
+          "type": "BOOLEAN",
+          "required": false,
+          "order": 12,
+          "options": {
+            "default": false
+          }
+        }
+      ]
+    }
+  ],
+  "entries": [
+    {
+      "id": null,
+      "contentTypeId": null,
+      "contentTypeIdentifier": "SiteSettings",
+      "entryTitle": "Site Settings",
+      "entryKey": "site-settings",
+      "slug": null,
+      "versions": [
+        {
+          "status": "PUBLISHED",
+          "data": {
+            "name": "Site Settings",
+            "siteName": "My Site",
+            "logo": null,
+            "defaultOgImage": null,
+            "footerCopy": "© {{year}} My Site. All rights reserved."
+          },
+          "publishedAt": null
+        }
+      ]
+    }
+  ]
+}

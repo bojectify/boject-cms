@@ -1,0 +1,201 @@
+{
+  "version": 1,
+  "name": "articles",
+  "extends": ["web-base", "taxonomy"],
+  "contentTypes": [
+    {
+      "identifier": "Author",
+      "mode": "create",
+      "name": "Author",
+      "description": "A content author with bio and headshot.",
+      "fields": [
+        {
+          "id": null,
+          "identifier": "name",
+          "name": "Name",
+          "type": "ENTRY_TITLE",
+          "required": true,
+          "order": 0,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "slug",
+          "name": "Slug",
+          "type": "SLUG",
+          "required": false,
+          "order": 1,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "bio",
+          "name": "Bio",
+          "type": "TEXTAREA",
+          "required": false,
+          "order": 2,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "headshot",
+          "name": "Headshot",
+          "type": "RELATION",
+          "required": false,
+          "order": 3,
+          "options": {
+            "targetContentTypeIds": [null],
+            "targetContentTypeIdentifiers": ["Image"]
+          }
+        }
+      ]
+    },
+    {
+      "identifier": "Page",
+      "mode": "create",
+      "name": "Page",
+      "description": "A standalone page with rich text body and SEO metadata.",
+      "extends": ["web-metadata"],
+      "fields": [
+        {
+          "id": null,
+          "identifier": "title",
+          "name": "Title",
+          "type": "ENTRY_TITLE",
+          "required": true,
+          "order": 0,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "slug",
+          "name": "Slug",
+          "type": "SLUG",
+          "required": false,
+          "order": 1,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "body",
+          "name": "Body",
+          "type": "RICHTEXT",
+          "required": false,
+          "order": 2,
+          "options": null
+        }
+      ]
+    },
+    {
+      "identifier": "Article",
+      "mode": "create",
+      "name": "Article",
+      "description": "An editorial article with rich text body, author, taxonomy, and SEO metadata.",
+      "extends": ["web-metadata"],
+      "fields": [
+        {
+          "id": null,
+          "identifier": "title",
+          "name": "Title",
+          "type": "ENTRY_TITLE",
+          "required": true,
+          "order": 0,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "slug",
+          "name": "Slug",
+          "type": "SLUG",
+          "required": false,
+          "order": 1,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "summary",
+          "name": "Summary",
+          "type": "TEXTAREA",
+          "required": false,
+          "order": 2,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "body",
+          "name": "Body",
+          "type": "RICHTEXT",
+          "required": false,
+          "order": 3,
+          "options": null
+        },
+        {
+          "id": null,
+          "identifier": "author",
+          "name": "Author",
+          "type": "RELATION",
+          "required": false,
+          "order": 4,
+          "options": {
+            "targetContentTypeIds": [null],
+            "targetContentTypeIdentifiers": ["Author"]
+          }
+        },
+        {
+          "id": null,
+          "identifier": "tags",
+          "name": "Tags",
+          "type": "MULTIRELATION",
+          "required": false,
+          "order": 5,
+          "options": {
+            "targetContentTypeIds": [null],
+            "targetContentTypeIdentifiers": ["Tag"]
+          }
+        },
+        {
+          "id": null,
+          "identifier": "category",
+          "name": "Category",
+          "type": "RELATION",
+          "required": false,
+          "order": 6,
+          "options": {
+            "targetContentTypeIds": [null],
+            "targetContentTypeIdentifiers": ["Category"]
+          }
+        },
+        {
+          "id": null,
+          "identifier": "featuredImage",
+          "name": "Featured image",
+          "type": "RELATION",
+          "required": false,
+          "order": 7,
+          "options": {
+            "targetContentTypeIds": [null],
+            "targetContentTypeIdentifiers": ["Image"]
+          }
+        }
+      ]
+    },
+    {
+      "identifier": "Link",
+      "mode": "patch",
+      "fields": [
+        {
+          "id": null,
+          "identifier": "internalLink",
+          "name": "Internal link",
+          "type": "RELATION",
+          "required": false,
+          "order": 3,
+          "options": {
+            "targetContentTypeIds": [null, null],
+            "targetContentTypeIdentifiers": ["Article", "Page"]
+          }
+        }
+      ]
+    }
+  ]
+}
