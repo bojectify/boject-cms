@@ -4,17 +4,40 @@ export interface ReadmeParams {
   starter: StarterChoice;
   adminEmail: string;
   hostPort: number;
+  aiAssist: boolean;
 }
 
 export function renderReadme({
   starter,
   adminEmail,
   hostPort,
+  aiAssist,
 }: ReadmeParams): string {
   const starterLine =
     starter === 'none'
       ? ''
       : `The \`${starter}\` starter bundle will be imported on first boot.\n\n`;
+
+  const aiSection = aiAssist
+    ? `## AI-assisted content modelling
+
+This project includes a \`.mcp.json\` that connects the [boject MCP server](https://www.npmjs.com/package/@boject/cli) to Claude Code, so you can design your content schema in a conversation — no CMS or database needs to be running.
+
+1. Open this folder in Claude Code and run \`claude\`; accept the workspace-trust prompt.
+2. Approve the \`boject\` server when asked (run \`/mcp\` any time to check its status).
+3. Run the modelling prompt:
+
+   \`\`\`
+   /mcp__boject__model_content
+   \`\`\`
+
+   Optionally describe what you're building: \`/mcp__boject__model_content "a recipe site"\`.
+
+Claude interviews you about your content, validates the result, and writes it to
+\`content-types/schema.boject.json\`. Then run \`docker compose up -d\` to load it.
+
+`
+    : '';
 
   return `# boject-cms
 
@@ -45,7 +68,7 @@ development; commit the file alongside your code so production deploys converge
 to the same schema. Destructive changes (removing types or fields) are blocked
 by default — set \`BOJECT_ALLOW_DESTRUCTIVE_SCHEMA=true\` in \`.env\` to allow them.
 
-## Stop the CMS
+${aiSection}## Stop the CMS
 
 \`\`\`bash
 docker compose down

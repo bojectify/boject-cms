@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { resolveStarter } from '../../src/prompts.js';
+import { resolveAiAssist, resolveStarter } from '../../src/prompts.js';
 
 vi.mock('@clack/prompts', () => ({
   select: vi.fn(),
+  confirm: vi.fn(),
   isCancel: vi.fn(() => false),
 }));
 
@@ -43,6 +44,38 @@ describe('resolveStarter', () => {
     vi.mocked(clack.isCancel).mockReturnValueOnce(true);
     await expect(
       resolveStarter({ flag: undefined, isTTY: true })
+    ).rejects.toThrow(/cancelled/i);
+  });
+});
+
+describe('resolveAiAssist', () => {
+  it('returns the flag without prompting when --ai is passed', async () => {
+    expect(await resolveAiAssist({ flag: true, isTTY: true })).toBe(true);
+    expect(clack.confirm).not.toHaveBeenCalled();
+  });
+
+  it('returns false when non-TTY and no flag (opt-in default off)', async () => {
+    expect(await resolveAiAssist({ flag: undefined, isTTY: false })).toBe(
+      false
+    );
+    expect(clack.confirm).not.toHaveBeenCalled();
+  });
+
+  it('prompts (default no) when TTY and no flag', async () => {
+    vi.mocked(clack.confirm).mockResolvedValueOnce(true);
+    expect(await resolveAiAssist({ flag: undefined, isTTY: true })).toBe(true);
+    expect(clack.confirm).toHaveBeenCalledOnce();
+  });
+
+  it('throws if the user cancels the prompt', async () => {
+    const cancelSymbol = Symbol('cancel');
+    vi.mocked(clack.confirm).mockResolvedValueOnce(
+      // eslint-disable-next-line no-restricted-syntax -- Symbol has no overlap with boolean; mocking clack's cancel sentinel
+      cancelSymbol as unknown as boolean
+    );
+    vi.mocked(clack.isCancel).mockReturnValueOnce(true);
+    await expect(
+      resolveAiAssist({ flag: undefined, isTTY: true })
     ).rejects.toThrow(/cancelled/i);
   });
 });
