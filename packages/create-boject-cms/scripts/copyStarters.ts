@@ -1,4 +1,4 @@
-import { copyFile, mkdir } from 'node:fs/promises';
+import { copyFile, mkdir, readdir } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -7,15 +7,14 @@ const PACKAGE_ROOT = resolve(HERE, '..');
 const REPO_STARTERS = resolve(PACKAGE_ROOT, '..', '..', 'starters');
 const DIST_STARTERS = join(PACKAGE_ROOT, 'dist', 'starters');
 
-const EXPECTED = ['web-base', 'articles', 'sport', 'rugby'] as const;
-
 async function main(): Promise<void> {
   await mkdir(DIST_STARTERS, { recursive: true });
-  for (const name of EXPECTED) {
-    const source = join(REPO_STARTERS, `${name}.boject.json`);
-    const dest = join(DIST_STARTERS, `${name}.boject.json`);
-    await copyFile(source, dest);
-    process.stdout.write(`copied ${name}.boject.json\n`);
+  const files = (await readdir(REPO_STARTERS)).filter((f) =>
+    f.endsWith('.boject.json')
+  );
+  for (const file of files) {
+    await copyFile(join(REPO_STARTERS, file), join(DIST_STARTERS, file));
+    process.stdout.write(`copied ${file}\n`);
   }
 }
 

@@ -3,6 +3,7 @@ import { dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { resolveHostPort } from './hostPort.js';
 import { resolveStarter, resolveAiAssist } from './prompts.js';
+import { starterNames } from './starters.js';
 import { IMAGE_TAG } from './version.js';
 import { writeProject } from './writeProject.js';
 
@@ -61,7 +62,12 @@ async function main(): Promise<void> {
     ai,
   } = parseCli(process.argv.slice(2));
   const isTTY = process.stdin.isTTY === true;
-  const starter = await resolveStarter({ flag: starterFlag, isTTY });
+  const startersSourceDir = resolveStartersSourceDir();
+  const starter = await resolveStarter({
+    flag: starterFlag,
+    isTTY,
+    starters: starterNames(startersSourceDir),
+  });
   const aiAssist = await resolveAiAssist({ flag: ai, isTTY });
 
   const { adminEmail, adminPassword } = await writeProject({
@@ -69,7 +75,7 @@ async function main(): Promise<void> {
     starter,
     imageTag,
     force,
-    startersSourceDir: resolveStartersSourceDir(),
+    startersSourceDir,
     hostPort,
     aiAssist,
   });

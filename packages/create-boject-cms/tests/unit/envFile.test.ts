@@ -1,5 +1,18 @@
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { renderEnvFile } from '../../src/templates/envFile.js';
+import { starterNames } from '../../src/starters.js';
+
+const REPO_STARTERS = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  '..',
+  '..',
+  '..',
+  '..',
+  'starters'
+);
+const STARTERS = starterNames(REPO_STARTERS);
 
 const baseParams = {
   sessionPassword: 'session-password-value',
@@ -66,13 +79,7 @@ describe('renderEnvFile', () => {
   });
 
   it('always includes BOJECT_SCHEMA_DIR=/app/content-types', () => {
-    for (const starter of [
-      'web-base',
-      'articles',
-      'sport',
-      'rugby',
-      'none',
-    ] as const) {
+    for (const starter of [...STARTERS, 'none']) {
       const out = renderEnvFile({
         sessionPassword: 'pw1',
         adminPassword: 'pw2',

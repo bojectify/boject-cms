@@ -1,5 +1,18 @@
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { renderContentTypesBundle } from '../../src/templates/contentTypes.js';
+import { starterNames } from '../../src/starters.js';
+
+const REPO_STARTERS = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  '..',
+  '..',
+  '..',
+  '..',
+  'starters'
+);
+const STARTERS = starterNames(REPO_STARTERS);
 
 describe('renderContentTypesBundle', () => {
   it('returns the empty bundle stub for the "none" starter', () => {
@@ -15,7 +28,7 @@ describe('renderContentTypesBundle', () => {
   });
 
   it('returns a copy directive for non-none starters', () => {
-    for (const starter of ['web-base', 'articles', 'sport', 'rugby'] as const) {
+    for (const starter of STARTERS) {
       const out = renderContentTypesBundle({ starter });
       expect(out).toEqual({
         kind: 'copy',

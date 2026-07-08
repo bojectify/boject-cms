@@ -1,5 +1,8 @@
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import { resolveAiAssist, resolveStarter } from '../../src/prompts.js';
+import { starterNames } from '../../src/starters.js';
 
 vi.mock('@clack/prompts', () => ({
   select: vi.fn(),
@@ -9,28 +12,46 @@ vi.mock('@clack/prompts', () => ({
 
 import * as clack from '@clack/prompts';
 
+const REPO_STARTERS = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  '..',
+  '..',
+  '..',
+  '..',
+  'starters'
+);
+const STARTERS = starterNames(REPO_STARTERS);
+
 describe('resolveStarter', () => {
   it('returns the flag value without calling the prompt when a valid flag is supplied', async () => {
-    const result = await resolveStarter({ flag: 'sport', isTTY: true });
+    const result = await resolveStarter({
+      flag: 'sport',
+      isTTY: true,
+      starters: STARTERS,
+    });
     expect(result).toBe('sport');
     expect(clack.select).not.toHaveBeenCalled();
   });
 
   it('throws on an invalid flag value', async () => {
     await expect(
-      resolveStarter({ flag: 'invalid', isTTY: true })
+      resolveStarter({ flag: 'invalid', isTTY: true, starters: STARTERS })
     ).rejects.toThrow(/must be one of/);
   });
 
   it('throws when non-TTY and no flag is provided', async () => {
     await expect(
-      resolveStarter({ flag: undefined, isTTY: false })
+      resolveStarter({ flag: undefined, isTTY: false, starters: STARTERS })
     ).rejects.toThrow(/non-interactive/i);
   });
 
   it('prompts via @clack/prompts when TTY and no flag', async () => {
     vi.mocked(clack.select).mockResolvedValueOnce('web-base');
-    const result = await resolveStarter({ flag: undefined, isTTY: true });
+    const result = await resolveStarter({
+      flag: undefined,
+      isTTY: true,
+      starters: STARTERS,
+    });
     expect(result).toBe('web-base');
     expect(clack.select).toHaveBeenCalledOnce();
   });
@@ -43,7 +64,7 @@ describe('resolveStarter', () => {
     );
     vi.mocked(clack.isCancel).mockReturnValueOnce(true);
     await expect(
-      resolveStarter({ flag: undefined, isTTY: true })
+      resolveStarter({ flag: undefined, isTTY: true, starters: STARTERS })
     ).rejects.toThrow(/cancelled/i);
   });
 });

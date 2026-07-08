@@ -1,61 +1,40 @@
 import { confirm, isCancel, select } from '@clack/prompts';
+import { starterLabel } from './starters.js';
 import type { StarterChoice } from './render.js';
-
-const CHOICES: StarterChoice[] = [
-  'web-base',
-  'articles',
-  'sport',
-  'rugby',
-  'none',
-];
-
-function isValidChoice(value: string): value is StarterChoice {
-  return (CHOICES as string[]).includes(value);
-}
 
 export interface ResolveStarterParams {
   flag: string | undefined;
   isTTY: boolean;
+  starters: string[]; // derived starter names (no 'none')
 }
 
 export async function resolveStarter({
   flag,
   isTTY,
+  starters,
 }: ResolveStarterParams): Promise<StarterChoice> {
+  const choices = [...starters, 'none'];
+
   if (flag !== undefined) {
-    if (!isValidChoice(flag)) {
-      throw new Error(`--starter must be one of: ${CHOICES.join(', ')}`);
+    if (!choices.includes(flag)) {
+      throw new Error(`--starter must be one of: ${choices.join(', ')}`);
     }
     return flag;
   }
 
   if (!isTTY) {
     throw new Error(
-      'Non-interactive shell detected. Pass --starter <web-base|articles|sport|rugby|none>.'
+      `Non-interactive shell detected. Pass --starter <${choices.join('|')}>.`
     );
   }
 
   const response = await select({
     message: 'Which starter?',
     options: [
-      {
-        value: 'web-base',
-        label:
-          'Web Base (Image, SiteSettings, Navigation, NavigationItem, Link)',
-      },
-      {
-        value: 'articles',
-        label: 'Articles (Web Base + Author, Page, Article, Tag, Category)',
-      },
-      {
-        value: 'sport',
-        label:
-          'Sport (Articles + Team, Club, Season, Competition, Fixture, Player)',
-      },
-      { value: 'rugby', label: 'Rugby (Sport + Position, patched Player)' },
+      ...starters.map((name) => ({ value: name, label: starterLabel(name) })),
       { value: 'none', label: 'None (empty database)' },
     ],
-    initialValue: 'web-base',
+    initialValue: starters[0] ?? 'none',
   });
 
   if (isCancel(response)) {
