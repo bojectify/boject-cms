@@ -28,6 +28,18 @@ describe('model_content prompt', () => {
     // Leads with understanding the project, not a pick-list of content types.
     expect(text).toContain('Understand the project first');
     expect(text).toContain('Do not open with a');
+    // starter-aware: references the starter origin + extend-not-replace
+    expect(text).toContain('starter');
+    expect(text).toContain('Build ON');
+    expect(text).toContain('content types from the starter');
+    // CLI schema-as-code editing path
+    expect(text).toContain('boject schema pull');
+    expect(text).toContain('boject schema validate');
+    // `boject schema apply` straddles a line break in the source array, so the
+    // joined string has a newline where a single substring match would expect
+    // a space — assert the two halves separately.
+    expect(text).toContain('boject schema');
+    expect(text).toContain('apply` (push changes');
     await client.close();
     await server.close();
   });
