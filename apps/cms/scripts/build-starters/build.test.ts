@@ -8,7 +8,7 @@ import { FIELD_TYPES } from '../../utils/fieldTypes';
 
 function makeWorkspace(): string {
   const root = mkdtempSync(join(tmpdir(), 'starters-build-'));
-  mkdirSync(join(root, 'src'));
+  mkdirSync(join(root, 'src', 'overlays'), { recursive: true });
   return root;
 }
 
@@ -48,7 +48,7 @@ describe('buildAll', () => {
   it('builds a single overlay extending base', async () => {
     writeFileSync(join(root, 'base.boject.json'), JSON.stringify(baseBundle));
     writeFileSync(
-      join(root, 'src', 'sport.overlay.json'),
+      join(root, 'src', 'overlays', 'sport.overlay.json'),
       JSON.stringify({
         version: 1,
         name: 'sport',
@@ -86,7 +86,7 @@ describe('buildAll', () => {
   it('builds chained overlays (rugby extends sport extends base)', async () => {
     writeFileSync(join(root, 'base.boject.json'), JSON.stringify(baseBundle));
     writeFileSync(
-      join(root, 'src', 'sport.overlay.json'),
+      join(root, 'src', 'overlays', 'sport.overlay.json'),
       JSON.stringify({
         version: 1,
         name: 'sport',
@@ -113,7 +113,7 @@ describe('buildAll', () => {
       })
     );
     writeFileSync(
-      join(root, 'src', 'rugby.overlay.json'),
+      join(root, 'src', 'overlays', 'rugby.overlay.json'),
       JSON.stringify({
         version: 1,
         name: 'rugby',
@@ -152,11 +152,11 @@ describe('buildAll', () => {
   it('throws on cycle', async () => {
     writeFileSync(join(root, 'base.boject.json'), JSON.stringify(baseBundle));
     writeFileSync(
-      join(root, 'src', 'a.overlay.json'),
+      join(root, 'src', 'overlays', 'a.overlay.json'),
       JSON.stringify({ version: 1, name: 'a', extends: 'b', contentTypes: [] })
     );
     writeFileSync(
-      join(root, 'src', 'b.overlay.json'),
+      join(root, 'src', 'overlays', 'b.overlay.json'),
       JSON.stringify({ version: 1, name: 'b', extends: 'a', contentTypes: [] })
     );
     await expect(buildAll(root)).rejects.toThrow(/cycle/i);
@@ -165,7 +165,7 @@ describe('buildAll', () => {
   it('throws on unknown parent', async () => {
     writeFileSync(join(root, 'base.boject.json'), JSON.stringify(baseBundle));
     writeFileSync(
-      join(root, 'src', 'orphan.overlay.json'),
+      join(root, 'src', 'overlays', 'orphan.overlay.json'),
       JSON.stringify({
         version: 1,
         name: 'orphan',
@@ -179,7 +179,7 @@ describe('buildAll', () => {
   it('validates each built bundle with validateBundle', async () => {
     writeFileSync(join(root, 'base.boject.json'), JSON.stringify(baseBundle));
     writeFileSync(
-      join(root, 'src', 'bad.overlay.json'),
+      join(root, 'src', 'overlays', 'bad.overlay.json'),
       JSON.stringify({
         version: 1,
         name: 'bad',
@@ -211,7 +211,7 @@ describe('buildAll', () => {
   it('writes deterministic JSON (2-space indent, trailing newline)', async () => {
     writeFileSync(join(root, 'base.boject.json'), JSON.stringify(baseBundle));
     writeFileSync(
-      join(root, 'src', 'sport.overlay.json'),
+      join(root, 'src', 'overlays', 'sport.overlay.json'),
       JSON.stringify({
         version: 1,
         name: 'sport',
@@ -228,7 +228,7 @@ describe('buildAll', () => {
   it('successive rebuilds differ only by exportedAt', async () => {
     writeFileSync(join(root, 'base.boject.json'), JSON.stringify(baseBundle));
     writeFileSync(
-      join(root, 'src', 'sport.overlay.json'),
+      join(root, 'src', 'overlays', 'sport.overlay.json'),
       JSON.stringify({
         version: 1,
         name: 'sport',
@@ -254,7 +254,7 @@ describe('buildAll', () => {
   it('throws when overlay name does not match filename', async () => {
     writeFileSync(join(root, 'base.boject.json'), JSON.stringify(baseBundle));
     writeFileSync(
-      join(root, 'src', 'sport.overlay.json'),
+      join(root, 'src', 'overlays', 'sport.overlay.json'),
       JSON.stringify({
         version: 1,
         name: 'football',
@@ -298,9 +298,9 @@ describe('buildAll', () => {
       })
     );
     // module: taxonomy with Tag
-    mkdirSync(join(root, 'modules'));
+    mkdirSync(join(root, 'src', 'modules'), { recursive: true });
     writeFileSync(
-      join(root, 'modules', 'taxonomy.boject.json'),
+      join(root, 'src', 'modules', 'taxonomy.boject.json'),
       JSON.stringify({
         version: 2,
         exportedAt: '2026-01-01T00:00:00.000Z',
@@ -348,7 +348,7 @@ describe('buildAll', () => {
     );
     // overlay: articles extends [web-base, taxonomy]; Article extends [web-metadata]
     writeFileSync(
-      join(root, 'src', 'articles.overlay.json'),
+      join(root, 'src', 'overlays', 'articles.overlay.json'),
       JSON.stringify({
         version: 1,
         name: 'articles',

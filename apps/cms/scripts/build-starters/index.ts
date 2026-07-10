@@ -63,7 +63,7 @@ async function main(): Promise<void> {
 }
 
 function getOverlayNames(root: string): string[] {
-  return readdirSync(join(root, 'src'))
+  return readdirSync(join(root, 'src', 'overlays'))
     .filter((f) => f.endsWith('.overlay.json'))
     .map((f) => f.replace(/\.overlay\.json$/, ''));
 }

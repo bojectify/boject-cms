@@ -4,14 +4,14 @@ import { join } from 'node:path';
 import { validateBundle } from '../content-bundle/validate';
 
 const here = new URL('../../../../starters/', import.meta.url).pathname;
-const modulesDir = join(here, 'modules');
+const modulesDir = join(here, 'src', 'modules');
 
 const topLevelBundleFiles = readdirSync(here).filter((f) =>
   f.endsWith('.boject.json')
 );
 const moduleBundleFiles = safeReaddir(modulesDir)
   .filter((f) => f.endsWith('.boject.json'))
-  .map((f) => join('modules', f));
+  .map((f) => join('src', 'modules', f));
 const bundleFiles = [...topLevelBundleFiles, ...moduleBundleFiles];
 
 function safeReaddir(path: string): string[] {
