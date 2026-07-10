@@ -1,6 +1,6 @@
 {
   "name": "@boject/cli",
-  "version": "0.0.1-rc.2",
+  "version": "0.0.1-rc.3",
   "license": "BUSL-1.1",
   "private": false,
   "type": "module",
