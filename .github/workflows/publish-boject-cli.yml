@@ -29,7 +29,11 @@ jobs:
         with:
           node-version: 24
 
-      - run: npm install -g npm@latest
+      # Pin npm: 11.18.0 is the version that published rc.2 successfully. npm
+      # 12.0.0 (2026-07-08) broke `npm publish --provenance` — it dropped
+      # `sigstore` from its bundled deps (Cannot find module 'sigstore' in
+      # libnpmpublish/lib/provenance.js). Revisit once npm 12.x fixes provenance.
+      - run: npm install -g npm@11.18.0
 
       - name: Install canvas build dependencies
         run: |
