@@ -126,4 +126,40 @@ describe('renderEnvFile', () => {
     const env = renderEnvFile({ ...baseParams, starter: 'web-base' });
     expect(env).toMatch(/^REDIS_URL=redis:\/\/redis:6379$/m);
   });
+
+  // Performance / rate-limit / cache tunables (#477). Each is surfaced as a
+  // commented hint carrying its code default, so operators can discover the
+  // knob without leaving the scaffolded project — but nothing is enabled, so
+  // behaviour is unchanged. Defaults verified against apps/cms source
+  // (graphqlComplexity.ts, rateLimitEndpoint.ts, cacheConfig.ts,
+  // publicWriteRateLimit.ts, clientIp.ts).
+  describe('performance / rate-limit / cache tunables', () => {
+    const TUNABLES: Array<[string, string]> = [
+      ['BOJECT_GRAPHQL_COMPLEXITY_MAX_COST', '1000'],
+      ['BOJECT_GRAPHQL_COMPLEXITY_LOG_ONLY', 'true'],
+      ['GRAPHQL_RATE_LIMIT_RPS', '1000'],
+      ['BOJECT_GRAPHQL_CACHE_MAX_BYTES', '1048576'],
+      ['BOJECT_SEARCH_RATE_LIMIT_RPM', '120'],
+      ['BOJECT_PUBLIC_RATE_LIMIT_RPM', '120'],
+      ['BOJECT_PUBLIC_WRITE_RATE_LIMIT_RPM', '120'],
+      ['BOJECT_PUBLIC_CACHE_TTL', '3600'],
+      ['BOJECT_TRUSTED_PROXY_HOPS', '0'],
+    ];
+
+    it.each(TUNABLES)(
+      'surfaces %s as a commented hint with its default',
+      (name, def) => {
+        const env = renderEnvFile({ ...baseParams, starter: 'web-base' });
+        expect(env).toMatch(new RegExp(`^# ${name}=${def}$`, 'm'));
+      }
+    );
+
+    it.each(TUNABLES)(
+      'does not enable %s by default (stays commented)',
+      (name) => {
+        const env = renderEnvFile({ ...baseParams, starter: 'web-base' });
+        expect(env).not.toMatch(new RegExp(`^${name}=`, 'm'));
+      }
+    );
+  });
 });
