@@ -5,7 +5,7 @@ Production-ready content type bundles for `pnpm content:import`. Apply these to 
 ## Vocabulary
 
 - **Starter** — a selectable bundle. What `create-boject-cms` prompts for and what you point `pnpm content:import` at directly. Starters form a chain: each one extends the previous, adding content types on top.
-- **Module** — a non-selectable, reusable bundle of content types shared by multiple starters via `extends`. Modules live under `starters/modules/` and are never offered as a top-level choice — they only exist to be extended.
+- **Module** — a non-selectable, reusable bundle of content types shared by multiple starters via `extends`. Modules live under `starters/src/modules/` and are never offered as a top-level choice — they only exist to be extended.
 - **Field-partial** — a reusable named group of fields, shared by multiple content types (in the same or different starters) via a content-type-level `extends`. Field-partials live under `starters/src/partials/` and contribute fields, not whole content types.
 
 All three compose through an `extends` array: a starter overlay's top-level `extends` names parent starters/modules; a content type's own `extends` names field-partials.
@@ -70,7 +70,7 @@ Sport + rugby-specific structure:
 
 Modules are reusable content-type bundles that are never selected directly — they exist only to be `extends`-ed by starters.
 
-### `modules/taxonomy.boject.json`
+### `src/modules/taxonomy.boject.json`
 
 - **Tag** — `name` + `slug`
 - **Category** — `name`, `slug`, `description`
@@ -101,7 +101,27 @@ Nesting is flat by design: `NavigationItem` has no self-referencing `children` f
 
 ## Applying a starter
 
-From a fresh CMS instance (no existing content types with matching identifiers):
+How you apply a starter depends on whether you're working **in a project you scaffolded** with `create-boject-cms` or **inside this monorepo**.
+
+### In a scaffolded project (the common case)
+
+`create-boject-cms` copies the starter you pick into your project as `content-types/schema.boject.json` and points `BOJECT_SCHEMA_DIR` at it, so **the starter's content types are applied automatically on every boot** — you run nothing. On first boot against an empty database, the starter's seed entries (e.g. the `SiteSettings` singleton) are imported too.
+
+To apply a starter — or a schema lifted from a similar project — to an **already-running** CMS, use the [`boject` CLI](../packages/boject-cli/README.md). It reads `.boject.config.json` for the CMS URL and `BOJECT_API_KEY` from the environment:
+
+```bash
+boject schema validate                 # offline shape check of content-types/schema.boject.json
+boject schema apply                    # push it to the running CMS (add --dry-run to preview)
+boject schema apply ./other.boject.json   # apply an arbitrary bundle file instead
+```
+
+`boject schema pull` does the reverse — it writes a running CMS's live schema to `content-types/schema.boject.json`. That's how you lift a content model **out of** a similar project: `pull` from that project's CMS, drop the file into your own `content-types/` (or point `boject schema apply` at it), then `git diff` and reconcile.
+
+> **`schema apply` is schema-only.** It creates, updates, and (with `--allow-destructive`) removes content types, but it does **not** import entries — so a starter's seed entries (the `SiteSettings` singleton) don't ride along. Seed entries land only on a project's first boot (empty DB) or via `boject entries import`.
+
+### In this monorepo (contributors)
+
+`pnpm content:import` applies a starter — **schema and entries together** — to the local dev CMS:
 
 ```bash
 pnpm content:import ./starters/web-base.boject.json
@@ -140,7 +160,7 @@ Two ways to extend a starter:
 
 ## Overlay system
 
-`web-base.boject.json` and `modules/taxonomy.boject.json` are authored directly. `articles.boject.json`, `sport.boject.json`, and `rugby.boject.json` are **built** from small overlay files under `starters/src/` — they should not be edited by hand.
+`web-base.boject.json` and `src/modules/taxonomy.boject.json` are authored directly. `articles.boject.json`, `sport.boject.json`, and `rugby.boject.json` are **built** from small overlay files under `starters/src/overlays/` — they should not be edited by hand.
 
 An overlay declares one or more parent bundles via `extends` (a starter or module name, or an array of names) and a list of content-type changes. Each change has a `mode`:
 
@@ -152,11 +172,11 @@ When an overlay's `extends` array names more than one parent (e.g. Articles exte
 ### Build
 
 ```bash
-pnpm starters:build   # read src/*.overlay.json + src/partials/*.json, write *.boject.json outputs
+pnpm starters:build   # read src/overlays/*.overlay.json + src/partials/*.json, write *.boject.json outputs
 pnpm starters:check   # rebuild in memory and diff against committed outputs (CI)
 ```
 
-Overlays resolve their parents recursively — a named parent is looked up first among the other overlays being built (already-built starters), then as `starters/<name>.boject.json`, then as `starters/modules/<name>.boject.json`. Cycles and unknown parents are build-time errors. Every built output is validated with `validateBundle` before being written. `starters:check` ignores the `exportedAt` field when comparing.
+Overlays resolve their parents recursively — a named parent is looked up first among the other overlays being built (already-built starters), then as `starters/<name>.boject.json`, then as `starters/src/modules/<name>.boject.json`. Cycles and unknown parents are build-time errors. Every built output is validated with `validateBundle` before being written. `starters:check` ignores the `exportedAt` field when comparing.
 
 Build outputs are committed so `pnpm content:import starters/sport.boject.json` works without a prior build step.
 
@@ -164,19 +184,22 @@ Build outputs are committed so `pnpm content:import starters/sport.boject.json` 
 
 ```
 starters/
-  web-base.boject.json       # authored directly (the root starter)
-  articles.boject.json       # built (extends web-base + taxonomy)
-  sport.boject.json          # built (extends articles)
-  rugby.boject.json          # built (extends sport)
-  modules/
-    taxonomy.boject.json     # authored directly (non-selectable module)
-  src/
-    articles.overlay.json
-    sport.overlay.json
-    rugby.overlay.json
+  web-base.boject.json          # authored directly (the root starter; selectable)
+  articles.boject.json          # built (extends web-base + taxonomy; selectable)
+  sport.boject.json             # built (extends articles; selectable)
+  rugby.boject.json             # built (extends sport; selectable)
+  src/                          # build inputs — never imported directly
+    overlays/
+      articles.overlay.json
+      sport.overlay.json
+      rugby.overlay.json
+    modules/
+      taxonomy.boject.json      # authored directly (non-selectable module)
     partials/
-      web-metadata.json      # field-partial
+      web-metadata.json         # field-partial
 ```
+
+The rule: **top-level `*.boject.json` is the selectable starter set** (what `create-boject-cms` offers and what the tooling derives by reading this directory); **everything the build reads lives under `src/`**, in a subdirectory named for its kind. `web-base.boject.json` sits at the top because it's both the authored root and a final output — it has no overlay to build from.
 
 ### Overlay shape
 

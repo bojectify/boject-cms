@@ -98,13 +98,13 @@ The CMS serves a token-authed external API — `/api/public/*` (REST read + writ
 
 ## Apps and packages
 
-| Path                                                                  | Purpose                                                                         |
-| --------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| [`apps/cms/`](apps/cms/README.md)                                     | The CMS application — Nuxt 4 + Prisma + GraphQL                                 |
-| [`packages/create-boject-cms/`](packages/create-boject-cms/README.md) | Project scaffolder (`pnpm create boject-cms my-site`)                           |
-| [`packages/boject-cli/`](packages/boject-cli/README.md)               | Maintenance + schema-as-code CLI for scaffolded projects (`boject ...`)         |
-| [`starters/`](starters/README.md)                                     | Starter bundle data (`base`, `sport`, `rugby`) consumed by the CMS + scaffolder |
-| [`perf/`](perf/README.md)                                             | Performance harness, scenarios, and committed reports                           |
+| Path                                                                  | Purpose                                                                                         |
+| --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| [`apps/cms/`](apps/cms/README.md)                                     | The CMS application — Nuxt 4 + Prisma + GraphQL                                                 |
+| [`packages/create-boject-cms/`](packages/create-boject-cms/README.md) | Project scaffolder (`pnpm create boject-cms my-site`)                                           |
+| [`packages/boject-cli/`](packages/boject-cli/README.md)               | Maintenance + schema-as-code CLI for scaffolded projects (`boject ...`)                         |
+| [`starters/`](starters/README.md)                                     | Starter bundle data (`web-base`, `articles`, `sport`, `rugby`) consumed by the CMS + scaffolder |
+| [`perf/`](perf/README.md)                                             | Performance harness, scenarios, and committed reports                                           |
 
 ## Project Structure
 
@@ -127,10 +127,11 @@ packages/
   create-boject-cms/           # Scaffolder (`pnpm create boject-cms`)
   boject-cli/                  # Maintenance + schema-as-code CLI (`boject`)
 starters/                      # Shared starter bundles (data, consumed by apps + packages)
-  web-base.boject.json, articles.boject.json, sport.boject.json, rugby.boject.json
-  modules/                     # Non-selectable composable modules (e.g. taxonomy.boject.json)
+  web-base.boject.json, articles.boject.json, sport.boject.json, rugby.boject.json  # selectable starters
   README.md
-  src/                         # Overlay sources authored directly (articles/sport/rugby derive via build)
+  src/                         # Build inputs — never imported directly
+    overlays/                  # Overlay sources (articles/sport/rugby derive from these via build)
+    modules/                   # Non-selectable composable modules (e.g. taxonomy.boject.json)
     partials/                  # Field-partials (e.g. web-metadata.json) composed onto content types
 perf/                          # Performance harness + reports
 scripts/

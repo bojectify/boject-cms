@@ -23,13 +23,14 @@ export async function buildAll(
   opts: BuildOptions = {}
 ): Promise<BuildResult[]> {
   const srcDir = join(root, 'src');
-  const overlayFiles = safeReaddir(srcDir).filter((f) =>
+  const overlayDir = join(srcDir, 'overlays');
+  const overlayFiles = safeReaddir(overlayDir).filter((f) =>
     f.endsWith('.overlay.json')
   );
 
   const overlays = new Map<string, Overlay>();
   for (const file of overlayFiles) {
-    const raw = readFileSync(join(srcDir, file), 'utf8');
+    const raw = readFileSync(join(overlayDir, file), 'utf8');
     const overlay = JSON.parse(raw) as Overlay;
     const result = validateOverlay(overlay);
     if (!result.ok) {
@@ -123,13 +124,13 @@ function loadParent(
     return JSON.parse(readFileSync(builtParent.path, 'utf8')) as Bundle;
   for (const candidate of [
     join(root, `${parentName}.boject.json`),
-    join(root, 'modules', `${parentName}.boject.json`),
+    join(root, 'src', 'modules', `${parentName}.boject.json`),
   ]) {
     if (existsSync(candidate))
       return JSON.parse(readFileSync(candidate, 'utf8')) as Bundle;
   }
   throw new Error(
-    `unknown parent bundle "${parentName}" (expected ${join(root, `${parentName}.boject.json`)}, ${join(root, 'modules', `${parentName}.boject.json`)}, or a built overlay)`
+    `unknown parent bundle "${parentName}" (expected ${join(root, `${parentName}.boject.json`)}, ${join(root, 'src', 'modules', `${parentName}.boject.json`)}, or a built overlay)`
   );
 }
 
