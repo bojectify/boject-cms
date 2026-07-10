@@ -34,7 +34,7 @@ export async function resolveStarter({
     message:
       'Pick the starter model that best suits your needs — a starting point you\n' +
       'can extend or edit later, including with the model_content MCP tool if you\n' +
-      'enable AI-assisted modelling.',
+      'enable AI-assisted modelling.\n',
     options: [
       ...ordered.map((name) => ({ value: name, label: starterLabel(name) })),
       { value: 'none', label: 'None (empty database)' },
@@ -63,7 +63,7 @@ export async function resolveAiAssist({
 
   const response = await confirm({
     message:
-      'Set up AI-assisted content modelling? (adds a Claude Code MCP config)',
+      'Set up AI-assisted content modelling? (adds a Claude Code MCP config)\n',
     initialValue: false,
   });
 

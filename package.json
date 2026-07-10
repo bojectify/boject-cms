@@ -55,7 +55,10 @@
     "perf:sweep": "pnpm --filter @boject/perf run sweep",
     "perf:report": "pnpm --filter @boject/perf run report",
     "perf:followups": "pnpm --filter @boject/perf run followups",
-    "perf:scenario": "pnpm --filter @boject/perf run scenario"
+    "perf:scenario": "pnpm --filter @boject/perf run scenario",
+    "create-boject-cms:build": "pnpm --filter create-boject-cms build",
+    "create-boject-cms:start": "node packages/create-boject-cms/dist/index.js",
+    "cli:build": "pnpm --filter @boject/cli build"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.3",
