@@ -3,7 +3,7 @@
 # ============================================================================
 # build stage — installs all deps, generates Prisma client, builds Nuxt
 # ============================================================================
-FROM node:24-alpine AS build
+FROM node:26-alpine AS build
 
 # pnpm via corepack (shipped with Node 24)
 RUN corepack enable && corepack prepare pnpm@11.11.0 --activate
@@ -39,7 +39,7 @@ RUN pnpm nuxt build
 # ============================================================================
 # runtime stage — slim image with only what's needed to run
 # ============================================================================
-FROM node:24-alpine AS runtime
+FROM node:26-alpine AS runtime
 
 RUN corepack enable && corepack prepare pnpm@11.11.0 --activate
 
