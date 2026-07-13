@@ -13,15 +13,6 @@ minimumReleaseAgeExclude:
   - caniuse-lite
   - electron-to-chromium
   - browserslist
-  # TEMPORARY (tracked in #442): Dependabot's #429 (nuxt) + #432 (vitest) lockfile
-  # regens floated these two transitives to versions younger than the cooldown,
-  # and those are the versions the rest of the tree needs (downgrading type-fest
-  # to a compliant version breaks Storybook's story types). Excluding keeps them
-  # at the working 5.8.0 / 16.2.1 without touching the lockfile. Drop these two
-  # once they age past minimumReleaseAge (type-fest 5.8.0 after 2026-07-07, globby
-  # 16.2.1 after 2026-07-09) so they float normally again.
-  - globby
-  - type-fest
 
 patchedDependencies:
   '@nuxt/test-utils@4.0.0': patches/@nuxt__test-utils@4.0.0.patch
