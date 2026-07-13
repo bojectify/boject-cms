@@ -63,6 +63,7 @@ pnpm nuke:packages            # Wipe every node_modules in the workspace and rei
 bash packages/create-boject-cms/scripts/smoke-test.sh   # Manual boot smoke gate: scaffold a project with create-boject-cms and `docker compose up` the GENERATED stack (cms + db + meilisearch + redis), asserting the cms container boots and answers HTTP 200/302. Mirrors apps/cms/docker/smoke-test.sh (bash, manual, not in `pnpm test`). SMOKE_IMAGE reuses a pre-built cms image (skips the build); SMOKE_PORT (default 4020) overrides the host port. Requires Docker + host Node + curl.
 bash scripts/release-prepare.sh <ver>   # Release: bump all artifacts to one version + open a PR (HOST-only — git writes; not `pnpm release:*`, the shim mounts .git read-only)
 bash scripts/release-tag.sh             # Release: after the PR merges, tag vX.Y.Z + create the GitHub Release (HOST-only)
+bash scripts/bump-pnpm.sh <X.Y.Z>       # Bump the pinned pnpm version across all 4 sites (root `package.json` packageManager + `Dockerfile.dev` ARG + `apps/cms/Dockerfile` x2) then rebuild + verify the dev container (HOST-only; asserts every site landed; `--no-rebuild` edits files only; doesn't commit or touch host pnpm)
 ```
 
 Note: commands run from the repo root forward to `apps/cms` via `pnpm --filter cms`. The Nuxt app source, Prisma schema, and tests all live under `apps/cms/`. Starter bundle JSONs stay at the repo root's `starters/` directory (shared data, consumed by multiple packages).
