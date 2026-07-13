@@ -4,7 +4,7 @@
   "license": "BUSL-1.1",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@11.10.0",
+  "packageManager": "pnpm@11.11.0",
   "scripts": {
     "dev": "pnpm --filter cms dev",
     "build": "pnpm --filter cms build",
