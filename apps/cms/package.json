@@ -44,7 +44,7 @@
     "@nuxt/eslint": "^1.15.1",
     "@nuxt/fonts": "^0.14.0",
     "@nuxt/test-utils": "^4.0.0",
-    "@nuxt/ui": "4.4.0",
+    "@nuxt/ui": "4.8.1",
     "@storybook/addon-vitest": "~10.3.5",
     "@storybook/vue3-vite": "~10.3.5",
     "@types/lodash": "^4.17.24",
