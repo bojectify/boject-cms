@@ -58,21 +58,21 @@
     "test:integration": "vitest run --project integration"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0",
-    "pg": "^8.13.1",
-    "semver": "^7.6.3",
-    "yaml": "^2.6.1",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "pg": "^8.22.0",
+    "semver": "^7.8.5",
+    "yaml": "^2.9.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {
-    "@prisma/adapter-pg": "^7.4.1",
-    "@prisma/client": "^7.4.1",
+    "@prisma/adapter-pg": "^7.9.1",
+    "@prisma/client": "^7.9.1",
     "@types/node": "^24.12.2",
-    "@types/pg": "^8.11.10",
-    "@types/semver": "^7.5.8",
+    "@types/pg": "^8.21.0",
+    "@types/semver": "^7.8.0",
     "msw": "^2.13.4",
     "tsup": "^8.3.0",
-    "tsx": "^4.19.0",
+    "tsx": "^4.23.11",
     "typescript": "^5.7.0",
     "vitest": "^4.1.5"
   }
