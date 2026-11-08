@@ -6,6 +6,10 @@ describe('GITIGNORE template', () => {
     expect(GITIGNORE).toContain('.env');
   });
 
+  it('ignores .env.local, where the CLI API key lives (#505)', () => {
+    expect(GITIGNORE.split('\n')).toContain('.env.local');
+  });
+
   it('ignores the storage directory', () => {
     expect(GITIGNORE).toContain('storage/');
   });

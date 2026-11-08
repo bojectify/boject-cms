@@ -105,9 +105,9 @@ describe('renderEnvFile', () => {
     );
     // The monorepo-only dev script doesn't exist in a scaffolded project.
     expect(env).not.toContain('pnpm apikey:create');
-    expect(env).toContain(
-      "export BOJECT_API_KEY=$(sed -n 's/^BOJECT_API_KEY=//p' .env)"
-    );
+    // The CLI loads .env.local itself (#505) — no export step.
+    expect(env).not.toContain('export BOJECT_API_KEY');
+    expect(env).toContain('.env.local');
   });
 
   it('does not enable BOJECT_API_KEY by default', () => {

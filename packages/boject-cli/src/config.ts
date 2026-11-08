@@ -39,13 +39,38 @@ const FILENAME = '.boject.config.json';
  *         missing/invalid.
  */
 export async function loadProjectConfig(cwd: string): Promise<LoadResult> {
+  const root = await findProjectRoot(cwd);
+  if (!root) {
+    throw new Error(
+      `No .boject.config.json found in ${cwd} or any parent directory.`
+    );
+  }
+  const candidate = join(root, FILENAME);
+  const raw = await readFile(candidate, 'utf8');
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    throw new Error(`Failed to parse ${candidate}: ${(err as Error).message}`);
+  }
+  return {
+    config: validateConfig(parsed, candidate),
+    configPath: candidate,
+  };
+}
+
+/**
+ * Walk up from `cwd` to the nearest directory containing
+ * `.boject.config.json` and return it, or `null` if none is found before the
+ * filesystem root. Never parses or validates the file, so callers that only
+ * need the project root (e.g. `.env` loading, #505) don't fail on a bad config.
+ */
+export async function findProjectRoot(cwd: string): Promise<string | null> {
   let dir = cwd;
   while (true) {
-    const candidate = join(dir, FILENAME);
-    let exists = false;
     try {
-      await stat(candidate);
-      exists = true;
+      await stat(join(dir, FILENAME));
+      return dir;
     } catch (err) {
       if (
         !(err instanceof Error) ||
@@ -55,27 +80,8 @@ export async function loadProjectConfig(cwd: string): Promise<LoadResult> {
         throw err;
       }
     }
-    if (exists) {
-      const raw = await readFile(candidate, 'utf8');
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(raw);
-      } catch (err) {
-        throw new Error(
-          `Failed to parse ${candidate}: ${(err as Error).message}`
-        );
-      }
-      return {
-        config: validateConfig(parsed, candidate),
-        configPath: candidate,
-      };
-    }
     const parent = dirname(dir);
-    if (parent === dir) {
-      throw new Error(
-        `No .boject.config.json found in ${cwd} or any parent directory.`
-      );
-    }
+    if (parent === dir) return null;
     dir = parent;
   }
 }

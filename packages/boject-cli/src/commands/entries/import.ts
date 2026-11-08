@@ -3,6 +3,7 @@ import { resolve, dirname, isAbsolute } from 'node:path';
 import { loadProjectConfig } from '../../config.js';
 import { importEntriesRemote, HttpError } from '../../api.js';
 import type { Bundle, EntriesImportResultLike } from '../../types.js';
+import { missingApiKeyMessage } from '../../projectEnv.js';
 
 export interface EntriesImportFlags {
   path?: string;
@@ -29,7 +30,7 @@ export async function runEntriesImport(
 ): Promise<EntriesImportResult> {
   const flags = params.flags ?? {};
   if (!params.apiKey) {
-    params.stderr('Error: BOJECT_API_KEY is not set.');
+    params.stderr(missingApiKeyMessage());
     return { exitCode: 1 };
   }
   if (!flags.path) {

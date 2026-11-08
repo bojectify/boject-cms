@@ -1,6 +1,7 @@
 import { API_KEY_SCOPES, isApiKeyScope } from '../../vendor/apiKeyScopes.js';
 import { createApiKey, HttpError } from '../../api.js';
 import { loadProjectConfig } from '../../config.js';
+import { missingApiKeyMessage } from '../../projectEnv.js';
 
 export interface ApikeyCreateFlags {
   name?: string;
@@ -51,7 +52,7 @@ export async function runApikeyCreate(
   }
 
   if (!params.apiKey) {
-    stderr('Error: BOJECT_API_KEY is not set.');
+    stderr(missingApiKeyMessage());
     return { exitCode: 1 };
   }
 

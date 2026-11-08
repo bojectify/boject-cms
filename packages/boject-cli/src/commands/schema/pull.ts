@@ -2,6 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { loadProjectConfig } from '../../config.js';
 import { getSchemaBundle, HttpError } from '../../api.js';
+import { missingApiKeyMessage } from '../../projectEnv.js';
 
 export interface SchemaPullFlags {
   out?: string;
@@ -26,7 +27,7 @@ export async function runSchemaPull(
   const flags = params.flags ?? {};
 
   if (!params.apiKey) {
-    params.stderr('Error: BOJECT_API_KEY is not set.');
+    params.stderr(missingApiKeyMessage());
     return { exitCode: 1 };
   }
 

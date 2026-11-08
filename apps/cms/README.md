@@ -146,11 +146,7 @@ Until the admin UI lands (tracked in #166), mint your first API key by exec'ing 
 docker compose exec cms tsx scripts/manage-api-keys/index.ts create cli --scopes schema:read,schema:write,content:export,content:import,apikey:read,apikey:write
 ```
 
-The raw key is printed once — save it. The CLI reads `BOJECT_API_KEY` from the shell environment (not from `.env`). A scaffolded project keeps it in `.env` and exports just that line:
-
-```bash
-export BOJECT_API_KEY=$(sed -n 's/^BOJECT_API_KEY=//p' .env)
-```
+The raw key is printed once — save it. In a scaffolded project, put it in `.env.local` as `BOJECT_API_KEY=<key>`. The CLI loads `.env.local` and then `.env` from the project root automatically (only `BOJECT_*` / `PERF_*` keys; a variable already set in the shell wins; `BOJECT_NO_DOTENV=1` turns it off). `.env.local` is gitignored and isn't passed to the CMS container. Elsewhere, export `BOJECT_API_KEY` in the shell.
 
 For a minimal bootstrap key, `--scopes apikey:write` alone is enough to mint the rest with `boject apikey create`. In the monorepo, `pnpm apikey:create <name> --scopes <csv>` runs the same script against the dev database.
 

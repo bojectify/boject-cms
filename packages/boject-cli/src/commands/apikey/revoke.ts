@@ -1,5 +1,6 @@
 import { revokeApiKey, HttpError } from '../../api.js';
 import { loadProjectConfig } from '../../config.js';
+import { missingApiKeyMessage } from '../../projectEnv.js';
 
 const PREFIX_PATTERN = /^boject_[a-f0-9]{4}$/;
 
@@ -34,7 +35,7 @@ export async function runApikeyRevoke(
     return { exitCode: 1 };
   }
   if (!params.apiKey) {
-    stderr('Error: BOJECT_API_KEY is not set.');
+    stderr(missingApiKeyMessage());
     return { exitCode: 1 };
   }
 

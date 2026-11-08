@@ -140,9 +140,12 @@ describe('renderReadme — AI-assisted modelling', () => {
     it('says the key is printed once and where to put it', () => {
       expect(section).toMatch(/printed once/i);
       expect(section).toContain('BOJECT_API_KEY=');
-      expect(section).toContain(
-        "export BOJECT_API_KEY=$(sed -n 's/^BOJECT_API_KEY=//p' .env)"
-      );
+    });
+
+    it('stores the key in .env.local, which the CLI loads itself (#505)', () => {
+      expect(section).toContain('.env.local');
+      expect(section).toMatch(/loads? .*\.env\.local.*\sautomatically/s);
+      expect(section).not.toContain('export BOJECT_API_KEY');
     });
 
     it('runs the CLI via npx (no local @boject/cli dependency)', () => {

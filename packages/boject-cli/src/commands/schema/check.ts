@@ -3,6 +3,7 @@ import { resolve, dirname, isAbsolute } from 'node:path';
 import { loadProjectConfig } from '../../config.js';
 import { getSchemaBundle, HttpError } from '../../api.js';
 import type { Bundle, BundleContentType, BundleField } from '../../types.js';
+import { missingApiKeyMessage } from '../../projectEnv.js';
 
 export interface SchemaCheckParams {
   cwd: string;
@@ -19,7 +20,7 @@ export async function runSchemaCheck(
   params: SchemaCheckParams
 ): Promise<SchemaCheckResult> {
   if (!params.apiKey) {
-    params.stderr('Error: BOJECT_API_KEY is not set.');
+    params.stderr(missingApiKeyMessage());
     return { exitCode: 1 };
   }
   let config: Awaited<ReturnType<typeof loadProjectConfig>>;

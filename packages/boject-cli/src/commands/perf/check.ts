@@ -1,6 +1,7 @@
 import { runPreflight } from '../../perf/preflight.js';
 import { loadProjectConfig } from '../../config.js';
 import { defaultK6Available, defaultFetchHealth } from '../../perf/runtime.js';
+import { missingApiKeyMessage } from '../../projectEnv.js';
 
 export interface PerfCheckFlags {
   url?: string;
@@ -54,7 +55,7 @@ export async function runPerfCheck(
 
   if (!apiKey) {
     params.stderr(
-      'Error: API key missing. Set BOJECT_API_KEY or pass --api-key. Mint with `boject apikey create --scopes content:read`.'
+      `${missingApiKeyMessage()} Pass --api-key, or mint one with \`boject apikey create --scopes content:read\`.`
     );
     return { exitCode: 2 };
   }

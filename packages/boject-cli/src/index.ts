@@ -1,5 +1,6 @@
 import { parseArgs } from 'node:util';
 import { runUpgrade, type CommandRunner } from './commands/upgrade.js';
+import { loadProjectEnv } from './projectEnv.js';
 import { runSchemaPull } from './commands/schema/pull.js';
 import { runSchemaValidate } from './commands/schema/validate.js';
 import { runSchemaApply } from './commands/schema/apply.js';
@@ -990,6 +991,13 @@ async function main(): Promise<void> {
   if (argv[0] === '--version' || argv[0] === '-v') {
     process.stdout.write(`${CLI_VERSION}\n`);
     process.exit(0);
+  }
+
+  // Load BOJECT_*/PERF_* from the project's .env.local / .env (#505) before
+  // any command reads process.env. Never fails on a missing/invalid config.
+  const projectEnv = await loadProjectEnv({ cwd: process.cwd() });
+  for (const warning of projectEnv.warnings) {
+    process.stderr.write(`${warning}\n`);
   }
 
   const [command, ...rest] = argv;
