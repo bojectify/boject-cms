@@ -47,11 +47,14 @@ export BOJECT_API_KEY=boject_...
 
 Upgrade the CMS image tag in the current directory's `docker-compose.yml`, pull the new image, restart the container, and wait for the health endpoint.
 
+The health check polls `<cms.url>/api/health`, using `cms.url` from `.boject.config.json` (or `--url`). Without a config file it uses `http://localhost:4000`. If the stack restarts but the check doesn't pass within 2 minutes, the command exits 1 and says the image was already swapped.
+
 ```bash
 boject upgrade                 # latest semver tag from the registry
 boject upgrade --to 1.4.2      # specific version
 boject upgrade --check         # exit 1 if an upgrade is available, 0 otherwise
 boject upgrade --dry-run       # show the diff without applying
+boject upgrade --url http://localhost:4100   # health-check a non-default URL
 ```
 
 ### `boject schema pull [--out <path>] [--url <url>]`
