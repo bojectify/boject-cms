@@ -49,6 +49,7 @@ export const FIELD_TYPES_DOC = `# Field types
 | RELATION | Link to one entry of another type. | \`options.targetContentTypeIdentifiers\`: string[] |
 | MULTIRELATION | Link to many entries of another type. | \`options.targetContentTypeIdentifiers\`: string[] |
 | IMAGE | Uploaded image (metadata auto-populated). | — |
+| JSON | Arbitrary JSON object or array (≤256 KB; not searchable or filterable; key order not preserved). | — |
 
 Notes:
 - \`required\` and \`unique\` are booleans on every field (\`unique\` optional, default false).
