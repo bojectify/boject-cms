@@ -1038,6 +1038,7 @@ async function main(): Promise<void> {
         to: { type: 'string' },
         'dry-run': { type: 'boolean', default: false },
         check: { type: 'boolean', default: false },
+        url: { type: 'string' },
       },
     });
     const { exitCode, message } = await runUpgrade({
@@ -1047,6 +1048,7 @@ async function main(): Promise<void> {
         to: values.to,
         dryRun: values['dry-run'] === true,
         check: values.check === true,
+        url: values.url,
       },
       stdout,
       stderr,
