@@ -63,6 +63,11 @@ function booleanFieldValue(v: unknown): boolean | undefined {
   return typeof v === 'boolean' ? v : undefined;
 }
 
+// Per-field JSON editor errors (#497): unparseable / rule-breaking text that
+// never reached `state`. Any entry blocks validation so a Save can't silently
+// persist the last valid value.
+const jsonErrors = reactive<Record<string, string | null>>({});
+
 function validate(formData: Record<string, unknown>): FormError[] {
   const errors: FormError[] = [];
   const knownKeys = new Set(props.fields.map((f) => f.key));
@@ -75,6 +80,11 @@ function validate(formData: Record<string, unknown>): FormError[] {
           message: `${field.label} is required`,
         });
       }
+    }
+  }
+  for (const [key, message] of Object.entries(jsonErrors)) {
+    if (message && knownKeys.has(key)) {
+      errors.push({ name: key, message });
     }
   }
   for (const [key, message] of Object.entries(props.fieldErrors ?? {})) {
@@ -277,6 +287,22 @@ defineExpose({ validate: runValidation });
                 field.linkTargetContentTypeIds ?? []
               "
               @update:model-value="state[field.key] = $event"
+            />
+          </UFormField>
+
+          <UFormField
+            v-else-if="field.type === 'json'"
+            :label="field.label"
+            :name="field.key"
+            :required="field.required"
+            size="xl"
+          >
+            <JsonField
+              :model-value="state[field.key] ?? null"
+              :label="field.label"
+              :required="field.required"
+              @update:model-value="state[field.key] = $event"
+              @update:error="jsonErrors[field.key] = $event"
             />
           </UFormField>
 

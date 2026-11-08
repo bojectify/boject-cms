@@ -91,6 +91,13 @@ export interface ImageFieldConfig {
   required?: boolean;
 }
 
+export interface JsonFieldConfig {
+  type: 'json';
+  key: string;
+  label: string;
+  required?: boolean;
+}
+
 export type FieldConfig =
   | TextFieldConfig
   | TextareaFieldConfig
@@ -103,4 +110,5 @@ export type FieldConfig =
   | MultirelationFieldConfig
   | DynamicRelationFieldConfig
   | DynamicMultirelationFieldConfig
-  | ImageFieldConfig;
+  | ImageFieldConfig
+  | JsonFieldConfig;

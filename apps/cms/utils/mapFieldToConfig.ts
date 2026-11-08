@@ -96,6 +96,13 @@ export function mapFieldToConfig(field: {
         targetContentTypeIds,
       };
     }
+    case FIELD_TYPES.JSON:
+      return {
+        type: 'json' as const,
+        key: field.identifier,
+        label: field.name,
+        required: field.required,
+      };
     case FIELD_TYPES.IMAGE:
       return {
         type: 'image' as const,
