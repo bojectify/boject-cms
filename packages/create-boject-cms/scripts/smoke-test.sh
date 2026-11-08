@@ -8,6 +8,8 @@ set -euo pipefail
 #   - asserts the cms container boots and answers HTTP (200/302)
 #   - runs the first-API-key command printed in the generated .env and checks
 #     the key authenticates GET /api/schema/export (#506)
+#   - saves the key to .env.local and runs `boject schema pull` with
+#     BOJECT_API_KEY unset, proving the CLI loads it itself (#505)
 #   - tears everything down on exit
 #
 # This is the gate the unit/e2e content-assertions can't provide: it proves the
@@ -42,8 +44,8 @@ else
   (cd "$REPO_ROOT" && docker build -f apps/cms/Dockerfile -t "$IMAGE_TAG" .)
 fi
 
-echo "[scaffold-smoke] building create-boject-cms dist"
-(cd "$REPO_ROOT" && pnpm --filter create-boject-cms build)
+echo "[scaffold-smoke] building create-boject-cms + @boject/cli dist"
+(cd "$REPO_ROOT" && pnpm --filter create-boject-cms build && pnpm --filter @boject/cli build)
 
 echo "[scaffold-smoke] scaffolding a project into $SITE_DIR"
 node "$REPO_ROOT/packages/create-boject-cms/dist/index.js" \
@@ -99,4 +101,21 @@ if [[ "$export_code" != "200" ]]; then
 fi
 echo "[scaffold-smoke] first API key works (GET /api/schema/export → 200)"
 
-echo "[scaffold-smoke] PASS — scaffolded stack booted, answered HTTP $code, and the first-key command works"
+# The CLI loads the key from .env.local itself (#505): save it there as the
+# generated README says, then run `schema pull` with BOJECT_API_KEY unset.
+echo "[scaffold-smoke] boject schema pull with the key only in .env.local"
+printf 'BOJECT_API_KEY=%s\n' "$RAW_KEY" >> "$SITE_DIR/.env.local"
+rm -f "$SITE_DIR/content-types/schema.boject.json"
+if ! (cd "$SITE_DIR" && env -u BOJECT_API_KEY -u BOJECT_NO_DOTENV \
+  node "$REPO_ROOT/packages/boject-cli/dist/index.js" schema pull \
+  --url "http://localhost:$HOST_PORT"); then
+  echo "[scaffold-smoke] FAIL: boject schema pull did not pick up .env.local"
+  exit 1
+fi
+if [[ ! -s "$SITE_DIR/content-types/schema.boject.json" ]]; then
+  echo "[scaffold-smoke] FAIL: schema pull wrote no schema file"
+  exit 1
+fi
+echo "[scaffold-smoke] CLI loaded the key from .env.local (schema pull OK)"
+
+echo "[scaffold-smoke] PASS — scaffolded stack booted, answered HTTP $code, the first-key command works, and the CLI loads .env.local"

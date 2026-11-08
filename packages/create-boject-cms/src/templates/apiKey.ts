@@ -15,7 +15,3 @@ export const CLI_KEY_SCOPES = [
 ] as const;
 
 export const FIRST_API_KEY_COMMAND = `docker compose exec cms tsx scripts/manage-api-keys/index.ts create cli --scopes ${CLI_KEY_SCOPES.join(',')}`;
-
-/** Exports just the key from `.env` into the shell (not the whole file). */
-export const EXPORT_API_KEY_COMMAND =
-  "export BOJECT_API_KEY=$(sed -n 's/^BOJECT_API_KEY=//p' .env)";

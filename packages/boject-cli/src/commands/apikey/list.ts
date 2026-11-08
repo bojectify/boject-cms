@@ -1,6 +1,7 @@
 import { listApiKeys, HttpError } from '../../api.js';
 import { loadProjectConfig } from '../../config.js';
 import type { ApiKeyListItem } from '../../types.js';
+import { missingApiKeyMessage } from '../../projectEnv.js';
 
 export interface ApikeyListFlags {
   url?: string;
@@ -37,7 +38,7 @@ export async function runApikeyList(
   const { stdout, stderr, flags } = params;
 
   if (!params.apiKey) {
-    stderr('Error: BOJECT_API_KEY is not set.');
+    stderr(missingApiKeyMessage());
     return { exitCode: 1 };
   }
 

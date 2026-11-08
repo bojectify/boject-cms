@@ -1,4 +1,4 @@
-import { EXPORT_API_KEY_COMMAND, FIRST_API_KEY_COMMAND } from './apiKey.js';
+import { FIRST_API_KEY_COMMAND } from './apiKey.js';
 // A runtime-derived starter set can't be a compile-time union — the set of
 // valid names comes from the filesystem (see src/starters.ts). `none` stays
 // a runtime sentinel meaning "no starter". Invalid names are now caught at
@@ -89,9 +89,9 @@ export function renderEnvFile({
     '# API key for the boject CLI (`boject schema`, `boject entries`,',
     '# `boject apikey`). Create one once the CMS is running:',
     `#   ${FIRST_API_KEY_COMMAND}`,
-    '# The key is printed once. The CLI reads it from your shell environment',
-    '# (not this file), so export it before running CLI commands:',
-    `#   ${EXPORT_API_KEY_COMMAND}`,
+    '# The key is printed once. Put it in .env.local as BOJECT_API_KEY=<key>.',
+    '# The CLI loads .env.local (then this file) automatically; .env.local is',
+    '# gitignored and, unlike this file, not passed to the CMS container.',
     '# BOJECT_API_KEY='
   );
   return lines.join('\n') + '\n';

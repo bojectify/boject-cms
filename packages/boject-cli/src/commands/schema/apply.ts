@@ -3,6 +3,7 @@ import { resolve, dirname, isAbsolute } from 'node:path';
 import { loadProjectConfig } from '../../config.js';
 import { applySchemaRemote, HttpError } from '../../api.js';
 import type { Bundle, BlockerLike } from '../../types.js';
+import { missingApiKeyMessage } from '../../projectEnv.js';
 
 export interface SchemaApplyFlags {
   path?: string;
@@ -28,7 +29,7 @@ export async function runSchemaApply(
 ): Promise<SchemaApplyResult> {
   const flags = params.flags ?? {};
   if (!params.apiKey) {
-    params.stderr('Error: BOJECT_API_KEY is not set.');
+    params.stderr(missingApiKeyMessage());
     return { exitCode: 1 };
   }
 

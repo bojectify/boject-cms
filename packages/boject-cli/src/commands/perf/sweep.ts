@@ -19,6 +19,7 @@ import {
 } from '../../perf/runtime.js';
 import { loadProjectConfig } from '../../config.js';
 import { CLI_VERSION } from '../../version.js';
+import { missingApiKeyMessage } from '../../projectEnv.js';
 
 const FLAT_SHAPES = ['bare', 'filtered', 'relation'] as const;
 const DEFAULT_PAGE_SIZES = [100, 500, 1000];
@@ -154,7 +155,7 @@ export async function runPerfSweep(
 
   if (!apiKey) {
     params.stderr(
-      'Error: API key missing. Set BOJECT_API_KEY or pass --api-key. Mint with `boject apikey create --scopes content:read`.'
+      `${missingApiKeyMessage()} Pass --api-key, or mint one with \`boject apikey create --scopes content:read\`.`
     );
     return { exitCode: 2 };
   }

@@ -1,5 +1,5 @@
 import type { StarterChoice } from './envFile.js';
-import { EXPORT_API_KEY_COMMAND, FIRST_API_KEY_COMMAND } from './apiKey.js';
+import { FIRST_API_KEY_COMMAND } from './apiKey.js';
 
 export interface ReadmeParams {
   starter: StarterChoice;
@@ -70,15 +70,18 @@ with an API key. A new project has none, so create one once the CMS is running:
 ${FIRST_API_KEY_COMMAND}
 \`\`\`
 
-The raw key is printed once — copy it straight away. Put it in \`.env\`
-(uncommented) as \`BOJECT_API_KEY=<key>\` to keep it with the project. The CLI
-reads it from your shell environment, not from \`.env\`, so export it before
-running CLI commands:
+The raw key is printed once — copy it straight away. Save it in \`.env.local\`:
 
 \`\`\`bash
-${EXPORT_API_KEY_COMMAND}
+echo 'BOJECT_API_KEY=<key>' >> .env.local
 npx @boject/cli@latest schema pull
 \`\`\`
+
+The CLI loads \`.env.local\` (and then \`.env\`) from the project root
+automatically, so there's nothing to export. \`.env.local\` is gitignored and,
+unlike \`.env\`, isn't passed to the CMS container. A \`BOJECT_API_KEY\` set in
+your shell takes precedence; set \`BOJECT_NO_DOTENV=1\` to stop the CLI reading
+these files.
 
 That key's scopes cover every CLI command group (run each as
 \`npx @boject/cli@latest <command>\`):

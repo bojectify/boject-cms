@@ -48,7 +48,12 @@ const BUNDLE = {
 
 let server: Server;
 let port: number;
-const requests: Array<{ method?: string; url?: string; body?: string }> = [];
+const requests: Array<{
+  method?: string;
+  url?: string;
+  body?: string;
+  authorization?: string;
+}> = [];
 
 beforeAll(async () => {
   await run('pnpm', ['--filter', '@boject/cli', 'build'], {
@@ -59,7 +64,12 @@ beforeAll(async () => {
     let body = '';
     req.on('data', (chunk) => (body += chunk.toString()));
     req.on('end', () => {
-      requests.push({ method: req.method, url: req.url, body });
+      requests.push({
+        method: req.method,
+        url: req.url,
+        body,
+        authorization: req.headers.authorization,
+      });
       if (req.method === 'GET' && req.url === '/api/schema/export') {
         res.writeHead(200, { 'content-type': 'application/json' });
         res.end(JSON.stringify(BUNDLE));
@@ -155,5 +165,39 @@ describe('boject schema (e2e)', () => {
     await expect(
       run('node', [CLI_PATH, 'schema', 'validate', path], { cwd: workDir })
     ).rejects.toMatchObject({ code: 1 });
+  });
+});
+
+describe('boject schema — project .env loading (#505, e2e)', () => {
+  function envWithoutKey(): NodeJS.ProcessEnv {
+    const env = { ...process.env };
+    delete env.BOJECT_API_KEY;
+    delete env.BOJECT_NO_DOTENV;
+    return env;
+  }
+
+  it('uses BOJECT_API_KEY from .env.local without exporting it', async () => {
+    await writeFile(
+      join(workDir, '.env.local'),
+      'BOJECT_API_KEY=boject_from_env_local\n'
+    );
+    const { stdout } = await run('node', [CLI_PATH, 'schema', 'pull'], {
+      cwd: workDir,
+      env: envWithoutKey(),
+    });
+    expect(stdout).toContain('Pulled schema from');
+    expect(requests[0]?.authorization).toBe('Bearer boject_from_env_local');
+  });
+
+  it('says where it looked when no key is set anywhere', async () => {
+    const err = await run('node', [CLI_PATH, 'schema', 'pull'], {
+      cwd: workDir,
+      env: envWithoutKey(),
+    }).catch((e: { code: number; stderr: string }) => e);
+    expect((err as { code: number }).code).toBe(1);
+    expect((err as { stderr: string }).stderr).toContain(
+      `Error: BOJECT_API_KEY is not set (checked: environment, ${join(workDir, '.env.local')}, ${join(workDir, '.env')}).`
+    );
+    expect(requests).toHaveLength(0);
   });
 });

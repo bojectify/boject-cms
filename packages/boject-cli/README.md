@@ -28,18 +28,28 @@ Most commands read a committed `.boject.config.json` at the project root and an 
 
 The CLI walks up from the current working directory to find the config — same pattern as Prettier / ESLint / Vitest. A developer running `boject schema pull` from a subdirectory still picks up the project root's config.
 
-The API key is per-user / per-environment and lives in `.env` (gitignored). Mint one in the CMS:
+The API key is per-user / per-environment. In a project scaffolded by `create-boject-cms`, mint the first one with the key script in the CMS container (see the project's README, "Create your first API key"):
 
 ```bash
-# In the CMS repo
-pnpm apikey:create my-cli --scopes schema:read,schema:write
+docker compose exec cms tsx scripts/manage-api-keys/index.ts create cli --scopes schema:read,schema:write,content:export,content:import,apikey:read,apikey:write
 ```
 
-Then put the printed `boject_...` key in your shell or project `.env`:
+Then save the printed `boject_...` key in `.env.local` next to `.boject.config.json`:
 
 ```bash
-export BOJECT_API_KEY=boject_...
+echo 'BOJECT_API_KEY=boject_...' >> .env.local
 ```
+
+### Project `.env` files
+
+When the CLI finds `.boject.config.json`, it also loads `.env.local` and then `.env` from the same directory:
+
+- **Only `BOJECT_*` and `PERF_*` keys are loaded.** The project `.env` also holds the CMS container's settings (`DATABASE_URL`, `NUXT_SESSION_PASSWORD`, …), which the CLI ignores.
+- **Nothing overwrites a variable that's already set.** A value exported in your shell wins over both files, and `.env.local` wins over `.env`. `--api-key` (on `perf`) wins over everything.
+- **Keep the key in `.env.local`.** It's gitignored in new scaffolds and, unlike `.env`, isn't passed to the CMS container. Older scaffolds only ignore `.env`: add `.env.local` to `.gitignore`. The CLI warns when it loads a `.env.local` that git doesn't ignore.
+- **`BOJECT_NO_DOTENV=1`** turns file loading off, e.g. in CI where the key comes from a secret.
+
+When the key is missing, the error lists where the CLI looked.
 
 ## Commands
 
