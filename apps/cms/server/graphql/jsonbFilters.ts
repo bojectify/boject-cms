@@ -99,6 +99,7 @@ const FIELD_TYPE_TO_FILTER_KEY: Record<string, keyof DynFilterRefs | null> = {
   DATETIME: 'DynDateTimeFilter',
   SELECT: 'DynStringFilter',
   RICHTEXT: null,
+  JSON: null,
   RELATION: 'DynRelationFilter',
   MULTIRELATION: 'DynMultirelationFilter',
 };

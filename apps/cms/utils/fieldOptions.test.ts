@@ -22,6 +22,12 @@ describe('parseFieldOptions', () => {
       });
     });
 
+    it('returns the bare type for JSON when options is null', () => {
+      expect(
+        parseFieldOptions({ type: FIELD_TYPES.JSON, options: null })
+      ).toEqual({ type: FIELD_TYPES.JSON });
+    });
+
     it('returns empty defaults for RELATION when options is undefined', () => {
       expect(
         parseFieldOptions({ type: FIELD_TYPES.RELATION, options: undefined })
