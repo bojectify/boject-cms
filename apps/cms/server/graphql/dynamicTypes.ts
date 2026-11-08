@@ -117,6 +117,7 @@ const FIELD_TYPE_TO_SCALAR: Record<string, ScalarTypeName | undefined> = {
   BOOLEAN: 'Boolean',
   DATETIME: 'DateTime',
   SELECT: 'String',
+  JSON: 'JSON',
 };
 
 function toCamelCase(str: string): string {

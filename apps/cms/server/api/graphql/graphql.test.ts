@@ -3270,4 +3270,78 @@ describe('GraphQL API', async () => {
       expect(node.fields).toEqual({ price: 99, colour: 'teal' });
     });
   });
+
+  describe('JSON fields (#497)', () => {
+    const identifier = `JsonPuzzle${Date.now()}`;
+    const listField = `${identifier.charAt(0).toLowerCase()}${identifier.slice(1)}List`;
+    const objectKey = { b: 'e', c: 'd' };
+    const arrayKey = [1, 'a', { x: [true] }];
+
+    // Seeded lazily inside the first `it`: a nested beforeAll fires before
+    // the outer `await setup()` context exists ("No context is available").
+    let seeded = false;
+    async function ensureSeeded(): Promise<void> {
+      if (seeded) return;
+      seeded = true;
+      const cookie = await getSessionCookie();
+      const ct = await $fetch<{ id: string }>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: identifier,
+          identifier,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: FIELD_TYPES.ENTRY_TITLE,
+              required: true,
+            },
+            { identifier: 'key', name: 'Key', type: FIELD_TYPES.JSON },
+          ],
+        },
+      });
+      for (const [title, key] of [
+        ['Object key', objectKey],
+        ['Array key', arrayKey],
+      ] as const) {
+        await $fetch<unknown>('/api/entries', {
+          method: 'POST',
+          headers: { cookie },
+          body: {
+            contentTypeId: ct.id,
+            data: { title, key },
+            status: CONTENT_STATUSES.PUBLISHED,
+          },
+        });
+      }
+    }
+
+    it('returns JSON values as real objects and arrays', async () => {
+      await ensureSeeded();
+      const { data, errors } = await gql<
+        Record<
+          string,
+          { edges: Array<{ node: { title: string; key: unknown } }> }
+        >
+      >(`{ ${listField} { edges { node { title key } } } }`);
+      expect(errors).toBeUndefined();
+      const byTitle = new Map(
+        data[listField]!.edges.map((e) => [e.node.title, e.node.key])
+      );
+      expect(byTitle.get('Object key')).toStrictEqual(objectKey);
+      expect(byTitle.get('Array key')).toStrictEqual(arrayKey);
+    });
+
+    it('exposes no where filter for a JSON field', async () => {
+      await ensureSeeded();
+      const { data } = await gql<{
+        __type: { inputFields: Array<{ name: string }> } | null;
+      }>(`{ __type(name: "${identifier}Where") { inputFields { name } } }`);
+      expect(data.__type).not.toBeNull();
+      const names = data.__type!.inputFields.map((f) => f.name);
+      expect(names).toContain('title');
+      expect(names).not.toContain('key');
+    });
+  });
 });
