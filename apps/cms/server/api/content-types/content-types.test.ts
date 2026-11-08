@@ -1850,6 +1850,78 @@ describe('Content Type endpoints', async () => {
   // one IP per `it`, so they bucket separately from the rest of the suite under
   // the in-memory mutation rate limiter (the dev server's bucket can't be reset
   // from the test process). Each test issues several mutating requests.
+  describe('JSON field type (#497)', () => {
+    let _ctId: string | null = null;
+    async function getCtId(): Promise<string> {
+      if (_ctId) return _ctId;
+      const cookie = await getSessionCookie();
+      const ct = await $fetch<ContentTypeResponse>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: `Json Fields ${Date.now()}`,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: FIELD_TYPES.ENTRY_TITLE,
+              required: true,
+            },
+          ],
+        },
+      });
+      _ctId = ct.id;
+      return _ctId;
+    }
+
+    async function postField(body: Record<string, unknown>) {
+      const cookie = await getSessionCookie();
+      return fetch(`/api/content-types/${await getCtId()}/fields`, {
+        method: 'POST',
+        headers: { cookie, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    }
+
+    it('adds a JSON field', async () => {
+      const res = await postField({
+        identifier: 'key',
+        name: 'Key',
+        type: FIELD_TYPES.JSON,
+      });
+      expect(res.status).toBe(201);
+      const field = (await res.json()) as FieldResponse;
+      expect(field.type).toBe(FIELD_TYPES.JSON);
+    });
+
+    it('rejects unique on a JSON field', async () => {
+      const res = await postField({
+        identifier: 'uniqueKey',
+        name: 'Unique Key',
+        type: FIELD_TYPES.JSON,
+        unique: true,
+      });
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as {
+        statusMessage?: string;
+        message?: string;
+      };
+      expect(body.statusMessage ?? body.message ?? '').toContain(
+        'unique is not supported for fields of type JSON'
+      );
+    });
+
+    it('rejects a default value on a JSON field', async () => {
+      const res = await postField({
+        identifier: 'defaultKey',
+        name: 'Default Key',
+        type: FIELD_TYPES.JSON,
+        options: { default: {} },
+      });
+      expect(res.status).toBe(400);
+    });
+  });
+
   describe('field default values — schema write (#344)', () => {
     // The shared content type is created lazily on first use (inside an `it`),
     // mirroring `getSessionCookie` — a `beforeAll` would fire before the outer

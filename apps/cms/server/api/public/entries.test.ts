@@ -495,4 +495,37 @@ describe('/api/public/entries', async () => {
       expect(res.status).toBe(401);
     });
   });
+
+  it('returns a JSON field value as an object (#497)', async () => {
+    const cookie = await getSessionCookie();
+    const identifier = `PubJson${Date.now()}`;
+    const ct = await $fetch<{ id: string }>('/api/content-types', {
+      method: 'POST',
+      headers: { cookie },
+      body: {
+        name: identifier,
+        identifier,
+        fields: [
+          { identifier: 'title', name: 'Title', type: 'ENTRY_TITLE', required: true },
+          { identifier: 'key', name: 'Key', type: 'JSON' },
+        ],
+      },
+    });
+    const key = { b: 'e', c: 'd' };
+    await $fetch<unknown>('/api/entries', {
+      method: 'POST',
+      headers: { cookie },
+      body: {
+        contentTypeId: ct.id,
+        data: { title: `Json ${randomUUID().slice(0, 6)}`, key },
+        status: 'PUBLISHED',
+      },
+    });
+    const res = await $fetch<{ items: Array<{ data: Record<string, unknown> }> }>(
+      `/api/public/entries?contentType=${identifier}`,
+      { headers: { Authorization: `Bearer ${TEST_API_KEY}` } }
+    );
+    expect(res.items).toHaveLength(1);
+    expect(res.items[0]!.data.key).toStrictEqual(key);
+  });
 });

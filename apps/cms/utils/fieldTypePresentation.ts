@@ -24,6 +24,7 @@ export const FIELD_TYPE_ICONS: Record<FieldTypeName, string> = {
   RELATION: 'link-2',
   MULTIRELATION: 'waypoints',
   IMAGE: 'image',
+  JSON: 'braces',
 };
 
 /**
@@ -44,4 +45,5 @@ export const FIELD_TYPE_SHORT_LABELS: Record<FieldTypeName, string> = {
   RELATION: 'Relation',
   MULTIRELATION: 'Multi-rel',
   IMAGE: 'Image',
+  JSON: 'JSON',
 };

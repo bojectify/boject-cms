@@ -7,7 +7,7 @@
 // left with their inferred object-literal types (no `as Bundle` cast) — the
 // original inline literals were likewise untyped and cast to `never` only at
 // the (now removed) call site.
-import { ct, field, makeBundle } from './bundleFactories';
+import { ct, entry, field, makeBundle, version } from './bundleFactories';
 import type { Bundle, BundleContentType } from './types';
 import { BUNDLE_VERSION } from './types';
 import { FIELD_TYPES } from '../../utils/fieldTypes';
@@ -292,3 +292,41 @@ export function bundleWithVersions(
     ],
   };
 }
+
+/** Content type with a title + an optional JSON `key` field (#497). */
+export const cryptogramContentType: BundleContentType = ct(
+  'Cryptogram',
+  { name: 'Cryptogram' },
+  [
+    field('title', FIELD_TYPES.ENTRY_TITLE, { name: 'Title', required: true }),
+    field('key', FIELD_TYPES.JSON, { name: 'Key', order: 1 }),
+  ]
+);
+
+function cryptogramEntry(key: unknown) {
+  return entry('Cryptogram', 'puzzle-one', {
+    entryTitle: 'Puzzle one',
+    versions: [
+      version(CONTENT_STATUSES.DRAFT, {
+        data: { title: 'Puzzle one', key },
+      }),
+    ],
+  });
+}
+
+/** Portable schema+entries bundle whose JSON value is a legal object. */
+export const bundleJsonValid: Bundle = makeBundle({
+  contentTypes: [cryptogramContentType],
+  entries: [cryptogramEntry({ b: 'e', c: 'd' })],
+});
+
+/** Portable schema+entries bundle whose JSON value is a top-level string. */
+export const bundleJsonInvalid: Bundle = makeBundle({
+  contentTypes: [cryptogramContentType],
+  entries: [cryptogramEntry('oops')],
+});
+
+/** Entries-only bundle (no contentTypes) with a top-level-string JSON value. */
+export const bundleEntriesOnlyJsonInvalid: Bundle = makeBundle({
+  entries: [cryptogramEntry('oops')],
+});

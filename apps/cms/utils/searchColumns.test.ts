@@ -19,6 +19,7 @@ describe('isColumnableFieldType', () => {
     expect(isColumnableFieldType(FIELD_TYPES.TEXTAREA)).toBe(false);
     expect(isColumnableFieldType(FIELD_TYPES.RICHTEXT)).toBe(false);
     expect(isColumnableFieldType(FIELD_TYPES.IMAGE)).toBe(false);
+    expect(isColumnableFieldType(FIELD_TYPES.JSON)).toBe(false);
     expect(isColumnableFieldType(FIELD_TYPES.ENTRY_TITLE)).toBe(false);
     expect(isColumnableFieldType(undefined)).toBe(false);
     expect(isColumnableFieldType('NOPE')).toBe(false);

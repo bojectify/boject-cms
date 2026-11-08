@@ -27,6 +27,7 @@ import {
   type RelationTargetPool,
 } from './valueGen/relations.js';
 import { generateImage } from './valueGen/image.js';
+import { generateJson } from './valueGen/json.js';
 import { slugify } from '../vendor/slugify.js';
 import { FIELD_TYPES } from '../vendor/fieldTypes.js';
 import { CONTENT_STATUSES } from '../vendor/contentStatus.js';
@@ -447,6 +448,8 @@ function generateFieldValue(ctx: FieldGenContext): unknown {
     }
     case FIELD_TYPES.IMAGE:
       return generateImage({ rand: ctx.rand, index: ctx.index });
+    case FIELD_TYPES.JSON:
+      return generateJson({ rand: ctx.rand });
     default:
       ctx.warnings.push(
         `unknown field type "${field.type}" on ${ctx.contentTypeIdentifier}.${field.identifier}`

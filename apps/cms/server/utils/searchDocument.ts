@@ -143,7 +143,7 @@ export function searchDocId(entryId: string, status: string): string {
  * plain text; NUMBER → number; BOOLEAN → boolean; DATETIME → epoch
  * milliseconds; RELATION → target entryId; MULTIRELATION → target entryId[];
  * ENTRY_TITLE is folded into the envelope `entryTitle` (not duplicated under
- * `fields`); IMAGE is skipped. Missing / malformed values degrade to null
+ * `fields`); IMAGE and JSON are skipped. Missing / malformed values degrade to null
  * (scalars), '' (rich text), or [] (multirelation) rather than throwing.
  */
 export function toSearchDocument(
@@ -159,7 +159,10 @@ export function toSearchDocument(
     switch (field.type) {
       case FIELD_TYPES.ENTRY_TITLE:
       case FIELD_TYPES.IMAGE:
-        // ENTRY_TITLE is carried by the envelope `entryTitle`; IMAGE is skipped.
+      case FIELD_TYPES.JSON:
+        // ENTRY_TITLE is carried by the envelope `entryTitle`; IMAGE and JSON
+        // (#497 — arbitrary structured data, deliberately non-searchable) are
+        // skipped.
         break;
 
       case FIELD_TYPES.TEXT:

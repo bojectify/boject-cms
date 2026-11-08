@@ -17,6 +17,7 @@ export const FIELD_TYPES = {
   RELATION: 'RELATION',
   MULTIRELATION: 'MULTIRELATION',
   IMAGE: 'IMAGE',
+  JSON: 'JSON',
 } as const;
 
 export const FIELD_TYPE_NAMES = Object.values(FIELD_TYPES);
@@ -46,6 +47,7 @@ export const FIELD_TYPE_LABELS: Record<FieldTypeName, string> = {
   RELATION: 'Relation',
   MULTIRELATION: 'Multi Relation',
   IMAGE: 'Image',
+  JSON: 'JSON',
 };
 
 export const FIELD_TYPE_OPTIONS: Array<{

@@ -11,6 +11,7 @@ enum FieldType {
   RELATION
   MULTIRELATION
   IMAGE
+  JSON
 }
 
 model ContentType {

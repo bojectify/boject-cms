@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../../generated/prisma/client';
 import { importBundle } from './import';
+import { exportBundle } from './export';
+import { BundleImportValidationError } from './importErrors';
 import type { Bundle } from './types';
 import { getTestDatabaseUrl } from '../../test/dbUrl';
 import { FIELD_TYPES } from '../../utils/fieldTypes';
@@ -149,6 +151,55 @@ describe('importBundle', () => {
       await expect(
         importBundle(prisma, fx.conflictKeySecondBundle, { mode: 'entries' })
       ).rejects.toThrow(/KeyedType:foo.*already exists/);
+    });
+  });
+
+  describe('JSON field values (#497)', () => {
+    it('round-trips a JSON value through export and re-import', async () => {
+      await importBundle(prisma, fx.cryptogramWithKey, { mode: 'all' });
+      const exported = await exportBundle(prisma, {
+        mode: 'all',
+        portable: true,
+      });
+      await reset();
+      await importBundle(prisma, exported, { mode: 'all' });
+
+      const stored = await prisma.contentEntry.findFirst({
+        where: { entryKey: 'puzzle-one' },
+        include: { versions: true },
+      });
+      const data = stored!.versions[0]!.data as Record<string, unknown>;
+      expect(data.key).toStrictEqual({ b: 'e', c: 'd' });
+    });
+
+    it('rejects an entries-only bundle with a bad JSON value and writes nothing', async () => {
+      await importBundle(prisma, fx.cryptogramSchema, { mode: 'schema' });
+
+      const err = await importBundle(prisma, fx.cryptogramEntriesOneBad, {
+        mode: 'entries',
+      }).catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(BundleImportValidationError);
+      expect((err as BundleImportValidationError).errors[0]).toStrictEqual({
+        path: 'entries[1].versions[0].data.key',
+        message: 'must be a JSON object or array',
+      });
+      expect(await prisma.contentEntry.count()).toBe(0);
+    });
+
+    it('checks against the target DB field types, not a stale bundle schema, in entries mode', async () => {
+      await importBundle(prisma, fx.cryptogramSchema, { mode: 'schema' });
+
+      const err = await importBundle(
+        prisma,
+        fx.cryptogramStaleSchemaStringKey,
+        { mode: 'entries' }
+      ).catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(BundleImportValidationError);
+      expect((err as BundleImportValidationError).errors[0]).toStrictEqual({
+        path: 'entries[0].versions[0].data.key',
+        message: 'must be a JSON object or array',
+      });
+      expect(await prisma.contentEntry.count()).toBe(0);
     });
   });
 

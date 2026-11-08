@@ -182,6 +182,56 @@ describe('generatePerfData', () => {
     }
   });
 
+  it('synthesises a plain-object value for JSON fields (#497)', () => {
+    const bundle: Bundle = {
+      version: 2,
+      exportedAt: '2026-05-07T00:00:00.000Z',
+      portable: false,
+      contentTypes: [
+        {
+          id: 'ct-puzzle',
+          identifier: 'Puzzle',
+          name: 'Puzzle',
+          description: null,
+          fields: [
+            {
+              id: 'f1',
+              identifier: 'title',
+              name: 'Title',
+              type: FIELD_TYPES.ENTRY_TITLE,
+              required: true,
+              unique: true,
+              order: 0,
+              options: null,
+            },
+            {
+              id: 'f2',
+              identifier: 'key',
+              name: 'Key',
+              type: FIELD_TYPES.JSON,
+              required: false,
+              order: 1,
+              options: null,
+            },
+          ],
+        },
+      ],
+    };
+    const r = generatePerfData(bundle, {
+      contentTypeIdentifier: 'Puzzle',
+      count: 3,
+      seed: 1,
+    });
+    expect(r.warnings).toStrictEqual([]);
+    for (const entry of r.groups[0]!.entries) {
+      const key = entry.versions![0]!.data.key;
+      expect(key).toBeTypeOf('object');
+      expect(Array.isArray(key)).toBe(false);
+      expect(Object.keys(key as object).length).toBeGreaterThanOrEqual(3);
+      expect(Object.keys(key as object).length).toBeLessThanOrEqual(5);
+    }
+  });
+
   it('handles an optional self-relation cycle via patches', async () => {
     const bundle = await loadFixture('with-cycle');
     const r = generatePerfData(bundle, {

@@ -39,6 +39,9 @@ describe('knowledge resources', () => {
     ]) {
       expect(text).toContain(t);
     }
+    // JSON row in the field-type table (#497) — matched as a table cell so
+    // the word "JSON" elsewhere in the doc can't satisfy it.
+    expect(text).toContain('| JSON |');
     await client.close();
     await server.close();
   });

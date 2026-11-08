@@ -247,6 +247,63 @@ describe('validateEntryData — RICHTEXT embeds (cmsEmbed nodes)', () => {
   });
 });
 
+describe('validateEntryData — JSON', () => {
+  const keyField = {
+    identifier: 'key',
+    name: 'Key',
+    type: FIELD_TYPES.JSON,
+    required: false,
+    options: null,
+  };
+  const requiredKeyField = { ...keyField, required: true };
+
+  it('passes an object through unchanged', async () => {
+    const result = await validateEntryData({ key: { b: 'e', c: 'd' } }, [
+      keyField,
+    ]);
+    expect(result.key).toStrictEqual({ b: 'e', c: 'd' });
+  });
+
+  it('passes an array through unchanged', async () => {
+    const result = await validateEntryData({ key: [1, { x: null }] }, [
+      keyField,
+    ]);
+    expect(result.key).toStrictEqual([1, { x: null }]);
+  });
+
+  it('rejects a top-level scalar', async () => {
+    await expect(
+      validateEntryData({ key: 'x' }, [keyField])
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      statusMessage: 'Key must be a JSON object or array',
+    });
+  });
+
+  it('rejects a value over 256 KB', async () => {
+    await expect(
+      validateEntryData({ key: { s: 'a'.repeat(300 * 1024) } }, [keyField])
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      statusMessage: 'Key exceeds the 256 KB limit',
+    });
+  });
+
+  it('rejects a missing value on a required field', async () => {
+    await expect(
+      validateEntryData({}, [requiredKeyField])
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      statusMessage: 'Key is required',
+    });
+  });
+
+  it('accepts an empty object on a required field', async () => {
+    const result = await validateEntryData({ key: {} }, [requiredKeyField]);
+    expect(result.key).toStrictEqual({});
+  });
+});
+
 describe('validateEntryData — IMAGE', () => {
   it('accepts a valid full IMAGE value', async () => {
     const result = await validateEntryData({ hero: fullImage }, [imageField]);

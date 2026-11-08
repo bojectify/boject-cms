@@ -60,7 +60,14 @@ export type FieldOptions =
       linkTargetContentTypeIds: string[];
     }
   | {
-      type: 'TEXT' | 'TEXTAREA' | 'DATETIME' | 'IMAGE' | 'ENTRY_TITLE' | 'SLUG';
+      type:
+        | 'TEXT'
+        | 'TEXTAREA'
+        | 'DATETIME'
+        | 'IMAGE'
+        | 'JSON'
+        | 'ENTRY_TITLE'
+        | 'SLUG';
     };
 
 const NO_PAYLOAD_FIELD_TYPES = [
@@ -68,6 +75,7 @@ const NO_PAYLOAD_FIELD_TYPES = [
   'TEXTAREA',
   'DATETIME',
   'IMAGE',
+  'JSON',
   'ENTRY_TITLE',
   'SLUG',
 ] as const;

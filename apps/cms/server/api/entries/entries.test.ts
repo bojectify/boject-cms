@@ -1882,6 +1882,92 @@ describe('Content Entry endpoints', async () => {
     });
   });
 
+  describe('JSON field end-to-end (#497)', () => {
+    const cipherKey = { b: 'e', c: 'd', h: 'o' };
+    let jsonTypeId: string;
+    let entryId: string;
+
+    it('creates a content type with a JSON field', async () => {
+      const cookie = await getSessionCookie();
+      const created = await $fetch<ContentTypeResponse>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          name: `HasJson_${Date.now()}`,
+          description: null,
+          fields: [
+            {
+              identifier: 'title',
+              name: 'Title',
+              type: FIELD_TYPES.ENTRY_TITLE,
+              required: true,
+              order: 0,
+            },
+            {
+              identifier: 'key',
+              name: 'Key',
+              type: FIELD_TYPES.JSON,
+              required: false,
+              order: 1,
+            },
+          ],
+        },
+      });
+      expect(created.fields.some((f) => f.type === FIELD_TYPES.JSON)).toBe(
+        true
+      );
+      jsonTypeId = created.id;
+    });
+
+    it('creates an entry with a JSON object value', async () => {
+      const cookie = await getSessionCookie();
+      const entry = await $fetch<EntryResponse>('/api/entries', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          contentTypeId: jsonTypeId,
+          data: { title: 'JSON field test entry', key: cipherKey },
+          status: CONTENT_STATUSES.DRAFT,
+        },
+      });
+      expect(entry.data.key).toStrictEqual(cipherKey);
+      entryId = entry.id;
+    });
+
+    it('reads the JSON value back as an object', async () => {
+      const cookie = await getSessionCookie();
+      const entry = await $fetch<EntryResponse>(`/api/entries/${entryId}`, {
+        headers: { cookie },
+      });
+      expect(entry.data.key).toStrictEqual(cipherKey);
+    });
+
+    it('keeps the JSON value when publishing', async () => {
+      const cookie = await getSessionCookie();
+      const published = await $fetch<EntryResponse>(`/api/entries/${entryId}`, {
+        method: 'PUT',
+        headers: { cookie },
+        body: {
+          data: { title: 'JSON field test entry', key: cipherKey },
+          status: CONTENT_STATUSES.PUBLISHED,
+        },
+      });
+      expect(published.data.key).toStrictEqual(cipherKey);
+    });
+
+    it('rejects a top-level string with 400', async () => {
+      const cookie = await getSessionCookie();
+      const res = await fetch(`/api/entries/${entryId}`, {
+        method: 'PUT',
+        headers: { cookie, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          data: { title: 'JSON field test entry', key: 'nope' },
+        }),
+      });
+      expect(res.status).toBe(400);
+    });
+  });
+
   describe('DELETE /api/entries/:id', () => {
     it('deletes an entry', async () => {
       const cookie = await getSessionCookie();
