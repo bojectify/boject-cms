@@ -185,6 +185,22 @@ describe('importBundle', () => {
       });
       expect(await prisma.contentEntry.count()).toBe(0);
     });
+
+    it('checks against the target DB field types, not a stale bundle schema, in entries mode', async () => {
+      await importBundle(prisma, fx.cryptogramSchema, { mode: 'schema' });
+
+      const err = await importBundle(
+        prisma,
+        fx.cryptogramStaleSchemaStringKey,
+        { mode: 'entries' }
+      ).catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(BundleImportValidationError);
+      expect((err as BundleImportValidationError).errors[0]).toStrictEqual({
+        path: 'entries[0].versions[0].data.key',
+        message: 'must be a JSON object or array',
+      });
+      expect(await prisma.contentEntry.count()).toBe(0);
+    });
   });
 
   it('rolls back on failure mid-import', async () => {

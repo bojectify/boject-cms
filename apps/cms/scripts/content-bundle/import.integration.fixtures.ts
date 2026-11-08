@@ -674,3 +674,21 @@ export const cryptogramEntriesOneBad: Bundle = makeBundle({
     cryptogramEntry('puzzle-bad', 'oops'),
   ],
 });
+
+/**
+ * Schema-carrying bundle whose stale Cryptogram declares `key` as TEXT, with a
+ * string value — imported in `entries` mode against a DB where `key` is JSON.
+ */
+export const cryptogramStaleSchemaStringKey: Bundle = makeBundle({
+  exportedAt: APR_14,
+  contentTypes: [
+    ct('Cryptogram', { name: 'Cryptogram' }, [
+      field('title', FIELD_TYPES.ENTRY_TITLE, {
+        name: 'Title',
+        required: true,
+      }),
+      field('key', FIELD_TYPES.TEXT, { name: 'Key', order: 1 }),
+    ]),
+  ],
+  entries: [cryptogramEntry('puzzle-stale', 'b=e,c=d')],
+});

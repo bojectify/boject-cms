@@ -120,9 +120,12 @@ export async function importBundle(
         fieldTypesByTypeId.set(ct.id, fieldTypes);
       }
 
-      // JSON field values (#497): checked against the target's field types
-      // (bundle-declared types win), so entries-only bundles are covered too.
-      // Throws before any entry write; the transaction rolls back.
+      // JSON field values (#497): checked against the field types entries are
+      // actually written under. The target DB is authoritative for every
+      // identifier that already exists (an `entries`-mode import never applies
+      // the bundle's schema, and `all` mode throws on an existing identifier);
+      // bundle-declared types only cover identifiers being created. Throws
+      // before any entry write; the transaction rolls back.
       if (wantsEntries && bundle.entries && bundle.entries.length > 0) {
         const jsonFieldsByType = jsonFieldsByTypeFromBundle(
           existingTypes.map((t) => ({
@@ -136,7 +139,9 @@ export async function importBundle(
         for (const [identifier, fields] of jsonFieldsByTypeFromBundle(
           bundle.contentTypes ?? []
         )) {
-          jsonFieldsByType.set(identifier, fields);
+          if (!jsonFieldsByType.has(identifier)) {
+            jsonFieldsByType.set(identifier, fields);
+          }
         }
         const jsonErrors = validateJsonFieldValues(
           bundle.entries,

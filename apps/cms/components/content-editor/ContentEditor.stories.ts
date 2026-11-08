@@ -27,15 +27,32 @@ function renderWithValidate(initial: Record<string, unknown>) {
       const editor = ref<{ validate: () => Promise<boolean> } | null>(null);
       const state = ref<Record<string, unknown>>({ ...initial });
       const result = ref('');
+      const loading = ref(false);
       async function run() {
         result.value = String(await editor.value!.validate());
       }
-      return { editor, state, result, run, fields: jsonFields };
+      // Simulates useContentEntryEditor's refresh (e.g. Discard changes):
+      // the form unmounts behind the spinner, then remounts.
+      async function reload() {
+        loading.value = true;
+        await new Promise((r) => setTimeout(r, 0));
+        loading.value = false;
+      }
+      return {
+        editor,
+        state,
+        result,
+        loading,
+        run,
+        reload,
+        fields: jsonFields,
+      };
     },
     template: `
       <div>
-        <ContentEditor ref="editor" v-model:state="state" title="Puzzle" :fields="fields" />
+        <ContentEditor ref="editor" v-model:state="state" title="Puzzle" :fields="fields" :loading="loading" />
         <button data-testid="run-validate" @click="run">Validate</button>
+        <button data-testid="run-reload" @click="reload">Reload</button>
         <output data-testid="validate-result">{{ result }}</output>
         <pre data-testid="state">{{ JSON.stringify(state) }}</pre>
       </div>`,
@@ -105,5 +122,27 @@ export const JsonRequiredCleared: Story = {
     );
     expect(await validate(canvasElement)).toBe('false');
     expect(await canvas.findByText('Key is required')).toBeTruthy();
+  },
+};
+
+// A broken edit discarded via a reload (the form unmounts behind the loading
+// spinner and remounts with the stored value) must not leave a stale error
+// that blocks the next Save.
+export const JsonErrorClearedOnReload: Story = {
+  render: renderWithValidate({ key: { b: 'e' } }),
+  play: async ({ canvasElement }) => {
+    const view = await getView(canvasElement);
+    view.dispatch({
+      changes: { from: 0, to: view.state.doc.length, insert: '{"c":' },
+    });
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByTestId('run-reload'));
+    const fresh = await waitFor(async () => {
+      const v = await getView(canvasElement);
+      if (v === view) throw new Error('editor not remounted yet');
+      return v;
+    });
+    expect(fresh.state.doc.toString()).toBe('{\n  "b": "e"\n}');
+    expect(await validate(canvasElement)).toBe('true');
   },
 };

@@ -120,6 +120,10 @@ watch(
 onBeforeUnmount(() => {
   view?.destroy();
   view = null;
+  // The parent keeps per-field errors across remounts (e.g. the form hides
+  // behind a loading spinner on refresh / Discard changes). A fresh mount shows
+  // the stored value, so drop any error from the discarded text.
+  if (error.value !== null) emit('update:error', null);
 });
 </script>
 
