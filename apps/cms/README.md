@@ -140,13 +140,19 @@ The CMS supports API keys with scoped access for external consumers (GraphQL cli
 
 ### Bootstrap (first key)
 
-Until the admin UI lands (tracked in #166), mint your first API key by exec'ing into the CMS container:
+Until the admin UI lands (tracked in #166), mint your first API key by exec'ing into the CMS container. In a project scaffolded by `create-boject-cms`, this key covers every CLI command group:
 
 ```bash
-docker compose exec cms tsx scripts/manage-api-keys/index.ts create "first-key" --scopes apikey:write
+docker compose exec cms tsx scripts/manage-api-keys/index.ts create cli --scopes schema:read,schema:write,content:export,content:import,apikey:read,apikey:write
 ```
 
-The raw key is printed once — save it. Set it as `BOJECT_API_KEY` on the machine you'll run the CLI from.
+The raw key is printed once — save it. The CLI reads `BOJECT_API_KEY` from the shell environment (not from `.env`). A scaffolded project keeps it in `.env` and exports just that line:
+
+```bash
+export BOJECT_API_KEY=$(sed -n 's/^BOJECT_API_KEY=//p' .env)
+```
+
+For a minimal bootstrap key, `--scopes apikey:write` alone is enough to mint the rest with `boject apikey create`. In the monorepo, `pnpm apikey:create <name> --scopes <csv>` runs the same script against the dev database.
 
 ### Day-to-day (`@boject/cli`)
 

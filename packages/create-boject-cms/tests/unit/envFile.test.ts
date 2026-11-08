@@ -98,6 +98,18 @@ describe('renderEnvFile', () => {
     expect(env).toMatch(/CLI|boject schema/i);
   });
 
+  it('shows a first-key command that works in a scaffolded project (#506)', () => {
+    const env = renderEnvFile({ ...baseParams, starter: 'web-base' });
+    expect(env).toContain(
+      '#   docker compose exec cms tsx scripts/manage-api-keys/index.ts create cli --scopes schema:read,schema:write,content:export,content:import,apikey:read,apikey:write'
+    );
+    // The monorepo-only dev script doesn't exist in a scaffolded project.
+    expect(env).not.toContain('pnpm apikey:create');
+    expect(env).toContain(
+      "export BOJECT_API_KEY=$(sed -n 's/^BOJECT_API_KEY=//p' .env)"
+    );
+  });
+
   it('does not enable BOJECT_API_KEY by default', () => {
     const env = renderEnvFile({ ...baseParams, starter: 'web-base' });
     expect(env).not.toMatch(/^BOJECT_API_KEY=/m);

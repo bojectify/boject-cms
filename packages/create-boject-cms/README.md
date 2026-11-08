@@ -72,22 +72,38 @@ Once the container is healthy, log in at http://localhost:4000/login. The admin 
 
 ## Scaffolded `.env`
 
-| Variable                                 | Purpose                                                                                                          |
-| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`                           | PostgreSQL connection string (points at the `db` service).                                                       |
-| `MEILI_URL`                              | Meilisearch endpoint (points at the `meilisearch` service).                                                      |
-| `MEILI_MASTER_KEY`                       | 32-byte random Meilisearch master key.                                                                           |
-| `REDIS_URL`                              | Redis connection string (points at the `redis` service).                                                         |
-| `NUXT_SESSION_PASSWORD`                  | 32-byte random session encryption key.                                                                           |
-| `BOJECT_ADMIN_EMAIL`                     | Initial admin (`admin@local`).                                                                                   |
-| `BOJECT_ADMIN_PASSWORD`                  | 16-byte random initial admin password.                                                                           |
-| `STORAGE_DRIVER`                         | `local` (default), `s3`, or `r2`.                                                                                |
-| `BOJECT_HOST_PORT`                       | Host port the CMS is published on (default 4000; Compose maps it to container port 3000).                        |
-| `BOJECT_SCHEMA_DIR`                      | `/app/content-types` — the entrypoint applies any `*.boject.json` here on every boot.                            |
-| `BOJECT_INITIAL_STARTER`                 | First-boot starter path (`/starters/<starter>.boject.json`).                                                     |
-| `# BOJECT_SCHEMA_READONLY=true`          | Commented. Set on production / staging to disable schema editing in the UI.                                      |
-| `# BOJECT_ALLOW_DESTRUCTIVE_SCHEMA=true` | Commented. Set on environments where the entrypoint applier should remove types/fields the bundle drops.         |
-| `# BOJECT_API_KEY=`                      | Commented. Set when running the [`boject schema *`](https://www.npmjs.com/package/@boject/cli) commands locally. |
+| Variable                                 | Purpose                                                                                                                                                                            |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                           | PostgreSQL connection string (points at the `db` service).                                                                                                                         |
+| `MEILI_URL`                              | Meilisearch endpoint (points at the `meilisearch` service).                                                                                                                        |
+| `MEILI_MASTER_KEY`                       | 32-byte random Meilisearch master key.                                                                                                                                             |
+| `REDIS_URL`                              | Redis connection string (points at the `redis` service).                                                                                                                           |
+| `NUXT_SESSION_PASSWORD`                  | 32-byte random session encryption key.                                                                                                                                             |
+| `BOJECT_ADMIN_EMAIL`                     | Initial admin (`admin@local`).                                                                                                                                                     |
+| `BOJECT_ADMIN_PASSWORD`                  | 16-byte random initial admin password.                                                                                                                                             |
+| `STORAGE_DRIVER`                         | `local` (default), `s3`, or `r2`.                                                                                                                                                  |
+| `BOJECT_HOST_PORT`                       | Host port the CMS is published on (default 4000; Compose maps it to container port 3000).                                                                                          |
+| `BOJECT_SCHEMA_DIR`                      | `/app/content-types` — the entrypoint applies any `*.boject.json` here on every boot.                                                                                              |
+| `BOJECT_INITIAL_STARTER`                 | First-boot starter path (`/starters/<starter>.boject.json`).                                                                                                                       |
+| `# BOJECT_SCHEMA_READONLY=true`          | Commented. Set on production / staging to disable schema editing in the UI.                                                                                                        |
+| `# BOJECT_ALLOW_DESTRUCTIVE_SCHEMA=true` | Commented. Set on environments where the entrypoint applier should remove types/fields the bundle drops.                                                                           |
+| `# BOJECT_API_KEY=`                      | Commented. API key for the [`boject` CLI](https://www.npmjs.com/package/@boject/cli) (`schema`, `entries`, `apikey`). See [Create your first API key](#create-your-first-api-key). |
+
+## Create your first API key
+
+The [`boject` CLI](https://www.npmjs.com/package/@boject/cli) authenticates with an API key, and a new project has none. Once the stack is running, mint one with the key script that ships in the CMS image:
+
+```bash
+docker compose exec cms tsx scripts/manage-api-keys/index.ts create cli --scopes schema:read,schema:write,content:export,content:import,apikey:read,apikey:write
+```
+
+The raw key is printed once. Store it in `.env` as `BOJECT_API_KEY=<key>`. The CLI reads it from the shell environment, not from `.env`, so export it before running CLI commands:
+
+```bash
+export BOJECT_API_KEY=$(sed -n 's/^BOJECT_API_KEY=//p' .env)
+```
+
+Those scopes cover `boject schema *` (`schema:read` / `schema:write`), `boject entries export` / `import` (`content:export` / `content:import`) and `boject apikey *` (`apikey:read` / `apikey:write`). Use `boject apikey create` to mint narrower keys, e.g. `content:read` for a frontend. The scaffolded project has no local `@boject/cli` dependency, so run it with `npx @boject/cli@latest <command>`. There's no admin UI for keys yet (#166).
 
 ## Schema-as-code workflow
 
@@ -97,7 +113,7 @@ After scaffold, your content types live in `content-types/schema.boject.json`. T
 # 1. Edit content types in the CMS UI in development.
 
 # 2. Pull the live schema into your project.
-pnpm exec boject schema pull
+npx @boject/cli@latest schema pull
 
 # 3. Review the diff and commit.
 git diff content-types/schema.boject.json
@@ -122,8 +138,8 @@ pnpm upgrade
 This runs `boject upgrade`, which finds the latest semver tag in the registry, rewrites `docker-compose.yml`, pulls the new image, restarts, and waits for the health endpoint.
 
 ```bash
-pnpm exec boject upgrade --check       # exit 1 if upgrade available
-pnpm exec boject upgrade --to 1.4.2    # specific version
+npx @boject/cli@latest upgrade --check       # exit 1 if upgrade available
+npx @boject/cli@latest upgrade --to 1.4.2    # specific version
 ```
 
 ## See also
