@@ -633,3 +633,44 @@ export function skipDangleCollidingBundle(
     ],
   });
 }
+
+// --- JSON field type (#497) ---
+
+const cryptogramType = ct('Cryptogram', { name: 'Cryptogram' }, [
+  field('title', FIELD_TYPES.ENTRY_TITLE, { name: 'Title', required: true }),
+  field('key', FIELD_TYPES.JSON, { name: 'Key', order: 1 }),
+]);
+
+function cryptogramEntry(entryKey: string, key: unknown) {
+  return entry('Cryptogram', entryKey, {
+    entryTitle: entryKey,
+    versions: [
+      version(CONTENT_STATUSES.PUBLISHED, {
+        data: { title: entryKey, key },
+        publishedAt: APR_14,
+      }),
+    ],
+  });
+}
+
+/** Portable schema-only bundle declaring Cryptogram with a JSON `key`. */
+export const cryptogramSchema: Bundle = makeBundle({
+  exportedAt: APR_14,
+  contentTypes: [cryptogramType],
+});
+
+/** Portable schema+entries bundle with a legal JSON object value. */
+export const cryptogramWithKey: Bundle = makeBundle({
+  exportedAt: APR_14,
+  contentTypes: [cryptogramType],
+  entries: [cryptogramEntry('puzzle-one', { b: 'e', c: 'd' })],
+});
+
+/** Entries-only bundle: one legal entry, then one with a top-level string. */
+export const cryptogramEntriesOneBad: Bundle = makeBundle({
+  exportedAt: APR_14,
+  entries: [
+    cryptogramEntry('puzzle-good', { b: 'e' }),
+    cryptogramEntry('puzzle-bad', 'oops'),
+  ],
+});

@@ -9,6 +9,7 @@ import {
   isContentStatusName,
 } from '../../utils/contentStatus';
 import { isObject } from '../../utils/isObject';
+import { jsonFieldValueError } from '../../utils/jsonFieldValue';
 import type {
   Bundle,
   BundleContentType,
@@ -81,6 +82,17 @@ export function validateBundle(bundle: unknown): ValidationResult {
           });
         }
         set.add(e.entryKey);
+      }
+
+      // JSON field values (#497) can only be checked when the bundle declares
+      // its content types; entries-only bundles are checked at import time.
+      if (Array.isArray(b.contentTypes) && b.contentTypes.length > 0) {
+        errors.push(
+          ...validateJsonFieldValues(
+            b.entries,
+            jsonFieldsByTypeFromBundle(b.contentTypes)
+          )
+        );
       }
     }
   }
@@ -314,4 +326,69 @@ function validateEntryVersion(
       message: 'must be a string or null',
     });
   }
+}
+
+/**
+ * Maps each content-type identifier in `contentTypes` to the identifiers of
+ * its JSON fields (#497). Malformed content types / fields are skipped — the
+ * structural validators report those separately.
+ */
+export function jsonFieldsByTypeFromBundle(
+  contentTypes: readonly unknown[]
+): Map<string, Set<string>> {
+  const map = new Map<string, Set<string>>();
+  for (const ct of contentTypes) {
+    if (!isObject(ct)) continue;
+    const c = ct as Partial<BundleContentType>;
+    if (typeof c.identifier !== 'string' || !Array.isArray(c.fields)) continue;
+    const jsonFields = new Set<string>();
+    for (const f of c.fields) {
+      if (
+        isObject(f) &&
+        (f as BundleField).type === FIELD_TYPES.JSON &&
+        typeof (f as BundleField).identifier === 'string'
+      ) {
+        jsonFields.add((f as BundleField).identifier);
+      }
+    }
+    map.set(c.identifier, jsonFields);
+  }
+  return map;
+}
+
+/**
+ * Checks every JSON-typed value in `entries` against the shared JSON field
+ * rule (#497). `jsonFieldsByType` maps content-type identifier → JSON field
+ * identifiers. `null`/`undefined` values are empty and skipped; malformed
+ * entries/versions are skipped (reported by the structural validators).
+ */
+export function validateJsonFieldValues(
+  entries: readonly unknown[],
+  jsonFieldsByType: ReadonlyMap<string, ReadonlySet<string>>
+): ValidationError[] {
+  const errors: ValidationError[] = [];
+  entries.forEach((e, i) => {
+    if (!isObject(e)) return;
+    const entry = e as Partial<BundleEntry>;
+    if (typeof entry.contentTypeIdentifier !== 'string') return;
+    const jsonFields = jsonFieldsByType.get(entry.contentTypeIdentifier);
+    if (!jsonFields || jsonFields.size === 0 || !Array.isArray(entry.versions))
+      return;
+    entry.versions.forEach((v, j) => {
+      if (!isObject(v) || !isObject((v as BundleEntryVersion).data)) return;
+      const data = (v as BundleEntryVersion).data;
+      for (const fieldId of jsonFields) {
+        const value = data[fieldId];
+        if (value === null || value === undefined) continue;
+        const message = jsonFieldValueError(value);
+        if (message) {
+          errors.push({
+            path: `entries[${i}].versions[${j}].data.${fieldId}`,
+            message,
+          });
+        }
+      }
+    });
+  });
+  return errors;
 }

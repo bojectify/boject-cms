@@ -12,7 +12,11 @@ import type {
   ImportResult,
   OnConflict,
 } from './types';
-import { validateBundle } from './validate';
+import {
+  jsonFieldsByTypeFromBundle,
+  validateBundle,
+  validateJsonFieldValues,
+} from './validate';
 import { decodeDataRefs } from './portable';
 import { FIELD_TYPES } from '../../utils/fieldTypes';
 import { planEntryImport } from './planEntryImport';
@@ -114,6 +118,33 @@ export async function importBundle(
         const fieldTypes: Record<string, FieldType> = {};
         for (const f of ct.fields) fieldTypes[f.identifier] = f.type;
         fieldTypesByTypeId.set(ct.id, fieldTypes);
+      }
+
+      // JSON field values (#497): checked against the target's field types
+      // (bundle-declared types win), so entries-only bundles are covered too.
+      // Throws before any entry write; the transaction rolls back.
+      if (wantsEntries && bundle.entries && bundle.entries.length > 0) {
+        const jsonFieldsByType = jsonFieldsByTypeFromBundle(
+          existingTypes.map((t) => ({
+            identifier: t.identifier,
+            fields: t.fields.map((f) => ({
+              identifier: f.identifier,
+              type: f.type,
+            })),
+          }))
+        );
+        for (const [identifier, fields] of jsonFieldsByTypeFromBundle(
+          bundle.contentTypes ?? []
+        )) {
+          jsonFieldsByType.set(identifier, fields);
+        }
+        const jsonErrors = validateJsonFieldValues(
+          bundle.entries,
+          jsonFieldsByType
+        );
+        if (jsonErrors.length > 0) {
+          throw new BundleImportValidationError(jsonErrors);
+        }
       }
       const existingEntries = await tx.contentEntry.findMany();
       for (const entry of existingEntries) {

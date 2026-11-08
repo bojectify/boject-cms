@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { validateBundle } from './validate';
 import {
   bundleDuplicateEntryKey,
+  bundleEntriesOnlyJsonInvalid,
+  bundleJsonInvalid,
+  bundleJsonValid,
   bundleEntryEmptyEntryKey,
   bundleEntryMissingEntryKey,
   bundleMissingEntryTitle,
@@ -162,5 +165,27 @@ describe('validateBundle two-slot invariant', () => {
       ])
     );
     expect(result.ok).toBe(true);
+  });
+});
+
+describe('validateBundle — JSON field values (#497)', () => {
+  it('accepts a JSON object value', () => {
+    expect(validateBundle(bundleJsonValid)).toStrictEqual({
+      ok: true,
+      errors: [],
+    });
+  });
+
+  it('rejects a top-level string when the bundle declares the field as JSON', () => {
+    const result = validateBundle(bundleJsonInvalid);
+    expect(result.ok).toBe(false);
+    expect(result.errors).toContainEqual({
+      path: 'entries[0].versions[0].data.key',
+      message: 'must be a JSON object or array',
+    });
+  });
+
+  it('cannot check an entries-only bundle (field types unknown offline)', () => {
+    expect(validateBundle(bundleEntriesOnlyJsonInvalid).ok).toBe(true);
   });
 });
