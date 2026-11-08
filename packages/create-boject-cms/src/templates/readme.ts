@@ -1,4 +1,5 @@
 import type { StarterChoice } from './envFile.js';
+import { EXPORT_API_KEY_COMMAND, FIRST_API_KEY_COMMAND } from './apiKey.js';
 
 export interface ReadmeParams {
   starter: StarterChoice;
@@ -59,6 +60,41 @@ ${starterLine}Once the container is healthy, log in at http://localhost:${hostPo
 
 The CMS is published on host port \`${hostPort}\` — change \`BOJECT_HOST_PORT\` in
 \`.env\` to run several projects side by side or to avoid a port clash.
+
+## Create your first API key
+
+The [\`boject\` CLI](https://www.npmjs.com/package/@boject/cli) authenticates
+with an API key. A new project has none, so create one once the CMS is running:
+
+\`\`\`bash
+${FIRST_API_KEY_COMMAND}
+\`\`\`
+
+The raw key is printed once — copy it straight away. Put it in \`.env\`
+(uncommented) as \`BOJECT_API_KEY=<key>\` to keep it with the project. The CLI
+reads it from your shell environment, not from \`.env\`, so export it before
+running CLI commands:
+
+\`\`\`bash
+${EXPORT_API_KEY_COMMAND}
+npx @boject/cli@latest schema pull
+\`\`\`
+
+That key's scopes cover every CLI command group (run each as
+\`npx @boject/cli@latest <command>\`):
+
+| Command | Scope |
+| --- | --- |
+| \`boject schema pull\` / \`boject schema check\` | \`schema:read\` |
+| \`boject schema apply\` | \`schema:write\` |
+| \`boject entries export\` | \`content:export\` |
+| \`boject entries import\` | \`content:import\` |
+| \`boject apikey list\` | \`apikey:read\` |
+| \`boject apikey create\` / \`boject apikey revoke\` | \`apikey:write\` |
+
+With \`apikey:write\` you can mint narrower keys for other uses with
+\`boject apikey create\` (for example \`content:read\` for a frontend calling
+\`/api/public/*\` or \`/api/graphql\`).
 
 ## Content types
 

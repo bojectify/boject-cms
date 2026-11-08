@@ -6,6 +6,8 @@ set -euo pipefail
 #   - scaffolds a fresh project into a temp dir, pinned to the local cms image
 #   - `docker compose up -d` on the GENERATED compose (cms + db + meilisearch + redis)
 #   - asserts the cms container boots and answers HTTP (200/302)
+#   - runs the first-API-key command printed in the generated .env and checks
+#     the key authenticates GET /api/schema/export (#506)
 #   - tears everything down on exit
 #
 # This is the gate the unit/e2e content-assertions can't provide: it proves the
@@ -73,4 +75,28 @@ fi
 echo "[scaffold-smoke] cms state:"
 (cd "$SITE_DIR" && docker compose -p "$PROJECT_NAME" ps)
 
-echo "[scaffold-smoke] PASS — scaffolded stack booted and answered HTTP $code"
+# First API key (#506): run the exact command the generated .env shows, then
+# prove the key authenticates a CLI-scoped endpoint.
+echo "[scaffold-smoke] minting the first API key with the command from .env"
+KEY_CMD=$(sed -n 's/^#   \(docker compose exec cms .*\)$/\1/p' "$SITE_DIR/.env")
+if [[ -z "$KEY_CMD" ]]; then
+  echo "[scaffold-smoke] FAIL: no first-key command found in generated .env"
+  exit 1
+fi
+KEY_OUT=$(cd "$SITE_DIR" && COMPOSE_PROJECT_NAME="$PROJECT_NAME" bash -c "$KEY_CMD" </dev/null)
+RAW_KEY=$(printf '%s\n' "$KEY_OUT" | sed -n 's/^ *Key: *\(boject_[^ ]*\)$/\1/p')
+if [[ -z "$RAW_KEY" ]]; then
+  echo "[scaffold-smoke] FAIL: first-key command printed no key:"
+  printf '%s\n' "$KEY_OUT"
+  exit 1
+fi
+export_code=$(curl -s -o /dev/null -w "%{http_code}" \
+  -H "Authorization: Bearer $RAW_KEY" \
+  "http://localhost:$HOST_PORT/api/schema/export")
+if [[ "$export_code" != "200" ]]; then
+  echo "[scaffold-smoke] FAIL: minted key got HTTP $export_code from /api/schema/export"
+  exit 1
+fi
+echo "[scaffold-smoke] first API key works (GET /api/schema/export → 200)"
+
+echo "[scaffold-smoke] PASS — scaffolded stack booted, answered HTTP $code, and the first-key command works"

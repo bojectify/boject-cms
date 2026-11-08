@@ -114,4 +114,54 @@ describe('renderReadme — AI-assisted modelling', () => {
     expect(out).not.toContain('AI-assisted content modelling');
     expect(out).not.toContain('/mcp__boject__');
   });
+
+  describe('Create your first API key (#506)', () => {
+    const md = renderReadme({
+      starter: 'web-base',
+      adminEmail: 'admin@local',
+      hostPort: 4000,
+      aiAssist: false,
+    });
+    const section = md.slice(md.indexOf('## Create your first API key'));
+
+    it('has the section, after starting the CMS', () => {
+      expect(md).toContain('## Create your first API key');
+      expect(md.indexOf('## Create your first API key')).toBeGreaterThan(
+        md.indexOf('## Start the CMS')
+      );
+    });
+
+    it('shows the working create command', () => {
+      expect(section).toContain(
+        'docker compose exec cms tsx scripts/manage-api-keys/index.ts create cli --scopes schema:read,schema:write,content:export,content:import,apikey:read,apikey:write'
+      );
+    });
+
+    it('says the key is printed once and where to put it', () => {
+      expect(section).toMatch(/printed once/i);
+      expect(section).toContain('BOJECT_API_KEY=');
+      expect(section).toContain(
+        "export BOJECT_API_KEY=$(sed -n 's/^BOJECT_API_KEY=//p' .env)"
+      );
+    });
+
+    it('runs the CLI via npx (no local @boject/cli dependency)', () => {
+      expect(section).toContain('npx @boject/cli@latest schema pull');
+      expect(md).not.toContain('pnpm exec boject');
+    });
+
+    it('lists the scopes each CLI command group needs', () => {
+      for (const [command, scopes] of [
+        ['boject schema pull', 'schema:read'],
+        ['boject schema apply', 'schema:write'],
+        ['boject entries export', 'content:export'],
+        ['boject entries import', 'content:import'],
+        ['boject apikey list', 'apikey:read'],
+        ['boject apikey create', 'apikey:write'],
+      ]) {
+        expect(section).toContain(command);
+        expect(section).toContain(scopes);
+      }
+    });
+  });
 });
