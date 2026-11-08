@@ -164,6 +164,61 @@ describe('/api/public/entries (write surface)', async () => {
     expect(body.data.summary ?? null).toBeNull();
   });
 
+  describe('JSON fields (#497)', () => {
+    let jsonTypeId = '';
+    async function getJsonTypeId(): Promise<string> {
+      if (jsonTypeId) return jsonTypeId;
+      const cookie = await getSessionCookie();
+      const ct = await $fetch<{ id: string }>('/api/content-types', {
+        method: 'POST',
+        headers: { cookie, 'Content-Type': 'application/json' },
+        body: {
+          name: `PubWriteJson ${sfx}`,
+          fields: [
+            { identifier: 'title', name: 'Title', type: 'ENTRY_TITLE', required: true },
+            { identifier: 'key', name: 'Key', type: 'JSON' },
+            { identifier: 'meta', name: 'Meta', type: 'JSON', required: true },
+          ],
+        },
+      });
+      jsonTypeId = ct.id;
+      return jsonTypeId;
+    }
+
+    async function createJsonEntry(): Promise<string> {
+      const res = await fetch('/api/public/entries', {
+        method: 'POST', headers: bearer,
+        body: JSON.stringify({
+          contentTypeId: await getJsonTypeId(),
+          data: { title: `Json ${sfx}-${randomUUID().slice(0, 6)}`, key: { b: 'e' }, meta: { v: 1 } },
+        }),
+      });
+      expect(res.status).toBe(201);
+      return ((await res.json()) as { id: string }).id;
+    }
+
+    it('PATCH null clears an optional JSON field', async () => {
+      const id = await createJsonEntry();
+      const res = await fetch(`/api/public/entries/${id}`, {
+        method: 'PATCH', headers: bearer, body: JSON.stringify({ data: { key: null } }),
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { data: Record<string, unknown> };
+      expect(body.data.key ?? null).toBeNull();
+      expect(body.data.meta).toStrictEqual({ v: 1 });
+    });
+
+    it('PATCH null on a required JSON field 400s', async () => {
+      const id = await createJsonEntry();
+      const res = await fetch(`/api/public/entries/${id}`, {
+        method: 'PATCH', headers: bearer, body: JSON.stringify({ data: { meta: null } }),
+      });
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { statusMessage?: string; message?: string };
+      expect(body.statusMessage ?? body.message ?? '').toContain('Meta is required');
+    });
+  });
+
   it('PATCH rejects an unknown field with 400 UNKNOWN_FIELD', async () => {
     const created = await fetch('/api/public/entries', {
       method: 'POST', headers: bearer,

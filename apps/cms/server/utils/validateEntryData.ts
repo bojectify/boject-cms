@@ -3,6 +3,7 @@ import type { FieldType } from '#prisma';
 import { parseFieldOptions } from '../../utils/fieldOptions';
 import { isUuid } from './validation';
 import { FIELD_TYPES } from '../../utils/fieldTypes';
+import { jsonFieldValueError } from '../../utils/jsonFieldValue';
 
 interface FieldDef {
   identifier: string;
@@ -253,6 +254,18 @@ export async function validateEntryData(
           });
         }
         validated[field.identifier] = validatedRefs;
+        break;
+      }
+
+      case FIELD_TYPES.JSON: {
+        const jsonError = jsonFieldValueError(value);
+        if (jsonError) {
+          throw createError({
+            statusCode: 400,
+            statusMessage: `${field.name} ${jsonError}`,
+          });
+        }
+        validated[field.identifier] = value;
         break;
       }
 
