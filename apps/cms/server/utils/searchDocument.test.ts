@@ -236,6 +236,19 @@ describe('toSearchDocument', () => {
     expect(doc.fields.tags).toEqual(['tag-1', 'tag-2']);
   });
 
+  it('skips JSON fields (not searchable, #497)', () => {
+    const fields: SearchableFieldDef[] = [
+      { identifier: 'key', type: FIELD_TYPES.JSON },
+      { identifier: 'summary', type: FIELD_TYPES.TEXT },
+    ];
+    const doc = toSearchDocument(
+      entry({ data: { key: { b: 'e' }, summary: 'kept' } }),
+      fields
+    );
+    expect(doc.fields).toEqual({ summary: 'kept' });
+    expect(doc.fields).not.toHaveProperty('key');
+  });
+
   it('skips IMAGE and ENTRY_TITLE fields (no fields keys for them)', () => {
     const fields: SearchableFieldDef[] = [
       { identifier: 'title', type: FIELD_TYPES.ENTRY_TITLE },

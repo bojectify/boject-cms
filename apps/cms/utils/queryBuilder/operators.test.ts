@@ -8,6 +8,7 @@ import {
   operatorArity,
   isOperatorId,
   operatorLabel,
+  OPERATORS,
 } from './operators';
 
 describe('operators registry', () => {
@@ -46,6 +47,8 @@ describe('operators registry', () => {
   it('excludes RICHTEXT and IMAGE from filterable types; includes ENTRY_TITLE', () => {
     expect(FILTERABLE_FIELD_TYPES).not.toContain('RICHTEXT');
     expect(FILTERABLE_FIELD_TYPES).not.toContain('IMAGE');
+    expect(FILTERABLE_FIELD_TYPES).not.toContain('JSON');
+    expect(isOperatorAllowed('JSON', OPERATORS.EQ)).toBe(false);
     // ENTRY_TITLE is filterable — its filters compile to the index envelope
     // path `entryTitle` (see compileSearchFilter), not `fields.<id>`.
     expect(FILTERABLE_FIELD_TYPES).toContain('ENTRY_TITLE');
