@@ -174,4 +174,42 @@ describe('renderEnvFile', () => {
       }
     );
   });
+
+  describe('bootstrap CLI key (#510)', () => {
+    const bootstrapApiKey = { prefix: 'boject_ab12', hash: 'f'.repeat(64) };
+
+    it('writes the prefix:hash and scopes when a key was generated', () => {
+      const env = renderEnvFile({
+        ...baseParams,
+        starter: 'web-base',
+        bootstrapApiKey,
+      });
+      expect(env).toMatch(
+        new RegExp(
+          `^BOJECT_BOOTSTRAP_API_KEY=boject_ab12:${'f'.repeat(64)}$`,
+          'm'
+        )
+      );
+      expect(env).toMatch(
+        /^BOJECT_BOOTSTRAP_API_KEY_SCOPES=schema:read,schema:write,content:export,content:import,apikey:read,apikey:write$/m
+      );
+      expect(env).toContain('outside local development');
+      // The manual command stays available for minting more keys.
+      expect(env).toContain(
+        '#   docker compose exec cms tsx scripts/manage-api-keys/index.ts create cli --scopes'
+      );
+    });
+
+    it('leaves the bootstrap variables out when no key was generated', () => {
+      for (const bootstrap of [undefined, null]) {
+        const env = renderEnvFile({
+          ...baseParams,
+          starter: 'web-base',
+          bootstrapApiKey: bootstrap,
+        });
+        expect(env).not.toMatch(/^BOJECT_BOOTSTRAP_API_KEY/m);
+        expect(env).toMatch(/^# BOJECT_API_KEY=/m);
+      }
+    });
+  });
 });

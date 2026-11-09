@@ -167,4 +167,29 @@ describe('renderReadme — AI-assisted modelling', () => {
       }
     });
   });
+
+  describe('Your CLI API key (#510)', () => {
+    const md = renderReadme({
+      starter: 'web-base',
+      adminEmail: 'admin@local',
+      hostPort: 4000,
+      aiAssist: false,
+      cliApiKey: true,
+    });
+
+    it('replaces "Create your first API key" when a key was generated', () => {
+      expect(md).toContain('## Your CLI API key');
+      expect(md).not.toContain('## Create your first API key');
+    });
+
+    it('explains where the key is and how to revoke or rotate it', () => {
+      const section = md.slice(md.indexOf('## Your CLI API key'));
+      expect(section).toContain('.env.local');
+      expect(section).toContain('boject apikey revoke');
+      expect(section).toContain('BOJECT_BOOTSTRAP_API_KEY');
+      expect(section).toContain(
+        'docker compose exec cms tsx scripts/manage-api-keys/index.ts create'
+      );
+    });
+  });
 });

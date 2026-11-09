@@ -34,6 +34,35 @@ afterAll(async () => {
 });
 
 describe('create-boject-cms E2E', () => {
+  it('generates a CLI key by default without printing it (#510)', async () => {
+    const target = join(workDir, 'site');
+    const { stdout } = await runCli([target, '--starter', 'none']);
+    const local = await readFile(join(target, '.env.local'), 'utf8');
+    const raw = /^BOJECT_API_KEY=(boject_[0-9a-f]{64})$/m.exec(local)?.[1];
+    expect(raw).toBeDefined();
+    expect(stdout).toContain('.env.local');
+    expect(stdout).not.toContain(raw!);
+    const env = await readFile(join(target, '.env'), 'utf8');
+    expect(env).toMatch(
+      /^BOJECT_BOOTSTRAP_API_KEY=boject_[0-9a-f]{4}:[0-9a-f]{64}$/m
+    );
+    expect(env).not.toContain(raw!);
+  });
+
+  it('--no-api-key writes no key (#510)', async () => {
+    const target = join(workDir, 'site');
+    const { stdout } = await runCli([
+      target,
+      '--starter',
+      'none',
+      '--no-api-key',
+    ]);
+    expect(await readdir(target)).not.toContain('.env.local');
+    expect(stdout).not.toContain('.env.local');
+    const env = await readFile(join(target, '.env'), 'utf8');
+    expect(env).not.toMatch(/^BOJECT_BOOTSTRAP_API_KEY/m);
+  });
+
   it('scaffolds the full file set with --starter web-base', async () => {
     const target = join(workDir, 'site');
     const { stdout } = await runCli([target, '--starter', 'web-base']);
@@ -46,6 +75,7 @@ describe('create-boject-cms E2E', () => {
       [
         '.boject.config.json',
         '.env',
+        '.env.local', // generated CLI API key — the non-TTY default (#510)
         '.gitignore',
         'README.md',
         'content-types',

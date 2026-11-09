@@ -6,6 +6,8 @@ export interface ReadmeParams {
   adminEmail: string;
   hostPort: number;
   aiAssist: boolean;
+  /** A CLI key was generated into .env.local (#510). */
+  cliApiKey?: boolean;
 }
 
 export function renderReadme({
@@ -13,6 +15,7 @@ export function renderReadme({
   adminEmail,
   hostPort,
   aiAssist,
+  cliApiKey = false,
 }: ReadmeParams): string {
   const starterLine =
     starter === 'none'
@@ -40,28 +43,35 @@ Claude interviews you about your content, validates the result, and writes it to
 `
     : '';
 
-  return `# boject-cms
+  const apiKeySection = cliApiKey
+    ? `## Your CLI API key
 
-A new boject-cms project scaffolded by \`create-boject-cms\`.
-
-## Start the CMS
+The [\`boject\` CLI](https://www.npmjs.com/package/@boject/cli) authenticates
+with an API key. This project already has one: the raw key is in \`.env.local\`
+(gitignored, never passed to the CMS container), and the CMS creates it on first
+boot from the prefix and hash in \`.env\` (\`BOJECT_BOOTSTRAP_API_KEY\`). Once the
+stack is running the CLI just works:
 
 \`\`\`bash
-docker compose up -d
+npx @boject/cli@latest schema pull
 \`\`\`
 
-This starts four services: the CMS, PostgreSQL, Meilisearch (search), and Redis
-(response cache).
+Its scopes cover \`boject schema\`, \`boject entries\` and \`boject apikey\`.
 
-${starterLine}Once the container is healthy, log in at http://localhost:${hostPort}/login with:
+To revoke it, run \`boject apikey revoke <prefix>\` (via \`npx @boject/cli@latest\`;
+the prefix is the first 11 characters of the key). It stays revoked across restarts. To rotate
+it, mint a replacement with \`boject apikey create\` (or the command below), save
+it in \`.env.local\`, and remove \`BOJECT_BOOTSTRAP_API_KEY\` from \`.env\`. Remove
+\`BOJECT_BOOTSTRAP_API_KEY\` outside local development too.
 
-- Email: \`${adminEmail}\`
-- Password: see \`BOJECT_ADMIN_PASSWORD\` in \`.env\`
+More keys, once the CMS is running:
 
-The CMS is published on host port \`${hostPort}\` — change \`BOJECT_HOST_PORT\` in
-\`.env\` to run several projects side by side or to avoid a port clash.
+\`\`\`bash
+${FIRST_API_KEY_COMMAND}
+\`\`\`
 
-## Create your first API key
+`
+    : `## Create your first API key
 
 The [\`boject\` CLI](https://www.npmjs.com/package/@boject/cli) authenticates
 with an API key. A new project has none, so create one once the CMS is running:
@@ -99,7 +109,30 @@ With \`apikey:write\` you can mint narrower keys for other uses with
 \`boject apikey create\` (for example \`content:read\` for a frontend calling
 \`/api/public/*\` or \`/api/graphql\`).
 
-## Content types
+`;
+
+  return `# boject-cms
+
+A new boject-cms project scaffolded by \`create-boject-cms\`.
+
+## Start the CMS
+
+\`\`\`bash
+docker compose up -d
+\`\`\`
+
+This starts four services: the CMS, PostgreSQL, Meilisearch (search), and Redis
+(response cache).
+
+${starterLine}Once the container is healthy, log in at http://localhost:${hostPort}/login with:
+
+- Email: \`${adminEmail}\`
+- Password: see \`BOJECT_ADMIN_PASSWORD\` in \`.env\`
+
+The CMS is published on host port \`${hostPort}\` — change \`BOJECT_HOST_PORT\` in
+\`.env\` to run several projects side by side or to avoid a port clash.
+
+${apiKeySection}## Content types
 
 Your content type schema lives in \`content-types/schema.boject.json\` and is
 applied to the database on every container boot. Edit it via the CMS UI in

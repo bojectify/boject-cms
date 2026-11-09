@@ -1,4 +1,4 @@
-import { FIRST_API_KEY_COMMAND } from './apiKey.js';
+import { CLI_KEY_SCOPES, FIRST_API_KEY_COMMAND } from './apiKey.js';
 // A runtime-derived starter set can't be a compile-time union — the set of
 // valid names comes from the filesystem (see src/starters.ts). `none` stays
 // a runtime sentinel meaning "no starter". Invalid names are now caught at
@@ -11,6 +11,11 @@ export interface EnvFileParams {
   meiliMasterKey: string;
   starter: StarterChoice;
   hostPort: number;
+  /**
+   * Prefix + SHA-256 hash of the CLI key whose raw value goes to .env.local
+   * (#510). The CMS seeds the key from these on first boot.
+   */
+  bootstrapApiKey?: { prefix: string; hash: string } | null;
 }
 
 export function renderEnvFile({
@@ -19,6 +24,7 @@ export function renderEnvFile({
   meiliMasterKey,
   starter,
   hostPort,
+  bootstrapApiKey,
 }: EnvFileParams): string {
   const lines = [
     'DATABASE_URL=postgresql://boject:boject@db:5432/boject',
@@ -86,13 +92,27 @@ export function renderEnvFile({
     '# shares a single rate-limit bucket.',
     '# BOJECT_TRUSTED_PROXY_HOPS=0',
     '',
-    '# API key for the boject CLI (`boject schema`, `boject entries`,',
-    '# `boject apikey`). Create one once the CMS is running:',
-    `#   ${FIRST_API_KEY_COMMAND}`,
-    '# The key is printed once. Put it in .env.local as BOJECT_API_KEY=<key>.',
-    '# The CLI loads .env.local (then this file) automatically; .env.local is',
-    '# gitignored and, unlike this file, not passed to the CMS container.',
-    '# BOJECT_API_KEY='
+    ...(bootstrapApiKey
+      ? [
+          '# CLI API key (#510). The raw key is in .env.local (gitignored, read',
+          '# by the boject CLI). This file holds only its prefix + SHA-256 hash —',
+          '# no secret — and the CMS creates the key from them on first boot.',
+          '# Remove BOJECT_BOOTSTRAP_API_KEY outside local development.',
+          `BOJECT_BOOTSTRAP_API_KEY=${bootstrapApiKey.prefix}:${bootstrapApiKey.hash}`,
+          `BOJECT_BOOTSTRAP_API_KEY_SCOPES=${CLI_KEY_SCOPES.join(',')}`,
+          '# More keys, once the CMS is running:',
+          `#   ${FIRST_API_KEY_COMMAND}`,
+          '# BOJECT_API_KEY=',
+        ]
+      : [
+          '# API key for the boject CLI (`boject schema`, `boject entries`,',
+          '# `boject apikey`). Create one once the CMS is running:',
+          `#   ${FIRST_API_KEY_COMMAND}`,
+          '# The key is printed once. Put it in .env.local as BOJECT_API_KEY=<key>.',
+          '# The CLI loads .env.local (then this file) automatically; .env.local is',
+          '# gitignored and, unlike this file, not passed to the CMS container.',
+          '# BOJECT_API_KEY=',
+        ])
   );
   return lines.join('\n') + '\n';
 }
