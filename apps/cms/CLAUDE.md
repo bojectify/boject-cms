@@ -339,7 +339,7 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder. The schema is
 - `apps/cms/generated/pothos-types.ts` — Pothos-Prisma type bridge (gitignored, regenerated)
 - `docker-compose.yml` — Local PostgreSQL 17 container
 - `apps/cms/eslint.config.mjs` — ESLint flat config (extends Nuxt-generated config, loads `@typescript-eslint` plugin)
-- `lefthook.yml` — Pre-commit (lint, format, single workspace-wide typecheck) and pre-push (`pnpm test` + storybook tests) hook configuration
+- `lefthook.yml` — Pre-commit hook configuration (lint, format, single workspace-wide typecheck); no pre-push hook — tests run in CI (#516)
 - `apps/cms/vitest.config.ts` — Vitest configuration (three projects: integration + unit + storybook, all running in parallel; `integration` pins `pool: 'forks'` + `maxWorkers: resolveMaxTestWorkers()` (#409) for per-worker-isolated parallelism)
 - `apps/cms/vitest.globalSetup.ts` — Resets and seeds `boject_test` as a template, then clones it into per-worker `boject_test_<id>` DBs, provisions per-worker `entries_test_<id>` Meili indexes, and flushes per-worker Redis logical DBs (#409)
 - `apps/cms/test/workerScope.ts` — Per-vitest-worker resource scoping (#409): `resolveWorkerId` / `resolveMaxTestWorkers` (cap `TEST_MAX_WORKERS`, default `min(cores-2, 4)`) + the DB-URL / Redis-URL / Meili-index suffix helpers; consumed by the resolvers, `vitest.integrationSetup.ts`, and `vitest.globalSetup.ts`

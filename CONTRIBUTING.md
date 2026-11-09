@@ -257,8 +257,10 @@ pnpm --filter @boject/cli test:integration   # CLI SQL-writer tests (real Postgr
 ```
 
 `lefthook` runs `pnpm lint`, `pnpm format`, and `pnpm typecheck` on staged files
-pre-commit, and the full `pnpm test` suite plus `pnpm --filter cms test:storybook`
-pre-push (skip the storybook job with `SKIP_STORYBOOK_TEST=1` if needed).
+pre-commit. There is no pre-push hook: CI is the test gate. Every PR must pass
+the `ci` check (lint, format, typecheck and the full `pnpm test`) before it can
+merge. Run `pnpm test`, or the suite for the package you changed, locally when
+your change warrants it, to catch failures before the ~10-minute CI round trip.
 
 ## Workspace scripts
 
@@ -283,7 +285,7 @@ For end-user CLI commands run from inside a scaffolded project (schema pull / ap
 - **ESLint** — Via `@nuxt/eslint` module. Config in `apps/cms/eslint.config.mjs`.
 - **Prettier** — Single quotes, trailing commas, semicolons, 2-space indent. Config in `.prettierrc.yml`.
 - **eslint-config-prettier** — Disables ESLint rules that conflict with Prettier.
-- **Lefthook** — Pre-commit hooks run ESLint, Prettier, and per-package `typecheck` jobs (cms, create-boject-cms, boject-cli, root scripts) in parallel on staged files. Pre-push runs the full `pnpm test` suite plus `pnpm --filter cms test:storybook`; the storybook-test job can be skipped via `SKIP_STORYBOOK_TEST=1`.
+- **Lefthook** — Pre-commit hooks run ESLint, Prettier, and a single workspace-wide `pnpm typecheck` (cms, create-boject-cms, boject-cli, perf, root scripts) in parallel on staged files. There is no pre-push hook; tests run in CI.
 
 ```bash
 pnpm lint          # Check

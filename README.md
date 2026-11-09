@@ -138,7 +138,7 @@ scripts/
   host-shims/                  # pnpm + pnpx shims that route into the dev container
 docker-compose.yml             # Local Postgres 17 + dev container
 docker-compose.dev.yml         # Local Docker / npm registries for maintainers
-lefthook.yml                   # Pre-commit + pre-push hooks (run on host)
+lefthook.yml                   # Pre-commit hooks (run on host)
 pnpm-workspace.yaml            # Declares apps/* and packages/*
 package.json                   # Slim workspace root (forwards scripts to cms via pnpm --filter)
 ```
