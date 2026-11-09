@@ -1,4 +1,4 @@
-import { copyFile, mkdir, readdir, writeFile } from 'node:fs/promises';
+import { chmod, copyFile, mkdir, readdir, writeFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import {
   GITIGNORE,
@@ -14,6 +14,7 @@ import {
 import { sanitiseProjectName } from './projectName.js';
 import {
   generateAdminPassword,
+  generateCliApiKey,
   generateMeiliMasterKey,
   generateSessionPassword,
 } from './secrets.js';
@@ -26,11 +27,14 @@ export interface WriteProjectParams {
   startersSourceDir: string;
   hostPort: number;
   aiAssist: boolean;
+  /** Generate a CLI API key into .env.local (#510). Defaults to false. */
+  cliApiKey?: boolean;
 }
 
 export interface WriteProjectResult {
   adminEmail: string;
   adminPassword: string;
+  cliApiKeyCreated: boolean;
 }
 
 export async function writeProject({
@@ -41,6 +45,7 @@ export async function writeProject({
   startersSourceDir,
   hostPort,
   aiAssist,
+  cliApiKey = false,
 }: WriteProjectParams): Promise<WriteProjectResult> {
   await mkdir(targetDir, { recursive: true });
   const existing = await readdir(targetDir);
@@ -55,6 +60,7 @@ export async function writeProject({
   const meiliMasterKey = generateMeiliMasterKey();
   const adminEmail = 'admin@local';
   const projectName = sanitiseProjectName(basename(targetDir));
+  const cliKey = cliApiKey ? generateCliApiKey() : null;
 
   await writeFile(
     join(targetDir, 'docker-compose.yml'),
@@ -68,8 +74,28 @@ export async function writeProject({
       meiliMasterKey,
       starter,
       hostPort,
+      bootstrapApiKey: cliKey
+        ? { prefix: cliKey.prefix, hash: cliKey.hash }
+        : null,
     })
   );
+  if (cliKey) {
+    // The only place the raw key is written (#510). gitignored; the boject CLI
+    // loads it. chmod explicitly: writeFile's mode only applies on create, and
+    // --force may be overwriting an existing, more permissive file.
+    const envLocal = join(targetDir, '.env.local');
+    await writeFile(
+      envLocal,
+      [
+        '# boject CLI API key — read automatically by @boject/cli. Keep this',
+        '# file out of git; it is not passed to the CMS container.',
+        `BOJECT_API_KEY=${cliKey.raw}`,
+        '',
+      ].join('\n'),
+      { mode: 0o600 }
+    );
+    await chmod(envLocal, 0o600);
+  }
   await writeFile(
     join(targetDir, 'package.json'),
     renderPackageJson({ name: projectName })
@@ -77,7 +103,13 @@ export async function writeProject({
   await writeFile(join(targetDir, '.gitignore'), GITIGNORE);
   await writeFile(
     join(targetDir, 'README.md'),
-    renderReadme({ starter, adminEmail, hostPort, aiAssist })
+    renderReadme({
+      starter,
+      adminEmail,
+      hostPort,
+      aiAssist,
+      cliApiKey: cliKey !== null,
+    })
   );
   if (aiAssist) {
     await writeFile(join(targetDir, '.mcp.json'), renderMcpConfig());
@@ -114,5 +146,5 @@ export async function writeProject({
     renderBojectConfig({ hostPort })
   );
 
-  return { adminEmail, adminPassword };
+  return { adminEmail, adminPassword, cliApiKeyCreated: cliKey !== null };
 }

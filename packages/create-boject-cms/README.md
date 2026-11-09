@@ -30,6 +30,7 @@ pnpm create boject-cms my-site --starter web-base
 pnpm create boject-cms my-site --starter web-base --image ghcr.io/bojectify/boject-cms:1.4.2
 pnpm create boject-cms my-site --starter web-base --port 4100   # host port (default 4000)
 pnpm create boject-cms my-site --force            # scaffold into a non-empty directory
+pnpm create boject-cms my-site --no-api-key       # skip generating a CLI API key (default: generate)
 ```
 
 The CMS is published on host port **4000** by default. Pass `--port <n>` at
@@ -64,50 +65,59 @@ The container's entrypoint:
 1. Waits for PostgreSQL.
 2. Runs Prisma migrations.
 3. Seeds an admin user from `BOJECT_ADMIN_EMAIL` + `BOJECT_ADMIN_PASSWORD` (only if the User table is empty).
-4. Imports `BOJECT_INITIAL_STARTER` (`/starters/<starter>.boject.json`) into an empty CMS — schema + entries.
-5. Runs the schema-as-code applier against `BOJECT_SCHEMA_DIR` (`/app/content-types`) — converges the schema on every boot.
-6. Starts Nuxt.
+4. Seeds the CLI API key from `BOJECT_BOOTSTRAP_API_KEY` + `BOJECT_BOOTSTRAP_API_KEY_SCOPES`, if set (only if no key with that hash exists — see [Your CLI API key](#your-cli-api-key)).
+5. Imports `BOJECT_INITIAL_STARTER` (`/starters/<starter>.boject.json`) into an empty CMS — schema + entries.
+6. Runs the schema-as-code applier against `BOJECT_SCHEMA_DIR` (`/app/content-types`) — converges the schema on every boot.
+7. Starts Nuxt.
 
 Once the container is healthy, log in at http://localhost:4000/login. The admin email is `admin@local`; the password lives in `.env` under `BOJECT_ADMIN_PASSWORD`.
 
 ## Scaffolded `.env`
 
-| Variable                                 | Purpose                                                                                                                                                                                                      |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `DATABASE_URL`                           | PostgreSQL connection string (points at the `db` service).                                                                                                                                                   |
-| `MEILI_URL`                              | Meilisearch endpoint (points at the `meilisearch` service).                                                                                                                                                  |
-| `MEILI_MASTER_KEY`                       | 32-byte random Meilisearch master key.                                                                                                                                                                       |
-| `REDIS_URL`                              | Redis connection string (points at the `redis` service).                                                                                                                                                     |
-| `NUXT_SESSION_PASSWORD`                  | 32-byte random session encryption key.                                                                                                                                                                       |
-| `BOJECT_ADMIN_EMAIL`                     | Initial admin (`admin@local`).                                                                                                                                                                               |
-| `BOJECT_ADMIN_PASSWORD`                  | 16-byte random initial admin password.                                                                                                                                                                       |
-| `STORAGE_DRIVER`                         | `local` (default), `s3`, or `r2`.                                                                                                                                                                            |
-| `BOJECT_HOST_PORT`                       | Host port the CMS is published on (default 4000; Compose maps it to container port 3000).                                                                                                                    |
-| `BOJECT_SCHEMA_DIR`                      | `/app/content-types` — the entrypoint applies any `*.boject.json` here on every boot.                                                                                                                        |
-| `BOJECT_INITIAL_STARTER`                 | First-boot starter path (`/starters/<starter>.boject.json`).                                                                                                                                                 |
-| `# BOJECT_SCHEMA_READONLY=true`          | Commented. Set on production / staging to disable schema editing in the UI.                                                                                                                                  |
-| `# BOJECT_ALLOW_DESTRUCTIVE_SCHEMA=true` | Commented. Set on environments where the entrypoint applier should remove types/fields the bundle drops.                                                                                                     |
-| `# BOJECT_API_KEY=`                      | Commented. Prefer `.env.local` for the [`boject` CLI](https://www.npmjs.com/package/@boject/cli) key (gitignored, not passed to the container). See [Create your first API key](#create-your-first-api-key). |
+| Variable                                 | Purpose                                                                                                                                                                                          |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `DATABASE_URL`                           | PostgreSQL connection string (points at the `db` service).                                                                                                                                       |
+| `MEILI_URL`                              | Meilisearch endpoint (points at the `meilisearch` service).                                                                                                                                      |
+| `MEILI_MASTER_KEY`                       | 32-byte random Meilisearch master key.                                                                                                                                                           |
+| `REDIS_URL`                              | Redis connection string (points at the `redis` service).                                                                                                                                         |
+| `NUXT_SESSION_PASSWORD`                  | 32-byte random session encryption key.                                                                                                                                                           |
+| `BOJECT_ADMIN_EMAIL`                     | Initial admin (`admin@local`).                                                                                                                                                                   |
+| `BOJECT_ADMIN_PASSWORD`                  | 16-byte random initial admin password.                                                                                                                                                           |
+| `STORAGE_DRIVER`                         | `local` (default), `s3`, or `r2`.                                                                                                                                                                |
+| `BOJECT_HOST_PORT`                       | Host port the CMS is published on (default 4000; Compose maps it to container port 3000).                                                                                                        |
+| `BOJECT_SCHEMA_DIR`                      | `/app/content-types` — the entrypoint applies any `*.boject.json` here on every boot.                                                                                                            |
+| `BOJECT_INITIAL_STARTER`                 | First-boot starter path (`/starters/<starter>.boject.json`).                                                                                                                                     |
+| `BOJECT_BOOTSTRAP_API_KEY`               | Prefix + SHA-256 hash (`boject_xxxx:<hash>`) of the generated CLI key — no secret. The CMS creates the key from it on first boot. Omitted with `--no-api-key`. Remove outside local development. |
+| `BOJECT_BOOTSTRAP_API_KEY_SCOPES`        | Scopes for that key (`schema:read,schema:write,content:export,content:import,apikey:read,apikey:write`). Applied only when the key is first created.                                             |
+| `# BOJECT_SCHEMA_READONLY=true`          | Commented. Set on production / staging to disable schema editing in the UI.                                                                                                                      |
+| `# BOJECT_ALLOW_DESTRUCTIVE_SCHEMA=true` | Commented. Set on environments where the entrypoint applier should remove types/fields the bundle drops.                                                                                         |
+| `# BOJECT_API_KEY=`                      | Commented. Prefer `.env.local` for the [`boject` CLI](https://www.npmjs.com/package/@boject/cli) key (gitignored, not passed to the container). See [Your CLI API key](#your-cli-api-key).       |
 
-## Create your first API key
+## Your CLI API key
 
-The [`boject` CLI](https://www.npmjs.com/package/@boject/cli) authenticates with an API key, and a new project has none. Once the stack is running, mint one with the key script that ships in the CMS image:
+The [`boject` CLI](https://www.npmjs.com/package/@boject/cli) authenticates with an API key. By default the scaffolder generates one (`--no-api-key` to skip; the interactive wizard asks, default yes):
+
+- The **raw key** goes to `.env.local` as `BOJECT_API_KEY` (mode `0600`, gitignored, never passed to the CMS container). The CLI loads it automatically.
+- `.env` gets only `BOJECT_BOOTSTRAP_API_KEY` (the key's prefix + SHA-256 hash, no secret) and `BOJECT_BOOTSTRAP_API_KEY_SCOPES`. On first boot the CMS creates the key from them, so after `docker compose up -d` the CLI just works: `npx @boject/cli@latest schema pull`.
+- Restarts don't duplicate it, a revoked bootstrap key stays revoked, and after `docker compose down -v` it's recreated so `.env.local` keeps working.
+- Scopes apply only when the key is first created: editing `BOJECT_BOOTSTRAP_API_KEY_SCOPES` later has no effect (the CMS logs a warning).
+- To rotate (e.g. after a suspected leak): (1) mint the replacement with the `docker compose exec … create` command below — `boject apikey create` can't mint keys with `apikey:write`; (2) put it in `.env.local`; (3) remove `BOJECT_BOOTSTRAP_API_KEY` **and** `BOJECT_BOOTSTRAP_API_KEY_SCOPES` from `.env` (otherwise a later `docker compose down -v` recreates the old key); (4) `boject apikey revoke <old prefix>`. Remove both variables outside local development too.
+
+The CLI loads `.env.local` and then `.env` from the project root, reading only the variables the CLI uses (`BOJECT_API_KEY`, `BOJECT_CMS_URL` and the `PERF_*` perf settings), so there's nothing to export. A variable already set in your shell wins, `--api-key` (on `perf`) wins over everything, and `BOJECT_NO_DOTENV=1` turns file loading off. The scaffolded project has no local `@boject/cli` dependency, so run it with `npx @boject/cli@latest <command>`.
+
+### More keys, or `--no-api-key`
+
+Mint keys with the key script that ships in the CMS image, once the stack is running:
 
 ```bash
 docker compose exec cms tsx scripts/manage-api-keys/index.ts create cli --scopes schema:read,schema:write,content:export,content:import,apikey:read,apikey:write
 ```
 
-The raw key is printed once. Save it in `.env.local`:
+The raw key is printed once; save it in `.env.local` as `BOJECT_API_KEY=<key>`. Those scopes cover `boject schema *` (`schema:read` / `schema:write`), `boject entries export` / `import` (`content:export` / `content:import`) and `boject apikey *` (`apikey:read` / `apikey:write`). Use `boject apikey create` to mint narrower keys, e.g. `content:read` for a frontend. There's no admin UI for keys yet (#166).
 
-```bash
-echo 'BOJECT_API_KEY=<key>' >> .env.local
-```
+### Existing projects
 
-The CLI loads `.env.local` and then `.env` from the project root automatically, reading only the variables the CLI uses (`BOJECT_API_KEY`, `BOJECT_CMS_URL` and the `PERF_*` perf settings), so there's nothing to export. `.env.local` is gitignored and, unlike `.env`, isn't passed to the CMS container. A variable already set in your shell wins, `--api-key` (on `perf`) wins over everything, and `BOJECT_NO_DOTENV=1` turns file loading off.
-
-> **Projects scaffolded before this change** only ignore `.env`. Add `.env.local` to your `.gitignore` before saving a key there. The CLI warns if it loads a `.env.local` that isn't ignored.
-
-Those scopes cover `boject schema *` (`schema:read` / `schema:write`), `boject entries export` / `import` (`content:export` / `content:import`) and `boject apikey *` (`apikey:read` / `apikey:write`). Use `boject apikey create` to mint narrower keys, e.g. `content:read` for a frontend. The scaffolded project has no local `@boject/cli` dependency, so run it with `npx @boject/cli@latest <command>`. There's no admin UI for keys yet (#166).
+Projects scaffolded before this release need nothing: the CMS skips the bootstrap step when `BOJECT_BOOTSTRAP_API_KEY` isn't set. To get a CLI key, use the command above and save it to `.env.local` — don't hand-craft `BOJECT_BOOTSTRAP_API_KEY`. Projects scaffolded before 0.0.2 only ignore `.env`: add `.env.local` to `.gitignore` first (the CLI warns if it loads a `.env.local` that isn't ignored).
 
 ## Schema-as-code workflow
 

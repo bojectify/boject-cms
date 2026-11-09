@@ -86,7 +86,7 @@ echo "[smoke-test] seeding content-types dir with the web-base starter"
 cp "$REPO_ROOT/starters/web-base.boject.json" "$CONTENT_DIR/schema.boject.json"
 # The container runs as the non-root `cms` user (uid 100). On a Linux runner a
 # bind mount keeps host ownership, and `mktemp -d` is mode 700 — so `cms` gets
-# EACCES reading /app/content-types and apply-schema (step 5) dies. Make the dir
+# EACCES reading /app/content-types and apply-schema (step 6) dies. Make the dir
 # traversable + the bundle world-readable. (Docker Desktop on macOS remaps mount
 # ownership to the container user, which is why this only bites in CI.)
 chmod 755 "$CONTENT_DIR"
@@ -138,7 +138,7 @@ if ! grep -q "imported" <<<"$logs"; then
   exit 1
 fi
 
-# step 5/6 first-boot expectation: starter already created the schema,
+# step 6/7 first-boot expectation: starter already created the schema,
 # so apply-schema is a no-op against the just-imported state.
 if ! grep -q "\\[apply-schema\\] done — 1 file applied, 0 total changes" <<<"$logs"; then
   echo "[smoke-test] FAIL: expected first-boot apply-schema no-op"
@@ -179,7 +179,7 @@ if ! grep -q "content-types-already-exist" <<<"$logs"; then
   exit 1
 fi
 
-# Step 5/6 second-boot expectation: still a no-op.
+# Step 6/7 second-boot expectation: still a no-op.
 if ! grep -q "\\[apply-schema\\] done — 1 file applied, 0 total changes" <<<"$logs"; then
   echo "[smoke-test] FAIL: expected second-boot apply-schema no-op"
   echo "$logs" | tail -50

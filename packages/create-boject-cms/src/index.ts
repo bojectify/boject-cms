@@ -2,7 +2,12 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { resolveHostPort } from './hostPort.js';
-import { resolveStarter, resolveAiAssist } from './prompts.js';
+import { renderNextSteps } from './nextSteps.js';
+import {
+  resolveAiAssist,
+  resolveCliApiKey,
+  resolveStarter,
+} from './prompts.js';
 import { starterNames } from './starters.js';
 import { IMAGE_TAG } from './version.js';
 import { writeProject } from './writeProject.js';
@@ -14,24 +19,27 @@ interface ParsedArgs {
   imageTag: string;
   hostPort: number;
   ai: boolean | undefined;
+  apiKey: boolean | undefined;
 }
 
 function parseCli(argv: string[]): ParsedArgs {
   const { values, positionals } = parseArgs({
     args: argv,
     allowPositionals: true,
+    allowNegative: true,
     options: {
       force: { type: 'boolean', default: false },
       starter: { type: 'string' },
       image: { type: 'string' },
       port: { type: 'string' },
       ai: { type: 'boolean' },
+      'api-key': { type: 'boolean' },
     },
   });
 
   if (positionals.length !== 1) {
     process.stderr.write(
-      'Usage: create-boject-cms <target-dir> [--force] [--starter <name>] [--image <tag>] [--port <n>] [--ai]\n'
+      'Usage: create-boject-cms <target-dir> [--force] [--starter <name>] [--image <tag>] [--port <n>] [--ai] [--no-api-key]\n'
     );
     process.exit(1);
   }
@@ -43,6 +51,7 @@ function parseCli(argv: string[]): ParsedArgs {
     imageTag: values.image ?? IMAGE_TAG,
     hostPort: resolveHostPort(values.port),
     ai: values.ai,
+    apiKey: values['api-key'],
   };
 }
 
@@ -60,6 +69,7 @@ async function main(): Promise<void> {
     imageTag,
     hostPort,
     ai,
+    apiKey,
   } = parseCli(process.argv.slice(2));
   const isTTY = process.stdin.isTTY === true;
   const startersSourceDir = resolveStartersSourceDir();
@@ -69,8 +79,9 @@ async function main(): Promise<void> {
     starters: starterNames(startersSourceDir),
   });
   const aiAssist = await resolveAiAssist({ flag: ai, isTTY });
+  const cliApiKey = await resolveCliApiKey({ flag: apiKey, isTTY });
 
-  const { adminEmail, adminPassword } = await writeProject({
+  const { adminEmail, adminPassword, cliApiKeyCreated } = await writeProject({
     targetDir,
     starter,
     imageTag,
@@ -78,30 +89,19 @@ async function main(): Promise<void> {
     startersSourceDir,
     hostPort,
     aiAssist,
+    cliApiKey,
   });
 
-  const aiNextSteps = aiAssist
-    ? `
-AI-assisted content modelling is set up (.mcp.json). To model your content,
-open this folder in Claude Code, approve the "boject" server, then run:
-  /mcp__boject__model_content
-See "AI-assisted content modelling" in README.md for the full flow.
-`
-    : '';
-
-  process.stdout.write(`
-Scaffolded boject-cms project at ${targetDir}
-
-Next steps:
-  cd ${targetDir}
-  docker compose up -d
-
-Once the container is healthy, log in at http://localhost:${hostPort}/login with:
-  Email:    ${adminEmail}
-  Password: ${adminPassword}
-
-This password is also saved in .env — you will NOT see it again.
-${aiNextSteps}`);
+  process.stdout.write(
+    renderNextSteps({
+      targetDir,
+      hostPort,
+      adminEmail,
+      adminPassword,
+      aiAssist,
+      cliApiKeyCreated,
+    })
+  );
 }
 
 main().catch((error: unknown) => {

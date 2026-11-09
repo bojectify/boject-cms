@@ -1,4 +1,13 @@
-import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import {
+  chmod,
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+  stat,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -220,5 +229,69 @@ describe('writeProject', () => {
     });
     const files = await readdir(target);
     expect(files).not.toContain('.mcp.json');
+  });
+
+  describe('CLI API key (#510)', () => {
+    async function scaffold(cliApiKey: boolean, force = false) {
+      const target = join(workDir, 'site');
+      const result = await writeProject({
+        ...baseArgs,
+        targetDir: target,
+        starter: 'web-base',
+        force,
+        cliApiKey,
+      });
+      return { target, result };
+    }
+
+    it('writes the raw key to .env.local (0600) and only its prefix:hash to .env', async () => {
+      const { target, result } = await scaffold(true);
+      expect(result.cliApiKeyCreated).toBe(true);
+
+      const local = await readFile(join(target, '.env.local'), 'utf8');
+      const raw = /^BOJECT_API_KEY=(boject_[0-9a-f]{64})$/m.exec(local)?.[1];
+      expect(raw).toBeDefined();
+      expect((await stat(join(target, '.env.local'))).mode & 0o777).toBe(0o600);
+
+      const hash = createHash('sha256').update(raw!).digest('hex');
+      const env = await readFile(join(target, '.env'), 'utf8');
+      expect(env).toMatch(
+        new RegExp(
+          `^BOJECT_BOOTSTRAP_API_KEY=${raw!.slice(0, 11)}:${hash}$`,
+          'm'
+        )
+      );
+      expect(env).not.toContain(raw!);
+      const readme = await readFile(join(target, 'README.md'), 'utf8');
+      expect(readme).not.toContain(raw!);
+      expect(readme).toContain('## Your CLI API key');
+    });
+
+    it('writes no key when opted out', async () => {
+      const { target, result } = await scaffold(false);
+      expect(result.cliApiKeyCreated).toBe(false);
+      expect(await readdir(target)).not.toContain('.env.local');
+      const env = await readFile(join(target, '.env'), 'utf8');
+      expect(env).not.toMatch(/^BOJECT_BOOTSTRAP_API_KEY/m);
+    });
+
+    it('rewrites an existing .env.local with mode 0600 on --force', async () => {
+      const target = join(workDir, 'site');
+      await writeProject({
+        ...baseArgs,
+        targetDir: target,
+        starter: 'web-base',
+        force: false,
+        cliApiKey: false,
+      });
+      await writeFile(join(target, '.env.local'), 'OLD=1\n');
+      await chmod(join(target, '.env.local'), 0o644);
+
+      await scaffold(true, true);
+      const local = await readFile(join(target, '.env.local'), 'utf8');
+      expect(local).not.toContain('OLD=1');
+      expect(local).toMatch(/^BOJECT_API_KEY=boject_[0-9a-f]{64}$/m);
+      expect((await stat(join(target, '.env.local'))).mode & 0o777).toBe(0o600);
+    });
   });
 });

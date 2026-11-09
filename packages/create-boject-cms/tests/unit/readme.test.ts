@@ -167,4 +167,51 @@ describe('renderReadme — AI-assisted modelling', () => {
       }
     });
   });
+
+  describe('Your CLI API key (#510)', () => {
+    const md = renderReadme({
+      starter: 'web-base',
+      adminEmail: 'admin@local',
+      hostPort: 4000,
+      aiAssist: false,
+      cliApiKey: true,
+    });
+
+    it('replaces "Create your first API key" when a key was generated', () => {
+      expect(md).toContain('## Your CLI API key');
+      expect(md).not.toContain('## Create your first API key');
+    });
+
+    it('documents a rotation that works with the (i) rule (#510 review)', () => {
+      const section = md.slice(
+        md.indexOf('## Your CLI API key'),
+        md.indexOf('## Content types')
+      );
+      const rotate = section.slice(section.indexOf('To rotate'));
+      // Mint the replacement via the in-container script FIRST (an API key
+      // can't mint apikey:write keys), then remove both vars, then revoke.
+      const mint = rotate.indexOf(
+        'docker compose exec cms tsx scripts/manage-api-keys/index.ts create'
+      );
+      const revoke = rotate.indexOf('boject apikey revoke');
+      expect(mint).toBeGreaterThanOrEqual(0);
+      expect(revoke).toBeGreaterThan(mint);
+      expect(rotate).toContain('BOJECT_BOOTSTRAP_API_KEY_SCOPES');
+      expect(section).toMatch(/can't mint keys with `apikey:write`/);
+    });
+
+    it('says scope edits only apply when the key is created', () => {
+      expect(md).toMatch(/scopes apply only when the key is first created/i);
+    });
+
+    it('explains where the key is and how to revoke or rotate it', () => {
+      const section = md.slice(md.indexOf('## Your CLI API key'));
+      expect(section).toContain('.env.local');
+      expect(section).toContain('boject apikey revoke');
+      expect(section).toContain('BOJECT_BOOTSTRAP_API_KEY');
+      expect(section).toContain(
+        'docker compose exec cms tsx scripts/manage-api-keys/index.ts create'
+      );
+    });
+  });
 });

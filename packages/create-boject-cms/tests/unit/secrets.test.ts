@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { createHash } from 'node:crypto';
 import {
   generateAdminPassword,
+  generateCliApiKey,
   generateMeiliMasterKey,
   generateSessionPassword,
 } from '../../src/secrets.js';
@@ -44,5 +46,18 @@ describe('generateMeiliMasterKey', () => {
     const a = generateMeiliMasterKey();
     const b = generateMeiliMasterKey();
     expect(a).not.toBe(b);
+  });
+});
+
+describe('generateCliApiKey (#510)', () => {
+  it('matches the CMS key format', () => {
+    const { raw, prefix, hash } = generateCliApiKey();
+    expect(raw).toMatch(/^boject_[0-9a-f]{64}$/);
+    expect(prefix).toBe(raw.slice(0, 11));
+    expect(hash).toBe(createHash('sha256').update(raw).digest('hex'));
+  });
+
+  it('returns unique keys across calls', () => {
+    expect(generateCliApiKey().raw).not.toBe(generateCliApiKey().raw);
   });
 });

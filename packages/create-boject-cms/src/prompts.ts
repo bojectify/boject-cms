@@ -73,3 +73,31 @@ export async function resolveAiAssist({
 
   return response === true;
 }
+
+export interface ResolveCliApiKeyParams {
+  flag: boolean | undefined;
+  isTTY: boolean;
+}
+
+/**
+ * Whether to generate a CLI API key (#510). The flag wins; non-interactive
+ * runs default to yes, so a scaffolded project's CLI works out of the box.
+ */
+export async function resolveCliApiKey({
+  flag,
+  isTTY,
+}: ResolveCliApiKeyParams): Promise<boolean> {
+  if (flag !== undefined) return flag;
+  if (!isTTY) return true;
+
+  const response = await confirm({
+    message: 'Create an API key for the boject CLI? (saved to .env.local)\n',
+    initialValue: true,
+  });
+
+  if (isCancel(response)) {
+    throw new Error('Scaffold cancelled by user.');
+  }
+
+  return response === true;
+}
