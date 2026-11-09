@@ -56,12 +56,23 @@ describe('loadProjectEnv (#505)', () => {
     expect(env.BOJECT_CMS_URL).toBe('http://from-env');
   });
 
-  it('only loads BOJECT_* and PERF_* keys', async () => {
+  it('only loads the variables the CLI reads (#512)', async () => {
     await writeFile(
       join(root, '.env'),
       [
         'BOJECT_API_KEY=k',
+        'BOJECT_CMS_URL=http://cms',
+        'PERF_DATABASE_URL=postgresql://perf',
+        'PERF_SAMPLER_CONTAINER=db',
+        'PERF_SAMPLER_INTERVAL_MS=500',
         'PERF_SAMPLER_OUT=out.csv',
+        // Container settings the CLI never reads:
+        'BOJECT_ADMIN_EMAIL=admin@local',
+        'BOJECT_ADMIN_PASSWORD=secret',
+        'BOJECT_HOST_PORT=4000',
+        'BOJECT_SCHEMA_DIR=/app/content-types',
+        'BOJECT_BOOTSTRAP_API_KEY=boject_ab12:00',
+        'PERF_SOMETHING_ELSE=x',
         'DATABASE_URL=postgresql://boject:boject@db:5432/boject',
         'NUXT_SESSION_PASSWORD=secret',
       ].join('\n')
@@ -70,8 +81,22 @@ describe('loadProjectEnv (#505)', () => {
     await load(env);
     expect(env).toStrictEqual({
       BOJECT_API_KEY: 'k',
+      BOJECT_CMS_URL: 'http://cms',
+      PERF_DATABASE_URL: 'postgresql://perf',
+      PERF_SAMPLER_CONTAINER: 'db',
+      PERF_SAMPLER_INTERVAL_MS: '500',
       PERF_SAMPLER_OUT: 'out.csv',
     });
+  });
+
+  it('never loads BOJECT_NO_DOTENV from a file', async () => {
+    await writeFile(
+      join(root, '.env'),
+      'BOJECT_NO_DOTENV=1\nBOJECT_API_KEY=k\n'
+    );
+    const env: NodeJS.ProcessEnv = {};
+    await load(env);
+    expect(env).toStrictEqual({ BOJECT_API_KEY: 'k' });
   });
 
   it('works with no .env files', async () => {

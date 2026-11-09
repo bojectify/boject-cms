@@ -9,9 +9,10 @@ import { findProjectRoot } from './config.js';
  * the directory holding `.boject.config.json`, so a scaffolded project's API
  * key works without exporting it in the shell.
  *
- * - Only `BOJECT_*` / `PERF_*` keys are loaded — the project `.env` also holds
- *   the CMS container's settings (`DATABASE_URL`, `NUXT_SESSION_PASSWORD`, …),
- *   which the CLI never reads and shouldn't pass on to child processes.
+ * - Only the variables the CLI reads ({@link CLI_ENV_VARS}) are loaded. The
+ *   project `.env` also holds the CMS container's settings — many of them
+ *   `BOJECT_*` (`BOJECT_ADMIN_PASSWORD`, `BOJECT_HOST_PORT`, …) — which the CLI
+ *   never reads and shouldn't hold or pass on to child processes (#512).
  * - Nothing overwrites a variable that's already set, so the shell wins, and
  *   because `.env.local` is read first it wins over `.env`.
  * - `BOJECT_NO_DOTENV=1` (or `true`) turns it off.
@@ -21,7 +22,32 @@ import { findProjectRoot } from './config.js';
 
 /** Files read, in precedence order (earlier wins). */
 const ENV_FILES = ['.env.local', '.env'] as const;
-const LOADED_PREFIXES = ['BOJECT_', 'PERF_'] as const;
+
+/**
+ * Every environment variable the CLI reads, and so the only keys loaded from
+ * `.env.local` / `.env` (#512). A new environment-variable read in the CLI
+ * must be added here too — tests/unit/cliEnvVars.test.ts fails otherwise.
+ * `BOJECT_NO_DOTENV` is deliberately absent: it controls file loading, so it's
+ * only ever read from the shell.
+ */
+export const CLI_ENV_VARS = {
+  BOJECT_API_KEY: 'BOJECT_API_KEY',
+  BOJECT_CMS_URL: 'BOJECT_CMS_URL',
+  PERF_DATABASE_URL: 'PERF_DATABASE_URL',
+  PERF_SAMPLER_CONTAINER: 'PERF_SAMPLER_CONTAINER',
+  PERF_SAMPLER_INTERVAL_MS: 'PERF_SAMPLER_INTERVAL_MS',
+  PERF_SAMPLER_OUT: 'PERF_SAMPLER_OUT',
+} as const;
+
+export type CliEnvVar = (typeof CLI_ENV_VARS)[keyof typeof CLI_ENV_VARS];
+
+const CLI_ENV_VARS_SET: ReadonlySet<string> = new Set(
+  Object.values(CLI_ENV_VARS)
+);
+
+export function isCliEnvVar(value: unknown): value is CliEnvVar {
+  return typeof value === 'string' && CLI_ENV_VARS_SET.has(value);
+}
 
 export interface ProjectEnvResult {
   /** Directory holding `.boject.config.json`, or `null` outside a project. */
@@ -84,7 +110,7 @@ export async function loadProjectEnv({
       throw err;
     }
     for (const [key, value] of Object.entries(parseEnv(raw))) {
-      if (!LOADED_PREFIXES.some((prefix) => key.startsWith(prefix))) continue;
+      if (!isCliEnvVar(key)) continue;
       if (env[key] !== undefined) continue;
       env[key] = value;
       loadedKeys.push(key);

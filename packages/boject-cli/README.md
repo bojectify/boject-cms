@@ -44,7 +44,7 @@ echo 'BOJECT_API_KEY=boject_...' >> .env.local
 
 When the CLI finds `.boject.config.json`, it also loads `.env.local` and then `.env` from the same directory:
 
-- **Only `BOJECT_*` and `PERF_*` keys are loaded.** The project `.env` also holds the CMS container's settings (`DATABASE_URL`, `NUXT_SESSION_PASSWORD`, …), which the CLI ignores.
+- **Only the variables the CLI reads are loaded:** `BOJECT_API_KEY`, `BOJECT_CMS_URL`, and the `perf` settings `PERF_DATABASE_URL`, `PERF_SAMPLER_CONTAINER`, `PERF_SAMPLER_INTERVAL_MS`, `PERF_SAMPLER_OUT`. The project `.env` also holds the CMS container's settings (`DATABASE_URL`, `BOJECT_ADMIN_PASSWORD`, `BOJECT_HOST_PORT`, …); the CLI leaves those alone.
 - **Nothing overwrites a variable that's already set.** A value exported in your shell wins over both files, and `.env.local` wins over `.env`. `--api-key` (on `perf`) wins over everything.
 - **Keep the key in `.env.local`.** It's gitignored in new scaffolds and, unlike `.env`, isn't passed to the CMS container. Older scaffolds only ignore `.env`: add `.env.local` to `.gitignore`. The CLI warns when it loads a `.env.local` that git doesn't ignore.
 - **`BOJECT_NO_DOTENV=1`** turns file loading off, e.g. in CI where the key comes from a secret.
