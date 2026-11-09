@@ -103,12 +103,13 @@ echo "[scaffold-smoke] first API key works (GET /api/schema/export → 200)"
 
 # The CLI loads the key from .env.local itself (#505): save it there as the
 # generated README says, then run `schema pull` with BOJECT_API_KEY unset.
+# No --url: the generated .boject.config.json must already point at the
+# scaffolded --port (#511).
 echo "[scaffold-smoke] boject schema pull with the key only in .env.local"
 printf 'BOJECT_API_KEY=%s\n' "$RAW_KEY" >> "$SITE_DIR/.env.local"
 rm -f "$SITE_DIR/content-types/schema.boject.json"
 if ! (cd "$SITE_DIR" && env -u BOJECT_API_KEY -u BOJECT_NO_DOTENV \
-  node "$REPO_ROOT/packages/boject-cli/dist/index.js" schema pull \
-  --url "http://localhost:$HOST_PORT"); then
+  node "$REPO_ROOT/packages/boject-cli/dist/index.js" schema pull); then
   echo "[scaffold-smoke] FAIL: boject schema pull did not pick up .env.local"
   exit 1
 fi

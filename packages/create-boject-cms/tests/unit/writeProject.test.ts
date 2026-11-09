@@ -124,6 +124,26 @@ describe('writeProject', () => {
     expect(compose).toContain("'${BOJECT_HOST_PORT:-4000}:3000'");
   });
 
+  it('uses the same host port in .env, README.md and .boject.config.json (#511)', async () => {
+    const target = join(workDir, 'site');
+    await writeProject({
+      ...baseArgs,
+      targetDir: target,
+      starter: 'web-base',
+      force: false,
+      hostPort: 4100,
+    });
+
+    const env = await readFile(join(target, '.env'), 'utf8');
+    expect(env).toMatch(/^BOJECT_HOST_PORT=4100$/m);
+    const readme = await readFile(join(target, 'README.md'), 'utf8');
+    expect(readme).toContain('http://localhost:4100/login');
+    const config = JSON.parse(
+      await readFile(join(target, '.boject.config.json'), 'utf8')
+    );
+    expect(config.cms.url).toBe('http://localhost:4100');
+  });
+
   it('throws when the starter bundle is missing from the source directory', async () => {
     const target = join(workDir, 'site');
     await expect(

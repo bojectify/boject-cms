@@ -109,7 +109,10 @@ export async function writeProject({
 
   // Always write .boject.config.json so the @boject/cli commands work
   // out of the box from the project root.
-  await writeFile(join(targetDir, '.boject.config.json'), renderBojectConfig());
+  await writeFile(
+    join(targetDir, '.boject.config.json'),
+    renderBojectConfig({ hostPort })
+  );
 
   return { adminEmail, adminPassword };
 }
