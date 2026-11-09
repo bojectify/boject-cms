@@ -6,10 +6,11 @@ set -euo pipefail
 #   - scaffolds a fresh project into a temp dir, pinned to the local cms image
 #   - `docker compose up -d` on the GENERATED compose (cms + db + meilisearch + redis)
 #   - asserts the cms container boots and answers HTTP (200/302)
-#   - runs the first-API-key command printed in the generated .env and checks
-#     the key authenticates GET /api/schema/export (#506)
-#   - saves the key to .env.local and runs `boject schema pull` with
-#     BOJECT_API_KEY unset, proving the CLI loads it itself (#505)
+#   - runs `boject schema pull` with zero manual steps: the scaffold's generated
+#     key (.env.local) was seeded by the CMS from BOJECT_BOOTSTRAP_API_KEY (#510)
+#   - runs the extra-key command printed in the generated .env and checks the
+#     key authenticates GET /api/schema/export (#506)
+#   - restarts cms and checks there is still exactly one bootstrap key (#510)
 #   - tears everything down on exit
 #
 # This is the gate the unit/e2e content-assertions can't provide: it proves the
@@ -77,18 +78,42 @@ fi
 echo "[scaffold-smoke] cms state:"
 (cd "$SITE_DIR" && docker compose -p "$PROJECT_NAME" ps)
 
-# First API key (#506): run the exact command the generated .env shows, then
-# prove the key authenticates a CLI-scoped endpoint.
-echo "[scaffold-smoke] minting the first API key with the command from .env"
+CLI=("node" "$REPO_ROOT/packages/boject-cli/dist/index.js")
+compose() { (cd "$SITE_DIR" && COMPOSE_PROJECT_NAME="$PROJECT_NAME" docker compose "$@"); }
+
+# 1. Zero-step CLI (#510): the scaffold generated a key (non-TTY default) into
+#    .env.local and its prefix:hash into .env; the CMS seeded it on boot. The
+#    CLI must work with nothing minted, exported or passed — no --url either
+#    (#511: .boject.config.json already points at the scaffolded --port).
+echo "[scaffold-smoke] boject schema pull with zero manual steps"
+if ! grep -q '^BOJECT_API_KEY=boject_' "$SITE_DIR/.env.local"; then
+  echo "[scaffold-smoke] FAIL: scaffold wrote no CLI key to .env.local"
+  exit 1
+fi
+rm -f "$SITE_DIR/content-types/schema.boject.json"
+if ! (cd "$SITE_DIR" && env -u BOJECT_API_KEY -u BOJECT_NO_DOTENV "${CLI[@]}" schema pull); then
+  echo "[scaffold-smoke] FAIL: schema pull failed with the bootstrap key"
+  compose logs cms | grep -i 'seed-api-key\|bootstrap' || true
+  exit 1
+fi
+if [[ ! -s "$SITE_DIR/content-types/schema.boject.json" ]]; then
+  echo "[scaffold-smoke] FAIL: schema pull wrote no schema file"
+  exit 1
+fi
+echo "[scaffold-smoke] CLI works out of the box (bootstrap key seeded from .env)"
+
+# 2. The manual first-key command (#506) still works for extra keys: run the
+#    exact line the generated .env shows and check the key authenticates.
+echo "[scaffold-smoke] minting an extra key with the command from .env"
 KEY_CMD=$(sed -n 's/^#   \(docker compose exec cms .*\)$/\1/p' "$SITE_DIR/.env")
 if [[ -z "$KEY_CMD" ]]; then
-  echo "[scaffold-smoke] FAIL: no first-key command found in generated .env"
+  echo "[scaffold-smoke] FAIL: no key command found in generated .env"
   exit 1
 fi
 KEY_OUT=$(cd "$SITE_DIR" && COMPOSE_PROJECT_NAME="$PROJECT_NAME" bash -c "$KEY_CMD" </dev/null)
 RAW_KEY=$(printf '%s\n' "$KEY_OUT" | sed -n 's/^ *Key: *\(boject_[^ ]*\)$/\1/p')
 if [[ -z "$RAW_KEY" ]]; then
-  echo "[scaffold-smoke] FAIL: first-key command printed no key:"
+  echo "[scaffold-smoke] FAIL: key command printed no key:"
   printf '%s\n' "$KEY_OUT"
   exit 1
 fi
@@ -99,24 +124,29 @@ if [[ "$export_code" != "200" ]]; then
   echo "[scaffold-smoke] FAIL: minted key got HTTP $export_code from /api/schema/export"
   exit 1
 fi
-echo "[scaffold-smoke] first API key works (GET /api/schema/export → 200)"
+echo "[scaffold-smoke] manual key command works (GET /api/schema/export → 200)"
 
-# The CLI loads the key from .env.local itself (#505): save it there as the
-# generated README says, then run `schema pull` with BOJECT_API_KEY unset.
-# No --url: the generated .boject.config.json must already point at the
-# scaffolded --port (#511).
-echo "[scaffold-smoke] boject schema pull with the key only in .env.local"
-printf 'BOJECT_API_KEY=%s\n' "$RAW_KEY" >> "$SITE_DIR/.env.local"
-rm -f "$SITE_DIR/content-types/schema.boject.json"
-if ! (cd "$SITE_DIR" && env -u BOJECT_API_KEY -u BOJECT_NO_DOTENV \
-  node "$REPO_ROOT/packages/boject-cli/dist/index.js" schema pull); then
-  echo "[scaffold-smoke] FAIL: boject schema pull did not pick up .env.local"
+# 3. Restart idempotency (#510): the bootstrap step must not duplicate the key.
+echo "[scaffold-smoke] restarting cms to check the bootstrap seed is idempotent"
+compose restart cms >/dev/null
+code="000"
+for _ in $(seq 1 "$HEALTH_WAIT_TRIES"); do
+  code=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:$HOST_PORT/" 2>/dev/null || echo "000")
+  if [[ "$code" == "200" || "$code" == "302" ]]; then
+    break
+  fi
+  sleep 1
+done
+if [[ "$code" != "200" && "$code" != "302" ]]; then
+  echo "[scaffold-smoke] FAIL: cms did not come back after restart (last code=$code)"
+  compose logs cms | tail -60 || true
   exit 1
 fi
-if [[ ! -s "$SITE_DIR/content-types/schema.boject.json" ]]; then
-  echo "[scaffold-smoke] FAIL: schema pull wrote no schema file"
+bootstrap_count=$(compose exec -T cms tsx scripts/manage-api-keys/index.ts list | grep -c 'cli (bootstrap)' || true)
+if [[ "$bootstrap_count" != "1" ]]; then
+  echo "[scaffold-smoke] FAIL: expected exactly 1 'cli (bootstrap)' key after restart, found $bootstrap_count"
   exit 1
 fi
-echo "[scaffold-smoke] CLI loaded the key from .env.local (schema pull OK)"
+echo "[scaffold-smoke] restart kept exactly one bootstrap key"
 
-echo "[scaffold-smoke] PASS — scaffolded stack booted, answered HTTP $code, the first-key command works, and the CLI loads .env.local"
+echo "[scaffold-smoke] PASS — stack booted, the CLI works with zero manual steps, the manual key command works, and restarts keep one bootstrap key"
