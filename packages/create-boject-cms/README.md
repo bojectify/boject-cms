@@ -65,9 +65,10 @@ The container's entrypoint:
 1. Waits for PostgreSQL.
 2. Runs Prisma migrations.
 3. Seeds an admin user from `BOJECT_ADMIN_EMAIL` + `BOJECT_ADMIN_PASSWORD` (only if the User table is empty).
-4. Imports `BOJECT_INITIAL_STARTER` (`/starters/<starter>.boject.json`) into an empty CMS — schema + entries.
-5. Runs the schema-as-code applier against `BOJECT_SCHEMA_DIR` (`/app/content-types`) — converges the schema on every boot.
-6. Starts Nuxt.
+4. Seeds the CLI API key from `BOJECT_BOOTSTRAP_API_KEY` + `BOJECT_BOOTSTRAP_API_KEY_SCOPES`, if set (only if no key with that hash exists — see [Your CLI API key](#your-cli-api-key)).
+5. Imports `BOJECT_INITIAL_STARTER` (`/starters/<starter>.boject.json`) into an empty CMS — schema + entries.
+6. Runs the schema-as-code applier against `BOJECT_SCHEMA_DIR` (`/app/content-types`) — converges the schema on every boot.
+7. Starts Nuxt.
 
 Once the container is healthy, log in at http://localhost:4000/login. The admin email is `admin@local`; the password lives in `.env` under `BOJECT_ADMIN_PASSWORD`.
 
