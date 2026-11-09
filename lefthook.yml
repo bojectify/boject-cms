@@ -1,3 +1,5 @@
+# Pre-commit only. Tests run in CI: the required `ci` check (.github/workflows/ci.yml)
+# runs lint, format, typecheck and the full `pnpm test` on every PR (#516).
 pre-commit:
   parallel: true
   jobs:
@@ -13,14 +15,3 @@ pre-commit:
     - name: typecheck
       glob: '*.{ts,vue}'
       run: pnpm typecheck
-
-pre-push:
-  jobs:
-    - name: test
-      glob: '*.{js,mjs,ts,vue,prisma}'
-      run: pnpm test
-
-    - name: storybook-test
-      run: pnpm --filter cms test:storybook
-      skip:
-        - run: test "$SKIP_STORYBOOK_TEST" = "1"
