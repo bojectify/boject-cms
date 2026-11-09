@@ -49,10 +49,25 @@ describe('release-notes.sh extract', () => {
     );
   });
 
-  it('runs to the end of the body when no heading follows', () => {
-    expect(sh(['extract'], '## Release notes\nOnly this.\n')).toBe(
-      'Only this.\n'
-    );
+  it('keeps ## headings written inside the notes; only "## Next steps" ends the section', () => {
+    const body = [
+      '## Release notes',
+      '',
+      '<!-- prompt -->',
+      '',
+      '## Upgrade notes',
+      '- Do the thing.',
+      '',
+      '## Next steps',
+      'run release-tag',
+    ].join('\n');
+    expect(sh(['extract'], body)).toBe('## Upgrade notes\n- Do the thing.\n');
+  });
+
+  it('runs to the end of the body when "## Next steps" is absent', () => {
+    expect(
+      sh(['extract'], '## Release notes\nOnly this.\n## Other\nAnd this.\n')
+    ).toBe('Only this.\n## Other\nAnd this.\n');
   });
 
   it('returns nothing when there is no Release notes section', () => {
@@ -61,7 +76,7 @@ describe('release-notes.sh extract', () => {
 
   it('handles CRLF bodies (GitHub API)', () => {
     expect(
-      sh(['extract'], '## Release notes\r\n\r\nNote.\r\n\r\n## Next\r\n')
+      sh(['extract'], '## Release notes\r\n\r\nNote.\r\n\r\n## Next steps\r\n')
     ).toBe('Note.\n');
   });
 });
