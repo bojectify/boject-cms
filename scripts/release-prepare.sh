@@ -32,8 +32,19 @@ git add -A
 # the local hook is redundant for a pure version-string commit.
 git commit --no-verify -m "chore(release): publish v$VERSION"
 git push -u origin "$RELEASE_BRANCH"
+
+# Body from a file (#513): avoids nested printf/backtick escaping, and carries
+# the `## Release notes` section release-tag.sh puts on the GitHub Release.
+BODY_FILE="$(mktemp)"
+trap 'rm -f "$BODY_FILE"' EXIT
+bash scripts/release-notes.sh body "$VERSION" > "$BODY_FILE"
+# The `release` label keeps this PR out of the generated "What's Changed"
+# list (.github/release.yml).
 gh pr create --base main --head "$RELEASE_BRANCH" \
   --title "chore(release): publish v$VERSION" \
-  --body "$(printf 'Unified version bump to \`v%s\` (all 4 package.json + both version.ts).\n\nAfter the required \`ci\` check passes and this merges, run:\n\n    bash scripts/release-tag.sh\n\nto tag \`v%s\` and trigger the publish workflows.\n' "$VERSION" "$VERSION")"
+  --label release \
+  --body-file "$BODY_FILE"
 
-echo "✓ Release PR opened for v$VERSION. Merge it, then: bash scripts/release-tag.sh"
+echo "✓ Release PR opened for v$VERSION."
+echo "  Fill in its '## Release notes' section (upgrade steps, behaviour changes),"
+echo "  merge it, then: bash scripts/release-tag.sh"

@@ -1,0 +1,45 @@
+name: PR labels
+
+# Applies a type label from the conventional-commit PR title (#513) so
+# .github/release.yml can group the generated release notes. The mapping lives
+# in scripts/pr-type-label.mjs (unit-tested).
+#
+# pull_request_target: can label PRs from forks. Safe because it checks out the
+# BASE branch (main) — the PR's own code is never checked out or run — and only
+# reads the title.
+
+on:
+  pull_request_target:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  label:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          sparse-checkout: scripts/pr-type-label.mjs
+          sparse-checkout-cone-mode: false
+      - uses: actions/github-script@v8
+        with:
+          script: |
+            const { labelForTitle, TYPE_LABELS } = await import(
+              `${process.env.GITHUB_WORKSPACE}/scripts/pr-type-label.mjs`
+            );
+            const pr = context.payload.pull_request;
+            const wanted = labelForTitle(pr.title);
+            const current = pr.labels.map((l) => l.name);
+            const issue = { ...context.repo, issue_number: pr.number };
+            for (const name of current) {
+              if (TYPE_LABELS.has(name) && name !== wanted) {
+                await github.rest.issues.removeLabel({ ...issue, name });
+              }
+            }
+            if (wanted && !current.includes(wanted)) {
+              await github.rest.issues.addLabels({ ...issue, labels: [wanted] });
+            }
+            core.info(`title: ${pr.title} → ${wanted ?? '(no type label)'}`);
