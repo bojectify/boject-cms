@@ -103,7 +103,7 @@ The raw key is printed once. Save it in `.env.local`:
 echo 'BOJECT_API_KEY=<key>' >> .env.local
 ```
 
-The CLI loads `.env.local` and then `.env` from the project root automatically, reading only `BOJECT_*` / `PERF_*` keys, so there's nothing to export. `.env.local` is gitignored and, unlike `.env`, isn't passed to the CMS container. A variable already set in your shell wins, `--api-key` (on `perf`) wins over everything, and `BOJECT_NO_DOTENV=1` turns file loading off.
+The CLI loads `.env.local` and then `.env` from the project root automatically, reading only the variables the CLI uses (`BOJECT_API_KEY`, `BOJECT_CMS_URL` and the `PERF_*` perf settings), so there's nothing to export. `.env.local` is gitignored and, unlike `.env`, isn't passed to the CMS container. A variable already set in your shell wins, `--api-key` (on `perf`) wins over everything, and `BOJECT_NO_DOTENV=1` turns file loading off.
 
 > **Projects scaffolded before this change** only ignore `.env`. Add `.env.local` to your `.gitignore` before saving a key there. The CLI warns if it loads a `.env.local` that isn't ignored.
 

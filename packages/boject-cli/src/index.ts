@@ -993,8 +993,9 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
-  // Load BOJECT_*/PERF_* from the project's .env.local / .env (#505) before
-  // any command reads process.env. Never fails on a missing/invalid config.
+  // Load the CLI's own variables (CLI_ENV_VARS) from the project's
+  // .env.local / .env (#505, #512) before any command reads them. Never fails
+  // on a missing or invalid config.
   const projectEnv = await loadProjectEnv({ cwd: process.cwd() });
   for (const warning of projectEnv.warnings) {
     process.stderr.write(`${warning}\n`);
