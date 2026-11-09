@@ -58,13 +58,29 @@ npx @boject/cli@latest schema pull
 
 Its scopes cover \`boject schema\`, \`boject entries\` and \`boject apikey\`.
 
-To revoke it, run \`boject apikey revoke <prefix>\` (via \`npx @boject/cli@latest\`;
-the prefix is the first 11 characters of the key). It stays revoked across restarts. To rotate
-it, mint a replacement with \`boject apikey create\` (or the command below), save
-it in \`.env.local\`, and remove \`BOJECT_BOOTSTRAP_API_KEY\` from \`.env\`. Remove
-\`BOJECT_BOOTSTRAP_API_KEY\` outside local development too.
+Scopes apply only when the key is first created: editing
+\`BOJECT_BOOTSTRAP_API_KEY_SCOPES\` later has no effect (the CMS logs a warning).
 
-More keys, once the CMS is running:
+To rotate it (for example after a suspected leak):
+
+1. Mint the replacement in the CMS container (it writes to the database
+   directly; \`boject apikey create\` can't mint keys with \`apikey:write\`,
+   because API keys can't create other keys that can create keys):
+
+   \`\`\`bash
+   ${FIRST_API_KEY_COMMAND}
+   \`\`\`
+
+2. Put the new key in \`.env.local\` as \`BOJECT_API_KEY\`.
+3. Remove \`BOJECT_BOOTSTRAP_API_KEY\` and \`BOJECT_BOOTSTRAP_API_KEY_SCOPES\`
+   from \`.env\` — otherwise a later \`docker compose down -v\` would recreate the
+   old key on the next boot.
+4. Revoke the old one: \`boject apikey revoke <prefix>\` (via
+   \`npx @boject/cli@latest\`; the prefix is the first 11 characters of the key).
+
+Remove both variables outside local development too.
+
+More keys use the same command, once the CMS is running:
 
 \`\`\`bash
 ${FIRST_API_KEY_COMMAND}

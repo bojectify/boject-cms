@@ -98,6 +98,8 @@ export function renderEnvFile({
           '# by the boject CLI). This file holds only its prefix + SHA-256 hash —',
           '# no secret — and the CMS creates the key from them on first boot.',
           '# Remove BOJECT_BOOTSTRAP_API_KEY outside local development.',
+          '# Scopes apply only when the key is first created; editing them later',
+          '# has no effect.',
           `BOJECT_BOOTSTRAP_API_KEY=${bootstrapApiKey.prefix}:${bootstrapApiKey.hash}`,
           `BOJECT_BOOTSTRAP_API_KEY_SCOPES=${CLI_KEY_SCOPES.join(',')}`,
           '# More keys, once the CMS is running:',

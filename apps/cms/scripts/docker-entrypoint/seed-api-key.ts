@@ -47,10 +47,18 @@ export function parseBootstrapScopes(value: string | undefined): ApiKeyScope[] {
   return items as ApiKeyScope[];
 }
 
-export interface SeedBootstrapApiKeyResult {
-  seeded: boolean;
-  reason: 'created' | 'already-exists';
-}
+export type SeedBootstrapApiKeyResult =
+  | { seeded: true; reason: 'created' }
+  | {
+      seeded: false;
+      reason: 'already-exists';
+      /**
+       * Whether the existing key's scopes equal the configured ones. Scopes
+       * apply only when the key is created — a later edit to
+       * BOJECT_BOOTSTRAP_API_KEY_SCOPES has no effect, so the caller warns.
+       */
+      scopesMatch: boolean;
+    };
 
 /**
  * Creates the bootstrap key unless a row with that hash already exists. Any
@@ -65,7 +73,13 @@ export async function seedBootstrapApiKey(
   const existing = await prisma.apiKey.findUnique({
     where: { keyHash: input.hash },
   });
-  if (existing) return { seeded: false, reason: 'already-exists' };
+  if (existing) {
+    const have = new Set(existing.scopes);
+    const want = new Set<string>(input.scopes);
+    const scopesMatch =
+      have.size === want.size && [...want].every((scope) => have.has(scope));
+    return { seeded: false, reason: 'already-exists', scopesMatch };
+  }
 
   await prisma.apiKey.create({
     data: {
@@ -108,11 +122,20 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   });
   try {
     const result = await seedBootstrapApiKey(prisma, parsed);
-    console.log(
-      result.seeded
-        ? `[seed-api-key] seeded bootstrap API key ${parsed.prefix} — remove BOJECT_BOOTSTRAP_API_KEY outside local development`
-        : `[seed-api-key] skipped — bootstrap key ${parsed.prefix} already exists`
-    );
+    if (result.seeded) {
+      console.log(
+        `[seed-api-key] seeded bootstrap API key ${parsed.prefix} — remove BOJECT_BOOTSTRAP_API_KEY outside local development`
+      );
+    } else {
+      console.log(
+        `[seed-api-key] skipped — bootstrap key ${parsed.prefix} already exists`
+      );
+      if (!result.scopesMatch) {
+        console.warn(
+          `[seed-api-key] WARNING: BOJECT_BOOTSTRAP_API_KEY_SCOPES differs from the existing key ${parsed.prefix}'s scopes. Scopes apply only when the key is first created, so this edit has no effect — rotate the key to change its scopes.`
+        );
+      }
+    }
   } catch (err) {
     console.error(
       `[seed-api-key] ${err instanceof Error ? err.message : String(err)}`

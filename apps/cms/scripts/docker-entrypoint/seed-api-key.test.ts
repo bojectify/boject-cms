@@ -123,20 +123,57 @@ describe('seedBootstrapApiKey', () => {
   });
 
   it('is a no-op when the key already exists', async () => {
-    const prisma = makePrisma({ id: 'k_1', revokedAt: null });
+    const prisma = makePrisma({
+      id: 'k_1',
+      revokedAt: null,
+      scopes: ['schema:read', 'apikey:write'],
+    });
     expect(await seed(prisma)).toStrictEqual({
       seeded: false,
       reason: 'already-exists',
+      scopesMatch: true,
     });
     expect(prisma.apiKey.create).not.toHaveBeenCalled();
   });
 
   it('never recreates a revoked bootstrap key', async () => {
-    const prisma = makePrisma({ id: 'k_1', revokedAt: new Date() });
+    const prisma = makePrisma({
+      id: 'k_1',
+      revokedAt: new Date(),
+      scopes: ['schema:read', 'apikey:write'],
+    });
     expect(await seed(prisma)).toStrictEqual({
       seeded: false,
       reason: 'already-exists',
+      scopesMatch: true,
     });
     expect(prisma.apiKey.create).not.toHaveBeenCalled();
+  });
+
+  it('reports scope drift when the existing key has different scopes (#510 review)', async () => {
+    const prisma = makePrisma({
+      id: 'k_1',
+      revokedAt: null,
+      scopes: ['schema:read'],
+    });
+    expect(await seed(prisma)).toStrictEqual({
+      seeded: false,
+      reason: 'already-exists',
+      scopesMatch: false,
+    });
+    expect(prisma.apiKey.create).not.toHaveBeenCalled();
+  });
+
+  it('treats the same scopes in a different order as matching', async () => {
+    const prisma = makePrisma({
+      id: 'k_1',
+      revokedAt: null,
+      scopes: ['apikey:write', 'schema:read'],
+    });
+    expect(await seed(prisma)).toStrictEqual({
+      seeded: false,
+      reason: 'already-exists',
+      scopesMatch: true,
+    });
   });
 });

@@ -194,6 +194,7 @@ describe('renderEnvFile', () => {
         /^BOJECT_BOOTSTRAP_API_KEY_SCOPES=schema:read,schema:write,content:export,content:import,apikey:read,apikey:write$/m
       );
       expect(env).toContain('outside local development');
+      expect(env).toMatch(/scopes apply only when the key is first created/i);
       // The manual command stays available for minting more keys.
       expect(env).toContain(
         '#   docker compose exec cms tsx scripts/manage-api-keys/index.ts create cli --scopes'
