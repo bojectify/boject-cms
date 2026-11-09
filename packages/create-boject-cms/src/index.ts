@@ -14,24 +14,27 @@ interface ParsedArgs {
   imageTag: string;
   hostPort: number;
   ai: boolean | undefined;
+  apiKey: boolean | undefined;
 }
 
 function parseCli(argv: string[]): ParsedArgs {
   const { values, positionals } = parseArgs({
     args: argv,
     allowPositionals: true,
+    allowNegative: true,
     options: {
       force: { type: 'boolean', default: false },
       starter: { type: 'string' },
       image: { type: 'string' },
       port: { type: 'string' },
       ai: { type: 'boolean' },
+      'api-key': { type: 'boolean' },
     },
   });
 
   if (positionals.length !== 1) {
     process.stderr.write(
-      'Usage: create-boject-cms <target-dir> [--force] [--starter <name>] [--image <tag>] [--port <n>] [--ai]\n'
+      'Usage: create-boject-cms <target-dir> [--force] [--starter <name>] [--image <tag>] [--port <n>] [--ai] [--no-api-key]\n'
     );
     process.exit(1);
   }
@@ -43,6 +46,7 @@ function parseCli(argv: string[]): ParsedArgs {
     imageTag: values.image ?? IMAGE_TAG,
     hostPort: resolveHostPort(values.port),
     ai: values.ai,
+    apiKey: values['api-key'],
   };
 }
 
