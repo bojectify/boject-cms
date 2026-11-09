@@ -312,7 +312,11 @@ pnpm format:fix    # Auto-fix formatting
 1. Fork (or branch, if you have write access) and make your change on a
    `<type>/<issue#>-<slug>` branch.
 2. Make sure `pnpm test`, `pnpm lint`, and `pnpm typecheck` pass.
-3. Open a PR against `main`. The [pull request template](.github/pull_request_template.md)
+3. Open a PR against `main`, with a [conventional-commit](https://www.conventionalcommits.org/)
+   title (`feat: …`, `fix(cli): …`, `docs: …`, `chore: …`). A workflow labels
+   the PR from that prefix (`type: feature` / `type: fix` / `documentation` /
+   `type: chore`), and the labels group the generated release notes. The
+   [pull request template](.github/pull_request_template.md)
    asks you to link the issue, note the type of change, and list the **manual
    verification** you did beyond the automated tests.
 4. CI (`.github/workflows/ci.yml`) must be green, and you'll be asked to sign the
@@ -425,10 +429,20 @@ All three artifacts (the `ghcr.io/bojectify/boject-cms` image, `@boject/cli`,
 > `.git` read-only, so git writes must happen on the host.
 
 1. `bash scripts/release-prepare.sh <X.Y.Z | X.Y.Z-rc.N>` — bumps all 4
-   `package.json` + both `version.ts` on a `release/*` branch and opens a PR.
-2. Review + merge the PR (its required `ci` check is the test gate).
-3. `bash scripts/release-tag.sh` — tags `vX.Y.Z` on the merged commit and
-   creates the GitHub Release (auto-generated notes). The tag triggers the
-   publish workflows, which stamp the per-version BSL `LICENSE` and publish.
+   `package.json` + both `version.ts` on a `release/*` branch and opens a PR
+   labelled `release`.
+2. **Fill in the PR's `## Release notes` section** — upgrade steps for existing
+   projects, behaviour changes, new flags or env vars. Leave it empty if
+   there's nothing to say; it adds nothing then.
+3. Review + merge the PR (its required `ci` check is the test gate).
+4. `bash scripts/release-tag.sh` — tags `vX.Y.Z` on the merged commit and
+   creates the GitHub Release. The PR's `## Release notes` text goes at the
+   top, above GitHub's generated "What's Changed" list, which
+   [`.github/release.yml`](.github/release.yml) groups into Features / Fixes /
+   Documentation / Chores / Other by PR label (the `release` PR itself is left
+   out). The tag triggers the publish workflows, which stamp the per-version
+   BSL `LICENSE` and publish.
+
+To fix a release's notes afterwards: `gh release edit vX.Y.Z --notes-file <file>`.
 
 The first public release is `v0.0.1-rc.1`.

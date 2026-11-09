@@ -1,0 +1,24 @@
+# Groups GitHub's generated release notes (gh release create --generate-notes,
+# run by scripts/release-tag.sh) by PR label (#513). Labels are applied from
+# the conventional-commit PR title by .github/workflows/pr-labels.yml.
+changelog:
+  exclude:
+    labels:
+      - release # the chore(release): publish PR itself
+  categories:
+    - title: Features
+      labels:
+        - 'type: feature'
+    - title: Fixes
+      labels:
+        - 'type: fix'
+    - title: Documentation
+      labels:
+        - documentation
+    - title: Chores
+      labels:
+        - 'type: chore'
+        - dependencies
+    - title: Other changes
+      labels:
+        - '*'
