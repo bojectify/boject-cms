@@ -7,7 +7,8 @@
 #
 # The release PR body has a `## Release notes` section for hand-written notes
 # (upgrade steps, behaviour changes, new flags). `extract` prints that
-# section's text — HTML comments (the prompt) removed, blank edges trimmed —
+# section's text, up to the template's "## Next steps" heading — HTML comments
+# (the prompt) removed, blank edges trimmed —
 # or nothing when it's empty, so release-tag.sh can put it above GitHub's
 # generated "What's Changed" list.
 set -euo pipefail
@@ -39,11 +40,12 @@ EOF
     ;;
   extract)
     # 1. Normalise CRLF. 2. Keep only the lines after "## Release notes" up to
-    # the next "## " heading. 3. Drop <!-- ... --> comments (may span lines).
-    # 4. Trim leading/trailing blank lines.
+    # the template's own "## Next steps" heading (or the end) — NOT any "## "
+    # heading, so notes can use their own ## headings. 3. Drop <!-- ... -->
+    # comments (may span lines). 4. Trim leading/trailing blank lines.
     tr -d '\r' | awk '
       /^## Release notes[[:space:]]*$/ { inside = 1; next }
-      inside && /^## / { inside = 0 }
+      inside && /^## Next steps[[:space:]]*$/ { inside = 0 }
       !inside { next }
       {
         line = $0
