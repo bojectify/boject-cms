@@ -330,8 +330,12 @@ describe('runUpgrade', () => {
         'DATABASE_URL=x\nMEILI_MASTER_KEY=k\nMEILI_URL=http://m\nREDIS_URL=redis://r\n'
       );
       vi.mocked(pollHealth).mockResolvedValueOnce(undefined);
-      const { exitCode } = await upgrade({ to: '0.0.3' }, async () => false);
+      const { exitCode, lines } = await upgrade(
+        { to: '0.0.3' },
+        async () => false
+      );
       expect(exitCode).toBe(0);
+      expect(lines.join('\n')).toContain('· advice    env-local-gitignored');
     });
 
     it('--dry-run prints findings and the diff; exit 1 when blocking', async () => {
@@ -343,6 +347,9 @@ describe('runUpgrade', () => {
       expect(exitCode).toBe(1);
       expect(lines.join('\n')).toContain('search-and-cache-services');
       expect(message).toContain('+ image: bojectify/boject-cms:0.0.3');
+      expect(message).toContain(
+        'A real upgrade would be blocked: 1 required change(s) above. Pass --force'
+      );
       expect(await readFile(composePath(), 'utf8')).toBe(before);
     });
 
@@ -371,6 +378,9 @@ describe('runUpgrade', () => {
       expect(crossesInto('0.0.3', '0.0.3')).toBe(false);
       expect(crossesInto('0.0.3', 'v0.0.2')).toBe(true);
       expect(crossesInto('0.0.3', 'latest')).toBe(true);
+      expect(crossesInto('0.0.1-rc.2', '0.0.1-rc.1')).toBe(true);
+      expect(crossesInto('0.0.1-rc.2', '0.0.1-rc.2')).toBe(false);
+      expect(crossesInto('0.0.1-rc.2', '0.0.1')).toBe(false);
     });
   });
 });

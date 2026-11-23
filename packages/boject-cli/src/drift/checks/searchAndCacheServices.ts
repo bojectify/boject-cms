@@ -58,6 +58,7 @@ export const searchAndCacheServices: DriftCheck = {
     if (missing.length === 0) return null;
 
     const composeText = [
+      '# Under services: — skip any service your docker-compose.yml already has.',
       MEILISEARCH_SERVICE_BLOCK,
       '',
       REDIS_SERVICE_BLOCK,

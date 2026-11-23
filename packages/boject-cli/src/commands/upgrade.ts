@@ -175,6 +175,12 @@ export async function runUpgrade(
         '--- docker-compose.yml (dry run)',
         `- image: ${repository}:${currentTag}`,
         `+ image: ${repository}:${targetTag}`,
+        ...(blocked
+          ? [
+              '',
+              `(A real upgrade would be blocked: ${blocking.length} required change(s) above. Pass --force to upgrade anyway.)`,
+            ]
+          : []),
       ].join('\n'),
     };
   }

@@ -445,6 +445,8 @@ All three artifacts (the `ghcr.io/bojectify/boject-cms` image, `@boject/cli`,
 
 To fix a release's notes afterwards: `gh release edit vX.Y.Z --notes-file <file>`.
 
+The first public release is `v0.0.1-rc.1`.
+
 #### Infra changes and drift checks
 
 An infra change is a new service, a new required env key or a new scaffolded file. `boject doctor` and the `boject upgrade` pre-flight catch these for existing projects.
@@ -452,5 +454,3 @@ An infra change is a new service, a new required env key or a new scaffolded fil
 - **Always:** an infra change adds a drift check in `packages/boject-cli/src/drift/` **and** a `## Release notes` entry containing the paste-able snippet. A new _required_ dependency gets a `required` check; optional or additive infra gets `advice` or `warning`.
 - **Before 1.0:** any release, including a `0.0.z` patch, may carry infra changes, provided they follow the rule above.
 - **From 1.0:** infra changes ship only in minor or major releases, never in a patch. A new required infra dependency is a breaking change (major); optional or additive infra is a minor.
-
-The first public release is `v0.0.1-rc.1`.
