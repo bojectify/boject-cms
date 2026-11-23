@@ -137,7 +137,10 @@ export function missingApiKeyMessage(
   return `Error: BOJECT_API_KEY is not set (checked: ${sources}).`;
 }
 
-function gitCheckIgnore(path: string, root: string): Promise<boolean | null> {
+export function gitCheckIgnore(
+  path: string,
+  root: string
+): Promise<boolean | null> {
   return new Promise((resolve) => {
     execFile('git', ['check-ignore', '-q', path], { cwd: root }, (err) => {
       if (!err) return resolve(true);
