@@ -102,6 +102,25 @@ describe('boject upgrade E2E (mock registry)', () => {
     expect(body).toContain(`localhost:${port}/boject/cms:1.0.0`);
   });
 
+  it('exits 1 with the search/cache snippet and leaves docker-compose.yml untouched', async () => {
+    const path = await writeFixture('0.0.1-rc.1');
+    await writeFile(
+      join(workDir, '.env'),
+      'DATABASE_URL=postgres://u:p@localhost/db\n'
+    );
+    tagsToServe.value = ['0.0.1-rc.1', '0.0.3'];
+    const before = await readFile(path, 'utf8');
+    await expect(runCli(['upgrade', '--to', '0.0.3'])).rejects.toMatchObject({
+      code: 1,
+      // The drift report goes to stdout; the verdict goes to stderr.
+      stdout: expect.stringMatching(
+        /search-and-cache-services[\s\S]*MEILI_MASTER_KEY=/
+      ),
+      stderr: expect.stringContaining('not applied'),
+    });
+    expect(await readFile(path, 'utf8')).toBe(before);
+  });
+
   it('exits 1 when no semver tags are available', async () => {
     await writeFixture('1.0.0');
     tagsToServe.value = ['latest', 'dev'];

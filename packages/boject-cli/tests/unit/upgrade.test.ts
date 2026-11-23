@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { runUpgrade } from '../../src/commands/upgrade.js';
+import { crossesInto, runUpgrade } from '../../src/commands/upgrade.js';
 
 vi.mock('../../src/registry.js', async () => {
   const actual = await vi.importActual<typeof import('../../src/registry.js')>(
@@ -252,6 +252,125 @@ describe('runUpgrade', () => {
       expect(message).toContain('docker compose logs cms');
       const out = await readFile(join(workDir, 'docker-compose.yml'), 'utf8');
       expect(out).toContain('image: ghcr.io/bojectify/boject-cms:1.1.0');
+    });
+  });
+
+  describe('drift pre-flight (#445)', () => {
+    const fixtureAt = (tag: string) =>
+      FIXTURE.replace('boject-cms:1.0.0', `boject-cms:${tag}`);
+    const composePath = () => join(workDir, 'docker-compose.yml');
+
+    async function setup(tag: string) {
+      await writeFile(composePath(), fixtureAt(tag));
+      await writeFile(
+        join(workDir, '.env'),
+        'DATABASE_URL=postgres://u:p@localhost/db\n'
+      );
+      return readFile(composePath(), 'utf8');
+    }
+
+    function upgrade(
+      flags: Parameters<typeof runUpgrade>[0]['flags'],
+      isGitIgnored: () => Promise<boolean> = async () => true
+    ) {
+      const lines: string[] = [];
+      const result = runUpgrade({
+        cwd: workDir,
+        runner,
+        flags,
+        shellEnv: {},
+        isGitIgnored,
+        stdout: (l) => lines.push(l),
+        stderr: () => {},
+      });
+      return result.then((r) => ({ ...r, lines }));
+    }
+
+    it('blocks when crossing into a required check', async () => {
+      const before = await setup('0.0.1-rc.1');
+      const { exitCode, message, lines } = await upgrade({ to: '0.0.3' });
+      expect(exitCode).toBe(1);
+      expect(message).toContain('not applied');
+      expect(lines.join('\n')).toContain('search-and-cache-services');
+      expect(await readFile(composePath(), 'utf8')).toBe(before);
+      expect(runner.run).not.toHaveBeenCalled();
+    });
+
+    it('--force proceeds past a blocking finding', async () => {
+      await setup('0.0.1-rc.1');
+      vi.mocked(pollHealth).mockResolvedValueOnce(undefined);
+      const { exitCode } = await upgrade({ to: '0.0.3', force: true });
+      expect(exitCode).toBe(0);
+      expect(await readFile(composePath(), 'utf8')).toContain(
+        'boject-cms:0.0.3'
+      );
+    });
+
+    it('already past appliesFrom: required downgrades to warning, upgrade proceeds', async () => {
+      await setup('0.0.2');
+      vi.mocked(pollHealth).mockResolvedValueOnce(undefined);
+      const { exitCode, lines } = await upgrade({ to: '0.0.3' });
+      expect(exitCode).toBe(0);
+      expect(lines.join('\n')).toContain(
+        '! warning   search-and-cache-services'
+      );
+    });
+
+    it('non-semver current tag blocks on required', async () => {
+      await setup('latest');
+      const { exitCode, message } = await upgrade({ to: '0.0.3' });
+      expect(exitCode).toBe(1);
+      expect(message).toContain('not applied');
+    });
+
+    it("advice doesn't block", async () => {
+      await writeFile(composePath(), fixtureAt('0.0.2'));
+      await writeFile(
+        join(workDir, '.env'),
+        'DATABASE_URL=x\nMEILI_MASTER_KEY=k\nMEILI_URL=http://m\nREDIS_URL=redis://r\n'
+      );
+      vi.mocked(pollHealth).mockResolvedValueOnce(undefined);
+      const { exitCode } = await upgrade({ to: '0.0.3' }, async () => false);
+      expect(exitCode).toBe(0);
+    });
+
+    it('--dry-run prints findings and the diff; exit 1 when blocking', async () => {
+      const before = await setup('0.0.1-rc.1');
+      const { exitCode, message, lines } = await upgrade({
+        to: '0.0.3',
+        dryRun: true,
+      });
+      expect(exitCode).toBe(1);
+      expect(lines.join('\n')).toContain('search-and-cache-services');
+      expect(message).toContain('+ image: bojectify/boject-cms:0.0.3');
+      expect(await readFile(composePath(), 'utf8')).toBe(before);
+    });
+
+    it('--dry-run --force exits 0', async () => {
+      await setup('0.0.1-rc.1');
+      const { exitCode } = await upgrade({
+        to: '0.0.3',
+        dryRun: true,
+        force: true,
+      });
+      expect(exitCode).toBe(0);
+    });
+
+    it("--check doesn't run drift checks", async () => {
+      await setup('0.0.1-rc.1');
+      const { exitCode, lines } = await upgrade({ to: '0.0.3', check: true });
+      expect(exitCode).toBe(1);
+      expect(lines).toEqual([]);
+    });
+  });
+
+  describe('crossesInto', () => {
+    it('handles null, semver, v-prefixed and non-semver tags', () => {
+      expect(crossesInto(null, '0.0.1')).toBe(false);
+      expect(crossesInto('0.0.3', '0.0.2')).toBe(true);
+      expect(crossesInto('0.0.3', '0.0.3')).toBe(false);
+      expect(crossesInto('0.0.3', 'v0.0.2')).toBe(true);
+      expect(crossesInto('0.0.3', 'latest')).toBe(true);
     });
   });
 });

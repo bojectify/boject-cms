@@ -28,7 +28,8 @@ const USAGE = `Usage: boject <command> [flags]
 Commands:
   doctor             Check this project for config drift (read-only).
   upgrade            Upgrade the CMS image tag in the current
-                     directory's docker-compose.yml.
+                     directory's docker-compose.yml, after checking for
+                     config drift (--force skips the required-change block).
   schema pull        Fetch schema from a CMS to content-types/schema.boject.json.
   schema validate    Validate a local bundle (no network).
   schema apply       Push a local bundle to a CMS via API.
@@ -1085,9 +1086,11 @@ async function main(): Promise<void> {
         'dry-run': { type: 'boolean', default: false },
         check: { type: 'boolean', default: false },
         url: { type: 'string' },
+        force: { type: 'boolean', default: false },
       },
     });
     const { exitCode, message } = await runUpgrade({
+      shellEnv,
       cwd: process.cwd(),
       runner: nodeRunner,
       flags: {
@@ -1095,6 +1098,7 @@ async function main(): Promise<void> {
         dryRun: values['dry-run'] === true,
         check: values.check === true,
         url: values.url,
+        force: values.force === true,
       },
       stdout,
       stderr,
