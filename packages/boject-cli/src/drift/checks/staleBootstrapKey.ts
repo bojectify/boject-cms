@@ -15,7 +15,7 @@ export const staleBootstrapKey: DriftCheck = {
     const apiKey = await resolveApiKey(ctx);
     if (apiKey === null) return null;
 
-    const bootstrapPrefix = bootstrap.split(':')[0];
+    const bootstrapPrefix = bootstrap.split(':')[0].slice(0, PREFIX_LENGTH);
     const keyPrefix = apiKey.slice(0, PREFIX_LENGTH);
     if (bootstrapPrefix === keyPrefix) return null;
 

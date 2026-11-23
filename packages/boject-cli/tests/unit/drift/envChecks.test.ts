@@ -3,7 +3,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DRIFT_CHECKS } from '../../../src/drift/checks/index.js';
-import { cliApiKey } from '../../../src/drift/checks/cliApiKey.js';
+import {
+  cliApiKey,
+  resolveApiKey,
+} from '../../../src/drift/checks/cliApiKey.js';
 import { envLocalGitignored } from '../../../src/drift/checks/envLocalGitignored.js';
 import { staleBootstrapKey } from '../../../src/drift/checks/staleBootstrapKey.js';
 import { createDriftContext } from '../../../src/drift/context.js';
@@ -99,6 +102,19 @@ describe('cliApiKey', () => {
     ).toBeNull();
   });
 
+  it('resolveApiKey skips an empty shell value for .env.local', async () => {
+    await writeFile(join(root, '.env.local'), `BOJECT_API_KEY=${KEY}\n`);
+    expect(await resolveApiKey(await ctxFor({ BOJECT_API_KEY: '' }))).toBe(KEY);
+  });
+
+  it('empty shell value with no key anywhere gives the finding', async () => {
+    await writeFile(join(root, '.env'), 'FOO=bar\n');
+    const out = await cliApiKey.run(await ctxFor({ BOJECT_API_KEY: '' }));
+    expect(out).toMatchObject({
+      title: 'No CLI API key (BOJECT_API_KEY) found',
+    });
+  });
+
   it('finding snippet contains FIRST_API_KEY_COMMAND', async () => {
     await writeFile(join(root, '.env'), 'FOO=bar\n');
     const out = await cliApiKey.run(await ctxFor());
@@ -168,6 +184,29 @@ describe('staleBootstrapKey', () => {
     const json = JSON.stringify(out);
     expect(json).not.toContain(OTHER_KEY);
     expect(json).not.toContain(HASH);
+  });
+
+  it('empty shell value does not cause a false warning', async () => {
+    await writeFile(
+      join(root, '.env'),
+      `BOJECT_BOOTSTRAP_API_KEY=boject_abcd:${HASH}\n`
+    );
+    await writeFile(join(root, '.env.local'), `BOJECT_API_KEY=${KEY}\n`);
+    expect(
+      await staleBootstrapKey.run(await ctxFor({ BOJECT_API_KEY: '' }))
+    ).toBeNull();
+  });
+
+  it('truncates a colon-less (raw key) bootstrap value to 11 chars', async () => {
+    const raw = `boject_9999${'3'.repeat(53)}`;
+    await writeFile(join(root, '.env'), `BOJECT_BOOTSTRAP_API_KEY=${raw}\n`);
+    const out = await staleBootstrapKey.run(
+      await ctxFor({ BOJECT_API_KEY: KEY })
+    );
+    const json = JSON.stringify(out);
+    expect(json).not.toContain(raw);
+    expect(json).not.toContain(KEY);
+    expect(json).toContain('refers to key `boject_9999`');
   });
 
   it('null with no bootstrap var', async () => {
