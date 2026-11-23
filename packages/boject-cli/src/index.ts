@@ -1067,12 +1067,14 @@ async function main(): Promise<void> {
       process.stdout.write(DOCTOR_USAGE);
       process.exit(0);
     }
-    const { exitCode, output } = await runDoctor({
+    const { exitCode, output, error } = await runDoctor({
       cwd: process.cwd(),
       shellEnv,
       flags: { json: values.json === true, strict: values.strict === true },
     });
-    const sink = exitCode === 0 ? process.stdout : process.stderr;
+    // The report always goes to stdout (so --json is pipeable even when
+    // drift sets exit 1); only a usage error goes to stderr.
+    const sink = error === true ? process.stderr : process.stdout;
     sink.write(`${output}\n`);
     process.exit(exitCode);
   }

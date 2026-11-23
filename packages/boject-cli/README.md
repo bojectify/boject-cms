@@ -74,7 +74,7 @@ Before changing anything, `upgrade` runs the same drift checks as [`boject docto
 - A required finding only blocks if this upgrade crosses into the version that needs it. If you're already past that version, it's shown as a warning instead.
 - If your current image tag isn't a version (for example `latest`), the CLI can't tell what you've already crossed, so required findings block.
 - **Warning** and **advice** findings are printed but never block.
-- `--check` and an already-up-to-date project skip the checks. With `--dry-run` the report is printed alongside the diff.
+- `--check` and an already-up-to-date project skip the checks. With `--dry-run` the report is printed alongside the diff, and the command exits 1 (with a note saying why) when the real run would be blocked.
 
 The drift report goes to stdout. The checks only read your files; the image tag in `docker-compose.yml` is the only thing `upgrade` writes.
 
@@ -87,6 +87,8 @@ boject doctor                  # human-readable report
 boject doctor --json           # machine-readable report
 boject doctor --strict         # also exit 1 on advice
 ```
+
+The report (text or `--json`) always goes to stdout, so `boject doctor --json | jq` works even when drift sets exit 1. Only the "no `docker-compose.yml`" error goes to stderr.
 
 Re-run it any time, for example after an upgrade or in CI.
 

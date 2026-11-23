@@ -78,6 +78,19 @@ describe('runDoctor', () => {
     expect(strict.exitCode).toBe(1);
   });
 
+  it('warning-only finding exits 1 without --strict', async () => {
+    await scaffold('0.0.3');
+    await writeFile(
+      join(cwd, '.env'),
+      `${FULL_ENV}BOJECT_BOOTSTRAP_API_KEY=boject_${'b'.repeat(64)}\n`
+    );
+    const r = await runDoctor({ cwd, shellEnv: {}, isGitIgnored: ignored });
+    expect(r.output).toContain('! warning   stale-bootstrap-key');
+    expect(r.output).not.toContain('✗ required');
+    expect(r.exitCode).toBe(1);
+    expect(r.error).toBeUndefined();
+  });
+
   it('non-semver tag runs every check', async () => {
     await scaffold('latest', 'FOO=bar\n');
     const r = await runDoctor({
@@ -114,6 +127,7 @@ describe('runDoctor', () => {
     const r = await runDoctor({ cwd, shellEnv: {}, isGitIgnored: ignored });
     expect(r).toEqual({
       exitCode: 1,
+      error: true,
       output: `No docker-compose.yml in ${cwd} — run boject doctor from your project directory.`,
     });
   });

@@ -17,6 +17,8 @@ export interface DoctorParams {
 export interface DoctorResult {
   exitCode: 0 | 1;
   output: string;
+  /** True when `output` is an error message (stderr), not the report. */
+  error?: boolean;
 }
 
 function isEnoent(error: unknown): boolean {
@@ -38,6 +40,7 @@ export async function runDoctor(params: DoctorParams): Promise<DoctorResult> {
     if (isEnoent(error)) {
       return {
         exitCode: 1,
+        error: true,
         output: `No docker-compose.yml in ${cwd} — run boject doctor from your project directory.`,
       };
     }
