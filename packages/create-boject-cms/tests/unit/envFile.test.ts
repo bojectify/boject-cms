@@ -54,6 +54,11 @@ describe('renderEnvFile', () => {
     expect(env.endsWith('\n')).toBe(true);
   });
 
+  it('turns GraphiQL on for the local stack (#525)', () => {
+    const env = renderEnvFile({ ...baseParams, starter: 'web-base' });
+    expect(env).toMatch(/^BOJECT_GRAPHIQL=true$/m);
+  });
+
   it('includes a commented BOJECT_SCHEMA_READONLY opt-in line', () => {
     const env = renderEnvFile({ ...baseParams, starter: 'web-base' });
     expect(env).toMatch(/^# BOJECT_SCHEMA_READONLY=true$/m);

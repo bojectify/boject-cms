@@ -17,7 +17,7 @@ PG_NAME="boject-cms-smoke-pg"
 REDIS_NAME="boject-cms-smoke-redis"
 MEILI_NAME="boject-cms-smoke-meili"
 APP_NAME="boject-cms-smoke-app"
-RO_APP_NAME="boject-cms-smoke-app-readonly"
+FLAGS_APP_NAME="boject-cms-smoke-app-flags"
 NETWORK_NAME="boject-cms-smoke-net"
 VOLUME_NAME="boject-cms-smoke-storage"
 IMAGE_TAG="${SMOKE_IMAGE:-boject/cms:dev}"
@@ -32,7 +32,7 @@ HEALTH_WAIT_TRIES="${HEALTH_WAIT_TRIES:-180}"
 
 cleanup() {
   echo "[smoke-test] cleaning up"
-  docker rm -f "$APP_NAME" "$RO_APP_NAME" "$PG_NAME" "$REDIS_NAME" "$MEILI_NAME" >/dev/null 2>&1 || true
+  docker rm -f "$APP_NAME" "$FLAGS_APP_NAME" "$PG_NAME" "$REDIS_NAME" "$MEILI_NAME" >/dev/null 2>&1 || true
   docker volume rm "$VOLUME_NAME" >/dev/null 2>&1 || true
   docker network rm "$NETWORK_NAME" >/dev/null 2>&1 || true
   rm -rf "$CONTENT_DIR" 2>/dev/null || true
@@ -208,10 +208,21 @@ if [[ "$x_cache" != "HIT" ]] || awk "BEGIN{exit !($seconds > 2)}"; then
   runtime_failures=$((runtime_failures + 1))
 fi
 
-# #527: BOJECT_SCHEMA_READONLY must lock schema editing in the built image,
-# server AND UI. A second app container (same DB) boots with the flag on.
-echo "[smoke-test] checking BOJECT_SCHEMA_READONLY locks schema editing (#527)"
-docker run -d --name "$RO_APP_NAME" \
+# #525: with BOJECT_GRAPHIQL unset, a browser GET of /api/graphql is still
+# refused without a key (the published behaviour before the flag existed).
+echo "[smoke-test] checking GraphiQL stays off without BOJECT_GRAPHIQL (#525)"
+gql_off=$(curl -s -o /dev/null -w "%{http_code}" -H 'Accept: text/html' \
+  http://localhost:4010/api/graphql)
+if [[ "$gql_off" != "401" ]]; then
+  echo "[smoke-test] FAIL: GET /api/graphql (Accept: text/html) without BOJECT_GRAPHIQL returned $gql_off (want 401)"
+  runtime_failures=$((runtime_failures + 1))
+fi
+
+# Deployment flags read at runtime (#527, #525). A second app container (same
+# DB) boots with them on; the built image is the only place a flag that was
+# fixed at build time shows up.
+echo "[smoke-test] booting a second container with runtime flags on (#525, #527)"
+docker run -d --name "$FLAGS_APP_NAME" \
   --network "$NETWORK_NAME" \
   -e DATABASE_URL=postgresql://boject:boject@${PG_NAME}:5432/boject \
   -e REDIS_URL=redis://${REDIS_NAME}:6379 \
@@ -219,6 +230,7 @@ docker run -d --name "$RO_APP_NAME" \
   -e MEILI_MASTER_KEY="$MEILI_KEY" \
   -e NUXT_SESSION_PASSWORD="$(head -c 32 /dev/urandom | base64)" \
   -e BOJECT_SCHEMA_READONLY=true \
+  -e BOJECT_GRAPHIQL=true \
   -v "${VOLUME_NAME}:/app/storage" \
   -p 4011:3000 \
   "$IMAGE_TAG" >/dev/null
@@ -227,12 +239,40 @@ for i in $(seq 1 "$HEALTH_WAIT_TRIES"); do
   [[ "$code" == "200" ]] && break
   sleep 1
 done
-RO_COOKIE_JAR="$CONTENT_DIR/cookies-ro.txt"
-curl -s -o /dev/null -c "$RO_COOKIE_JAR" \
+FLAGS_COOKIE_JAR="$CONTENT_DIR/cookies-flags.txt"
+curl -s -o /dev/null -c "$FLAGS_COOKIE_JAR" \
   -H 'content-type: application/json' -H 'Origin: http://localhost:4011' \
   -X POST http://localhost:4011/api/auth/login \
   --data "$(jq -n --arg p "$ADMIN_PASSWORD" '{email: "admin@smoke.test", password: $p}')"
-ro_create=$(curl -s -o /dev/null -w "%{http_code}" -b "$RO_COOKIE_JAR" \
+
+echo "[smoke-test] checking BOJECT_GRAPHIQL serves GraphiQL and keeps queries authenticated (#525)"
+GQL_URL="http://localhost:4011/api/graphql"
+if ! curl -s -H 'Accept: text/html' "$GQL_URL" | grep -q "boject GraphiQL"; then
+  echo "[smoke-test] FAIL: GET /api/graphql (Accept: text/html) with BOJECT_GRAPHIQL=true didn't return the GraphiQL page"
+  runtime_failures=$((runtime_failures + 1))
+fi
+# A browser GET carrying a query still gets the page, never query results.
+if curl -s -H 'Accept: text/html' "$GQL_URL?query=%7B__typename%7D" | grep -q '"data"'; then
+  echo "[smoke-test] FAIL: GET /api/graphql?query=… without a key returned query results"
+  runtime_failures=$((runtime_failures + 1))
+fi
+gql_nokey=$(curl -s -o /dev/null -w "%{http_code}" -H 'content-type: application/json' \
+  -X POST "$GQL_URL" --data '{"query":"{__typename}"}')
+if [[ "$gql_nokey" != "401" ]]; then
+  echo "[smoke-test] FAIL: POST /api/graphql without a key and BOJECT_GRAPHIQL=true returned $gql_nokey (want 401)"
+  runtime_failures=$((runtime_failures + 1))
+fi
+# The example query from the scaffolded README (create-boject-cms readme.ts).
+gql_data=$(curl -s -H 'content-type: application/json' -H "Authorization: Bearer $api_key" \
+  -X POST "$GQL_URL" \
+  --data '{"query":"{ contentEntryList(first: 5) { edges { node { __typename id entryKey } } } }"}')
+if ! jq -e '.data.contentEntryList.edges | type == "array"' <<<"$gql_data" >/dev/null 2>&1; then
+  echo "[smoke-test] FAIL: POST /api/graphql with a content:read key and BOJECT_GRAPHIQL=true didn't return data: $gql_data"
+  runtime_failures=$((runtime_failures + 1))
+fi
+
+echo "[smoke-test] checking BOJECT_SCHEMA_READONLY locks schema editing (#527)"
+ro_create=$(curl -s -o /dev/null -w "%{http_code}" -b "$FLAGS_COOKIE_JAR" \
   -H 'content-type: application/json' -H 'Origin: http://localhost:4011' \
   -X POST http://localhost:4011/api/content-types \
   --data '{"name":"Smoke Readonly","fields":[{"name":"Title","identifier":"title","type":"ENTRY_TITLE","required":true}]}')
@@ -240,11 +280,11 @@ if [[ "$ro_create" != "403" ]]; then
   echo "[smoke-test] FAIL: POST /api/content-types with BOJECT_SCHEMA_READONLY=true returned $ro_create (want 403)"
   runtime_failures=$((runtime_failures + 1))
 fi
-if ! curl -s -b "$RO_COOKIE_JAR" http://localhost:4011/content-types | grep -q "Schema is read-only on this environment"; then
+if ! curl -s -b "$FLAGS_COOKIE_JAR" http://localhost:4011/content-types | grep -q "Schema is read-only on this environment"; then
   echo "[smoke-test] FAIL: content types page doesn't show the read-only banner with BOJECT_SCHEMA_READONLY=true"
   runtime_failures=$((runtime_failures + 1))
 fi
-docker rm -f "$RO_APP_NAME" >/dev/null 2>&1 || true
+docker rm -f "$FLAGS_APP_NAME" >/dev/null 2>&1 || true
 
 if (( runtime_failures > 0 )); then
   echo "[smoke-test] FAIL: $runtime_failures runtime-config check(s) failed"

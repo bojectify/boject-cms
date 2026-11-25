@@ -9,6 +9,11 @@ import { maxDepthPlugin } from '@escape.tech/graphql-armor-max-depth';
 import { getSchema } from '../../graphql/schema';
 import { validateApiKey } from '../../utils/validateApiKey';
 import {
+  isGraphiqlEnabled,
+  renderGraphiqlPage,
+  wantsGraphiqlPage,
+} from '../../utils/graphiqlPage';
+import {
   buildRateLimitedExtensions,
   checkGraphqlRateLimit,
   setRateLimitHeaders,
@@ -34,6 +39,17 @@ export default defineEventHandler(async (event) => {
   const { req, res } = event.node;
   const isProduction = process.env.NODE_ENV === 'production';
   const authHeader = getRequestHeader(event, 'authorization');
+
+  // #525: BOJECT_GRAPHIQL=true serves the static GraphiQL page to a browser
+  // without a key, on any build. Rendered here, never via Yoga, so no
+  // operation runs before the key + scope gate below.
+  if (
+    isGraphiqlEnabled(process.env) &&
+    wantsGraphiqlPage(event.method, getRequestHeader(event, 'accept'))
+  ) {
+    setResponseHeader(event, 'Content-Type', 'text/html; charset=utf-8');
+    return renderGraphiqlPage();
+  }
 
   // Dev mode without an Authorization header — let GraphiQL introspect freely.
   // Once a Bearer header is present (or in production) we always validate so
