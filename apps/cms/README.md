@@ -111,6 +111,10 @@ A single batched query returns the body plus everything it references — no N+1
 
 In production, all `/api/graphql` requests require an `Authorization: Bearer boject_...` header with a valid API key carrying the `content:read` scope. In development, requests with no Authorization header pass through (so GraphiQL can introspect freely); a request that presents a Bearer header always validates.
 
+### GraphiQL
+
+Set `BOJECT_GRAPHIQL=true` to serve GraphiQL at `/api/graphql` to a browser on any build, including the published image. The flag is read at runtime, so restart the container to pick up a change. The page itself loads without a key; every query it sends still needs a `content:read` key, which you paste into the prefilled `Authorization` header in GraphiQL's Headers tab. Headers aren't saved in the browser. Projects scaffolded by `create-boject-cms` set the flag in their local `.env`; leave it unset on production unless you want the page public there.
+
 Key creation, listing, revocation, and the full scope catalogue are documented in [API key management](#api-key-management) below.
 
 ### Query complexity

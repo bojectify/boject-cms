@@ -148,7 +148,42 @@ ${starterLine}Once the container is healthy, log in at http://localhost:${hostPo
 The CMS is published on host port \`${hostPort}\` — change \`BOJECT_HOST_PORT\` in
 \`.env\` to run several projects side by side or to avoid a port clash.
 
-${apiKeySection}## Content types
+${apiKeySection}## Explore the GraphQL API
+
+Open http://localhost:${hostPort}/api/graphql in a browser for GraphiQL. It's on
+because \`.env\` sets \`BOJECT_GRAPHIQL=true\`; leave that out on production
+unless you want the page public there.
+
+The page loads without a key, but every query needs an API key with the
+\`content:read\` scope. Create one:
+
+\`\`\`bash
+npx @boject/cli@latest apikey create --name graphiql --scopes content:read
+\`\`\`
+
+Then replace the placeholder in GraphiQL's **Headers** tab with the printed key:
+
+\`\`\`json
+{ "Authorization": "Bearer boject_..." }
+\`\`\`
+
+and try a query. GraphQL serves published entries only:
+
+\`\`\`graphql
+{
+  contentEntryList(first: 5) {
+    edges {
+      node {
+        __typename
+        id
+        entryKey
+      }
+    }
+  }
+}
+\`\`\`
+
+## Content types
 
 Your content type schema lives in \`content-types/schema.boject.json\` and is
 applied to the database on every container boot. Edit it via the CMS UI in

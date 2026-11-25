@@ -225,7 +225,7 @@ pnpm dev
 
 All commands run from the repo root — the workspace forwards them to `apps/cms/` via `pnpm --filter cms`. You shouldn't need to `cd` into `apps/cms/` during normal development.
 
-The app runs at http://localhost:4000. The GraphQL playground (GraphiQL) is available at http://localhost:4000/api/graphql in development.
+The app runs at http://localhost:4000. The GraphQL playground (GraphiQL) is available at http://localhost:4000/api/graphql in development. On a built image it's off unless `BOJECT_GRAPHIQL=true` is set (see [`apps/cms/README.md`](apps/cms/README.md#graphiql)).
 
 For everything CMS-specific (architecture, GraphQL surface, API keys, schema-as-code, testing, Docker image, backup & disaster recovery, env vars), see [`apps/cms/README.md`](apps/cms/README.md).
 

@@ -215,3 +215,35 @@ describe('renderReadme — AI-assisted modelling', () => {
     });
   });
 });
+
+describe('renderReadme GraphiQL section (#525)', () => {
+  const md = renderReadme({
+    starter: 'web-base',
+    adminEmail: 'admin@local',
+    hostPort: 4123,
+    aiAssist: false,
+    cliApiKey: true,
+  });
+  const start = md.indexOf('## Explore the GraphQL API');
+  const section = md.slice(start, md.indexOf('\n## ', start + 1));
+
+  it('has the section, after the API key section', () => {
+    expect(start).toBeGreaterThan(md.indexOf('## Your CLI API key'));
+  });
+
+  it('links GraphiQL on the project host port and names the flag', () => {
+    expect(section).toContain('http://localhost:4123/api/graphql');
+    expect(section).toContain('BOJECT_GRAPHIQL=true');
+  });
+
+  it('shows how to mint a content:read key and where to paste it', () => {
+    expect(section).toContain(
+      'npx @boject/cli@latest apikey create --name graphiql --scopes content:read'
+    );
+    expect(section).toContain('"Authorization": "Bearer boject_');
+  });
+
+  it('includes an example query', () => {
+    expect(section).toContain('contentEntryList(first: 5)');
+  });
+});
