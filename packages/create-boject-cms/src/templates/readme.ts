@@ -168,6 +168,10 @@ docker compose down
 pnpm upgrade
 \`\`\`
 
-This runs \`npx @boject/cli@latest upgrade\` to rewrite the pinned image tag in \`docker-compose.yml\` and restart the container.
+This runs \`npx @boject/cli@latest upgrade\` to rewrite the pinned image tag in \`docker-compose.yml\` and restart the container. It first checks whether the new version needs infrastructure your project doesn't have yet, and prints what to add. Re-check any time with:
+
+\`\`\`bash
+npx @boject/cli@latest doctor
+\`\`\`
 `;
 }

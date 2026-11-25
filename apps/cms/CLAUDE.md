@@ -402,6 +402,7 @@ Served at `/api/graphql` via GraphQL Yoga + Pothos schema builder. The schema is
 - `packages/boject-cli/src/commands/schema/{pull,validate,apply,check}.ts` — Schema CLI commands (function names `runSchemaPull` / `runSchemaValidate` / `runSchemaApply` / `runSchemaCheck` unchanged)
 - `packages/boject-cli/src/vendor/` — vendored `validateBundle` + `planSchema` + types (kept in sync with `apps/cms/scripts/content-bundle/`)
 - `packages/boject-cli/src/vendor/migrate.ts` — Vendored runner (kept in sync with the canonical via the existing vendor convention)
+- `packages/boject-cli/src/drift/` — drift checks behind `boject doctor` and the `boject upgrade` pre-flight (`checks/` holds one file per check, `runDriftChecks.ts` the version-gated runner, `render.ts` the report). Read-only, offline; never write user files or print raw keys. Rule: every infra change (new service, required env key, scaffolded file) adds a check here AND a `## Release notes` entry with the snippet (policy in `CONTRIBUTING.md` → Releasing)
 - `packages/boject-cli/src/commands/bundle/migrate.ts` — `boject bundle migrate <path>` CLI command (file I/O + `--dry-run` + deterministic JSON output)
 - `packages/boject-cli/src/commands/perf/{scenario,sweep,report,check}.ts` — `boject perf *` command shells.
 - `packages/boject-cli/src/perf/{introspect,preflight,render,runK6,sanitise,confirm,runtime}.ts` — Pure modules powering the perf CLI.

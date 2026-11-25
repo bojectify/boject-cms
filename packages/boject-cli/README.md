@@ -65,7 +65,43 @@ boject upgrade --to 1.4.2      # specific version
 boject upgrade --check         # exit 1 if an upgrade is available, 0 otherwise
 boject upgrade --dry-run       # show the diff without applying
 boject upgrade --url http://localhost:4100   # health-check a non-default URL
+boject upgrade --force         # upgrade even with required changes outstanding
 ```
+
+Before changing anything, `upgrade` runs the same drift checks as [`boject doctor`](#boject-doctor) against your project and prints the report. A new version can need infrastructure your project doesn't have yet, such as a Meilisearch or Redis service. When it does, `upgrade` prints the snippets to add and links to the upgrade notes for that version.
+
+- **Required** findings block the upgrade. Nothing is written and the command exits 1. Make the change and re-run, or pass `--force` to upgrade anyway.
+- A required finding only blocks if this upgrade crosses into the version that needs it. If you're already past that version, it's shown as a warning instead.
+- If your current image tag isn't a version (for example `latest`), the CLI can't tell what you've already crossed, so required findings block.
+- **Warning** and **advice** findings are printed but never block.
+- `--check` and an already-up-to-date project skip the checks. With `--dry-run` the report is printed alongside the diff, and the command exits 1 (with a note saying why) when the real run would be blocked.
+
+The drift report goes to stdout. The checks only read your files; the image tag in `docker-compose.yml` is the only thing `upgrade` writes.
+
+### `boject doctor`
+
+Check the project in the current directory for configuration drift: infrastructure and config that your CMS version expects but your project doesn't have. It runs offline, never edits a file, and needs `docker-compose.yml` in the current directory.
+
+```bash
+boject doctor                  # human-readable report
+boject doctor --json           # machine-readable report
+boject doctor --strict         # also exit 1 on advice
+```
+
+The report (text or `--json`) always goes to stdout, so `boject doctor --json | jq` works even when drift sets exit 1. Only the "no `docker-compose.yml`" error goes to stderr.
+
+Re-run it any time, for example after an upgrade or in CI.
+
+| Check                       | Severity | Since        | Catches                                                                                                                                 |
+| --------------------------- | -------- | ------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `search-and-cache-services` | required | `0.0.1-rc.2` | `MEILI_URL`, `MEILI_MASTER_KEY` or `REDIS_URL` isn't set in `.env` or the `cms` service. Prints the compose and `.env` snippets to add. |
+| `env-local-gitignored`      | advice   | `0.0.2`      | `.env.local` (which holds your CLI API key) isn't gitignored.                                                                           |
+| `cli-api-key`               | advice   | `0.0.3`      | No `BOJECT_API_KEY` in your shell, `.env.local` or `.env`. Prints the command to create one.                                            |
+| `stale-bootstrap-key`       | warning  | any          | `BOJECT_BOOTSTRAP_API_KEY` in `.env` points at a different key from the one your CLI uses. Prints key prefixes only.                    |
+
+Missing files are not drift. A check that has nothing to look at (no `.env`, not a git repository) is reported as skipped, and skipped checks never affect the exit code, so `doctor` is safe to run in CI on a project that doesn't keep its env files in the repo.
+
+**Exit codes:** `0` when there are no required or warning findings, `1` when there are, or when `docker-compose.yml` is missing. With `--strict`, advice findings also exit `1`. `--json` prints `{ version, tag, findings, skipped }`.
 
 ### `boject schema pull [--out <path>] [--url <url>]`
 

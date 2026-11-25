@@ -156,6 +156,12 @@ npx @boject/cli@latest upgrade --check       # exit 1 if upgrade available
 npx @boject/cli@latest upgrade --to 1.4.2    # specific version
 ```
 
+`upgrade` also checks whether the new version needs infrastructure your project doesn't have yet, and prints what to add. To re-check at any time:
+
+```bash
+npx @boject/cli@latest doctor
+```
+
 ## See also
 
 - The CMS itself: [`boject-cms`](https://github.com/bojectify/boject-cms)

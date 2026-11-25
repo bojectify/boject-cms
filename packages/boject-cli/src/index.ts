@@ -1,5 +1,6 @@
 import { parseArgs } from 'node:util';
 import { runUpgrade, type CommandRunner } from './commands/upgrade.js';
+import { runDoctor } from './commands/doctor.js';
 import { loadProjectEnv } from './projectEnv.js';
 import { runSchemaPull } from './commands/schema/pull.js';
 import { runSchemaValidate } from './commands/schema/validate.js';
@@ -25,8 +26,10 @@ import { CLI_VERSION } from './version.js';
 const USAGE = `Usage: boject <command> [flags]
 
 Commands:
+  doctor             Check this project for config drift (read-only).
   upgrade            Upgrade the CMS image tag in the current
-                     directory's docker-compose.yml.
+                     directory's docker-compose.yml, after checking for
+                     config drift (--force skips the required-change block).
   schema pull        Fetch schema from a CMS to content-types/schema.boject.json.
   schema validate    Validate a local bundle (no network).
   schema apply       Push a local bundle to a CMS via API.
@@ -42,6 +45,16 @@ Commands:
   mcp                Start the stdio MCP server (schema authoring assistant).
 
 Run \`boject <command> --help\` for command-specific flags.
+`;
+
+const DOCTOR_USAGE = `Usage: boject doctor [--json] [--strict]
+
+Checks the project in the current directory for configuration drift
+(read-only; never modifies files).
+
+Flags:
+  --json    Print the report as JSON.
+  --strict  Exit 1 on advice-level findings too.
 `;
 
 const PERF_USAGE = `Usage: boject perf <command> [flags]
@@ -996,6 +1009,7 @@ async function main(): Promise<void> {
   // Load the CLI's own variables (CLI_ENV_VARS) from the project's
   // .env.local / .env (#505, #512) before any command reads them. Never fails
   // on a missing or invalid config.
+  const shellEnv = { ...process.env };
   const projectEnv = await loadProjectEnv({ cwd: process.cwd() });
   for (const warning of projectEnv.warnings) {
     process.stderr.write(`${warning}\n`);
@@ -1039,6 +1053,32 @@ async function main(): Promise<void> {
     return;
   }
 
+  if (command === 'doctor') {
+    const { values } = parseArgs({
+      args: rest,
+      allowPositionals: false,
+      options: {
+        json: { type: 'boolean', default: false },
+        strict: { type: 'boolean', default: false },
+        help: { type: 'boolean', short: 'h', default: false },
+      },
+    });
+    if (values.help === true) {
+      process.stdout.write(DOCTOR_USAGE);
+      process.exit(0);
+    }
+    const { exitCode, output, error } = await runDoctor({
+      cwd: process.cwd(),
+      shellEnv,
+      flags: { json: values.json === true, strict: values.strict === true },
+    });
+    // The report always goes to stdout (so --json is pipeable even when
+    // drift sets exit 1); only a usage error goes to stderr.
+    const sink = error === true ? process.stderr : process.stdout;
+    sink.write(`${output}\n`);
+    process.exit(exitCode);
+  }
+
   if (command === 'upgrade') {
     const { values } = parseArgs({
       args: rest,
@@ -1048,9 +1088,11 @@ async function main(): Promise<void> {
         'dry-run': { type: 'boolean', default: false },
         check: { type: 'boolean', default: false },
         url: { type: 'string' },
+        force: { type: 'boolean', default: false },
       },
     });
     const { exitCode, message } = await runUpgrade({
+      shellEnv,
       cwd: process.cwd(),
       runner: nodeRunner,
       flags: {
@@ -1058,6 +1100,7 @@ async function main(): Promise<void> {
         dryRun: values['dry-run'] === true,
         check: values.check === true,
         url: values.url,
+        force: values.force === true,
       },
       stdout,
       stderr,
