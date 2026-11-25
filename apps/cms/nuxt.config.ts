@@ -35,16 +35,11 @@ export default defineNuxtConfig({
     '#generated': resolve(__dirname, 'generated'),
   },
 
+  // Values here are fixed when the image is BUILT; only `NUXT_*` env names
+  // override them at runtime. Read deployment flags from process.env where
+  // they're used instead (BOJECT_SCHEMA_READONLY: utils/schemaReadonly.ts,
+  // #527; storage: server/plugins/runtime-storage.ts, #524/#528).
   runtimeConfig: {
-    databaseUrl: process.env.DATABASE_URL ?? '',
-    schemaReadonly:
-      process.env.BOJECT_SCHEMA_READONLY === 'true' ||
-      process.env.BOJECT_SCHEMA_READONLY === '1',
-    public: {
-      schemaReadonly:
-        process.env.BOJECT_SCHEMA_READONLY === 'true' ||
-        process.env.BOJECT_SCHEMA_READONLY === '1',
-    },
     session: {
       cookie: {
         sameSite: 'strict',

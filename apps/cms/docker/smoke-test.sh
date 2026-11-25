@@ -17,6 +17,7 @@ PG_NAME="boject-cms-smoke-pg"
 REDIS_NAME="boject-cms-smoke-redis"
 MEILI_NAME="boject-cms-smoke-meili"
 APP_NAME="boject-cms-smoke-app"
+RO_APP_NAME="boject-cms-smoke-app-readonly"
 NETWORK_NAME="boject-cms-smoke-net"
 VOLUME_NAME="boject-cms-smoke-storage"
 IMAGE_TAG="${SMOKE_IMAGE:-boject/cms:dev}"
@@ -31,7 +32,7 @@ HEALTH_WAIT_TRIES="${HEALTH_WAIT_TRIES:-180}"
 
 cleanup() {
   echo "[smoke-test] cleaning up"
-  docker rm -f "$APP_NAME" "$PG_NAME" "$REDIS_NAME" "$MEILI_NAME" >/dev/null 2>&1 || true
+  docker rm -f "$APP_NAME" "$RO_APP_NAME" "$PG_NAME" "$REDIS_NAME" "$MEILI_NAME" >/dev/null 2>&1 || true
   docker volume rm "$VOLUME_NAME" >/dev/null 2>&1 || true
   docker network rm "$NETWORK_NAME" >/dev/null 2>&1 || true
   rm -rf "$CONTENT_DIR" 2>/dev/null || true
@@ -206,6 +207,45 @@ if [[ "$x_cache" != "HIT" ]] || awk "BEGIN{exit !($seconds > 2)}"; then
   docker logs "$APP_NAME" 2>&1 | grep -m5 -i 'ioredis\|\[cache\]' || true
   runtime_failures=$((runtime_failures + 1))
 fi
+
+# #527: BOJECT_SCHEMA_READONLY must lock schema editing in the built image,
+# server AND UI. A second app container (same DB) boots with the flag on.
+echo "[smoke-test] checking BOJECT_SCHEMA_READONLY locks schema editing (#527)"
+docker run -d --name "$RO_APP_NAME" \
+  --network "$NETWORK_NAME" \
+  -e DATABASE_URL=postgresql://boject:boject@${PG_NAME}:5432/boject \
+  -e REDIS_URL=redis://${REDIS_NAME}:6379 \
+  -e MEILI_URL=http://${MEILI_NAME}:7700 \
+  -e MEILI_MASTER_KEY="$MEILI_KEY" \
+  -e NUXT_SESSION_PASSWORD="$(head -c 32 /dev/urandom | base64)" \
+  -e BOJECT_SCHEMA_READONLY=true \
+  -v "${VOLUME_NAME}:/app/storage" \
+  -p 4011:3000 \
+  "$IMAGE_TAG" >/dev/null
+for i in $(seq 1 "$HEALTH_WAIT_TRIES"); do
+  code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:4011/api/health 2>/dev/null || echo "000")
+  [[ "$code" == "200" ]] && break
+  sleep 1
+done
+RO_COOKIE_JAR="$CONTENT_DIR/cookies-ro.txt"
+curl -s -o /dev/null -c "$RO_COOKIE_JAR" \
+  -H 'content-type: application/json' -H 'Origin: http://localhost:4011' \
+  -X POST http://localhost:4011/api/auth/login \
+  --data "$(jq -n --arg p "$ADMIN_PASSWORD" '{email: "admin@smoke.test", password: $p}')"
+ro_create=$(curl -s -o /dev/null -w "%{http_code}" -b "$RO_COOKIE_JAR" \
+  -H 'content-type: application/json' -H 'Origin: http://localhost:4011' \
+  -X POST http://localhost:4011/api/content-types \
+  --data '{"name":"Smoke Readonly","fields":[{"name":"Title","identifier":"title","type":"ENTRY_TITLE","required":true}]}')
+if [[ "$ro_create" != "403" ]]; then
+  echo "[smoke-test] FAIL: POST /api/content-types with BOJECT_SCHEMA_READONLY=true returned $ro_create (want 403)"
+  runtime_failures=$((runtime_failures + 1))
+fi
+if ! curl -s -b "$RO_COOKIE_JAR" http://localhost:4011/content-types | grep -q "Schema is read-only on this environment"; then
+  echo "[smoke-test] FAIL: content types page doesn't show the read-only banner with BOJECT_SCHEMA_READONLY=true"
+  runtime_failures=$((runtime_failures + 1))
+fi
+docker rm -f "$RO_APP_NAME" >/dev/null 2>&1 || true
+
 if (( runtime_failures > 0 )); then
   echo "[smoke-test] FAIL: $runtime_failures runtime-config check(s) failed"
   exit 1

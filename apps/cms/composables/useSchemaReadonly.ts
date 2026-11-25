@@ -7,6 +7,11 @@
 // crafts a request manually.
 
 export function useSchemaReadonly() {
-  const config = useRuntimeConfig();
-  return computed(() => config.public.schemaReadonly === true);
+  // Read BOJECT_SCHEMA_READONLY from the server's env during SSR and hand it
+  // to the client in the payload via useState. Not runtimeConfig: that is
+  // fixed when the image is built (#527).
+  const readonly = useState<boolean>('schemaReadonly', () =>
+    import.meta.server ? isSchemaReadonly(process.env) : false
+  );
+  return computed(() => readonly.value === true);
 }
