@@ -92,6 +92,8 @@ cp "$REPO_ROOT/starters/web-base.boject.json" "$CONTENT_DIR/schema.boject.json"
 chmod 755 "$CONTENT_DIR"
 chmod 644 "$CONTENT_DIR/schema.boject.json"
 
+ADMIN_PASSWORD="$(head -c 16 /dev/urandom | base64)"
+
 echo "[smoke-test] starting cms (first boot — expect admin seed + starter import)"
 docker run -d --name "$APP_NAME" \
   --network "$NETWORK_NAME" \
@@ -101,7 +103,7 @@ docker run -d --name "$APP_NAME" \
   -e MEILI_MASTER_KEY="$MEILI_KEY" \
   -e NUXT_SESSION_PASSWORD="$(head -c 32 /dev/urandom | base64)" \
   -e BOJECT_ADMIN_EMAIL=admin@smoke.test \
-  -e BOJECT_ADMIN_PASSWORD="$(head -c 16 /dev/urandom | base64)" \
+  -e BOJECT_ADMIN_PASSWORD="$ADMIN_PASSWORD" \
   -e BOJECT_INITIAL_STARTER=/starters/web-base.boject.json \
   -e BOJECT_SCHEMA_DIR=/app/content-types \
   -v "${VOLUME_NAME}:/app/storage" \
@@ -146,6 +148,66 @@ if ! grep -q "\\[apply-schema\\] done — 1 file applied, 0 total changes" <<<"$
   grep -E "\\[apply-schema\\]" <<<"$logs" || echo "(no apply-schema lines found)"
   echo "[smoke-test] --- last 80 lines of full log ---"
   echo "$logs" | tail -80
+  exit 1
+fi
+
+# Runtime config (#524, #528). Storage mounts must read the CONTAINER's env at
+# boot, not whatever was set when the image was built: dev runs with Redis on
+# localhost and storage under ./storage, so only the built image can catch a
+# build-time-baked mount.
+echo "[smoke-test] checking image uploads land on the storage volume (#528)"
+COOKIE_JAR="$CONTENT_DIR/cookies.txt"
+login_code=$(curl -s -o /dev/null -w "%{http_code}" -c "$COOKIE_JAR" \
+  -H 'content-type: application/json' -H 'Origin: http://localhost:4010' \
+  -X POST http://localhost:4010/api/auth/login \
+  --data "$(jq -n --arg p "$ADMIN_PASSWORD" '{email: "admin@smoke.test", password: $p}')")
+if [[ "$login_code" != "200" ]]; then
+  echo "[smoke-test] FAIL: admin login returned $login_code"
+  exit 1
+fi
+docker exec "$APP_NAME" node -e \
+  "require('sharp')({create:{width:8,height:8,channels:3,background:'#f00'}}).png().toFile('/tmp/smoke.png')"
+docker cp "$APP_NAME":/tmp/smoke.png "$CONTENT_DIR/smoke.png"
+upload=$(curl -s -b "$COOKIE_JAR" -H 'Origin: http://localhost:4010' \
+  -F "file=@$CONTENT_DIR/smoke.png;type=image/png" http://localhost:4010/api/files/upload)
+storage_key=$(jq -r '.storageKey // empty' <<<"$upload")
+if [[ -z "$storage_key" ]]; then
+  echo "[smoke-test] FAIL: upload returned no storageKey: $upload"
+  exit 1
+fi
+runtime_failures=0
+if ! docker exec "$APP_NAME" test -f "/app/storage/images/originals/$storage_key"; then
+  echo "[smoke-test] FAIL: uploaded image is not on the /app/storage volume, found at:"
+  docker exec "$APP_NAME" sh -c 'find / -name "'"$storage_key"'" 2>/dev/null' || true
+  runtime_failures=$((runtime_failures + 1))
+fi
+
+echo "[smoke-test] checking the Redis cache uses REDIS_URL (#524)"
+api_key=$(docker exec "$APP_NAME" npx --no-install tsx scripts/manage-api-keys/index.ts \
+  create smoke --scopes content:read 2>/dev/null | sed -n 's/^ *Key: *//p')
+if [[ -z "$api_key" ]]; then
+  echo "[smoke-test] FAIL: could not create an API key"
+  exit 1
+fi
+PUBLIC_URL="http://localhost:4010/api/public/entries?contentType=SiteSettings"
+cache_request() {
+  # -m 60: a broken cache costs ~20s+ per request (ioredis retries); don't let
+  # curl's timeout abort the script (set -e) before the check can report it.
+  curl -s -o /dev/null -D - -m 60 -w 'time=%{time_total}\n' \
+    -H "Authorization: Bearer $api_key" "$PUBLIC_URL" || true
+}
+first=$(cache_request)
+second=$(cache_request)
+x_cache=$(grep -i '^x-cache:' <<<"$second" | tr -d '\r' | awk '{print $2}')
+seconds=$(sed -n 's/^time=//p' <<<"$second")
+if [[ "$x_cache" != "HIT" ]] || awk "BEGIN{exit !($seconds > 2)}"; then
+  echo "[smoke-test] FAIL: second public read was X-Cache=${x_cache:-none} in ${seconds}s (want HIT, <2s)"
+  echo "[smoke-test] first response: $(grep -i '^x-cache:\|^time=' <<<"$first" | tr -d '\r' | tr '\n' ' ')"
+  docker logs "$APP_NAME" 2>&1 | grep -m5 -i 'ioredis\|\[cache\]' || true
+  runtime_failures=$((runtime_failures + 1))
+fi
+if (( runtime_failures > 0 )); then
+  echo "[smoke-test] FAIL: $runtime_failures runtime-config check(s) failed"
   exit 1
 fi
 
