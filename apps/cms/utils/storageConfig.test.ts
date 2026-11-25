@@ -47,6 +47,20 @@ describe('buildStorageConfig', () => {
     });
   });
 
+  it('gives an s3 spec the regional AWS endpoint the unstorage driver requires', () => {
+    // unstorage's s3 driver throws at construction without an endpoint, so a
+    // spec without one crashes the server at boot once mounts run at runtime.
+    process.env.STORAGE_DRIVER = 's3';
+    process.env.S3_BUCKET = 'b';
+    process.env.AWS_REGION = 'eu-west-2';
+    process.env.AWS_ACCESS_KEY_ID = 'k';
+    process.env.AWS_SECRET_ACCESS_KEY = 's';
+    const spec = buildStorageConfig();
+    expect(spec['images:originals']).toMatchObject({
+      endpoint: 'https://s3.eu-west-2.amazonaws.com',
+    });
+  });
+
   it('builds an r2 spec with auto region and account endpoint', () => {
     process.env.STORAGE_DRIVER = 'r2';
     process.env.R2_BUCKET = 'b';

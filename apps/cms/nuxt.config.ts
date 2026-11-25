@@ -1,5 +1,4 @@
 import { resolve } from 'node:path';
-import { buildStorageConfig } from './utils/storageConfig';
 
 export default defineNuxtConfig({
   ignore: ['**/storage/**'],
@@ -144,29 +143,10 @@ export default defineNuxtConfig({
       inline: ['@prisma/adapter-pg', 'graphql-yoga'],
       external: ['sharp'],
     },
-    devStorage: {
-      'images:originals': {
-        driver: 'fs',
-        base: './storage/images/originals',
-      },
-      'images:transforms': {
-        driver: 'fs',
-        base: './storage/images/transforms',
-      },
-      // Mirror the prod `storage.cache` Redis mount in dev so integration tests
-      // that boot a Nitro dev server (setup({ dev: true })) get a real Redis-backed
-      // cache. Without this, Nitro dev mode falls back to an fs driver for the
-      // `cache` mount and `taggedCache.assertRedisInstance` throws.
-      cache: { driver: 'redis', url: process.env.REDIS_URL },
-    },
-    storage: {
-      ...buildStorageConfig(),
-      // Cache backend for the caching epic (#254). Redis via the unstorage
-      // redis driver; REDIS_URL overrides the ioredis default of
-      // localhost:6379. Kept inline (not in buildStorageConfig) because that
-      // helper is shared with the standalone bundle CLI, which has no cache.
-      cache: { driver: 'redis', url: process.env.REDIS_URL },
-    },
+    // No `storage` / `devStorage` here: Nitro evaluates them when the image is
+    // BUILT, which baked a URL-less Redis cache and ./storage image paths into
+    // the published image (#524, #528). The cache + image mounts are created
+    // from the container's env at server start by server/plugins/runtime-storage.ts.
     experimental: { tasks: true },
     scheduledTasks: {
       '0 3 * * *': ['webhooks:cleanup'],

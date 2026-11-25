@@ -22,8 +22,8 @@ export function buildStorageConfig(): StorageSpec {
   const driver = process.env.STORAGE_DRIVER ?? STORAGE_DRIVERS.LOCAL;
 
   if (driver === STORAGE_DRIVERS.LOCAL) {
-    // Default to a CWD-relative `./storage`, matching the Nitro `devStorage`
-    // override in nuxt.config.ts so the dev server and the standalone bundle
+    // Default to a CWD-relative `./storage`, so the dev server (mounted at
+    // runtime by server/plugins/runtime-storage.ts) and the standalone bundle
     // CLI (createBundleStorage) read/write the same directory. The container
     // image sets STORAGE_LOCAL_BASE=/app/storage explicitly (apps/cms/Dockerfile),
     // so production never relies on this default; `/app/storage` is a
@@ -51,9 +51,11 @@ export function buildStorageConfig(): StorageSpec {
       ? required('R2_SECRET_ACCESS_KEY')
       : required('AWS_SECRET_ACCESS_KEY');
     const region = isR2 ? 'auto' : required('AWS_REGION');
+    // unstorage's s3 driver is S3-compatible (not AWS-specific) and requires
+    // an explicit endpoint — it throws at construction without one.
     const endpoint = isR2
       ? `https://${required('R2_ACCOUNT_ID')}.r2.cloudflarestorage.com`
-      : undefined;
+      : `https://s3.${region}.amazonaws.com`;
 
     const base = {
       driver: 's3',
@@ -61,7 +63,7 @@ export function buildStorageConfig(): StorageSpec {
       region,
       accessKeyId,
       secretAccessKey,
-      ...(endpoint ? { endpoint } : {}),
+      endpoint,
     };
 
     return {
