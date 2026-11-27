@@ -28,7 +28,7 @@ else
 fi
 
 log "step 5/7: importing starter if needed"
-tsx scripts/docker-entrypoint/import-starter.ts
+tsx scripts/docker-entrypoint/import-starter-missing.ts
 
 log "step 6/7: applying schema-as-code"
 tsx scripts/docker-entrypoint/apply-schema.ts
