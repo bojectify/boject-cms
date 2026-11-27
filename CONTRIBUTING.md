@@ -259,7 +259,12 @@ pnpm --filter @boject/cli test:integration   # CLI SQL-writer tests (real Postgr
 `lefthook` runs `pnpm lint`, `pnpm format`, and `pnpm typecheck` on staged files
 pre-commit. There is no pre-push hook: CI is the test gate. Every PR must pass
 the `ci` check (lint, format, typecheck and the full `pnpm test`) before it can
-merge. Run `pnpm test`, or the suite for the package you changed, locally when
+merge. A PR that touches anything the CMS image is built from (`apps/cms/`,
+`starters/`, the lockfile and the other paths in
+[`scripts/image-inputs-changed.sh`](scripts/image-inputs-changed.sh)) must also
+pass `image-smoke`, which builds the image and runs
+[`apps/cms/docker/smoke-test.sh`](apps/cms/docker/smoke-test.sh) against it;
+other PRs skip it. Run `pnpm test`, or the suite for the package you changed, locally when
 your change warrants it, to catch failures before the ~10-minute CI round trip.
 
 ## Workspace scripts

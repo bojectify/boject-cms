@@ -2,6 +2,10 @@ name: CI
 
 on:
   pull_request:
+  # Pushes to main run only the image smoke job, so a new PR's first image
+  # build can reuse main's GHA layer cache (#499).
+  push:
+    branches: [main]
 
 permissions:
   contents: read
@@ -12,6 +16,7 @@ concurrency:
 
 jobs:
   ci:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-24.04
     services:
       postgres:
@@ -101,3 +106,75 @@ jobs:
       - run: pnpm typecheck
 
       - run: pnpm test
+
+  # Did this change touch anything the CMS image is built from? (#499)
+  # Any doubt (no usable base commit, a failed diff) counts as "yes".
+  changes:
+    runs-on: ubuntu-24.04
+    outputs:
+      cms: ${{ steps.filter.outputs.cms }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Detect image inputs
+        id: filter
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: |
+          decide() {
+            echo "cms=$1" >> "$GITHUB_OUTPUT"
+            echo "image inputs changed: $1 ($2)"
+          }
+          if [ "$EVENT" = "pull_request" ]; then
+            range="$BASE...$HEAD"
+          elif [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ] \
+            || ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            decide true "no usable base commit for this push"
+            exit 0
+          else
+            range="$BEFORE..$AFTER"
+          fi
+          if ! files="$(git diff --name-only "$range")"; then
+            decide true "git diff $range failed"
+            exit 0
+          fi
+          decide "$(printf '%s\n' "$files" | bash scripts/image-inputs-changed.sh)" "git diff $range"
+
+  # Build the CMS image and run apps/cms/docker/smoke-test.sh against it (#499):
+  # the only check that sees a broken image boot or a setting fixed at build
+  # time. Mirrors the gate in publish-cms-image.yml (amd64, full test). The
+  # scaffolder smoke test (packages/create-boject-cms/scripts/smoke-test.sh)
+  # is not run here yet.
+  image-smoke:
+    needs: changes
+    # A skipped required check counts as passing, so run whenever `changes`
+    # didn't positively say "no image input changed".
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.cms == 'true') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build the image (load)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/cms/Dockerfile
+          platforms: linux/amd64
+          load: true
+          tags: boject/cms:gate
+          cache-from: type=gha,scope=linux-amd64
+          cache-to: type=gha,scope=linux-amd64,mode=max
+
+      - name: Smoke test
+        env:
+          SMOKE_IMAGE: boject/cms:gate
+        run: apps/cms/docker/smoke-test.sh
