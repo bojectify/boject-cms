@@ -140,11 +140,18 @@ jobs:
           else
             range="$BEFORE..$AFTER"
           fi
-          if ! files="$(git diff --name-only "$range")"; then
+          # --no-renames: a file moved OUT of an image path lists its old path
+          # too. core.quotePath=false: non-ASCII paths aren't wrapped in quotes.
+          if ! files="$(git -c core.quotePath=false diff --no-renames --name-only "$range")"; then
             decide true "git diff $range failed"
             exit 0
           fi
-          decide "$(printf '%s\n' "$files" | bash scripts/image-inputs-changed.sh)" "git diff $range"
+          if ! cms="$(printf '%s\n' "$files" | bash scripts/image-inputs-changed.sh)" \
+            || { [ "$cms" != true ] && [ "$cms" != false ]; }; then
+            decide true "image-inputs-changed.sh failed or printed '${cms:-}'"
+            exit 0
+          fi
+          decide "$cms" "git diff $range"
 
   # Build the CMS image and run apps/cms/docker/smoke-test.sh against it (#499):
   # the only check that sees a broken image boot or a setting fixed at build
@@ -155,7 +162,7 @@ jobs:
     needs: changes
     # A skipped required check counts as passing, so run whenever `changes`
     # didn't positively say "no image input changed".
-    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.cms == 'true') }}
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.cms != 'false') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
